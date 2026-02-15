@@ -1,0 +1,327 @@
+[[monsters]]
+name = "giant ant"
+symbol = "a"
+level = 2
+movement = 18
+ac = 3
+mr = 0
+alignment = 0
+geno = 131 # G_GENO | G_SGROUP | 3
+weight = 10
+nutrition = 10
+msound = 7 # MS_SILENT
+msize = 1 # MZ_TINY
+resists = 0
+conveys = 0
+flags1 = 0x20044000 # M1_ANIMAL | M1_NOHANDS | M1_OVIPAROUS | M1_CARNIVORE
+flags2 = 0x00100000 # M2_HOSTILE
+flags3 = 0
+difficulty = 4
+color = 6 # CLR_BROWN
+
+[[monsters.attacks]]
+atype = 2 # AT_BITE
+adtype = 0 # AD_PHYS
+dice = 1
+sides = 4
+
+[[monsters]]
+name = "killer bee"
+symbol = "a"
+level = 1
+movement = 18
+ac = -1
+mr = 0
+alignment = 0
+geno = 130 # G_GENO | G_LGROUP | 2
+weight = 1
+nutrition = 5
+msound = 4 # MS_BUZZ
+msize = 1 # MZ_TINY
+resists = 0x00000002 # MR_POISON
+conveys = 0x00000002 # MR_POISON
+flags1 = 0x20044208 # M1_ANIMAL | M1_FLY | M1_NOHANDS | M1_POIS
+flags2 = 0x00100040 # M2_HOSTILE | M2_FEMALE
+flags3 = 0
+difficulty = 5
+color = 11 # CLR_YELLOW
+
+[[monsters.attacks]]
+atype = 3 # AT_STNG
+adtype = 7 # AD_DRST
+dice = 1
+sides = 3
+
+[[monsters]]
+name = "soldier ant"
+symbol = "a"
+level = 3
+movement = 18
+ac = 3
+mr = 0
+alignment = 0
+geno = 130 # G_GENO | G_SGROUP | 2
+weight = 20
+nutrition = 5
+msound = 7 # MS_SILENT
+msize = 1 # MZ_TINY
+resists = 0x00000002 # MR_POISON
+conveys = 0x00000002 # MR_POISON
+flags1 = 0x20044200 # M1_ANIMAL | M1_NOHANDS | M1_OVIPAROUS | M1_POIS
+flags2 = 0x00100000 # M2_HOSTILE
+flags3 = 0
+difficulty = 6
+color = 12 # CLR_BLUE
+
+[[monsters]]
+name = "acid blob"
+symbol = "b"
+level = 1
+movement = 3
+ac = 8
+mr = 0
+alignment = 0
+geno = 2 # G_GENO | 2
+weight = 30
+nutrition = 10
+msound = 7 # MS_SILENT
+msize = 1 # MZ_TINY
+resists = 0x0000004B # MR_SLEEP | MR_POISON | MR_ACID | MR_STONE
+conveys = 0x00000008 # MR_STONE
+flags1 = 0x21F80000 # M1_BREATHLESS | M1_AMORPHOUS | M1_NOEYES | M1_MINDLESS | M1_ACID
+flags2 = 0x00000004 # M2_WANDER
+flags3 = 0
+difficulty = 2
+color = 2 # CLR_GREEN
+
+[[monsters]]
+name = "kobold"
+symbol = "k"
+level = 0
+movement = 6
+ac = 10
+mr = 0
+alignment = -2
+geno = 0
+weight = 400
+nutrition = 100
+msound = 9 # MS_GRUNT
+msize = 1 # MZ_SMALL
+resists = 0x00000002 # MR_POISON
+conveys = 0
+flags1 = 0x40020000 # M1_HUMANOID | M1_OMNIVORE
+flags2 = 0x00100180 # M2_HOSTILE | M2_COLLECT | M2_MAGIC
+flags3 = 0
+difficulty = 1
+color = 6 # CLR_BROWN
+
+[[monsters.attacks]]
+atype = 254 # Weapon
+adtype = 0 # Phys
+dice = 1
+sides = 4
+
+[[monsters]]
+name = "little dog"
+symbol = "d"
+level = 2
+movement = 18
+ac = 6
+mr = 0
+alignment = 0
+geno = 3
+weight = 150
+nutrition = 150
+msound = 1 # MS_BARK
+msize = 1 # MZ_SMALL
+resists = 0
+conveys = 0
+flags1 = 0x20040000 # M1_ANIMAL | M1_NOHANDS | M1_CARNIVORE
+flags2 = 0x00000420 # M2_DOMESTIC
+flags3 = 0x00000002 # M3_INFRAVISIBLE
+difficulty = 3
+color = 7 # CLR_WHITE
+
+[[monsters]]
+name = "poisonous spider"
+symbol = "s"
+level = 1
+movement = 12
+ac = 8
+mr = 0
+alignment = 0
+geno = 0
+weight = 10
+nutrition = 5
+msound = 0
+msize = 0
+resists = 0
+conveys = 0
+flags1 = 0x20040000
+flags2 = 0x00100000
+flags3 = 0
+difficulty = 3
+color = 2 # CLR_RED (테스트용)
+
+[[monsters.attacks]]
+atype = 2 # Bite
+adtype = 7 # Drst (Poison)
+dice = 1
+sides = 2
+
+[[monsters.attacks]]
+atype = 1 # Claw
+adtype = 0 # Phys
+dice = 1
+sides = 2
+
+[[monsters]]
+name = "oracle"
+symbol = "@"
+level = 12
+movement = 0
+ac = 0
+mr = 50
+alignment = 0
+geno = 1
+weight = 0
+nutrition = 0
+msound = 0
+msize = 2
+resists = 0
+conveys = 0
+flags1 = 0x20000000
+flags2 = 0x00000000
+flags3 = 0
+difficulty = 15
+color = 13 # CLR_MAGENTA
+[[monsters]]
+name = "baby red dragon"
+symbol = "D"
+level = 4
+movement = 9
+ac = 2
+mr = 10
+alignment = -3
+geno = 0
+weight = 500
+nutrition = 500
+msound = 0
+msize = 2
+resists = 0x0001 # FIRE
+conveys = 0x0001 # FIRE
+flags1 = 0x20000000 # CARNIVORE
+flags2 = 0x00100000 # HOSTILE
+flags3 = 0
+difficulty = 9
+color = 1 # CLR_RED
+
+[[monsters.attacks]]
+atype = 12 # AT_BREA (Breath)
+adtype = 2 # AD_FIRE
+dice = 2
+sides = 6
+
+[[monsters]]
+name = "floating eye"
+symbol = "e"
+level = 2
+movement = 1
+ac = 9
+mr = 10
+alignment = 0
+geno = 0
+weight = 10
+nutrition = 10
+msound = 7 # SILENT
+msize = 1 # SMALL
+resists = 0
+conveys = 0
+flags1 = 0x00011400 # FLY | MINDLESS | NOEYES?? (NetHack says it has eyes but no hands)
+# NetHack Floating Eye: M1_FLY | M1_NOHANDS | M1_NOMIND | M1_NOTAKE | M1_NOEYES??
+# Actually floating eye has eyes.
+flags2 = 0x01100000 # HOSTILE | STALK
+flags3 = 0
+difficulty = 3
+color = 12 # CLR_BLUE
+
+[[monsters.attacks]]
+atype = 15 # AT_GAZE (Gaze)
+adtype = 14 # AD_PLYS (Paralysis)
+dice = 0
+sides = 0 # NetHack gaze usually doesn't do dice damage
+
+[[monsters.attacks]]
+atype = 5 # AT_TCH (Passive touch is handled via passive method)
+adtype = 14 # AD_PLYS
+dice = 0
+sides = 0
+
+[[monsters]]
+name = "priest"
+symbol = "@"
+level = 5
+movement = 12
+ac = 5
+mr = 50
+alignment = 0
+geno = 1
+weight = 1450
+nutrition = 400
+msound = 9 # MS_CLERIC
+msize = 2 # MZ_HUMAN
+resists = 0
+conveys = 0
+flags1 = 0x40000000 # M1_HUMANOID
+flags2 = 0x01100000 # M2_HOSTILE | M2_MAGIC
+flags3 = 0
+difficulty = 10
+color = 7 # CLR_WHITE
+
+[[monsters]]
+name = "watchman"
+symbol = "@"
+level = 6
+movement = 12
+ac = 10
+mr = 0
+alignment = 0
+geno = 1
+weight = 1450
+nutrition = 400
+msound = 8 # MS_HUMANOID
+msize = 2 # MZ_HUMAN
+resists = 0
+conveys = 0
+flags1 = 0x40000000 # M1_HUMANOID
+flags2 = 0x00100000 # M2_HOSTILE
+flags3 = 0
+difficulty = 8
+color = 12 # CLR_BLUE
+
+[[monsters]]
+name = "yellow light"
+symbol = "y"
+level = 3
+movement = 15
+ac = 0
+mr = 0
+alignment = 0
+geno = 2068 # G_NOCORPSE | G_GENO | 4
+weight = 0
+nutrition = 0
+msound = 7 # MS_SILENT
+msize = 1 # MZ_SMALL
+resists = 255 # MR_FIRE | MR_COLD | MR_ELEC | MR_DISINT | MR_SLEEP | MR_POISON | MR_ACID | MR_STONE
+conveys = 0
+flags1 = 0x00000001 # M1_FLY (Simplified)
+flags2 = 0x00100000 # M2_HOSTILE
+flags3 = 0x00010000 # M3_INFRAVISIBLE
+difficulty = 5
+color = 11 # CLR_YELLOW
+
+[[monsters.attacks]]
+atype = 13 # AT_EXPL
+adtype = 11 # AD_BLND
+dice = 10
+sides = 20

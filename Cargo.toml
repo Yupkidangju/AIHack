@@ -1,0 +1,31 @@
+[package]
+name = "aihack"
+version = "2.4.0"
+edition = "2021"
+authors = ["Yupkidangju"]
+license = "Apache-2.0"
+license-file = "LICENSE.NGPL"
+repository = "https://github.com/Yupkidangju/AIHack"
+homepage = "https://github.com/Yupkidangju/AIHack"
+description = "AIHack — A modern Rust roguelike inspired by classic dungeon crawlers. Based on NetHack 3.6.7 (NGPL)."
+
+[dependencies]
+# UI Frameworks
+ratatui = "0.26"
+eframe = "0.27"     # egui framework for native windows
+crossterm = "0.27"
+
+# ECS Engine
+legion = "0.4"      # High-performance ECS
+
+# Data & Logic
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+rand = "0.8"
+bitflags = { version = "2.4", features = ["serde"] }
+serde_repr = "0.1"
+lazy_static = "1.4"
+
+[dev-dependencies]
+pretty_assertions = "1.4"

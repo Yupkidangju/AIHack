@@ -1,0 +1,1385 @@
+[[items]]
+name = "strange object"
+bits = 1 # NMKN
+dir = 1 # NODIR
+material = 11 # Iron
+class = 1 # IllObj
+subtype = 0
+prop = 0
+delay = 0
+color = 0 # CLR_BLACK
+prob = 0
+weight = 0
+cost = 0
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+# --- WEAPONS ---
+[[items]]
+name = "arrow"
+bits = 7 # NMKN | MRG | USKN
+dir = 1 # PIERCE
+material = 11 # Iron
+class = 2 # Weapon
+subtype = 21 # P_BOW
+prop = 0
+delay = 0
+color = 6 # HI_METAL (CLR_CYAN)
+prob = 55
+weight = 1
+cost = 2
+wsdam = 6
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "elven arrow"
+description = "runed arrow"
+bits = 6 # MRG | USKN
+dir = 1
+material = 8
+class = 2
+subtype = 21
+prop = 0
+delay = 0
+color = 3
+prob = 20
+weight = 1
+cost = 2
+wsdam = 7
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "orcish arrow"
+description = "crude arrow"
+bits = 6
+dir = 1
+material = 11
+class = 2
+subtype = 21
+prop = 0
+delay = 0
+color = 0
+prob = 20
+weight = 1
+cost = 2
+wsdam = 5
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "silver arrow"
+bits = 7
+dir = 1
+material = 14
+class = 2
+subtype = 21
+prop = 0
+delay = 0
+color = 7
+prob = 12
+weight = 1
+cost = 5
+wsdam = 6
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "ya"
+description = "bamboo arrow"
+bits = 6
+dir = 1
+material = 12
+class = 2
+subtype = 21
+prop = 0
+delay = 0
+color = 6
+prob = 15
+weight = 1
+cost = 4
+wsdam = 7
+wldam = 7
+oc1 = 1
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "crossbow bolt"
+bits = 7
+dir = 1
+material = 11
+class = 2
+subtype = 23
+prop = 0
+delay = 0
+color = 6
+prob = 55
+weight = 1
+cost = 2
+wsdam = 4
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "dart"
+bits = 7
+dir = 1
+material = 11
+class = 2
+subtype = 24
+prop = 0
+delay = 0
+color = 6
+prob = 60
+weight = 1
+cost = 2
+wsdam = 3
+wldam = 2
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "shuriken"
+description = "throwing star"
+bits = 6
+dir = 1
+material = 11
+class = 2
+subtype = 25
+prop = 0
+delay = 0
+color = 6
+prob = 35
+weight = 1
+cost = 5
+wsdam = 8
+wldam = 6
+oc1 = 2
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "boomerang"
+bits = 7
+dir = 0
+material = 8
+class = 2
+subtype = 26
+prop = 0
+delay = 0
+color = 3
+prob = 15
+weight = 5
+cost = 20
+wsdam = 9
+wldam = 9
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "dagger"
+bits = 7
+dir = 1
+material = 11
+class = 2
+subtype = 1
+prop = 0
+delay = 0
+color = 6
+prob = 30
+weight = 10
+cost = 4
+wsdam = 4
+wldam = 3
+oc1 = 2
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "short sword"
+bits = 5
+dir = 1
+material = 11
+class = 2
+subtype = 5
+prop = 0
+delay = 0
+color = 6
+prob = 8
+weight = 30
+cost = 10
+wsdam = 6
+wldam = 8
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "long sword"
+bits = 5
+dir = 2
+material = 11
+class = 2
+subtype = 7
+prop = 0
+delay = 0
+color = 6
+prob = 50
+weight = 40
+cost = 15
+wsdam = 8
+wldam = 12
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "two-handed sword"
+bits = 261
+dir = 2
+material = 11
+class = 2
+subtype = 8
+prop = 0
+delay = 0
+color = 6
+prob = 22
+weight = 150
+cost = 50
+wsdam = 12
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "mace"
+bits = 5
+dir = 0
+material = 11
+class = 2
+subtype = 12
+prop = 0
+delay = 0
+color = 6
+prob = 40
+weight = 30
+cost = 5
+wsdam = 6
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "morning star"
+bits = 5
+dir = 0
+material = 11
+class = 2
+subtype = 13
+prop = 0
+delay = 0
+color = 6
+prob = 12
+weight = 120
+cost = 10
+wsdam = 4
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "war hammer"
+bits = 5
+dir = 0
+material = 11
+class = 2
+subtype = 15
+prop = 0
+delay = 0
+color = 6
+prob = 15
+weight = 50
+cost = 5
+wsdam = 4
+wldam = 4
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "club"
+bits = 5
+dir = 0
+material = 8
+class = 2
+subtype = 11
+prop = 0
+delay = 0
+color = 3
+prob = 12
+weight = 30
+cost = 3
+wsdam = 6
+wldam = 3
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "quarterstaff"
+bits = 260
+dir = 0
+material = 8
+class = 2
+subtype = 16
+prop = 0
+delay = 0
+color = 3
+prob = 11
+weight = 40
+cost = 5
+wsdam = 6
+wldam = 6
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+# --- ARMOR ---
+[[items]]
+name = "leather armor"
+bits = 5
+dir = 0
+material = 7
+class = 3
+subtype = 0
+prop = 0
+delay = 3
+color = 3
+prob = 82
+weight = 150
+cost = 5
+wsdam = 0
+wldam = 0
+oc1 = 2 # 10 - 8
+oc2 = 1
+nutrition = 0
+
+[[items]]
+name = "plate mail"
+bits = 261
+dir = 0
+material = 11
+class = 3
+subtype = 0
+prop = 0
+delay = 5
+color = 6
+prob = 44
+weight = 450
+cost = 600
+wsdam = 0
+wldam = 0
+oc1 = 7 # 10 - 3
+oc2 = 2
+nutrition = 0
+
+[[items]]
+name = "elven cloak"
+bits = 20
+dir = 0
+material = 6
+class = 3
+subtype = 5
+prop = 41
+delay = 0
+color = 0
+prob = 8
+weight = 10
+cost = 60
+wsdam = 0
+wldam = 0
+oc1 = 1
+oc2 = 1
+nutrition = 0
+
+# --- RINGS ---
+[[items]]
+name = "adornment"
+description = "wooden"
+bits = 52
+dir = 0
+material = 8
+class = 4
+subtype = 0
+prop = 38
+delay = 0
+color = 3
+prob = 0
+weight = 3
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 15
+
+[[items]]
+name = "regeneration"
+description = "moonstone"
+bits = 20
+dir = 0
+material = 21
+class = 4
+subtype = 0
+# prop.h: REGENERATION = 56.
+prop = 56
+delay = 0
+color = 7
+prob = 0
+weight = 3
+cost = 200
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 15
+
+# --- POTIONS ---
+[[items]]
+name = "healing"
+description = "purple-red"
+bits = 18 # MGC | MRG (2 | 16 = 18)
+dir = 0
+material = 19
+class = 8
+subtype = 0
+prop = 0
+delay = 0
+color = 5
+prob = 57
+weight = 10
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 10
+
+[[items]]
+name = "extra healing"
+description = "puce"
+bits = 18
+dir = 0
+material = 19
+class = 8
+subtype = 0
+prop = 0
+delay = 0
+color = 1
+prob = 47
+weight = 10
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 10
+
+# --- SCROLLS ---
+[[items]]
+name = "identify"
+description = "KERNOD WEL"
+bits = 18
+dir = 0
+material = 5
+class = 9
+subtype = 0
+prop = 0
+delay = 0
+color = 15 # HI_PAPER
+prob = 180
+weight = 5
+cost = 20
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 6
+
+# --- WANDS ---
+[[items]]
+name = "magic missile"
+description = "steel"
+bits = 52 # MGC | CHRG | USKN
+dir = 3 # RAY
+material = 11
+class = 11
+subtype = 0
+prop = 0
+delay = 0
+color = 6
+prob = 50
+weight = 7
+cost = 150
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 30
+
+[[items]]
+name = "striking"
+description = "oak"
+bits = 52 # MGC | CHRG | USKN
+dir = 3 # RAY
+material = 8 # Wood
+class = 11 # Wand
+subtype = 0
+prop = 0
+delay = 0
+color = 3
+prob = 50
+weight = 7
+cost = 150
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 30
+
+# --- FOOD ---
+[[items]]
+name = "corpse"
+bits = 0
+dir = 0
+material = 4 # Flesh
+class = 7 # Food
+subtype = 0
+prop = 0
+delay = 0
+color = 1 # CLR_RED
+prob = 0
+weight = 100
+cost = 5
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0 # Will be calculated by monster weight
+
+[[items]]
+name = "food ration"
+bits = 7
+dir = 0
+material = 3
+class = 7
+subtype = 0
+prop = 0
+delay = 5
+color = 3
+prob = 380
+weight = 20
+cost = 5
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 800
+
+# --- GEMS ---
+[[items]]
+name = "tinning kit"
+bits = 4 # USKN
+dir = 0
+material = 11 # Iron
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 6
+prob = 15
+weight = 75
+cost = 30
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "tin"
+bits = 4 # USKN
+dir = 0
+material = 11 # Iron
+class = 7 # Food
+subtype = 0
+prop = 0
+delay = 0
+color = 6
+prob = 75
+weight = 10
+cost = 5
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0 # Based on content
+
+[[items]]
+name = "luckstone"
+description = "gray"
+bits = 18 # MGC | MRG (Wait, Luckstone is MGC in NetHack)
+dir = 0
+material = 21
+class = 13
+# skills.h: P_SLING = 22. -P_SLING = -22.
+subtype = -22
+prop = 0
+delay = 0
+color = 7
+prob = 10
+weight = 10
+cost = 60
+wsdam = 3
+wldam = 3
+oc1 = 0
+oc2 = 0
+nutrition = 10
+
+[[items]]
+name = "elven dagger"
+description = "runed dagger"
+bits = 7
+dir = 1
+material = 8
+class = 2
+subtype = 1
+prop = 0
+delay = 0
+color = 6
+prob = 10
+weight = 10
+cost = 4
+wsdam = 5
+wldam = 3
+oc1 = 2
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "orcish dagger"
+description = "crude dagger"
+bits = 7
+dir = 1
+material = 11
+class = 2
+subtype = 1
+prop = 0
+delay = 0
+color = 0
+prob = 12
+weight = 10
+cost = 4
+wsdam = 3
+wldam = 3
+oc1 = 2
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "scimitar"
+description = "curved sword"
+bits = 5
+dir = 2
+material = 11
+class = 2
+subtype = 7
+prop = 0
+delay = 0
+color = 6
+prob = 15
+weight = 40
+cost = 15
+wsdam = 8
+wldam = 8
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "orcish short sword"
+description = "crude short sword"
+bits = 5
+dir = 1
+material = 11
+class = 2
+subtype = 5
+prop = 0
+delay = 0
+color = 0
+prob = 10
+weight = 30
+cost = 10
+wsdam = 5
+wldam = 8
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "silver long sword"
+bits = 5
+dir = 2
+material = 14 # Silver
+class = 2
+subtype = 7 # P_LONG_SWORD
+prop = 0
+delay = 0
+color = 7 # HI_SILVER
+prob = 2
+weight = 40
+cost = 75
+wsdam = 8
+wldam = 12
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "runesword"
+bits = 21 # NMKN | MGC
+dir = 2
+material = 11 # Iron
+class = 2
+subtype = 7 # P_LONG_SWORD
+prop = 0
+delay = 0
+color = 0 # CLR_BLACK
+prob = 0
+weight = 40
+cost = 300
+wsdam = 8
+wldam = 12
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "spear"
+bits = 5
+dir = 1
+material = 11
+class = 2
+subtype = 3
+prop = 0
+delay = 0
+color = 6
+prob = 50
+weight = 30
+cost = 3
+wsdam = 6
+wldam = 8
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "trident"
+bits = 5
+dir = 1
+material = 11
+class = 2
+subtype = 4
+prop = 0
+delay = 0
+color = 6
+prob = 8
+weight = 25
+cost = 5
+wsdam = 6
+wldam = 4
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "bullwhip"
+bits = 5
+dir = 0
+material = 7
+class = 2
+subtype = 14
+prop = 0
+delay = 0
+color = 3
+prob = 2
+weight = 20
+cost = 4
+wsdam = 2
+wldam = 1
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "knife"
+bits = 7
+dir = 1
+material = 11
+class = 2
+subtype = 2
+prop = 0
+delay = 0
+color = 6
+prob = 20
+weight = 5
+cost = 4
+wsdam = 3
+wldam = 2
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "chain mail"
+bits = 5
+dir = 0
+material = 11
+class = 3
+subtype = 0
+prop = 0
+delay = 5
+color = 6
+prob = 72
+weight = 300
+cost = 75
+wsdam = 0
+wldam = 0
+oc1 = 5
+oc2 = 1
+nutrition = 0
+
+[[items]]
+name = "orcish shield"
+description = "crude shield"
+bits = 5
+dir = 0
+material = 11
+class = 3
+subtype = 1
+prop = 0
+delay = 0
+color = 0
+prob = 8
+weight = 150
+cost = 7
+wsdam = 0
+wldam = 0
+oc1 = 1
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "uruk-hai shield"
+description = "white-handed shield"
+bits = 5
+dir = 0
+material = 11
+class = 3
+subtype = 1
+prop = 0
+delay = 0
+color = 15
+prob = 2
+weight = 150
+cost = 7
+wsdam = 0
+wldam = 0
+oc1 = 1
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "blindness"
+description = "yellow"
+bits = 18
+dir = 0
+material = 19
+class = 8
+subtype = 0
+prop = 0
+delay = 0
+color = 11
+prob = 40
+weight = 10
+cost = 150
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 10
+
+[[items]]
+name = "confusion"
+description = "pink"
+bits = 18
+dir = 0
+material = 19
+class = 8
+subtype = 0
+prop = 0
+delay = 0
+color = 13
+prob = 42
+weight = 10
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 10
+
+[[items]]
+name = "remove curse"
+description = "DARETH SHU"
+bits = 18
+dir = 0
+material = 5
+class = 9
+subtype = 0
+prop = 0
+delay = 0
+color = 15
+prob = 65
+weight = 5
+cost = 80
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 6
+
+[[items]]
+name = "water"
+description = "clear"
+bits = 18
+dir = 0
+material = 19
+class = 8
+subtype = 0
+prop = 0
+delay = 0
+color = 12
+prob = 50
+weight = 10
+cost = 0
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 10
+
+[[items]]
+name = "blank paper"
+description = "unlabeled scroll"
+bits = 18
+dir = 0
+material = 5
+class = 9
+subtype = 0
+prop = 0
+delay = 0
+color = 15
+prob = 50
+weight = 5
+cost = 60
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 6
+
+[[items]]
+name = "pick-axe"
+bits = 4
+dir = 1
+material = 11
+class = 6
+subtype = 16
+prop = 0
+delay = 0
+color = 6
+prob = 20
+weight = 100
+cost = 50
+wsdam = 6
+wldam = 3
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "key"
+bits = 0
+dir = 0
+material = 11
+class = 6
+subtype = 0
+prop = 0
+delay = 0
+color = 6
+prob = 15
+weight = 3
+cost = 10
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "oil lamp"
+description = "lamp"
+bits = 0
+dir = 0
+material = 10 # Copper/Bronze
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 11 # CLR_YELLOW
+prob = 45
+weight = 20
+cost = 10
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "magic lamp"
+description = "lamp"
+bits = 16 # Magic
+dir = 0
+material = 10 # Copper/Bronze
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 11 # CLR_YELLOW
+prob = 15
+weight = 20
+cost = 50
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "brass lantern"
+bits = 0
+dir = 0
+material = 10 # Copper/Bronze
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 11 # CLR_YELLOW
+prob = 30
+weight = 30
+cost = 12
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "large box"
+bits = 0
+dir = 1
+material = 8 # Wood
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 3 # CLR_BROWN
+prob = 40
+weight = 400
+cost = 8
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "chest"
+bits = 0
+dir = 1
+material = 8 # Wood
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 3
+prob = 35
+weight = 600
+cost = 16
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "ice box"
+bits = 0
+dir = 1
+material = 11 # Iron
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 6 # HI_METAL
+prob = 5
+weight = 900
+cost = 42
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "sack"
+description = "bag"
+bits = 0
+dir = 1
+material = 6 # Cloth
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 3
+prob = 35
+weight = 15
+cost = 2
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "bag of holding"
+description = "bag"
+bits = 16 # MGC
+dir = 1
+material = 6 # Cloth
+class = 6 # Tool
+subtype = 0
+prop = 0
+delay = 0
+color = 3
+prob = 20
+weight = 15
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "boulder"
+bits = 256 # oc_big
+dir = 0
+material = 21 # Mineral
+class = 14 # Rock
+subtype = 0
+prop = 0
+delay = 0
+color = 7 # HI_MINERAL (CLR_GRAY)
+prob = 0
+weight = 2000
+cost = 0
+wsdam = 20
+wldam = 20
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "statue"
+bits = 256 # oc_big
+dir = 0
+material = 21 # Mineral
+class = 14 # Rock
+subtype = 0
+prop = 0
+delay = 0
+color = 7
+prob = 0
+weight = 2500
+cost = 0
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "potion of oil"
+bits = 2 # oc_merge
+dir = 1
+material = 1 # Liquid
+class = 8 # Potion
+subtype = 0
+prop = 0
+delay = 0
+color = 3 # CLR_BROWN
+prob = 10
+weight = 10
+cost = 5
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 20
+
+[[items]]
+name = "Potion of healing"
+bits = 2 # oc_merge
+dir = 1
+material = 1
+class = 8
+subtype = 0
+prop = 0
+delay = 0
+color = 13 # CLR_MAGENTA
+prob = 60
+weight = 10
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 10
+
+[[items]]
+name = "Scroll of teleportation"
+bits = 18 # oc_pre_discovered | NMKN
+dir = 0
+material = 5 # Paper
+class = 9 # Scroll
+subtype = 0
+prop = 0
+delay = 0
+color = 15 # CLR_WHITE
+prob = 55
+weight = 5
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "Scroll of light"
+bits = 18
+dir = 0
+material = 5 # Paper
+class = 9 # Scroll
+subtype = 0
+prop = 0
+delay = 0
+color = 15 # CLR_WHITE
+prob = 90
+weight = 5
+cost = 50
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "water"
+bits = 3 # oc_name_known | oc_merge
+dir = 1
+material = 1
+class = 8
+subtype = 0
+prop = 0
+delay = 0
+color = 12 # CLR_BLUE
+prob = 0
+weight = 10
+cost = 0
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "blank paper"
+bits = 3
+dir = 0
+material = 5
+class = 9
+subtype = 0
+prop = 0
+delay = 0
+color = 15
+prob = 0
+weight = 5
+cost = 0
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0
+
+[[items]]
+name = "Wand of light"
+bits = 17 # MGC | dir=NODIR
+dir = 0
+material = 19 # Glass
+class = 10 # Wand
+subtype = 0
+prop = 0
+delay = 0
+color = 15 # CLR_WHITE
+prob = 95
+weight = 7
+cost = 100
+wsdam = 0
+wldam = 0
+oc1 = 0
+oc2 = 0
+nutrition = 0

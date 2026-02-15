@@ -1,0 +1,10 @@
+dogname = "Hachi"
+catname = "Milo"
+fruit = "slime mold"
+autopickup = true
+pickup_types = "$*?/"
+show_exp = true
+show_score = true
+color = true
+hilite_pet = true
+current_symbol_set = "RogueIBM"
