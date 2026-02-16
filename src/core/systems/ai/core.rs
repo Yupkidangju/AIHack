@@ -358,6 +358,7 @@ pub fn monster_ai(
                             }
                         }
                         // ... (Other cases simplified for length, add critical ones)
+                        // [v2.9.3] 생명력 흡수: mhitu.rs 유틸 활용
                         crate::core::entity::monster::DamageType::Drli => {
                             if rng.rn2(10) == 0 {
                                 log.add_colored(
@@ -368,6 +369,111 @@ pub fn monster_ai(
                                 if let Ok(h) = p_entry.get_component_mut::<Health>() {
                                     h.max = (h.max - 1).max(1);
                                     h.current = h.current.min(h.max);
+                                }
+                            }
+                        }
+                        // [v2.9.3] 절도 공격: mhitu.rs steal_check ECS 연결
+                        crate::core::entity::monster::DamageType::Sgld
+                        | crate::core::entity::monster::DamageType::Sitm => {
+                            // 인벤토리 크기 확인 (골드는 향후 별도 컴포넌트로 관리)
+                            let (inv_size, has_gold) = {
+                                if let Ok(inv) =
+                                    p_entry.get_component::<crate::core::entity::Inventory>()
+                                {
+                                    (inv.items.len(), false) // TODO: 골드 컴포넌트 연결
+                                } else {
+                                    (0, false)
+                                }
+                            };
+                            let m_type = match attack.adtype {
+                                crate::core::entity::monster::DamageType::Sgld => "leprechaun",
+                                _ => "nymph",
+                            };
+                            let theft = crate::core::systems::combat::mhitu::steal_check(
+                                &m_name.to_string(),
+                                m_type,
+                                10,
+                                inv_size,
+                                has_gold,
+                                rng,
+                            );
+                            if theft.stolen {
+                                log.add_colored(&theft.message, [255, 200, 0], *turn);
+                            } else {
+                                log.add(&theft.message, *turn);
+                            }
+                        }
+                        // [v2.9.3] 녹 공격: mhitu.rs rust_attack_effect ECS 연결
+                        crate::core::entity::monster::DamageType::Rust => {
+                            let rust_result =
+                                crate::core::systems::combat::mhitu::rust_attack_effect(
+                                    "armor", 0, false,
+                                );
+                            match rust_result {
+                                crate::core::systems::combat::mhitu::RustResult::Eroded {
+                                    slot_name,
+                                    new_level,
+                                } => {
+                                    log.add_colored(
+                                        &format!(
+                                            "Your {} is damaged! (erosion {})",
+                                            slot_name, new_level
+                                        ),
+                                        [200, 100, 0],
+                                        *turn,
+                                    );
+                                }
+                                crate::core::systems::combat::mhitu::RustResult::Destroyed {
+                                    slot_name,
+                                } => {
+                                    log.add_colored(
+                                        &format!("Your {} crumbles to dust!", slot_name),
+                                        [255, 0, 0],
+                                        *turn,
+                                    );
+                                }
+                                crate::core::systems::combat::mhitu::RustResult::NoEffect => {}
+                            }
+                        }
+                        // [v2.9.3] 라이칸스로피 공격: mhitu.rs lycanthropy_attack ECS 연결
+                        crate::core::entity::monster::DamageType::Were => {
+                            let effect = crate::core::systems::combat::mhitu::lycanthropy_attack(
+                                &m_name.to_string(),
+                                "werewolf",
+                                false,
+                                rng,
+                                log,
+                                *turn,
+                            );
+                            if effect.is_some() {
+                                if let Ok(p_status) = p_entry.get_component_mut::<StatusBundle>() {
+                                    p_status.add(StatusFlags::LYCANTHROPY, 200);
+                                }
+                            }
+                        }
+                        // [v2.9.3] 질병 공격: mhitu.rs disease_attack ECS 연결
+                        crate::core::entity::monster::DamageType::Dise => {
+                            let dummy_atk = crate::core::entity::monster::Attack {
+                                atype: attack.atype,
+                                adtype: attack.adtype,
+                                dice: attack.dice,
+                                sides: attack.sides,
+                            };
+                            let result = crate::core::systems::combat::mhitu::disease_attack(
+                                &dummy_atk,
+                                &m_name.to_string(),
+                                false,
+                                12,
+                                rng,
+                                log,
+                                *turn,
+                            );
+                            if let Some(
+                                crate::core::systems::combat::mhitu::StatusEffect::Disease,
+                            ) = result.status_effect
+                            {
+                                if let Ok(p_status) = p_entry.get_component_mut::<StatusBundle>() {
+                                    p_status.add(StatusFlags::SICK, 100);
                                 }
                             }
                         }

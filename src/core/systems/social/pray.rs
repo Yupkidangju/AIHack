@@ -692,3 +692,408 @@ mod pray_extended_tests {
         assert_eq!(stats.divine_punishments, 1);
     }
 }
+
+// =============================================================================
+// [v2.9.1] pray.c 대량 이식  축복/저주/개종/신의 선물/행운
+// 원본: nethack-3.6.7/src/pray.c (2,162줄)
+// =============================================================================
+
+/// [v2.9.1] 신의 호감도 등급 (원본: pray.c:250-300 u_trouble)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DivineFavor {
+    /// 극도로 분노
+    Enraged,
+    /// 분노
+    Angry,
+    /// 불쾌
+    Displeased,
+    /// 무관심
+    Indifferent,
+    /// 흡족
+    Pleased,
+    /// 매우 흡족
+    VeryPleased,
+    /// 절대적 은총
+    Pious,
+}
+
+/// [v2.9.1] 신앙도로부터 호감도 계산
+pub fn divine_favor_level(piety: i32, alignment_record: i32) -> DivineFavor {
+    let combined = piety + alignment_record * 2;
+    if combined < -30 { DivineFavor::Enraged }
+    else if combined < -15 { DivineFavor::Angry }
+    else if combined < -5 { DivineFavor::Displeased }
+    else if combined < 10 { DivineFavor::Indifferent }
+    else if combined < 25 { DivineFavor::Pleased }
+    else if combined < 50 { DivineFavor::VeryPleased }
+    else { DivineFavor::Pious }
+}
+
+/// [v2.9.1] 문제 우선순위 (원본: pray.c:400-500 in_trouble/fix_worst_trouble)
+/// 신이 기도에 응답할 때 해결하는 문제의 우선순위
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TroubleType {
+    /// 1순위: 석화 진행 중
+    Stoning,
+    /// 2순위: 슬라임화 진행 중
+    Sliming,
+    /// 3순위: 질식/교살 중
+    Strangled,
+    /// 4순위: 식중독/병
+    FoodPoisoning,
+    /// 5순위: 질병
+    Sick,
+    /// 6순위: HP 위험 (최대의 1/7 이하)
+    DyingHP,
+    /// 7순위: 기아 (Fainting)
+    Starving,
+    /// 8순위: 실명
+    Blind,
+    /// 9순위: 혼란
+    Confused,
+    /// 10순위: 능력치 저하
+    AttributeLoss,
+    /// 11순위: HP 낮음 (최대의 1/4 이하)
+    LowHP,
+    /// 12순위: 약간의 허기
+    Hungry,
+    /// 13순위: 기절
+    Stunned,
+    /// 14순위: 환각
+    Hallucinating,
+}
+
+/// [v2.9.1] 현재 문제 목록 스캔 (원본: in_trouble)
+pub fn scan_troubles(
+    hp: i32, max_hp: i32,
+    nutrition: i32,
+    is_stoning: bool, is_sliming: bool, is_strangled: bool,
+    is_food_poisoning: bool, is_sick: bool,
+    is_blind: bool, is_confused: bool, is_stunned: bool,
+    is_hallucinating: bool,
+    has_attribute_loss: bool,
+) -> Vec<TroubleType> {
+    let mut troubles = Vec::new();
+
+    if is_stoning { troubles.push(TroubleType::Stoning); }
+    if is_sliming { troubles.push(TroubleType::Sliming); }
+    if is_strangled { troubles.push(TroubleType::Strangled); }
+    if is_food_poisoning { troubles.push(TroubleType::FoodPoisoning); }
+    if is_sick { troubles.push(TroubleType::Sick); }
+    if hp <= max_hp / 7 { troubles.push(TroubleType::DyingHP); }
+    if nutrition <= 0 { troubles.push(TroubleType::Starving); }
+    if is_blind { troubles.push(TroubleType::Blind); }
+    if is_confused { troubles.push(TroubleType::Confused); }
+    if has_attribute_loss { troubles.push(TroubleType::AttributeLoss); }
+    if hp <= max_hp / 4 && hp > max_hp / 7 { troubles.push(TroubleType::LowHP); }
+    if nutrition > 0 && nutrition <= 150 { troubles.push(TroubleType::Hungry); }
+    if is_stunned { troubles.push(TroubleType::Stunned); }
+    if is_hallucinating { troubles.push(TroubleType::Hallucinating); }
+
+    // 우선순위 정렬 (이미 enum 순서로 됨)
+    troubles.sort();
+    troubles
+}
+
+/// [v2.9.1] 기도 응답 결정 (원본: pray.c dosacred)
+/// 호감도에 따라 어떤 응답을 하는지 결정
+pub fn determine_prayer_response(
+    favor: DivineFavor,
+    troubles: &[TroubleType],
+    on_aligned_altar: bool,
+    rng: &mut NetHackRng,
+) -> PrayerResult {
+    match favor {
+        DivineFavor::Enraged | DivineFavor::Angry => PrayerResult::Furious,
+        DivineFavor::Displeased => {
+            if rng.rn2(3) == 0 { PrayerResult::Furious }
+            else { PrayerResult::Ignored }
+        }
+        DivineFavor::Indifferent => {
+            if !troubles.is_empty() && rng.rn2(2) == 0 {
+                PrayerResult::Answered
+            } else {
+                PrayerResult::Ignored
+            }
+        }
+        DivineFavor::Pleased | DivineFavor::VeryPleased => {
+            if !troubles.is_empty() {
+                PrayerResult::Answered
+            } else {
+                PrayerResult::Pleased
+            }
+        }
+        DivineFavor::Pious => {
+            if !troubles.is_empty() {
+                PrayerResult::Answered
+            } else if on_aligned_altar {
+                PrayerResult::Pleased
+            } else {
+                PrayerResult::Pleased
+            }
+        }
+    }
+}
+
+/// [v2.9.1] 축복 효과  아이템 BUC 변경 (원본: pray.c gods_bless)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlessingEffect {
+    /// 저주 해제 (cursed  uncursed)
+    Uncurse,
+    /// 축복 부여 (uncursed  blessed)
+    Bless,
+    /// 수리 (침식 제거)
+    Repair,
+    /// 부여 증가 (+1 spe)
+    Enchant,
+}
+
+/// [v2.9.1] 신의 축복 대상 선택 (원본: bless_items)
+pub fn select_blessing_targets(
+    inventory_items: &[(usize, bool, bool, i32)], // (idx, cursed, blessed, spe)
+) -> Vec<(usize, BlessingEffect)> {
+    let mut results = Vec::new();
+
+    // 1순위: 저주 해제
+    for &(idx, cursed, _, _) in inventory_items {
+        if cursed {
+            results.push((idx, BlessingEffect::Uncurse));
+        }
+    }
+
+    // 2순위: 주요 장비 축복 (spe가 낮은 것)
+    for &(idx, _, blessed, spe) in inventory_items {
+        if !blessed && spe < 3 {
+            results.push((idx, BlessingEffect::Bless));
+        }
+    }
+
+    results
+}
+
+/// [v2.9.1] 개종 조건 판정 (원본: pray.c:600-650 altar_conversion)
+pub fn can_convert(
+    piety: i32,
+    luck: i32,
+    player_alignment: Alignment,
+    altar_alignment: Alignment,
+    rng: &mut NetHackRng,
+) -> bool {
+    // 같은 성향이면 개종 불필요
+    if player_alignment == altar_alignment {
+        return false;
+    }
+
+    // 최소 조건
+    if piety < 10 || luck < 0 {
+        return false;
+    }
+
+    // 확률: piety/100 (최대 50%)
+    let chance = (piety / 2).clamp(5, 50);
+    rng.rn2(100) < chance
+}
+
+/// [v2.9.1] 개종 시 효과 (원본: pray.c altar_conversion effects)
+pub fn conversion_effects(
+    old_alignment: Alignment,
+    new_alignment: Alignment,
+) -> Vec<&'static str> {
+    let mut effects = Vec::new();
+
+    effects.push("Your soul shudders as you convert!");
+
+    // 성향 변경에 따른 페널티/보너스
+    match (old_alignment, new_alignment) {
+        (Alignment::Lawful, Alignment::Chaotic) | (Alignment::Chaotic, Alignment::Lawful) => {
+            effects.push("The extreme alignment shift weakens you!");
+            effects.push("You feel your wisdom drain away.");
+        }
+        _ => {
+            effects.push("The transition is relatively smooth.");
+        }
+    }
+
+    effects
+}
+
+/// [v2.9.1] 기도 쿨다운 계산 (원본: pray.c prayer_timeout)
+pub fn prayer_cooldown(favor: DivineFavor, player_level: i32) -> i32 {
+    let base = match favor {
+        DivineFavor::Pious => 300,
+        DivineFavor::VeryPleased => 400,
+        DivineFavor::Pleased => 500,
+        DivineFavor::Indifferent => 700,
+        _ => 1000,
+    };
+    // 고레벨에서 쿨다운 감소
+    let reduction = (player_level * 10).min(200);
+    (base - reduction).max(100)
+}
+
+/// [v2.9.1] 제물의 종류별 가치 수정 (원본: pray.c:1300-1380)
+pub fn sacrifice_type_modifier(
+    is_own_race: bool,
+    is_unique: bool,
+    is_undead: bool,
+    corpse_age_turns: u64,
+    current_turn: u64,
+) -> f32 {
+    let mut modifier = 1.0;
+
+    // 자기 종족 제물: 혼돈 성향이 아니면 페널티
+    if is_own_race {
+        modifier *= 0.5; // 식인 관련 페널티
+    }
+
+    // 유니크 몬스터 시체: 높은 가치
+    if is_unique {
+        modifier *= 3.0;
+    }
+
+    // 언데드: 성향에 따라 보정
+    if is_undead {
+        modifier *= 1.5;
+    }
+
+    // 시체 부패: 오래된 시체는 가치 감소
+    let age = current_turn.saturating_sub(corpse_age_turns);
+    if age > 200 {
+        modifier *= 0.3; // 부패한 시체
+    } else if age > 100 {
+        modifier *= 0.7; // 약간 부패
+    }
+
+    modifier
+}
+
+/// [v2.9.1] 간단한 제물 메시지 (원본: pray.c dosacred message)
+pub fn sacrifice_message(
+    corpse_name: &str,
+    altar_alignment: Alignment,
+    player_alignment: Alignment,
+    accepted: bool,
+) -> String {
+    if accepted {
+        if altar_alignment == player_alignment {
+            format!("The {} vanishes in a burst of flame! Your god is pleased.", corpse_name)
+        } else {
+            format!("The {} disappears in a flash!", corpse_name)
+        }
+    } else {
+        format!("The {} lies on the altar, ignored.", corpse_name)
+    }
+}
+
+/// [v2.9.1] 행운 변동 조건 (원본: pray.c:1500-1560)
+pub fn prayer_luck_change(favor: DivineFavor, on_altar: bool) -> i32 {
+    match favor {
+        DivineFavor::Pious if on_altar => 3,
+        DivineFavor::Pious => 2,
+        DivineFavor::VeryPleased => 1,
+        DivineFavor::Pleased if on_altar => 1,
+        DivineFavor::Pleased => 0,
+        DivineFavor::Indifferent => 0,
+        DivineFavor::Displeased => -1,
+        DivineFavor::Angry => -3,
+        DivineFavor::Enraged => -5,
+    }
+}
+
+// =============================================================================
+// [v2.9.1] pray.c 테스트
+// =============================================================================
+#[cfg(test)]
+mod pray_v291_tests {
+    use super::*;
+
+    #[test]
+    fn test_divine_favor_level() {
+        assert_eq!(divine_favor_level(50, 10), DivineFavor::Pious);
+        assert_eq!(divine_favor_level(-40, 0), DivineFavor::Enraged);
+        assert_eq!(divine_favor_level(0, 0), DivineFavor::Indifferent);
+    }
+
+    #[test]
+    fn test_scan_troubles_empty() {
+        let t = scan_troubles(100, 100, 900, false, false, false, false, false, false, false, false, false, false);
+        assert!(t.is_empty());
+    }
+
+    #[test]
+    fn test_scan_troubles_priority() {
+        let t = scan_troubles(5, 100, 0, true, false, false, false, true, true, false, false, false, false);
+        assert_eq!(t[0], TroubleType::Stoning); // 최우선
+    }
+
+    #[test]
+    fn test_scan_troubles_starving() {
+        let t = scan_troubles(50, 100, 0, false, false, false, false, false, false, false, false, false, false);
+        assert!(t.contains(&TroubleType::Starving));
+    }
+
+    #[test]
+    fn test_determine_response_furious() {
+        let mut rng = NetHackRng::new(42);
+        let r = determine_prayer_response(DivineFavor::Enraged, &[], false, &mut rng);
+        assert_eq!(r, PrayerResult::Furious);
+    }
+
+    #[test]
+    fn test_determine_response_answered() {
+        let mut rng = NetHackRng::new(42);
+        let troubles = vec![TroubleType::Sick];
+        let r = determine_prayer_response(DivineFavor::Pleased, &troubles, false, &mut rng);
+        assert_eq!(r, PrayerResult::Answered);
+    }
+
+    #[test]
+    fn test_select_blessing_cursed() {
+        let items = vec![(0, true, false, 0), (1, false, false, 1)];
+        let targets = select_blessing_targets(&items);
+        assert!(targets.iter().any(|(idx, effect)| *idx == 0 && *effect == BlessingEffect::Uncurse));
+    }
+
+    #[test]
+    fn test_can_convert_same_align() {
+        let mut rng = NetHackRng::new(42);
+        assert!(!can_convert(50, 5, Alignment::Lawful, Alignment::Lawful, &mut rng));
+    }
+
+    #[test]
+    fn test_conversion_effects() {
+        let e = conversion_effects(Alignment::Lawful, Alignment::Chaotic);
+        assert!(e.len() >= 2);
+        assert!(e[0].contains("convert"));
+    }
+
+    #[test]
+    fn test_prayer_cooldown() {
+        let cd = prayer_cooldown(DivineFavor::Pious, 20);
+        assert!(cd < prayer_cooldown(DivineFavor::Angry, 1));
+    }
+
+    #[test]
+    fn test_sacrifice_type_modifier_unique() {
+        let m = sacrifice_type_modifier(false, true, false, 100, 110);
+        assert!(m > 2.0);
+    }
+
+    #[test]
+    fn test_sacrifice_type_modifier_old_corpse() {
+        let m = sacrifice_type_modifier(false, false, false, 0, 300);
+        assert!(m < 0.5);
+    }
+
+    #[test]
+    fn test_sacrifice_message() {
+        let msg = sacrifice_message("goblin", Alignment::Lawful, Alignment::Lawful, true);
+        assert!(msg.contains("pleased"));
+    }
+
+    #[test]
+    fn test_luck_change() {
+        assert!(prayer_luck_change(DivineFavor::Pious, true) > 0);
+        assert!(prayer_luck_change(DivineFavor::Enraged, false) < 0);
+    }
+}

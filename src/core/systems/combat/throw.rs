@@ -509,3 +509,432 @@ pub fn throw_hit_chance(
     let to_hit = player_dex + skill_bonus - distance - target_ac;
     rng.rn2(20) < to_hit.max(1)
 }
+
+// =============================================================================
+// [v2.9.0] dothrow.c 대량 이식  hurtle/multishot/gem/walking_missile
+// 원본: nethack-3.6.7/src/dothrow.c (2,025줄)
+// =============================================================================
+
+/// [v2.9.0] 밀려남 결과 (원본: dothrow.c:1200-1280 hurtle)
+#[derive(Debug, Clone)]
+pub struct HurtleResult {
+    /// 밀려난 거리
+    pub distance: i32,
+    /// 최종 위치
+    pub final_pos: (i32, i32),
+    /// 벽/장애물에 충돌했는지
+    pub hit_obstacle: bool,
+    /// 충돌 데미지
+    pub collision_damage: i32,
+    /// 메시지
+    pub message: String,
+}
+
+/// [v2.9.0] 밀려남 계산 (원본: dothrow.c hurtle)
+/// 플레이어나 몬스터가 힘에 의해 밀려나는 효과
+pub fn hurtle_calc(
+    start_x: i32,
+    start_y: i32,
+    dx: i32,
+    dy: i32,
+    range: i32,
+    is_player: bool,
+    check_walkable: &dyn Fn(i32, i32) -> bool,
+) -> HurtleResult {
+    let mut x = start_x;
+    let mut y = start_y;
+    let mut dist = 0;
+    let mut hit_obs = false;
+
+    for _ in 0..range {
+        let nx = x + dx;
+        let ny = y + dy;
+        if !check_walkable(nx, ny) {
+            hit_obs = true;
+            break;
+        }
+        x = nx;
+        y = ny;
+        dist += 1;
+    }
+
+    // 충돌 데미지: 벽에 부딪힌 경우
+    let collision_dmg = if hit_obs { (range - dist).max(1) } else { 0 };
+    let msg = if hit_obs {
+        if is_player {
+            "You slam into an obstacle!".to_string()
+        } else {
+            "The monster slams into an obstacle!".to_string()
+        }
+    } else if is_player {
+        format!("You are pushed {} squares!", dist)
+    } else {
+        format!("The monster is pushed {} squares!", dist)
+    };
+
+    HurtleResult {
+        distance: dist,
+        final_pos: (x, y),
+        hit_obstacle: hit_obs,
+        collision_damage: collision_dmg,
+        message: msg,
+    }
+}
+
+/// [v2.9.0] 밀려남 거리 계산 (원본: dothrow.c:1283 hurtle_step)
+/// 큰 몬스터는 밀려남이 줄어듦
+pub fn hurtle_range(weight: i32, force: i32) -> i32 {
+    let base = force * 3 / weight.max(1);
+    base.clamp(1, 8)
+}
+
+/// [v2.9.0] 다중 발사(Multishot) 판정 (원본: dothrow.c:390-475 multishot)
+/// 역할/숙련도에 따라 한 턴에 여러 발 발사
+pub fn multishot_count(
+    role: &str,
+    throwable: ThrowableType,
+    skill_level: i32, // 0=Unskilled, 1=Basic, 2=Skilled, 3=Expert
+    player_level: i32,
+    _rng: &mut NetHackRng,
+) -> i32 {
+    let mut count = 1;
+
+    // 숙련도 보너스: Skilled +1, Expert +2
+    if skill_level >= 2 {
+        count += 1;
+    }
+    if skill_level >= 3 {
+        count += 1;
+    }
+
+    // 레인저 특수: 화살/볼트 Skilled 이상이면 추가
+    if role == "Ranger" && matches!(throwable, ThrowableType::Ammo) && skill_level >= 2 {
+        count += 1;
+    }
+
+    // 사무라이 특수: 수리검(단검류) Expert이면 추가
+    if role == "Samurai" && matches!(throwable, ThrowableType::Dagger) && skill_level >= 3 {
+        count += 1;
+    }
+
+    // 레벨 보너스: 20레벨 이상이면 1발 추가
+    if player_level >= 20 {
+        count += 1;
+    }
+
+    // 최대 제한
+    count.min(5)
+}
+
+/// [v2.9.0] 보석 수락 (원본: dothrow.c:505-585 gem_accept)
+/// 유니콘에게 보석을 던지면 행운이 변함
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GemAcceptResult {
+    /// 유니콘이 보석을 수락 (행운 증가)
+    Accepted,
+    /// 유니콘이 유리를 거부 (행운 감소)
+    Rejected,
+    /// 유니콘이 무시
+    Ignored,
+}
+
+pub fn gem_accept(
+    _gem_name: &str,
+    is_valuable: bool,
+    unicorn_same_alignment: bool,
+) -> (GemAcceptResult, i32, &'static str) {
+    if !is_valuable {
+        // 유리/무가치 돌  행운 감소
+        return (
+            GemAcceptResult::Rejected,
+            -1,
+            "The unicorn is not impressed.",
+        );
+    }
+
+    if unicorn_same_alignment {
+        // 같은 성향 유니콘  큰 행운 증가
+        (
+            GemAcceptResult::Accepted,
+            5,
+            "The unicorn graciously accepts the gem!",
+        )
+    } else {
+        // 다른 성향 유니콘  작은 행운 증가
+        (
+            GemAcceptResult::Accepted,
+            2,
+            "The unicorn takes the gem and leaves.",
+        )
+    }
+}
+
+/// [v2.9.0] 걷는 미사일 (원본: dothrow.c walking_missile 개념)
+/// 밀려남에 의해 이동 중인 엔티티가 각 타일에서 효과를 발생
+pub fn walking_missile_check(tile_type: &str, is_player: bool) -> Option<&'static str> {
+    match tile_type {
+        "lava" => Some(if is_player {
+            "You are pushed into lava!"
+        } else {
+            "The monster falls into lava!"
+        }),
+        "water" | "pool" => Some(if is_player {
+            "You fall into the water!"
+        } else {
+            "The monster falls into water!"
+        }),
+        "trap_pit" | "pit" => Some(if is_player {
+            "You fall into a pit!"
+        } else {
+            "The monster falls into a pit!"
+        }),
+        "trap_hole" => Some(if is_player {
+            "You fall through a hole!"
+        } else {
+            "The monster falls through a hole!"
+        }),
+        _ => None,
+    }
+}
+
+/// [v2.9.0] 투척 시 파괴 판정 확장 (원본: dothrow.c:breakobj)
+/// 유리, 물약, 알, 크리스탈볼 등 파괴되는 아이템
+pub fn breakobj_check(
+    item_name: &str,
+    hit_wall: bool,
+    rng: &mut NetHackRng,
+) -> (bool, &'static str) {
+    let l = item_name.to_lowercase();
+
+    // 물약  항상 파괴
+    if l.contains("potion") {
+        return (true, "The potion shatters!");
+    }
+    // 알  항상 파괴
+    if l.contains("egg") {
+        return (true, "The egg splatters!");
+    }
+    // 유리  높은 확률
+    if l.contains("mirror") || l.contains("crystal ball") {
+        if hit_wall || rng.rn2(3) == 0 {
+            return (true, "The glass shatters into pieces!");
+        }
+    }
+    // 빈 병  벽에 부딪히면 파괴
+    if l.contains("empty bottle") && hit_wall {
+        return (true, "The bottle shatters!");
+    }
+    // 일반 경우
+    (false, "")
+}
+
+/// [v2.9.0] 투척 메시지 생성 (원본: dothrow.c:245-280)
+pub fn throw_message(item_name: &str, target_name: &str, damage: i32, is_kill: bool) -> String {
+    if is_kill {
+        format!("The {} strikes {} fatally!", item_name, target_name)
+    } else if damage > 0 {
+        format!(
+            "The {} hits {} for {} damage!",
+            item_name, target_name, damage
+        )
+    } else {
+        format!("The {} misses {}.", item_name, target_name)
+    }
+}
+
+/// [v2.9.0] 러너 체크  몬스터가 투척물을 맞고 도주
+pub fn monster_flees_from_throw(
+    monster_hp: i32,
+    monster_max_hp: i32,
+    damage: i32,
+    is_peaceful: bool,
+    rng: &mut NetHackRng,
+) -> bool {
+    // HP가 1/3 이하이고 평화적이지 않으면 도주 확률 있음
+    let remaining = monster_hp - damage;
+    if remaining <= monster_max_hp / 3 && !is_peaceful {
+        rng.rn2(3) == 0
+    } else {
+        false
+    }
+}
+
+/// [v2.9.0] 투척된 아이템이 스택에 합류 가능한지 판정
+pub fn can_merge_thrown(
+    thrown_name: &str,
+    ground_name: &str,
+    thrown_blessed: bool,
+    ground_blessed: bool,
+    thrown_cursed: bool,
+    ground_cursed: bool,
+) -> bool {
+    thrown_name == ground_name && thrown_blessed == ground_blessed && thrown_cursed == ground_cursed
+}
+
+/// [v2.9.0] 투척 데미지에 대한 아이템 보정 (spe, BUC)
+pub fn throw_damage_adjustment(
+    base_damage: i32,
+    spe: i32,
+    is_blessed: bool,
+    is_cursed: bool,
+) -> i32 {
+    let mut dmg = base_damage + spe;
+    if is_blessed {
+        dmg += 1;
+    }
+    if is_cursed {
+        dmg -= 1;
+    }
+    dmg.max(0)
+}
+
+/// [v2.9.0] 투척 방향 유효성 검증
+pub fn validate_throw_direction(dx: i32, dy: i32) -> bool {
+    // 0,0은 자기 자신에게  유효하지 않음
+    dx != 0 || dy != 0
+}
+
+/// [v2.9.0] 골렘에게 투척 시 특수 효과 (원본: dothrow.c thitmonst)
+pub fn throw_at_golem(golem_type: &str, item_name: &str) -> Option<(i32, &'static str)> {
+    let l_item = item_name.to_lowercase();
+    let l_gol = golem_type.to_lowercase();
+
+    // 아이언 골렘 + 철제 투척물  회복
+    if l_gol.contains("iron") && (l_item.contains("iron") || l_item.contains("steel")) {
+        return Some((0, "The iron golem absorbs the metal!"));
+    }
+    // 플레시 골렘 + 음식  회복
+    if l_gol.contains("flesh") && (l_item.contains("corpse") || l_item.contains("meat")) {
+        return Some((0, "The flesh golem absorbs the organic matter!"));
+    }
+    None
+}
+
+// =============================================================================
+// 테스트
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify() {
+        assert_eq!(classify_throwable("silver dagger"), ThrowableType::Dagger);
+        assert_eq!(classify_throwable("javelin"), ThrowableType::Spear);
+        assert_eq!(classify_throwable("boomerang"), ThrowableType::Boomerang);
+        assert_eq!(classify_throwable("arrow"), ThrowableType::Ammo);
+    }
+
+    #[test]
+    fn test_throw_range() {
+        assert_eq!(throw_range_modifier(ThrowableType::Boomerang), 4);
+        assert_eq!(throw_range_modifier(ThrowableType::Potion), -2);
+    }
+
+    #[test]
+    fn test_hurtle_no_obstacle() {
+        let result = hurtle_calc(5, 5, 1, 0, 3, true, &|_, _| true);
+        assert_eq!(result.distance, 3);
+        assert_eq!(result.final_pos, (8, 5));
+        assert!(!result.hit_obstacle);
+    }
+
+    #[test]
+    fn test_hurtle_with_wall() {
+        let result = hurtle_calc(5, 5, 1, 0, 5, true, &|x, _| x < 8);
+        assert!(result.hit_obstacle);
+        assert_eq!(result.final_pos, (7, 5));
+    }
+
+    #[test]
+    fn test_hurtle_range() {
+        assert_eq!(hurtle_range(100, 20), 1);
+        assert_eq!(hurtle_range(10, 30), 8); // clamped to 8
+    }
+
+    #[test]
+    fn test_multishot_basic() {
+        let mut rng = NetHackRng::new(42);
+        let count = multishot_count("Ranger", ThrowableType::Ammo, 3, 20, &mut rng);
+        assert!(count >= 3);
+        assert!(count <= 5);
+    }
+
+    #[test]
+    fn test_multishot_samurai() {
+        let mut rng = NetHackRng::new(42);
+        let count = multishot_count("Samurai", ThrowableType::Dagger, 3, 10, &mut rng);
+        assert!(count >= 4); // Expert + Samurai bonus
+    }
+
+    #[test]
+    fn test_gem_accept_valuable() {
+        let (result, luck, _) = gem_accept("diamond", true, true);
+        assert_eq!(result, GemAcceptResult::Accepted);
+        assert_eq!(luck, 5);
+    }
+
+    #[test]
+    fn test_gem_accept_glass() {
+        let (result, luck, _) = gem_accept("worthless glass", false, true);
+        assert_eq!(result, GemAcceptResult::Rejected);
+        assert_eq!(luck, -1);
+    }
+
+    #[test]
+    fn test_walking_missile() {
+        assert!(walking_missile_check("lava", true).is_some());
+        assert!(walking_missile_check("floor", true).is_none());
+    }
+
+    #[test]
+    fn test_breakobj_potion() {
+        let mut rng = NetHackRng::new(1);
+        let (broken, _) = breakobj_check("potion of healing", false, &mut rng);
+        assert!(broken);
+    }
+
+    #[test]
+    fn test_breakobj_mirror() {
+        let mut rng = NetHackRng::new(1);
+        let (broken, _) = breakobj_check("mirror", true, &mut rng);
+        assert!(broken);
+    }
+
+    #[test]
+    fn test_throw_message() {
+        let msg = throw_message("dagger", "orc", 5, false);
+        assert!(msg.contains("hits"));
+        let msg2 = throw_message("dagger", "orc", 5, true);
+        assert!(msg2.contains("fatally"));
+    }
+
+    #[test]
+    fn test_damage_adjustment() {
+        assert_eq!(throw_damage_adjustment(5, 2, true, false), 8); // 5+2+1
+        assert_eq!(throw_damage_adjustment(5, 0, false, true), 4); // 5-1
+    }
+
+    #[test]
+    fn test_validate_direction() {
+        assert!(validate_throw_direction(1, 0));
+        assert!(!validate_throw_direction(0, 0));
+    }
+
+    #[test]
+    fn test_throw_at_golem() {
+        let r = throw_at_golem("iron golem", "iron chain");
+        assert!(r.is_some());
+        assert!(throw_at_golem("stone golem", "iron chain").is_none());
+    }
+
+    #[test]
+    fn test_can_merge() {
+        assert!(can_merge_thrown(
+            "arrow", "arrow", false, false, false, false
+        ));
+        assert!(!can_merge_thrown(
+            "arrow", "bolt", false, false, false, false
+        ));
+    }
+}

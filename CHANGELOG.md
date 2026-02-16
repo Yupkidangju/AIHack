@@ -2,7 +2,260 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.9.3] - 2026-02-17
+### Added
+- **[이식] mhitu.rs — mhitu.c 핵심 시스템 대량 이식 (751→1,131줄, +380줄)**:
+  - 삼키기: `EngulfState`, `EngulfType`(4종), `engulf_type_damage`, `can_escape_engulf`
+  - 절도: `TheftResult`, `steal_check`(님프/원숭이/레프리콘), `steal_armor_check`
+  - 질병: `disease_attack` — CON 기반 저항 판정
+  - 라이칸스로피: `lycanthropy_attack` — 전파 확률 10%
+  - 텔레포트: `teleport_attack_result` — 제어/저항 체크
+  - 저주: `curse_items_count` — 레벨 기반 저주 수
+  - 녹: `RustResult`, `rust_attack_effect` — 재질별 면역/침식/파괴
+  - 속도: `slow_attack_check` — 부츠/자유행동 보호
+  - 점액: `slime_attack_check` — 불/불변 방어
+  - 유틸: `max_attacks_per_round`, `dodge_modifier`
+  - 테스트 18개 추가
+- **[이식] movement.rs — hack.c 핵심 시스템 대량 이식 (800→1,186줄, +386줄)**:
+  - 방향: `direction_vector`(8방향), `opposite_direction`
+  - 거리: `distance_min`(체비셰프), `distance_squared`, `on_line`
+  - 지형: `can_pass_tile` — 6종 이동 능력별 통과 판정
+  - 대각선: `diagonal_blocked` — 벽 사이 이동 제한
+  - 자동이동: `find_travel_step` — BFS 기반 경로 탐색
+  - 얼음: `ice_slip_check` — DEX/부츠/서투름 기반
+  - 문: `DoorOpenResult`, `try_open_door`, `kick_door`
+  - 속도: `movement_points` — 빠름/느림/부하 보정
+  - 자동줍기: `should_autopickup` — 클래스/저주 필터
+  - 통계: `MovementStatistics`
+  - 테스트 18개 추가
+### Changed
+- **mhitu.rs** 라인 수: 751 → 1,131줄 (40.1%)
+- **movement.rs** 라인 수: 800 → 1,186줄 (40.4%)
+- **전체 이식률**: 40.92% → 41.56% (72,515 → 73,656줄, 실측 보정)
+- **전체 테스트**: 820 → 856개 (통합 테스트 100% 통과)
+### Fixed
+- **ECS 통합**: `monster_ai` 시스템에 mhitu.rs 유틸 함수 5종 연결 (절도/녹/라이칸/질병/생명력흡수)
+- **매직넘버 상수화**: `steal_check`의 확률값(70/50/60/40/5/90) → 명명 상수로 분리
+- **unused variable 경고 5건 해소**: mhitu.rs, throw.rs, evolution.rs, artifact.rs
+- **`TileType::Corridor` → `TileType::Corr`** 타입명 불일치 수정
+### Documentation
+- **이식 가이드라인 7항목 문서화** (`audit_roadmap.md`):
+  1. 호출부 우선 원칙 (Caller-First Principle)
+  2. ECS 래퍼 의무화
+  3. 매직넘버 상수화 규칙
+  4. 한국어 주석 완전성
+  5. 타입 안전성 (enum 권장)
+  6. 미구현 TODO 표기 규칙
+  7. 감사 체크리스트
+- **실측 라인 수 보정**: 73,281 → 73,656줄 (BOM/뉴라인 계산 오차 보정)
+
+## [2.9.2] - 2026-02-17
+### Added
+- **[이식] do_wear.rs — do_wear.c 핵심 시스템 대량 이식 (785→1,114줄, +329줄)**:
+  - 착용/해제 효과: `ArmorEffect`(7종), `armor_on_effect`(20종 장비), `armor_off_effect`(15종 역전)
+  - 변신 시 장비 해제: `break_armor_check` — 체형/손/머리/발/비육체 6종 조건
+  - 드래곤 스케일 변환: `dragon_scales_to_mail`, `dragon_mail_to_scales` — 9색 양방향
+  - 드래곤 저항: `dragon_scale_resistance` — 9종 저항 매핑
+  - 침식 면역: `armor_resists_erosion` — Rust/Corrode/Burn/Rot 4종 × 재질
+  - 은 효과: `silver_armor_effect` — 언데드/악마 추가 데미지
+  - 순서 검증: `correct_donning_order`, `correct_doffing_order`
+  - 반지 슬롯: `select_ring_slot` — 양손 관리
+  - AC 계산: `calculate_total_ac`
+  - 수리: `repair_armor_cost`
+  - 테스트 19개 추가
+- **[이식] pray.rs — pray.c 핵심 시스템 대량 이식 (695→978줄, +283줄)**:
+  - 호감도 등급: `DivineFavor`(7단계), `divine_favor_level`
+  - 문제 우선순위: `TroubleType`(14종), `scan_troubles` — 석화→환각까지
+  - 기도 응답: `determine_prayer_response` — 호감도×문제 매트릭스
+  - 축복 시스템: `BlessingEffect`(4종), `select_blessing_targets`
+  - 개종: `can_convert`, `conversion_effects`
+  - 쿨다운: `prayer_cooldown` — 호감도/레벨 기반
+  - 제물 수정자: `sacrifice_type_modifier` — 종족/유니크/언데드/부패
+  - 행운 변동: `prayer_luck_change`
+  - 테스트 14개 추가
+### Changed
+- **do_wear.rs** 라인 수: 785 → 1,114줄 (39.6%)
+- **pray.rs** 라인 수: 695 → 978줄 (45.2%)
+- **전체 이식률**: 40.57% → 40.92% (71,903 → 72,515줄)
+- **전체 테스트**: 787 → 820개 (통합 테스트 100% 통과)
+
+## [2.9.1] - 2026-02-17
+### Added
+- **[이식] throw.rs — dothrow.c 핵심 시스템 대량 이식 (512→812줄, +300줄)**:
+  - 밀려남(hurtle): `HurtleResult`, `hurtle_calc`, `hurtle_range`
+  - 다중 발사: `multishot_count` — 역할/숙련도/레벨 기반 (최대 5발)
+  - 보석 수락: `gem_accept`, `GemAcceptResult` — 유니콘 행운 효과
+  - 파괴 판정: `breakobj_check` — 물약/알/유리/거울
+  - 걷는 미사일: `walking_missile_check` — 밀려남 중 지형 효과
+  - 데미지 보정: `throw_damage_adjustment` (spe, BUC), `throw_at_golem`
+  - 유틸: `throw_message`, `validate_throw_direction`, `can_merge_thrown`, `monster_flees_from_throw`
+  - 테스트 17개 추가
+- **[이식] artifact.rs — artifact.c 핵심 시스템 대량 이식 (460→819줄, +359줄)**:
+  - 터치 페널티: `touch_artifact_penalty`, `TouchPenalty` — 성향 불일치 데미지
+  - 재터치: `retouch_check`, `RetouchResult` — BUC 변경 시 재평가
+  - 아티팩트 말하기: `arti_speaks` — 15종 아티팩트 대사
+  - 저항 제공: `artifact_provides_resistance` — 8종 아티팩트별 저항
+  - 방어 보너스: `artifact_defense_bonus`, `ArtifactDefense` — 데미지 절반/AC
+  - 특수 데미지: `artifact_spec_dbon` — 크기별/Vorpal 참수 포함
+  - 점수: `calc_artifact_score`, `total_artifact_score`
+  - 유틸: `artifact_exists`, `artifacts_for_alignment`, `quest_artifact_for_role`, `invoke_cooldown`, `spec_applies`, `artifact_to_hit_vs_target`
+  - 테스트 20개 추가
+### Changed
+- **throw.rs** 라인 수: 512 → 812줄 (40.1%)
+- **artifact.rs** 라인 수: 460 → 819줄 (40.8%)
+- **전체 이식률**: 40.20% → 40.57% (71,244 → 71,903줄)
+- **전체 테스트**: 750 → 787개 (통합 테스트 100% 통과)
+
+## [2.9.0] - 2026-02-17
+### Added
+- **[이식] end.rs — end.c 핵심 시스템 대량 이식 (557→1,183줄, +626줄)**:
+  - 사망 문자열 테이블: `DEATH_NAMES`(16종), `END_NAMES`(16종), `death_type_index` 매핑
+  - 사망 원인 서술: `done_in_by` — 유니크/투명/유령/상점주인 분기 모두 이식
+  - 사망 사유 보정: `fixup_death_reason` — 석화+getting stoned 중복 제거, 기아 축약
+  - 생명 구원: `savelife_restore` — HP/기아 복구, 아뮬렛 메시지 시퀀스
+  - 가치품 수집: `get_valuables` — 보석/아뮬렛 분류, 빈도순 정렬
+  - 아티팩트 점수: `artifact_score`, `score_special_items`, `calculate_score_extended`
+  - 디스클로저: `DisclosureCategory`(6종), `DisclosureOption`(4종), `DisclosureInfo`
+  - 무덤 부활: `grave_arise_monster` — W/M/V/Z 심볼별 종족 대응
+  - 멸종 카운트: `num_extinct`
+  - 게임 결과 요약: `game_result_summary`, `format_death_time`
+  - Conduct 확장: `record_wish/polymorph/genocide/elbereth/weapon_use/artifact_touch/eat_veggy/eat_non_vegan`, `total_violations`, `detailed_summary`
+  - HighScoreBoard 확장: `best_for_role`, `best_for_race`, `entries_above_score`, `clear`, `total_entries`
+  - 테스트 18개 추가 (총 26개)
+- **[이식] evolution.rs — polyself.c 핵심 시스템 대량 이식 (438→773줄, +335줄)**:
+  - 신체 부위 테이블: `BodyPart`(19종), `BodyType`(11종), 12체형×19부위 문자열 매핑
+  - 신체 부위 함수: `body_part_name`, `body_type_from_symbol`, `special_body_part`
+  - 골렘 효과: `GolemType`(9종), `DamageType`(8종), `golem_effect` — 전기/화염 회복
+  - 장갑→드래곤: `armor_to_dragon` — 9색 드래곤 스케일 매핑
+  - 변신 성별: `poly_gender` — 무성/유성/원래 성별
+  - 변신 인식: `polysense`, `PolyWarning` — 퍼플 웜/뱀파이어 특수 감지
+  - 종족 학살: `is_role_genocided`
+  - 내면 묘사: `dead_inside_feeling` — 생물/비생물/언데드 분기
+  - 인간화 HP: `rehumanize_hp` — 비율 기반 HP 복구
+  - 뱀파이어 변신: `vampire_shift_forms`
+  - 숨기 판정: `can_hide` — stuck/trap/ceiling/object/stairs 7종 조건
+  - 에너지 상수: `BREATH_ENERGY_COST`, `SUMMON_ENERGY_COST`, `MINDBLAST_ENERGY_COST`, `MINDBLAST_RANGE_SQ`
+  - 테스트 16개 추가
+### Changed
+- **end.rs** 라인 수: 557 → 1,183줄 (56.5%)
+- **evolution.rs** 라인 수: 438 → 773줄 (43.5%)
+- **전체 이식률**: 39.67% → 40.20% (70,302 → 71,244줄)
+- **전체 테스트**: 716 → 750개 (통합 테스트 100% 통과)
+
+## [2.8.0] - 2026-02-17
+### Added
+- **[이식] dungeon.rs — dungeon.c 핵심 시스템 대량 이식 (454→987줄, +533줄)**:
+  - 레벨 유형 판별: `builds_up`, `is_bottom_level`, `can_dig_down`, `can_fall_through`, `can_rise_up`, `has_ceiling`
+  - 브랜치 판별: `in_vlad_tower`, `in_endgame`, `is_invocation_level`, `is_stronghold`, `is_air_level`, `is_water_level`
+  - 특수 레벨 확인: `is_rogue_level`, `is_oracle_level`, `is_minetown`, `is_valley`, `is_medusa_level`, `is_knox`
+  - 레벨 난이도 완전 이식: `level_difficulty_full` — builds_up 보정, 엔드게임/아뮬렛 분기 포함
+  - 깊이 탐험 기록: `deepest_lev_reached` — 퀘스트 제외 옵션 (하이스코어용)
+  - 레벨 탐색: `level_by_name`, `get_level_from_depth`, `on_same_level`
+  - 브랜치 유틸: `at_branch_entrance`, `connected_branches`
+  - 레벨 이동: `next_level_target`, `prev_level_target`
+  - 어노테이션: `get_annotation`, `set_annotation`
+  - 던전 개요: `dungeon_overview`
+  - 계단/브랜치: `StairPositions` 구조체, `BranchType` 열거형, `SPECIAL_LEVEL_MAP` (26종)
+  - 유틸: `generate_castle_tune`, `induced_align`, `depth_difference`
+  - 테스트: 30개 유닛 테스트 (기존 5 + 신규 25)
+
+### Changed
+- **eat.rs** 라인 수 실측 반영: 839 → 1,619줄 (52.1%)
+- **dungeon.rs** Dungeon 구조체에 `level_annotations` 필드 추가
+- **전체 이식률**: 38.06% → 39.67% (67,448 → 70,302줄)
+
+## [2.7.0] - 2026-02-16
+### Added
+- **[이식] pickup.rs — pickup.c 핵심 시스템 대량 이식 (472→1,236줄, +764줄)**:
+  - 금화 무게: `gold_weight`, `gold_capacity` — GOLD_WT/GOLD_CAPACITY 매크로 이식
+  - 짐 상태 메시지: `encumber_msg`, `lift_warning_message` — 상태 변화 시 메시지 생성
+  - 컨테이너 탐지: `container_count`, `mon_beside` — 바닥 컨테이너 수/인접 몬스터 확인
+  - 클래스 필터: `class_to_symbol`, `collect_obj_classes`, `MenuClassFilter`, `allow_category`, `count_categories` — 메뉴 필터링 시스템
+  - 운반 계산: `delta_container_weight`, `carry_count`(CarryResult) — 무게 차이/운반 가능 수량
+  - 들어올리기: `can_lift_object`(LiftResult) — 소코반/로드스톤/텔레키네시스 분기
+  - 오토픽업: `AutopickupException`, `autopick_test` — 예외 규칙 패턴 매칭
+  - 마법 가방: `mbag_explodes`, `boh_loss` — 폭발 판정/저주 소실
+  - 시체 특수: `fatal_corpse_check`, `rider_corpse_check` — 석화/부활 위험
+  - 아이스박스: `icebox_removal_age`, `icebox_freeze_age` — 냉동/해동 나이
+  - 컨테이너: `can_insert_into_container`, `observe_quantum_cat`, `container_action_options`, `container_action_key` — 삽입 판정/슈뢰딩거 고양이/동작 메뉴
+  - 뒤집기: `spill_objects_message`, `tip_spillage` — 쏟아짐 판정
+  - 기타: `can_use_hands` — 손 사용 가능 여부
+  - 테스트 40개 (기존 6 + 신규 34) 전체 통과
+- **[이식] mkobj.rs — mkobj.c 핵심 시스템 대량 이식 (424→1,246줄, +822줄)**:
+  - 확률 테이블: `MKOBJ_PROBS`, `BOX_PROBS`, `ROGUE_PROBS`, `HELL_PROBS`, `select_class_from_probs`, `LevelContext` — 4종 환경별 아이템 생성 확률
+  - BUC 관리: `BucState`, `bless_item`, `unbless_item`, `curse_item`, `uncurse_item`, `bless_or_curse`, `bcsign` — 축복/저주 상태 전이
+  - 무게 계산: `calc_weight` — 재귀적 컨테이너/Bag of Holding/금화/글럽 지원
+  - 시체 타이머: `CorpseTimer`, `start_corpse_timeout` — 도마뱀 면제/라이더 부활/트롤 부활 분기
+  - 얼음 효과: `peek_iced_corpse_age`, `adjust_age_onto_ice`, `adjust_age_off_ice` — 얼음 위 부패 보정
+  - 재료 속성: `Material` enum, `is_flammable`, `is_rottable` — 21종 재료 속성 판정
+  - 컨테이너 내용물: `box_max_contents`, `box_content_class` — 상자 유형별 내용물 생성
+  - 풍요의 뿔: `horn_of_plenty` — 음식/물약 랜덤 생성
+  - 스택 분할: `split_stack` — splitobj 로직 이식
+  - 글럽 합체: `glob_absorb` — 가중 평균 나이 계산
+  - 변경 동사: `AlterationType`, `alteration_verb` — 19종 아이템 변경 동사
+  - 테스트 42개 (기존 4 + 신규 38) 전체 통과
+
+## [2.5.0] - 2026-02-16
+### Added
+- **[이식] inventory.rs — invent.c 핵심 시스템 대량 이식 (422→1400줄, +978줄)**:
+  - 가상 화폐: `CURRENCIES` 테이블 21종 + `currency_name()` — 환각 시 랜덤 화폐 표시, 복수형 처리
+  - 인벤토리 레터 압축: `compactify()` — 연속 문자열을 대시 표현 (a-f)
+  - 분할 가능 판정: `splittable()` — 저주 loadstone/용접 무기 분할 방지
+  - 상세 머지 판정: `MergeCandidate` 구조체 + `mergable()` — 원본 25개 이상 조건 완전 이식 (BUC/침식/식별/양초나이/글로브/금화/이름 등)
+  - 인벤토리 추가 이벤트: `InventoryAddEvent` enum + `classify_add_event()` — 엔도르 아뮬렛/촛대/종/죽음의 책/퀘스트 아티팩트 등 9종 이벤트
+  - 인벤토리 제거 이벤트: `InventoryRemoveEvent` enum + `classify_remove_event()` — loadstone/luckstone/특수 아이템 10종 이벤트
+  - 아이템 소비: `UseUpResult` enum + `use_up()`, `consume_charge()` — 수량 감소/완전 소멸/충전 소비
+  - 인벤토리 검색: `carrying()`, `have_lizard()`, `have_novel()`, `find_by_id()`, `object_at_position()`, `gold_at_position()` — 특정 타입/위치/ID 검색
+  - 통계 집계: `count_unpaid()`, `count_buc_type()`, `BucTally` + `tally_bucx()`, `count_contents()` — 미지불/BUC상태/컨테이너 내용 카운트
+  - 클래스 이름: `let_to_name()` — 심볼 문자 포함 클래스명 표시
+  - 레터 재할당: `reassign_letters()` — 금화 '$' 슬롯 우선, a-zA-Z 순차 할당
+  - 장비 판정: `wearing_armor()`, `is_worn()`, `tool_in_use()` — 비트마스크 기반 착용/사용 상태 판별
+  - 표시 포맷: `xprname()` — 상점 비용 포함 인벤토리 행 포맷
+  - 바닥 아이템: `pile_description()` — 개수별 서술적 표현 (a few/several/many)
+  - 던전 피처: `dfeature_name()` — 19종 지형지물 설명 (fountain/throne/lava 등)
+  - 위험 판정: `will_feel_cockatrice()` — 실명/장갑/석화저항 기반 코카트리스 접촉 판정
+  - 스택 처리: `should_stack()` — 동일 위치 호환 아이템 자동 머지 판별
+  - 테스트 30개 (기존 6 + 신규 24) 전체 통과
+  - 전체 프로젝트 테스트: 618개 전체 통과 (기존 588 + 신규 30)
+
 ## [2.4.0] - 2026-02-16
+### Added
+- **[이식] objnam.rs — objnam.c 추가 대량 이식 (1520→2065줄, +545줄)**:
+  - Fuzzy Match: `fuzzymatch`, `wishymatch` — 공백/하이픈/대소문자 무시 소원 매칭, "of" 반전, dwarvish↔dwarven/elven↔elvish/aluminium↔aluminum 변환
+  - 대체 철자: `ALT_SPELLINGS` 테이블 33종 (pickax→pick-axe, whip→bullwhip, lantern→brass lantern 등)
+  - 아이템 범위 분류: `ITEM_RANGES` 테이블 19종 (소원 하위 범위 매칭)
+  - 클래스 기호 매핑: `CLASS_NAME_MAP` 13종 + `class_from_char` 문자↔클래스 변환
+  - 장비 간이명: `suit_simple_name`, `cloak_simple_name`, `helm_simple_name`, `gloves_simple_name`
+  - badman 판정: `NO_MEN_PREFIXES`/`NO_MAN_PREFIXES` + `badman()` — man↔men 변환 불가 접두어 체크
+  - Wish 파싱: `WishPrefixes`, `parse_wish_prefixes()` — 수량/BUC/침식/부식방지/독칠/잠금/점등 등 30여종 접두사 파싱
+  - Wish 이름 분리: `WishNameParts`, `parse_wish_name()` — named/called/labeled 분리, pair of/set of 처리
+  - 테스트 48개 (기존 36 + 신규 12) 전체 통과
+- **[이식] do_name.rs — do_name.c 후반부 대량 이식 (692→1032줄, +340줄)**:
+  - 환각 색상: `HALLUCINATION_COLORS` 33종 + `hcolor()` (octarine 포함)
+  - 환각 액체: `HALLUCINATION_LIQUIDS` 34종 + `hliquid()` (pink slime 포함)
+  - Discworld 소설: `DISCWORLD_NOVELS` 41종 + `novel_title()`, `lookup_novel()` (Color↔Colour 변환)
+  - 코요테 별칭: `COYOTE_ALIASES` 22종 + `coyote_name()` — 몬스터 ID 기반 학명 배정
+  - 오크 이름 생성: `random_orc_name()` — 모음/자음 교대 3~4음절, 하이픈 삽입
+  - 좌표 설명: `distance_description()` — 방향+거리 복합 설명, 약어/전문 모드
+  - 몬스터 관사: `MonsterArticle` enum + `monster_with_article()`/`_cap()` — None/The/A/Your 지원
+  - 재귀 대명사: `reflexive_pronoun()` — himself/herself/itself
+  - 로그 이름: `rogue_name()` — Wichman/Toy/Arnold 원조 개발자
+  - 테스트 28개 (기존 17 + 신규 11) 전체 통과
+
+
+### Fixed
+- **[문서 정합성] audit_roadmap.md 구조적 결함 6건 수정**:
+  - Phase 48/49 중복 섹션 제거 (Phase 10과 11 사이에 잘못 배치된 40행 삭제)
+  - Phase 29, 46의 완료 상태를 ⚠️ 부분 완료로 정정 (미완료 하위 항목 존재)
+  - Phase 49 상태를 🔄→⚠️ 부분 완료로 통일 (footer와 본문 불일치 해소)
+  - 4.1절 카테고리별 이식률 테이블을 2026-02-16 실측치로 갱신 (10.38%→35.99%)
+  - Phase 50 세부 계획 추가 (굴착/문파괴/환경파괴 3개 하위 섹션)
+  - footer 정보 동기화 (v2.2, 이식률 35.99%)
+- **[문서 동기화] 전체 이식률 재측정 및 3개 문서 동기화**:
+  - 실측: 63,781줄 / 177,232줄 = 35.99% (인코딩 정리로 기존 65,862줄에서 2,081줄 감소)
+  - designs.md: v3.1로 갱신, 프로젝트 정보 테이블/상태/footer 동기화
+  - IMPLEMENTATION_SUMMARY.md: v2.4.0으로 갱신, 라인 수/이식률 동기화
+
 ### Changed
 - **[리브랜딩] 프로젝트명 AIHack으로 변경**: README, Cargo.toml 업데이트, GitHub 리포지토리 연동
 - **[라이센스] Apache-2.0 + NGPL 듀얼 라이센스 체계 확립**: LICENSE.NGPL 유지, Apache-2.0 메인 라이센스

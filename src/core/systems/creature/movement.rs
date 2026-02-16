@@ -797,3 +797,495 @@ pub fn movement(
         }
     }
 }
+
+// =============================================================================
+// [v2.9.2] hack.c 대량 이식  이동 유틸리티/자동탐험/이동제한/지형효과
+// 원본: nethack-3.6.7/src/hack.c (2,939줄)
+// =============================================================================
+
+/// [v2.9.2] 이동 방향 벡터 (원본: hack.c xdir/ydir)
+pub fn direction_vector(direction: u8) -> (i32, i32) {
+    match direction {
+        0 => (0, -1),  // N
+        1 => (1, -1),  // NE
+        2 => (1, 0),   // E
+        3 => (1, 1),   // SE
+        4 => (0, 1),   // S
+        5 => (-1, 1),  // SW
+        6 => (-1, 0),  // W
+        7 => (-1, -1), // NW
+        _ => (0, 0),
+    }
+}
+
+/// [v2.9.2] 반대 방향 (원본: hack.c opp_dir)
+pub fn opposite_direction(direction: u8) -> u8 {
+    (direction + 4) % 8
+}
+
+/// [v2.9.2] 두 좌표 간 거리 (원본: hack.c distmin)
+pub fn distance_min(x1: i32, y1: i32, x2: i32, y2: i32) -> i32 {
+    let dx = (x1 - x2).abs();
+    let dy = (y1 - y2).abs();
+    dx.max(dy) // Chebyshev distance
+}
+
+/// [v2.9.2] 유클리드 거리 제곱 (원본: hack.c dist2)
+pub fn distance_squared(x1: i32, y1: i32, x2: i32, y2: i32) -> i32 {
+    let dx = x1 - x2;
+    let dy = y1 - y2;
+    dx * dx + dy * dy
+}
+
+/// [v2.9.2] 직선 상에 있는지 (원본: hack.c online2)
+pub fn on_line(x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
+    let dx = (x1 - x2).abs();
+    let dy = (y1 - y2).abs();
+    dx == 0 || dy == 0 || dx == dy
+}
+
+/// [v2.9.2] 타일 통과 가능 여부 (원본: hack.c test_move)
+pub fn can_pass_tile(
+    tile_type: TileType,
+    is_levitating: bool,
+    is_flying: bool,
+    has_water_walking: bool,
+    is_swimming: bool,
+    passes_walls: bool,
+) -> bool {
+    match tile_type {
+        TileType::Stone => passes_walls,
+        t if t.is_wall() => passes_walls,
+        TileType::Pool | TileType::Moat | TileType::Water => {
+            is_levitating || is_flying || has_water_walking || is_swimming
+        }
+        TileType::LavaPool => is_levitating || is_flying,
+        TileType::Door
+        | TileType::OpenDoor
+        | TileType::Room
+        | TileType::Corr
+        | TileType::StairsUp
+        | TileType::StairsDown
+        | TileType::Altar
+        | TileType::Fountain
+        | TileType::Throne
+        | TileType::Grave
+        | TileType::Ladder
+        | TileType::Ice
+        | TileType::Air => true,
+        _ => true,
+    }
+}
+
+/// [v2.9.2] 대각선 이동 제한 (원본: hack.c bad_rock)
+/// 벽/돌 사이 대각선 이동 불가 (꺽어서 이동 필요)
+pub fn diagonal_blocked(
+    from_x: i32,
+    from_y: i32,
+    to_x: i32,
+    to_y: i32,
+    is_wall_fn: impl Fn(i32, i32) -> bool,
+) -> bool {
+    let dx = to_x - from_x;
+    let dy = to_y - from_y;
+
+    // 대각선이 아니면 항상 허용
+    if dx == 0 || dy == 0 {
+        return false;
+    }
+
+    // 양 옆이 모두 벽이면 대각선 불가
+    let wall_h = is_wall_fn(to_x, from_y); // 수평 방향 벽
+    let wall_v = is_wall_fn(from_x, to_y); // 수직 방향 벽
+
+    wall_h && wall_v
+}
+
+/// [v2.9.2] 자동 이동(travel) 다음 스텝 (원본: hack.c findtravelpath)
+/// BFS 기반 경로 탐색  다음 이동 방향 반환
+pub fn find_travel_step(
+    from_x: i32,
+    from_y: i32,
+    to_x: i32,
+    to_y: i32,
+    max_cols: i32,
+    max_rows: i32,
+    is_passable: impl Fn(i32, i32) -> bool,
+) -> Option<(i32, i32)> {
+    if from_x == to_x && from_y == to_y {
+        return None; // 이미 도착
+    }
+
+    // BFS
+    let mut visited = std::collections::HashSet::new();
+    let mut queue = std::collections::VecDeque::new();
+    // (x, y, first_step_x, first_step_y)
+    for d in 0..8u8 {
+        let (ddx, ddy) = direction_vector(d);
+        let nx = from_x + ddx;
+        let ny = from_y + ddy;
+        if nx >= 0 && nx < max_cols && ny >= 0 && ny < max_rows && is_passable(nx, ny) {
+            if nx == to_x && ny == to_y {
+                return Some((ddx, ddy));
+            }
+            visited.insert((nx, ny));
+            queue.push_back((nx, ny, ddx, ddy));
+        }
+    }
+
+    while let Some((cx, cy, fx, fy)) = queue.pop_front() {
+        for d in 0..8u8 {
+            let (ddx, ddy) = direction_vector(d);
+            let nx = cx + ddx;
+            let ny = cy + ddy;
+            if nx >= 0
+                && nx < max_cols
+                && ny >= 0
+                && ny < max_rows
+                && !visited.contains(&(nx, ny))
+                && is_passable(nx, ny)
+            {
+                if nx == to_x && ny == to_y {
+                    return Some((fx, fy));
+                }
+                visited.insert((nx, ny));
+                // BFS 최대 탐색 범위 제한
+                if visited.len() > 2000 {
+                    return None;
+                }
+                queue.push_back((nx, ny, fx, fy));
+            }
+        }
+    }
+
+    None // 경로 없음
+}
+
+/// [v2.9.2] 얼음 미끄러짐 (원본: hack.c slip_on_ice)
+pub fn ice_slip_check(
+    dex: i32,
+    has_boots_of_gripping: bool,
+    is_fumbling: bool,
+    rng: &mut NetHackRng,
+) -> bool {
+    if has_boots_of_gripping {
+        return false;
+    }
+
+    let mut slip_chance = 10; // 기본 10%
+    if is_fumbling {
+        slip_chance += 30;
+    }
+    if dex < 10 {
+        slip_chance += (10 - dex) * 3;
+    }
+    if dex >= 18 {
+        slip_chance = slip_chance.saturating_sub(5);
+    }
+
+    rng.rn2(100) < slip_chance
+}
+
+/// [v2.9.2] 문 열기 시도 (원본: hack.c doopen)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DoorOpenResult {
+    /// 성공
+    Opened,
+    /// 잠김 (자물쇠)
+    Locked,
+    /// 걸림 (열쇠 필요 없이 힘으로)
+    Stuck,
+    /// 문이 아님
+    NotADoor,
+    /// 이미 열려있음
+    AlreadyOpen,
+}
+
+/// [v2.9.2] 문 열기 판정
+pub fn try_open_door(
+    is_door: bool,
+    is_open: bool,
+    is_locked: bool,
+    player_str: i32,
+    rng: &mut NetHackRng,
+) -> DoorOpenResult {
+    if !is_door {
+        return DoorOpenResult::NotADoor;
+    }
+    if is_open {
+        return DoorOpenResult::AlreadyOpen;
+    }
+    if is_locked {
+        return DoorOpenResult::Locked;
+    }
+
+    // 힘 기반 문 여는 판정
+    if rng.rn2(100) < (player_str * 4 + 20).min(95) {
+        DoorOpenResult::Opened
+    } else {
+        DoorOpenResult::Stuck
+    }
+}
+
+/// [v2.9.2] 문 부수기 (원본: hack.c kick_door)
+pub fn kick_door(player_str: i32, is_locked: bool, rng: &mut NetHackRng) -> (bool, &'static str) {
+    if !is_locked {
+        if rng.rn2(3) < 2 {
+            (true, "As you kick the door, it crashes open!")
+        } else {
+            (false, "The door shudders but holds.")
+        }
+    } else {
+        let break_chance = player_str * 3;
+        if rng.rn2(100) < break_chance.min(70) {
+            (true, "As you kick the door, it crashes open!")
+        } else {
+            (false, "THUD! The locked door resists your kick.")
+        }
+    }
+}
+
+/// [v2.9.2] 이동 속도 계산 (원본: hack.c moveloop speed)
+pub fn movement_points(
+    base_speed: i32,
+    is_fast: bool,
+    is_very_fast: bool,
+    is_slow: bool,
+    encumbrance_level: i32, // 0=unenc, 1=burdened, 2=stressed, 3=strained, 4=overtaxed
+) -> i32 {
+    let mut speed = base_speed;
+    if is_very_fast {
+        speed += 8;
+    } else if is_fast {
+        speed += 4;
+    }
+    if is_slow {
+        speed -= 4;
+    }
+
+    // 부하 감속
+    speed -= encumbrance_level * 2;
+
+    speed.max(1)
+}
+
+/// [v2.9.2] 자동 줍기 필터 (원본: hack.c autopickup)
+pub fn should_autopickup(
+    item_class: &str,
+    autopickup_classes: &[&str],
+    item_cursed_known: bool,
+    item_is_cursed: bool,
+) -> bool {
+    // 저주된 걸로 알려진 아이템은 무시
+    if item_cursed_known && item_is_cursed {
+        return false;
+    }
+    autopickup_classes.contains(&item_class)
+}
+
+/// [v2.9.2] 이동 통계
+#[derive(Debug, Clone, Default)]
+pub struct MovementStatistics {
+    pub steps_taken: u64,
+    pub doors_opened: u32,
+    pub doors_kicked: u32,
+    pub ice_slips: u32,
+    pub bumps: u32,
+    pub boulder_pushes: u32,
+    pub travel_uses: u32,
+}
+
+impl MovementStatistics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn record_step(&mut self) {
+        self.steps_taken += 1;
+    }
+    pub fn record_door_open(&mut self) {
+        self.doors_opened += 1;
+    }
+    pub fn record_ice_slip(&mut self) {
+        self.ice_slips += 1;
+    }
+    pub fn record_bump(&mut self) {
+        self.bumps += 1;
+    }
+}
+
+// =============================================================================
+// [v2.9.2] hack.c 테스트
+// =============================================================================
+#[cfg(test)]
+mod movement_v292_tests {
+    use super::*;
+
+    #[test]
+    fn test_direction_vector() {
+        assert_eq!(direction_vector(0), (0, -1)); // N
+        assert_eq!(direction_vector(4), (0, 1)); // S
+        assert_eq!(direction_vector(2), (1, 0)); // E
+    }
+
+    #[test]
+    fn test_opposite_direction() {
+        assert_eq!(opposite_direction(0), 4); // N  S
+        assert_eq!(opposite_direction(1), 5); // NE  SW
+    }
+
+    #[test]
+    fn test_distance_min() {
+        assert_eq!(distance_min(0, 0, 3, 4), 4);
+        assert_eq!(distance_min(0, 0, 5, 5), 5);
+    }
+
+    #[test]
+    fn test_distance_squared() {
+        assert_eq!(distance_squared(0, 0, 3, 4), 25);
+    }
+
+    #[test]
+    fn test_on_line() {
+        assert!(on_line(0, 0, 0, 5)); // 수직
+        assert!(on_line(0, 0, 5, 0)); // 수평
+        assert!(on_line(0, 0, 3, 3)); // 대각
+        assert!(!on_line(0, 0, 2, 3)); // 비직선
+    }
+
+    #[test]
+    fn test_can_pass_room() {
+        assert!(can_pass_tile(
+            TileType::Room,
+            false,
+            false,
+            false,
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn test_can_pass_wall() {
+        assert!(!can_pass_tile(
+            TileType::Stone,
+            false,
+            false,
+            false,
+            false,
+            false
+        ));
+        assert!(can_pass_tile(
+            TileType::Stone,
+            false,
+            false,
+            false,
+            false,
+            true
+        ));
+    }
+
+    #[test]
+    fn test_can_pass_water() {
+        assert!(!can_pass_tile(
+            TileType::Pool,
+            false,
+            false,
+            false,
+            false,
+            false
+        ));
+        assert!(can_pass_tile(
+            TileType::Pool,
+            true,
+            false,
+            false,
+            false,
+            false
+        ));
+        assert!(can_pass_tile(
+            TileType::Pool,
+            false,
+            false,
+            true,
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn test_diagonal_blocked() {
+        let walls = |x: i32, y: i32| x == 1 && y == 0 || x == 0 && y == 1;
+        assert!(diagonal_blocked(0, 0, 1, 1, walls));
+    }
+
+    #[test]
+    fn test_diagonal_not_blocked() {
+        let walls = |_x: i32, _y: i32| false;
+        assert!(!diagonal_blocked(0, 0, 1, 1, walls));
+    }
+
+    #[test]
+    fn test_travel_adjacent() {
+        let step = find_travel_step(0, 0, 1, 0, 80, 21, |_, _| true);
+        assert_eq!(step, Some((1, 0)));
+    }
+
+    #[test]
+    fn test_travel_same_pos() {
+        let step = find_travel_step(5, 5, 5, 5, 80, 21, |_, _| true);
+        assert!(step.is_none());
+    }
+
+    #[test]
+    fn test_ice_slip_gripping() {
+        let mut rng = NetHackRng::new(42);
+        assert!(!ice_slip_check(10, true, false, &mut rng));
+    }
+
+    #[test]
+    fn test_open_door() {
+        let mut rng = NetHackRng::new(42);
+        let r = try_open_door(true, false, false, 18, &mut rng);
+        assert!(r == DoorOpenResult::Opened || r == DoorOpenResult::Stuck);
+    }
+
+    #[test]
+    fn test_open_locked_door() {
+        let mut rng = NetHackRng::new(42);
+        let r = try_open_door(true, false, true, 18, &mut rng);
+        assert_eq!(r, DoorOpenResult::Locked);
+    }
+
+    #[test]
+    fn test_kick_door() {
+        let mut rng = NetHackRng::new(42);
+        let (broke, msg) = kick_door(18, true, &mut rng);
+        assert!(!msg.is_empty());
+        let _ = broke; // 확률적
+    }
+
+    #[test]
+    fn test_movement_points() {
+        let sp = movement_points(12, true, false, false, 0);
+        assert_eq!(sp, 16);
+        let sp2 = movement_points(12, false, false, true, 2);
+        assert_eq!(sp2, 4); // 12 - 4 - 4
+    }
+
+    #[test]
+    fn test_autopickup() {
+        assert!(should_autopickup("gold", &["gold", "gem"], false, false));
+        assert!(!should_autopickup("scroll", &["gold", "gem"], false, false));
+        assert!(!should_autopickup("gold", &["gold"], true, true)); // 저주된 건 무시
+    }
+
+    #[test]
+    fn test_movement_stats() {
+        let mut s = MovementStatistics::new();
+        s.record_step();
+        s.record_step();
+        s.record_door_open();
+        assert_eq!(s.steps_taken, 2);
+        assert_eq!(s.doors_opened, 1);
+    }
+}

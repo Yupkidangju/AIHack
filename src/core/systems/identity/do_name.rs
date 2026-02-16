@@ -689,3 +689,480 @@ mod do_name_extended_tests {
         assert_eq!(enchantment_display(-1), "-1 ");
     }
 }
+
+// =============================================================================
+// [v2.4.0] do_name.c 후반부 대량 이식
+// 원본: nethack-3.6.7/src/do_name.c (2103-2289)
+// 환각 색상/액체, Discworld 소설, 오크 이름, 코요테, 좌표 설명 등
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// 환각용 색상 테이블 (원본: do_name.c:2103-2111 hcolors[])
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] 환각 시 표시되는 가짜 색상 테이블 (원본: hcolors[])
+pub const HALLUCINATION_COLORS: &[&str] = &[
+    "ultraviolet",
+    "infrared",
+    "bluish-orange",
+    "reddish-green",
+    "dark white",
+    "light black",
+    "sky blue-pink",
+    "salty",
+    "sweet",
+    "sour",
+    "bitter",
+    "striped",
+    "spiral",
+    "swirly",
+    "plaid",
+    "checkered",
+    "argyle",
+    "paisley",
+    "blotchy",
+    "guernsey-spotted",
+    "polka-dotted",
+    "square",
+    "round",
+    "triangular",
+    "cabernet",
+    "sangria",
+    "fuchsia",
+    "wisteria",
+    "lemon-lime",
+    "strawberry-banana",
+    "peppermint",
+    "romantic",
+    "incandescent",
+    "octarine", // Discworld: 마법의 색
+];
+
+/// [v2.4.0] 환각 상태에서 색상 반환 (원본: hcolor)
+pub fn hcolor(color_pref: Option<&str>, rng: &mut NetHackRng) -> String {
+    match color_pref {
+        Some(c) => c.to_string(),
+        None => {
+            let idx = rng.rn2(HALLUCINATION_COLORS.len() as i32) as usize;
+            HALLUCINATION_COLORS[idx].to_string()
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 환각용 액체 테이블 (원본: do_name.c:2133-2141 hliquids[])
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] 환각 시 표시되는 가짜 액체 테이블 (원본: hliquids[])
+pub const HALLUCINATION_LIQUIDS: &[&str] = &[
+    "yoghurt",
+    "oobleck",
+    "clotted blood",
+    "diluted water",
+    "purified water",
+    "instant coffee",
+    "tea",
+    "herbal infusion",
+    "liquid rainbow",
+    "creamy foam",
+    "mulled wine",
+    "bouillon",
+    "nectar",
+    "grog",
+    "flubber",
+    "ketchup",
+    "slow light",
+    "oil",
+    "vinaigrette",
+    "liquid crystal",
+    "honey",
+    "caramel sauce",
+    "ink",
+    "aqueous humour",
+    "milk substitute",
+    "fruit juice",
+    "glowing lava",
+    "gastric acid",
+    "mineral water",
+    "cough syrup",
+    "quicksilver",
+    "sweet vitriol",
+    "grey goo",
+    "pink slime",
+];
+
+/// [v2.4.0] 환각 상태에서 액체 반환 (원본: hliquid)
+pub fn hliquid(liquid_pref: Option<&str>, rng: &mut NetHackRng) -> String {
+    match liquid_pref {
+        Some(l) => l.to_string(),
+        None => {
+            let idx = rng.rn2(HALLUCINATION_LIQUIDS.len() as i32) as usize;
+            HALLUCINATION_LIQUIDS[idx].to_string()
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Discworld 소설 목록 (원본: do_name.c:2232-2244 sir_Terry_novels[])
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] Terry Pratchett Discworld 소설 목록 (원본: sir_Terry_novels[])
+pub const DISCWORLD_NOVELS: &[&str] = &[
+    "The Colour of Magic",
+    "The Light Fantastic",
+    "Equal Rites",
+    "Mort",
+    "Sourcery",
+    "Wyrd Sisters",
+    "Pyramids",
+    "Guards! Guards!",
+    "Eric",
+    "Moving Pictures",
+    "Reaper Man",
+    "Witches Abroad",
+    "Small Gods",
+    "Lords and Ladies",
+    "Men at Arms",
+    "Soul Music",
+    "Interesting Times",
+    "Maskerade",
+    "Feet of Clay",
+    "Hogfather",
+    "Jingo",
+    "The Last Continent",
+    "Carpe Jugulum",
+    "The Fifth Elephant",
+    "The Truth",
+    "Thief of Time",
+    "The Last Hero",
+    "The Amazing Maurice and His Educated Rodents",
+    "Night Watch",
+    "The Wee Free Men",
+    "Monstrous Regiment",
+    "A Hat Full of Sky",
+    "Going Postal",
+    "Thud!",
+    "Wintersmith",
+    "Making Money",
+    "Unseen Academicals",
+    "I Shall Wear Midnight",
+    "Snuff",
+    "Raising Steam",
+    "The Shepherd's Crown",
+];
+
+/// [v2.4.0] 랜덤 소설 제목 (원본: noveltitle)
+pub fn novel_title(rng: &mut NetHackRng) -> &'static str {
+    let idx = rng.rn2(DISCWORLD_NOVELS.len() as i32) as usize;
+    DISCWORLD_NOVELS[idx]
+}
+
+/// [v2.4.0] 소설 이름 조회 (원본: lookup_novel)
+/// 미국식 "Color" ↔ 영국식 "Colour" 변환 지원
+pub fn lookup_novel(name: &str) -> Option<&'static str> {
+    // "The Color of Magic" → "The Colour of Magic" 변환
+    let normalized = if name.eq_ignore_ascii_case("The Color of Magic")
+        || name.eq_ignore_ascii_case("Color of Magic")
+    {
+        "The Colour of Magic"
+    } else {
+        name
+    };
+
+    DISCWORLD_NOVELS
+        .iter()
+        .find(|n| {
+            n.eq_ignore_ascii_case(normalized)
+                || format!("The {}", normalized).eq_ignore_ascii_case(n)
+        })
+        .copied()
+}
+
+// ---------------------------------------------------------------------------
+// 코요테 별칭 (원본: do_name.c:2153-2162 coynames[])
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] 로드러너의 천적 코요테 학명 별칭 (원본: coynames[])
+pub const COYOTE_ALIASES: &[&str] = &[
+    "Carnivorous Vulgaris",
+    "Road-Runnerus Digestus",
+    "Eatibus Anythingus",
+    "Famishus-Famishus",
+    "Eatibus Almost Anythingus",
+    "Eatius Birdius",
+    "Famishius Fantasticus",
+    "Eternalii Famishiis",
+    "Famishus Vulgarus",
+    "Famishius Vulgaris Ingeniusi",
+    "Eatius-Slobbius",
+    "Hardheadipus Oedipus",
+    "Carnivorous Slobbius",
+    "Hard-Headipus Ravenus",
+    "Evereadii Eatibus",
+    "Apetitius Giganticus",
+    "Hungrii Flea-Bagius",
+    "Overconfidentii Vulgaris",
+    "Caninus Nervous Rex",
+    "Grotesques Appetitus",
+    "Nemesis Ridiculii",
+    "Canis latrans",
+];
+
+/// [v2.4.0] 코요테 이름 생성 (원본: coyotename)
+pub fn coyote_name(monster_name: &str, monster_id: u32, is_cancelled: bool) -> String {
+    let alias = if is_cancelled {
+        COYOTE_ALIASES[COYOTE_ALIASES.len() - 1] // 마지막: "Canis latrans" (정식 학명)
+    } else {
+        COYOTE_ALIASES[(monster_id as usize) % (COYOTE_ALIASES.len() - 1)]
+    };
+    format!("{} - {}", monster_name, alias)
+}
+
+// ---------------------------------------------------------------------------
+// 오크 이름 생성 (원본: do_name.c:2178-2196 rndorcname)
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] 오크 이름용 모음
+const ORC_VOWELS: &[&str] = &["a", "ai", "og", "u"];
+
+/// [v2.4.0] 오크 이름용 자음
+const ORC_CONSONANTS: &[&str] = &[
+    "gor", "gris", "un", "bane", "ruk", "oth", "ul", "z", "thos", "akh", "hai",
+];
+
+/// [v2.4.0] 랜덤 오크 이름 생성 (원본: rndorcname)
+pub fn random_orc_name(rng: &mut NetHackRng) -> String {
+    let syllable_count = 3 + rng.rn2(2) as usize; // 3~4 음절
+    let mut vowel_start = rng.rn2(2) != 0;
+    let mut name = String::new();
+
+    for i in 0..syllable_count {
+        // 30분의 1 확률로 하이픈 삽입 (첫 음절 제외)
+        if i > 0 && rng.rn2(30) == 0 {
+            name.push('-');
+        }
+
+        if vowel_start {
+            let idx = rng.rn2(ORC_VOWELS.len() as i32) as usize;
+            name.push_str(ORC_VOWELS[idx]);
+        } else {
+            let idx = rng.rn2(ORC_CONSONANTS.len() as i32) as usize;
+            name.push_str(ORC_CONSONANTS[idx]);
+        }
+        vowel_start = !vowel_start; // 모음/자음 교대
+    }
+
+    // 첫 글자 대문자
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+        None => name,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 좌표 설명 확장 (원본: do_name.c:458-493 dxdy_to_dist_descr)
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] 좌표 차이를 거리 설명으로 변환 (원본: dxdy_to_dist_descr)
+pub fn distance_description(dx: i32, dy: i32, full_dir: bool) -> String {
+    if dx == 0 && dy == 0 {
+        return "here".to_string();
+    }
+
+    // 단일 이동 방향인 경우
+    if dx.abs() <= 1 && dy.abs() <= 1 {
+        return direction_name(dx, dy).to_string();
+    }
+
+    // 복합 이동
+    let dir_names: [(&str, &str); 4] =
+        [("n", "north"), ("s", "south"), ("w", "west"), ("e", "east")];
+
+    let mut parts = Vec::new();
+
+    if dy != 0 {
+        let dir_idx = if dy > 0 { 1 } else { 0 };
+        let dir = if full_dir {
+            dir_names[dir_idx].1
+        } else {
+            dir_names[dir_idx].0
+        };
+        parts.push(format!("{}{}", dy.abs(), dir));
+    }
+
+    if dx != 0 {
+        let dir_idx = if dx > 0 { 3 } else { 2 };
+        let dir = if full_dir {
+            dir_names[dir_idx].1
+        } else {
+            dir_names[dir_idx].0
+        };
+        parts.push(format!("{}{}", dx.abs(), dir));
+    }
+
+    parts.join(",")
+}
+
+// ---------------------------------------------------------------------------
+// 몬스터 관사 헬퍼 (원본: do_name.c:1898-1939)
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] 몬스터 관사 유형 (원본: ARTICLE_NONE/THE/A/YOUR)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MonsterArticle {
+    /// 관사 없음
+    None,
+    /// 정관사 "the"
+    The,
+    /// 부정관사 "a/an"
+    A,
+    /// 소유격 "your"
+    Your,
+}
+
+/// [v2.4.0] 몬스터 이름에 관사 적용 (원본: mon_nam, a_monnam, Adjmonnam)
+pub fn monster_with_article(name: &str, article_type: MonsterArticle) -> String {
+    match article_type {
+        MonsterArticle::None => name.to_string(),
+        MonsterArticle::The => format!("the {}", name),
+        MonsterArticle::A => a_name(name),
+        MonsterArticle::Your => format!("your {}", name),
+    }
+}
+
+/// [v2.4.0] 대문자 시작 몬스터 이름 (원본: Adjmonnam, Amonnam)
+pub fn monster_with_article_cap(name: &str, article_type: MonsterArticle) -> String {
+    let result = monster_with_article(name, article_type);
+    let mut chars = result.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+        None => result,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 재귀적 대명사 (원본: do_name.c:1964-1987 mon_nam_too)
+// ---------------------------------------------------------------------------
+
+/// [v2.4.0] 성별 기반 재귀 대명사 (원본: mon_nam_too)
+pub fn reflexive_pronoun(gender: u8) -> &'static str {
+    match gender {
+        0 => "himself",
+        1 => "herself",
+        _ => "itself",
+    }
+}
+
+/// [v2.4.0] 로그 이름 (원본: roguename)
+pub fn rogue_name(rng: &mut NetHackRng) -> &'static str {
+    match rng.rn2(3) {
+        0 => "Glenn Wichman",
+        1 => "Michael Toy",
+        _ => "Kenneth Arnold",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 테스트
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod do_name_v240_tests {
+    use super::*;
+
+    #[test]
+    fn test_hallucination_colors() {
+        let mut rng = NetHackRng::new(42);
+        let color = hcolor(None, &mut rng);
+        assert!(!color.is_empty());
+        assert!(HALLUCINATION_COLORS.contains(&color.as_str()));
+
+        // 선호 색상 지정 시 그대로 반환
+        assert_eq!(hcolor(Some("red"), &mut rng), "red");
+    }
+
+    #[test]
+    fn test_hallucination_liquids() {
+        let mut rng = NetHackRng::new(42);
+        let liquid = hliquid(None, &mut rng);
+        assert!(!liquid.is_empty());
+        assert!(HALLUCINATION_LIQUIDS.contains(&liquid.as_str()));
+    }
+
+    #[test]
+    fn test_novel_title() {
+        let mut rng = NetHackRng::new(42);
+        let title = novel_title(&mut rng);
+        assert!(DISCWORLD_NOVELS.contains(&title));
+    }
+
+    #[test]
+    fn test_lookup_novel() {
+        assert_eq!(lookup_novel("Mort"), Some("Mort"));
+        assert_eq!(
+            lookup_novel("The Color of Magic"),
+            Some("The Colour of Magic")
+        );
+        assert_eq!(lookup_novel("nonexistent book"), None);
+    }
+
+    #[test]
+    fn test_coyote_name() {
+        let name = coyote_name("coyote", 5, false);
+        assert!(name.starts_with("coyote - "));
+
+        let cancelled = coyote_name("coyote", 0, true);
+        assert!(cancelled.contains("Canis latrans"));
+    }
+
+    #[test]
+    fn test_random_orc_name() {
+        let mut rng = NetHackRng::new(42);
+        let name = random_orc_name(&mut rng);
+        assert!(!name.is_empty());
+        // 첫 글자 대문자 확인
+        assert!(name.chars().next().unwrap().is_uppercase());
+    }
+
+    #[test]
+    fn test_distance_description() {
+        assert_eq!(distance_description(0, 0, false), "here");
+        assert_eq!(distance_description(0, -1, false), "north");
+        assert_eq!(distance_description(3, -5, false), "5n,3e");
+        assert_eq!(distance_description(3, -5, true), "5north,3east");
+    }
+
+    #[test]
+    fn test_monster_with_article() {
+        assert_eq!(monster_with_article("orc", MonsterArticle::The), "the orc");
+        assert_eq!(monster_with_article("orc", MonsterArticle::A), "an orc");
+        assert_eq!(
+            monster_with_article("orc", MonsterArticle::Your),
+            "your orc"
+        );
+        assert_eq!(monster_with_article("orc", MonsterArticle::None), "orc");
+    }
+
+    #[test]
+    fn test_monster_with_article_cap() {
+        assert_eq!(
+            monster_with_article_cap("orc", MonsterArticle::The),
+            "The orc"
+        );
+        assert_eq!(monster_with_article_cap("orc", MonsterArticle::A), "An orc");
+    }
+
+    #[test]
+    fn test_reflexive_pronoun() {
+        assert_eq!(reflexive_pronoun(0), "himself");
+        assert_eq!(reflexive_pronoun(1), "herself");
+        assert_eq!(reflexive_pronoun(2), "itself");
+    }
+
+    #[test]
+    fn test_rogue_name() {
+        let mut rng = NetHackRng::new(42);
+        let name = rogue_name(&mut rng);
+        assert!(!name.is_empty());
+    }
+}

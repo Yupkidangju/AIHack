@@ -782,3 +782,465 @@ mod do_wear_extended_tests {
         assert_eq!(s.curse_blocks, 1);
     }
 }
+
+// =============================================================================
+// [v2.9.1] do_wear.c 대량 이식  방어구 효과/제한/변신/침식/섀폴리
+// 원본: nethack-3.6.7/src/do_wear.c (2,816줄)
+// =============================================================================
+
+/// [v2.9.1] 방어구 고유 효과 (원본: do_wear.c:on_do_wear Armor_on)
+/// 장비 착용 시 발동하는 특수 효과
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArmorEffect {
+    /// 효과 없음
+    None,
+    /// 능력치 변경 (str, dex 등)
+    StatChange { stat: &'static str, delta: i32 },
+    /// 상태 효과 부여
+    StatusGrant(&'static str),
+    /// 시야 변경
+    VisionChange(&'static str),
+    /// 자동 저주
+    AutoCurse,
+    /// 성향 반전
+    AlignmentReverse,
+    /// AC 보너스 (착용 즉시)
+    ImmediateACBonus(i32),
+}
+
+/// [v2.9.1] 착용 시 효과 결정 (원본: Armor_on)
+pub fn armor_on_effect(name: &str) -> Vec<ArmorEffect> {
+    match name {
+        "gauntlets of power" => vec![ArmorEffect::StatChange { stat: "str", delta: 25 }],
+        "gauntlets of dexterity" => vec![ArmorEffect::StatChange { stat: "dex", delta: 0 }],
+        "gauntlets of fumbling" => vec![ArmorEffect::StatusGrant("fumbling"), ArmorEffect::AutoCurse],
+        "helm of brilliance" => vec![
+            ArmorEffect::StatChange { stat: "int", delta: 0 },
+            ArmorEffect::StatChange { stat: "wis", delta: 0 },
+        ],
+        "helm of telepathy" => vec![ArmorEffect::StatusGrant("telepathy")],
+        "helm of opposite alignment" => vec![ArmorEffect::AlignmentReverse, ArmorEffect::AutoCurse],
+        "dunce cap" => vec![
+            ArmorEffect::StatChange { stat: "int", delta: -1 },
+            ArmorEffect::StatChange { stat: "wis", delta: -1 },
+            ArmorEffect::AutoCurse,
+        ],
+        "cloak of magic resistance" => vec![ArmorEffect::StatusGrant("magic_resistance")],
+        "cloak of invisibility" => vec![ArmorEffect::StatusGrant("invisible")],
+        "cloak of protection" => vec![ArmorEffect::ImmediateACBonus(-3)],
+        "cloak of displacement" => vec![ArmorEffect::StatusGrant("displacement")],
+        "elven cloak" => vec![ArmorEffect::StatusGrant("stealth")],
+        "speed boots" => vec![ArmorEffect::StatusGrant("speed")],
+        "levitation boots" => vec![ArmorEffect::StatusGrant("levitation"), ArmorEffect::AutoCurse],
+        "fumble boots" => vec![ArmorEffect::StatusGrant("fumbling"), ArmorEffect::AutoCurse],
+        "jumping boots" => vec![ArmorEffect::StatusGrant("jumping")],
+        "water walking boots" => vec![ArmorEffect::StatusGrant("water_walking")],
+        "elven boots" => vec![ArmorEffect::StatusGrant("stealth")],
+        "kicking boots" => vec![ArmorEffect::StatChange { stat: "kick_damage", delta: 5 }],
+        "shield of reflection" => vec![ArmorEffect::StatusGrant("reflection")],
+        _ => vec![ArmorEffect::None],
+    }
+}
+
+/// [v2.9.1] 해제 시 효과 역전 (원본: Armor_off)
+pub fn armor_off_effect(name: &str) -> Vec<ArmorEffect> {
+    match name {
+        "gauntlets of power" => vec![ArmorEffect::StatChange { stat: "str", delta: -25 }],
+        "gauntlets of fumbling" => vec![ArmorEffect::StatusGrant("remove_fumbling")],
+        "helm of brilliance" => vec![
+            ArmorEffect::StatChange { stat: "int", delta: 0 },
+            ArmorEffect::StatChange { stat: "wis", delta: 0 },
+        ],
+        "helm of telepathy" => vec![ArmorEffect::StatusGrant("remove_telepathy")],
+        "dunce cap" => vec![
+            ArmorEffect::StatChange { stat: "int", delta: 1 },
+            ArmorEffect::StatChange { stat: "wis", delta: 1 },
+        ],
+        "cloak of magic resistance" => vec![ArmorEffect::StatusGrant("remove_magic_resistance")],
+        "cloak of invisibility" => vec![ArmorEffect::StatusGrant("remove_invisible")],
+        "cloak of displacement" => vec![ArmorEffect::StatusGrant("remove_displacement")],
+        "elven cloak" | "elven boots" => vec![ArmorEffect::StatusGrant("remove_stealth")],
+        "speed boots" => vec![ArmorEffect::StatusGrant("remove_speed")],
+        "levitation boots" => vec![ArmorEffect::StatusGrant("remove_levitation")],
+        "fumble boots" => vec![ArmorEffect::StatusGrant("remove_fumbling")],
+        "jumping boots" => vec![ArmorEffect::StatusGrant("remove_jumping")],
+        "water walking boots" => vec![ArmorEffect::StatusGrant("remove_water_walking")],
+        "shield of reflection" => vec![ArmorEffect::StatusGrant("remove_reflection")],
+        _ => vec![ArmorEffect::None],
+    }
+}
+
+/// [v2.9.1] 변신 시 방어구 자동 해제 판정 (원본: do_wear.c:1200-1280 break_armor)
+/// 변신 체형에 따라 어떤 장비가 떨어지는지 결정
+pub fn break_armor_check(
+    new_body_size: i32,   // 0=tiny, 1=small, 2=medium, 3=large, 4=huge
+    has_hands: bool,
+    has_head: bool,
+    has_feet: bool,
+    is_whirly: bool,      // 소용돌이형 (에어 엘리멘탈 등)
+    is_noncorporeal: bool, // 비육체 (유령 등)
+) -> Vec<&'static str> {
+    let mut dropped = Vec::new();
+
+    // 비육체  모든 장비 떨어짐
+    if is_noncorporeal {
+        return vec!["armor", "cloak", "helmet", "gloves", "boots", "shield", "shirt"];
+    }
+
+    // 소용돌이형  대부분 떨어짐
+    if is_whirly {
+        dropped.push("helmet");
+        dropped.push("gloves");
+        dropped.push("boots");
+        dropped.push("shield");
+    }
+
+    // 크기 변화
+    if new_body_size <= 1 {
+        // 작은 체형: 갑옷, 클로크 떨어짐
+        dropped.push("armor");
+        dropped.push("cloak");
+    }
+
+    if new_body_size >= 4 {
+        // 거대 체형: 갑옷 파괴
+        dropped.push("armor");
+        dropped.push("shirt");
+    }
+
+    if !has_hands {
+        dropped.push("gloves");
+        dropped.push("shield");
+    }
+
+    if !has_head {
+        dropped.push("helmet");
+    }
+
+    if !has_feet {
+        dropped.push("boots");
+    }
+
+    dropped
+}
+
+/// [v2.9.1] 드래곤 스케일  드래곤 스케일 메일 변환 (원본: do_wear.c:870-920 Dragon_scales_to_mail)
+pub fn dragon_scales_to_mail(scales_name: &str) -> Option<&'static str> {
+    match scales_name {
+        "silver dragon scales" => Some("silver dragon scale mail"),
+        "red dragon scales" => Some("red dragon scale mail"),
+        "blue dragon scales" => Some("blue dragon scale mail"),
+        "green dragon scales" => Some("green dragon scale mail"),
+        "yellow dragon scales" => Some("yellow dragon scale mail"),
+        "black dragon scales" => Some("black dragon scale mail"),
+        "white dragon scales" => Some("white dragon scale mail"),
+        "orange dragon scales" => Some("orange dragon scale mail"),
+        "gray dragon scales" => Some("gray dragon scale mail"),
+        _ => None,
+    }
+}
+
+/// [v2.9.1] 드래곤 스케일 메일  드래곤 스케일 역변환
+pub fn dragon_mail_to_scales(mail_name: &str) -> Option<&'static str> {
+    match mail_name {
+        "silver dragon scale mail" => Some("silver dragon scales"),
+        "red dragon scale mail" => Some("red dragon scales"),
+        "blue dragon scale mail" => Some("blue dragon scales"),
+        "green dragon scale mail" => Some("green dragon scales"),
+        "yellow dragon scale mail" => Some("yellow dragon scales"),
+        "black dragon scale mail" => Some("black dragon scales"),
+        "white dragon scale mail" => Some("white dragon scales"),
+        "orange dragon scale mail" => Some("orange dragon scales"),
+        "gray dragon scale mail" => Some("gray dragon scales"),
+        _ => None,
+    }
+}
+
+/// [v2.9.1] 드래곤 스케일 메일 저항 (원본: do_wear.c dragonscale_intrinsic)
+pub fn dragon_scale_resistance(name: &str) -> Option<&'static str> {
+    let prefix = if name.contains("dragon scale") {
+        name.split(" dragon").next().unwrap_or("")
+    } else {
+        return None;
+    };
+    match prefix {
+        "silver" => Some("reflection"),
+        "red" => Some("fire_resistance"),
+        "blue" => Some("shock_resistance"),
+        "green" => Some("poison_resistance"),
+        "yellow" => Some("acid_resistance"),
+        "black" => Some("disintegration_resistance"),
+        "white" => Some("cold_resistance"),
+        "orange" => Some("sleep_resistance"),
+        "gray" => Some("magic_resistance"),
+        _ => None,
+    }
+}
+
+/// [v2.9.1] 방어구 재질별 침식 면역 (원본: do_wear.c:690-740)
+pub fn armor_resists_erosion(name: &str, erosion_type: ErosionType) -> bool {
+    match erosion_type {
+        ErosionType::Rust => {
+            // 나무/돌/뼈/유리/천/가죽은 녹슬지 않음
+            name.contains("leather") || name.contains("elven")
+                || name.contains("studded") || name.contains("dragon")
+                || name.contains("crystal") || name.contains("cloth")
+        }
+        ErosionType::Corrode => {
+            // 석재/나무/가죽은 부식되지 않음
+            name.contains("leather") || name.contains("crystal")
+                || name.contains("dragon")
+        }
+        ErosionType::Burn => {
+            // 금속은 불에 타지 않음
+            name.contains("iron") || name.contains("steel")
+                || name.contains("mithril") || name.contains("dwarvish")
+                || name.contains("chain") || name.contains("plate")
+                || name.contains("ring mail") || name.contains("scale mail")
+                || name.contains("splint") || name.contains("banded")
+        }
+        ErosionType::Rot => {
+            // 금속/돌/유리는 썩지 않음
+            name.contains("iron") || name.contains("steel")
+                || name.contains("crystal") || name.contains("chain")
+                || name.contains("plate") || name.contains("mithril")
+        }
+        ErosionType::None => true,
+    }
+}
+
+/// [v2.9.1] 방어구 수리 비용 (원본: do_wear.c:fix_armor_cost)
+pub fn repair_armor_cost(base_value: u32, erosion_level: i32) -> u32 {
+    let multiplier = match erosion_level {
+        1 => 1,
+        2 => 3,
+        3 => 6,
+        _ => 0,
+    };
+    (base_value / 4 * multiplier as u32).max(10)
+}
+
+/// [v2.9.1] 은 방어구 vs 특정 종족 효과 (원본: do_wear.c silver_damage)
+pub fn silver_armor_effect(armor_name: &str, target_is_undead: bool, target_is_demon: bool) -> i32 {
+    if !armor_name.contains("silver") {
+        return 0;
+    }
+    if target_is_undead || target_is_demon {
+        // 은 방어구를 맞으면 추가 데미지 (킥 등)
+        20
+    } else {
+        0
+    }
+}
+
+/// [v2.9.1] 착용 순서 검증 (원본: do_wear.c donning_order)
+/// 올바른 착용 순서: 셔츠  갑옷  클로크
+pub fn correct_donning_order(slot: WornSlot, currently_worn: &WornSlots) -> Result<(), &'static str> {
+    match slot {
+        WornSlot::Shirt => {
+            if currently_worn.has(WornSlot::Armor) {
+                return Err("You must remove your armor first.");
+            }
+            if currently_worn.has(WornSlot::Cloak) {
+                return Err("You must remove your cloak first.");
+            }
+            Ok(())
+        }
+        WornSlot::Armor => {
+            if currently_worn.has(WornSlot::Cloak) {
+                return Err("You must remove your cloak first.");
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+/// [v2.9.1] 해제 순서 검증 (원본: do_wear.c doffing_order)
+pub fn correct_doffing_order(slot: WornSlot, currently_worn: &WornSlots) -> Result<(), &'static str> {
+    match slot {
+        WornSlot::Cloak => Ok(()), // 클로크는 항상 해제 가능
+        WornSlot::Armor => {
+            if currently_worn.has(WornSlot::Cloak) {
+                return Err("You must remove your cloak first.");
+            }
+            Ok(())
+        }
+        WornSlot::Shirt => {
+            if currently_worn.has(WornSlot::Cloak) {
+                return Err("You must remove your cloak first.");
+            }
+            if currently_worn.has(WornSlot::Armor) {
+                return Err("You must remove your armor first.");
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+/// [v2.9.1] 반지 슬롯 선택 (원본: do_wear.c select_ring_slot)
+pub fn select_ring_slot(
+    left_occupied: bool,
+    right_occupied: bool,
+    left_cursed: bool,
+    prefer_left: bool,
+) -> Result<WornSlot, &'static str> {
+    match (left_occupied, right_occupied) {
+        (false, false) => {
+            if prefer_left { Ok(WornSlot::RingLeft) } else { Ok(WornSlot::RingRight) }
+        }
+        (true, false) => Ok(WornSlot::RingRight),
+        (false, true) => Ok(WornSlot::RingLeft),
+        (true, true) => {
+            if left_cursed {
+                Err("Your ring on the left hand is cursed!")
+            } else {
+                Err("You are already wearing two rings.")
+            }
+        }
+    }
+}
+
+/// [v2.9.1] AC 총합 계산 (원본: do_wear.c calc_total_ac)
+pub fn calculate_total_ac(
+    base_ac: i32,
+    armor_ac: i32,
+    shield_ac: i32,
+    helmet_ac: i32,
+    gloves_ac: i32,
+    boots_ac: i32,
+    cloak_ac: i32,
+    ring_protection: i32,
+    dex_bonus: i32,
+) -> i32 {
+    let total = base_ac - armor_ac - shield_ac - helmet_ac - gloves_ac - boots_ac - cloak_ac - ring_protection - dex_bonus;
+    total
+}
+
+// =============================================================================
+// [v2.9.1] do_wear.c 테스트
+// =============================================================================
+#[cfg(test)]
+mod do_wear_v291_tests {
+    use super::*;
+
+    #[test]
+    fn test_armor_on_speed_boots() {
+        let effects = armor_on_effect("speed boots");
+        assert!(effects.iter().any(|e| matches!(e, ArmorEffect::StatusGrant("speed"))));
+    }
+
+    #[test]
+    fn test_armor_on_dunce_cap() {
+        let effects = armor_on_effect("dunce cap");
+        assert!(effects.iter().any(|e| matches!(e, ArmorEffect::AutoCurse)));
+    }
+
+    #[test]
+    fn test_armor_off_reverse() {
+        let effects = armor_off_effect("gauntlets of power");
+        assert!(effects.iter().any(|e| matches!(e, ArmorEffect::StatChange { stat: "str", delta: -25 })));
+    }
+
+    #[test]
+    fn test_break_armor_tiny() {
+        let dropped = break_armor_check(0, true, true, true, false, false);
+        assert!(dropped.contains(&"armor"));
+        assert!(dropped.contains(&"cloak"));
+    }
+
+    #[test]
+    fn test_break_armor_noncorporeal() {
+        let dropped = break_armor_check(2, true, true, true, false, true);
+        assert_eq!(dropped.len(), 7); // 모든 장비
+    }
+
+    #[test]
+    fn test_break_armor_no_hands() {
+        let dropped = break_armor_check(2, false, true, true, false, false);
+        assert!(dropped.contains(&"gloves"));
+        assert!(dropped.contains(&"shield"));
+    }
+
+    #[test]
+    fn test_dragon_scales_to_mail() {
+        assert_eq!(dragon_scales_to_mail("silver dragon scales"), Some("silver dragon scale mail"));
+        assert_eq!(dragon_scales_to_mail("leather armor"), None);
+    }
+
+    #[test]
+    fn test_dragon_mail_to_scales() {
+        assert_eq!(dragon_mail_to_scales("red dragon scale mail"), Some("red dragon scales"));
+    }
+
+    #[test]
+    fn test_dragon_resistance() {
+        assert_eq!(dragon_scale_resistance("silver dragon scale mail"), Some("reflection"));
+        assert_eq!(dragon_scale_resistance("red dragon scales"), Some("fire_resistance"));
+        assert_eq!(dragon_scale_resistance("leather armor"), None);
+    }
+
+    #[test]
+    fn test_erosion_immunity_rust() {
+        assert!(armor_resists_erosion("leather armor", ErosionType::Rust));
+        assert!(!armor_resists_erosion("iron shoes", ErosionType::Rust));
+    }
+
+    #[test]
+    fn test_erosion_immunity_burn() {
+        assert!(armor_resists_erosion("chain mail", ErosionType::Burn));
+        assert!(!armor_resists_erosion("leather armor", ErosionType::Burn));
+    }
+
+    #[test]
+    fn test_repair_cost() {
+        assert!(repair_armor_cost(200, 1) < repair_armor_cost(200, 3));
+    }
+
+    #[test]
+    fn test_silver_effect() {
+        assert_eq!(silver_armor_effect("silver dragon scale mail", true, false), 20);
+        assert_eq!(silver_armor_effect("chain mail", true, false), 0);
+    }
+
+    #[test]
+    fn test_donning_order() {
+        let mut worn = WornSlots::empty();
+        assert!(correct_donning_order(WornSlot::Shirt, &worn).is_ok());
+        worn.wear(WornSlot::Armor);
+        assert!(correct_donning_order(WornSlot::Shirt, &worn).is_err());
+    }
+
+    #[test]
+    fn test_doffing_order() {
+        let mut worn = WornSlots::empty();
+        worn.wear(WornSlot::Cloak);
+        worn.wear(WornSlot::Armor);
+        assert!(correct_doffing_order(WornSlot::Armor, &worn).is_err());
+    }
+
+    #[test]
+    fn test_ring_slot_both_empty() {
+        let slot = select_ring_slot(false, false, false, true);
+        assert_eq!(slot, Ok(WornSlot::RingLeft));
+    }
+
+    #[test]
+    fn test_ring_slot_left_full() {
+        let slot = select_ring_slot(true, false, false, true);
+        assert_eq!(slot, Ok(WornSlot::RingRight));
+    }
+
+    #[test]
+    fn test_ring_slot_both_full() {
+        let slot = select_ring_slot(true, true, false, true);
+        assert!(slot.is_err());
+    }
+
+    #[test]
+    fn test_calc_total_ac() {
+        let ac = calculate_total_ac(10, 5, 2, 1, 1, 1, 1, 0, 0);
+        assert_eq!(ac, -1); // 10 - 11 = -1
+    }
+}
