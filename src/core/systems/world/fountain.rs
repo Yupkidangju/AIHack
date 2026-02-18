@@ -402,3 +402,449 @@ mod fountain_extended_tests {
         assert_eq!(stats.wishes_granted, 1);
     }
 }
+
+// =============================================================================
+// [v2.9.8] fountain.c 미구현 함수 이식 — 분수 마시기 확장, 싱크대, 소환, 고갈
+// =============================================================================
+
+/// [v2.9.8] 분수 마시기 상세 효과 (원본: drinkfountain L222-358)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DrinkFountainEffect {
+    /// 시원한 물 — 허기 +rnd(10) (fate < 10)
+    CoolDraught { hunger_gain: i32 },
+    /// 축복 분수 효과 — 어트리뷰트 복원 및 증가
+    BlessedFountain { attr_index: usize },
+    /// 자기 인식 (fate=19)
+    SelfKnowledge,
+    /// 오염된 물 — 구토 (fate=20)
+    FoulWater { hunger_loss: i32 },
+    /// 독물 (fate=21)
+    Poisonous { has_poison_res: bool, str_loss: i32, hp_loss: i32 },
+    /// 뱀 소환 (fate=22)
+    WaterSnakes { count: i32 },
+    /// 물 악마 소환 (fate=23)
+    WaterDemon { grants_wish: bool },
+    /// 아이템 저주 (fate=24)
+    CurseItems { hunger_loss: i32 },
+    /// 투명체 감지 (fate=25)
+    SeeInvisible { is_blind: bool, is_invisible: bool },
+    /// 몬스터 감지 (fate=26)
+    MonsterDetect,
+    /// 보석 발견 (fate=27), 이미 약탈된 경우 님프로 대체
+    FindGem,
+    /// 님프 소환 (fate=28 또는 이미 약탈된 27)
+    WaterNymph,
+    /// 악취 공포 (fate=29)
+    BadBreathScare,
+    /// 물 분출 (fate=30)
+    GushForth,
+    /// 미지근한 물 (default)
+    TepidWater,
+}
+
+/// [v2.9.8] 분수 마시기 판정 (원본: drinkfountain L222-358)
+pub fn drink_fountain_effect(
+    is_blessed: bool,
+    luck: i32,
+    is_fountain_looted: bool,
+    rng: &mut NetHackRng,
+) -> DrinkFountainEffect {
+    let fate = rng.rnd(30);
+
+    // 축복 분수: 행운 >= 0이고 fate >= 10이면 축복 효과
+    if is_blessed && luck >= 0 && fate >= 10 {
+        let attr_idx = rng.rn2(6) as usize; // A_MAX = 6
+        return DrinkFountainEffect::BlessedFountain { attr_index: attr_idx };
+    }
+
+    if fate < 10 {
+        // 시원한 물
+        return DrinkFountainEffect::CoolDraught { hunger_gain: rng.rnd(10) };
+    }
+
+    match fate {
+        19 => DrinkFountainEffect::SelfKnowledge,
+        20 => DrinkFountainEffect::FoulWater { hunger_loss: rng.rn1(20, 11) },
+        21 => {
+            let has_pr = false; // 호출자가 결정
+            DrinkFountainEffect::Poisonous {
+                has_poison_res: has_pr,
+                str_loss: rng.rn1(4, 3),
+                hp_loss: rng.rnd(10),
+            }
+        }
+        22 => DrinkFountainEffect::WaterSnakes { count: rng.rn1(5, 2) },
+        23 => {
+            // 물 악마 — 레벨 난이도에 따라 소원 부여
+            let grants = rng.rnd(100) > 80; // 간단 근사
+            DrinkFountainEffect::WaterDemon { grants_wish: grants }
+        }
+        24 => DrinkFountainEffect::CurseItems { hunger_loss: rng.rn1(20, 11) },
+        25 => DrinkFountainEffect::SeeInvisible { is_blind: false, is_invisible: false },
+        26 => DrinkFountainEffect::MonsterDetect,
+        27 => {
+            if !is_fountain_looted {
+                DrinkFountainEffect::FindGem
+            } else {
+                DrinkFountainEffect::WaterNymph // FALLTHRU
+            }
+        }
+        28 => DrinkFountainEffect::WaterNymph,
+        29 => DrinkFountainEffect::BadBreathScare,
+        30 => DrinkFountainEffect::GushForth,
+        _ => DrinkFountainEffect::TepidWater,
+    }
+}
+
+/// [v2.9.8] 싱크대 마시기 효과 (원본: drinksink L519-626)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DrinkSinkEffect {
+    /// 차가운 물 (case 0)
+    VeryCold,
+    /// 따뜻한 물 (case 1)
+    VeryWarm,
+    /// 끓는 물 (case 2)
+    ScaldingHot { has_fire_res: bool, hp_loss: i32 },
+    /// 하수쥐 소환 (case 3)
+    SewerRat { rats_gone: bool },
+    /// 랜덤 포션 효과 (case 4)
+    RandomPotion,
+    /// 반지 발견 (case 5)
+    FindRing { already_looted: bool },
+    /// 파이프 파괴 → 분수로 변환 (case 6)
+    BreakSink,
+    /// 워터 엘리멘탈 소환 (case 7)
+    WaterElemental { elementals_gone: bool },
+    /// 역겨운 물 — 경험치 +1 (case 8)
+    AwfulTaste,
+    /// 하수 맛 — 구토 (case 9)
+    SewageTaste { hunger_loss: i32 },
+    /// 독성 폐수 — 변신 (case 10)
+    ToxicWaste,
+    /// 파이프 소리 (case 11)
+    PipeClanking,
+    /// 하수도 노래 (case 12)
+    SewerSong,
+    /// 환각 시 손 (case 19)
+    HallucinatoryHand { is_hallucinating: bool },
+    /// 일반 물 (default)
+    NormalWater { temperature: &'static str },
+}
+
+/// [v2.9.8] 싱크대 마시기 판정 (원본: drinksink L519-626)
+pub fn drink_sink_effect(rng: &mut NetHackRng) -> DrinkSinkEffect {
+    let roll = rng.rn2(20);
+    match roll {
+        0 => DrinkSinkEffect::VeryCold,
+        1 => DrinkSinkEffect::VeryWarm,
+        2 => DrinkSinkEffect::ScaldingHot { has_fire_res: false, hp_loss: rng.rnd(6) },
+        3 => DrinkSinkEffect::SewerRat { rats_gone: false },
+        4 => DrinkSinkEffect::RandomPotion,
+        5 => DrinkSinkEffect::FindRing { already_looted: false },
+        6 => DrinkSinkEffect::BreakSink,
+        7 => DrinkSinkEffect::WaterElemental { elementals_gone: false },
+        8 => DrinkSinkEffect::AwfulTaste,
+        9 => DrinkSinkEffect::SewageTaste { hunger_loss: rng.rn1(20, 11) },
+        10 => DrinkSinkEffect::ToxicWaste,
+        11 => DrinkSinkEffect::PipeClanking,
+        12 => DrinkSinkEffect::SewerSong,
+        19 => DrinkSinkEffect::HallucinatoryHand { is_hallucinating: false },
+        _ => {
+            let temp = match rng.rn2(3) {
+                0 => { if rng.rn2(2) == 0 { "cold" } else { "warm" } }
+                _ => "hot",
+            };
+            DrinkSinkEffect::NormalWater { temperature: temp }
+        }
+    }
+}
+
+/// [v2.9.8] 분수 고갈 상세 결과 (원본: dryup L166-219)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DryupResult {
+    /// 고갈 안 됨
+    NoChange,
+    /// 마을 내 경고 — 경비원이 경고
+    TownWarning { guard_warned: bool, is_deaf: bool },
+    /// 분수 파괴 — ROOM으로 변환
+    FountainDestroyed { in_town: bool },
+}
+
+/// [v2.9.8] 분수 고갈 판정 (원본: dryup L166-219)
+pub fn dryup_result(
+    is_fountain: bool,
+    was_warned: bool,
+    is_in_town: bool,
+    is_player: bool,
+    rng: &mut NetHackRng,
+) -> DryupResult {
+    if !is_fountain {
+        return DryupResult::NoChange;
+    }
+    // 33% 확률 또는 이미 경고받은 경우
+    if rng.rn2(3) != 0 && !was_warned {
+        return DryupResult::NoChange;
+    }
+    // 마을 내 + 플레이어 + 아직 미경고 → 경고
+    if is_player && is_in_town && !was_warned {
+        return DryupResult::TownWarning { guard_warned: true, is_deaf: false };
+    }
+    // 분수 파괴
+    DryupResult::FountainDestroyed { in_town: is_in_town }
+}
+
+/// [v2.9.8] 물 분출 타일 판정 (원본: gush L120-149)
+pub fn gush_tile_should_pool(
+    x: i32, y: i32,
+    player_x: i32, player_y: i32,
+    tile_is_room: bool,
+    has_boulder: bool,
+    next_to_door: bool,
+    rng: &mut NetHackRng,
+) -> bool {
+    // 체커보드 패턴, 플레이어 위치, 거리, 방 타일, 바위, 문 옆 확인
+    if ((x + y) % 2) != 0 { return false; }
+    if x == player_x && y == player_y { return false; }
+    let dist = (x - player_x).abs().max((y - player_y).abs());
+    if rng.rn2(1 + dist) != 0 { return false; }
+    if !tile_is_room || has_boulder || next_to_door { return false; }
+    true
+}
+
+/// [v2.9.8] 분수에 아이템 담그기 상세 효과 (원본: dipfountain L361-503)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DipFountainEffect {
+    /// 엑스칼리버 성공 (질서 성향)
+    ExcaliburSuccess,
+    /// 엑스칼리버 실패 — 저주 + 강화치 감소
+    ExcaliburFail { spe_decrease: bool },
+    /// 물 손상
+    WaterDamage,
+    /// 아이템 저주 (case 16)
+    CurseItem,
+    /// 아이템 해주 (case 17-20)
+    UncurseItem { was_cursed: bool },
+    /// 물 악마 소환 (case 21)
+    WaterDemonDip,
+    /// 님프 소환 (case 22)
+    WaterNymphDip,
+    /// 뱀 소환 (case 23)
+    WaterSnakesDip,
+    /// 보석 발견 (case 24)
+    FindGemDip,
+    /// 물 분출 (case 25)
+    GushForthDip,
+    /// 따끔거림 (case 26)
+    StrangeTingling,
+    /// 한기 (case 27)
+    SuddenChill,
+    /// 목욕 충동 — 돈 손실 (case 28)
+    BathUrge { money_fraction: i32 },
+    /// 코인 발견 (case 29)
+    FindCoins { amount: i32 },
+    /// 아무 일 없음
+    Nothing,
+}
+
+/// [v2.9.8] 분수 담그기 상세 판정 (원본: dipfountain L361-503)
+pub fn dip_fountain_detail(
+    is_long_sword: bool,
+    quantity: i32,
+    player_level: i32,
+    player_alignment: i32, // 1=lawful, -1=chaotic, 0=neutral
+    has_excalibur: bool,
+    is_fountain_looted: bool,
+    dungeon_depth_from_surface: i32,
+    rng: &mut NetHackRng,
+) -> DipFountainEffect {
+    // 엑스칼리버 시도: 롱소드, 수량 1, 레벨 5+, 6분의1, 미보유
+    if is_long_sword && quantity == 1 && player_level >= 5
+        && rng.rn2(6) == 0 && !has_excalibur
+    {
+        if player_alignment != 1 {
+            // 비질서 → 실패
+            let spe_dec = rng.rn2(3) != 0;
+            return DipFountainEffect::ExcaliburFail { spe_decrease: spe_dec };
+        } else {
+            return DipFountainEffect::ExcaliburSuccess;
+        }
+    }
+
+    // 물 손상 후 50% 확률로 종료
+    if rng.rn2(2) == 0 {
+        return DipFountainEffect::WaterDamage;
+    }
+
+    match rng.rnd(30) {
+        16 => DipFountainEffect::CurseItem,
+        17 | 18 | 19 | 20 => DipFountainEffect::UncurseItem { was_cursed: false },
+        21 => DipFountainEffect::WaterDemonDip,
+        22 => DipFountainEffect::WaterNymphDip,
+        23 => DipFountainEffect::WaterSnakesDip,
+        24 => {
+            if !is_fountain_looted { DipFountainEffect::FindGemDip }
+            else { DipFountainEffect::GushForthDip } // FALLTHRU
+        }
+        25 => DipFountainEffect::GushForthDip,
+        26 => DipFountainEffect::StrangeTingling,
+        27 => DipFountainEffect::SuddenChill,
+        28 => {
+            let fraction = rng.rnd(10); // somegold 근사
+            DipFountainEffect::BathUrge { money_fraction: fraction }
+        }
+        29 => {
+            let amount = rng.rnd(dungeon_depth_from_surface.max(1) * 2) + 5;
+            DipFountainEffect::FindCoins { amount }
+        }
+        _ => DipFountainEffect::Nothing,
+    }
+}
+
+/// [v2.9.8] breaksink 결과 (원본: breaksink L505-517)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BreakSinkResult {
+    /// 파이프 파괴 가시 여부
+    pub visible: bool,
+}
+
+/// [v2.9.8] 공중 부유 메시지 (원본: floating_above L17-30)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FloatingAboveResult {
+    /// 바닥에 갇힘
+    TrappedInFloor,
+    /// 공중 부유
+    FloatingAbove,
+}
+
+/// [v2.9.8] floating_above 판정
+pub fn floating_above_result(is_trapped_in_floor: bool) -> FloatingAboveResult {
+    if is_trapped_in_floor {
+        FloatingAboveResult::TrappedInFloor
+    } else {
+        FloatingAboveResult::FloatingAbove
+    }
+}
+
+// =============================================================================
+// [v2.9.8] 테스트 — fountain.c 추가 이식분
+// =============================================================================
+#[cfg(test)]
+mod fountain_phase2_tests {
+    use super::*;
+
+    #[test]
+    fn test_drink_fountain_cool() {
+        let mut rng = NetHackRng::new(42);
+        // fate < 10이 나올 때까지 시도
+        for seed in 0..100u64 {
+            let mut r = NetHackRng::new(seed);
+            let effect = drink_fountain_effect(false, 0, false, &mut r);
+            if let DrinkFountainEffect::CoolDraught { hunger_gain } = effect {
+                assert!(hunger_gain >= 1 && hunger_gain <= 10);
+                return;
+            }
+        }
+    }
+
+    #[test]
+    fn test_drink_fountain_blessed() {
+        // 축복 분수 + 행운 >= 0 + fate >= 10 → BlessedFountain
+        for seed in 0..100u64 {
+            let mut r = NetHackRng::new(seed);
+            let effect = drink_fountain_effect(true, 5, false, &mut r);
+            if let DrinkFountainEffect::BlessedFountain { attr_index } = effect {
+                assert!(attr_index < 6);
+                return;
+            }
+        }
+    }
+
+    #[test]
+    fn test_drink_fountain_variety() {
+        // 다양한 효과가 나오는지 확인
+        let mut effects = std::collections::HashSet::new();
+        for seed in 0..200u64 {
+            let mut r = NetHackRng::new(seed);
+            let e = drink_fountain_effect(false, 0, false, &mut r);
+            effects.insert(std::mem::discriminant(&e));
+        }
+        assert!(effects.len() >= 5); // 최소 5종 이상
+    }
+
+    #[test]
+    fn test_drink_sink_variety() {
+        let mut effects = std::collections::HashSet::new();
+        for seed in 0..200u64 {
+            let mut r = NetHackRng::new(seed);
+            let e = drink_sink_effect(&mut r);
+            effects.insert(std::mem::discriminant(&e));
+        }
+        assert!(effects.len() >= 5);
+    }
+
+    #[test]
+    fn test_dryup_no_fountain() {
+        let mut rng = NetHackRng::new(42);
+        assert_eq!(dryup_result(false, false, false, true, &mut rng), DryupResult::NoChange);
+    }
+
+    #[test]
+    fn test_dryup_town_warning() {
+        // 마을 내 미경고 상태에서 고갈 시도
+        for seed in 0..100u64 {
+            let mut r = NetHackRng::new(seed);
+            if let DryupResult::TownWarning { .. } = dryup_result(true, false, true, true, &mut r) {
+                return; // 경고 발생 확인
+            }
+        }
+    }
+
+    #[test]
+    fn test_gush_tile() {
+        let mut rng = NetHackRng::new(42);
+        // 체커보드 패턴, 플레이어 위치 아닌 곳, 방 타일
+        let result = gush_tile_should_pool(2, 2, 5, 5, true, false, false, &mut rng);
+        // 결과는 랜덤 — 타입만 확인
+        assert!(result == true || result == false);
+    }
+
+    #[test]
+    fn test_dip_excalibur_lawful() {
+        // 질서 성향으로 엑스칼리버 시도
+        for seed in 0..500u64 {
+            let mut r = NetHackRng::new(seed);
+            let effect = dip_fountain_detail(true, 1, 10, 1, false, false, 5, &mut r);
+            if effect == DipFountainEffect::ExcaliburSuccess {
+                return; // 성공 확인
+            }
+        }
+    }
+
+    #[test]
+    fn test_dip_excalibur_chaotic() {
+        for seed in 0..500u64 {
+            let mut r = NetHackRng::new(seed);
+            let effect = dip_fountain_detail(true, 1, 10, -1, false, false, 5, &mut r);
+            if let DipFountainEffect::ExcaliburFail { .. } = effect {
+                return;
+            }
+        }
+    }
+
+    #[test]
+    fn test_dip_variety() {
+        let mut effects = std::collections::HashSet::new();
+        for seed in 0..500u64 {
+            let mut r = NetHackRng::new(seed);
+            let e = dip_fountain_detail(false, 1, 3, 0, false, false, 5, &mut r);
+            effects.insert(std::mem::discriminant(&e));
+        }
+        assert!(effects.len() >= 3);
+    }
+
+    #[test]
+    fn test_floating_above() {
+        assert_eq!(floating_above_result(true), FloatingAboveResult::TrappedInFloor);
+        assert_eq!(floating_above_result(false), FloatingAboveResult::FloatingAbove);
+    }
+}

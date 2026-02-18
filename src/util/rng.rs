@@ -87,6 +87,37 @@ impl NetHackRng {
         }
         x as i32
     }
+
+    /// [v2.9.8] 0 <= rnl(x) < x (행운 조정) (원본: rnd.c L116-159)
+    /// 행운이 좋으면 0 쪽으로, 나쁘면 (x-1) 쪽으로 결과 편향
+    pub fn rnl(&mut self, x: i32, luck: i32) -> i32 {
+        if x <= 0 {
+            return 0;
+        }
+        // 작은 범위에서는 행운/3 적용 (0에서 멀어지는 방향으로 반올림)
+        let adjustment = if x <= 15 {
+            let abs_luck = luck.abs();
+            let adj_abs = (abs_luck + 1) / 3;
+            if luck >= 0 {
+                adj_abs
+            } else {
+                -adj_abs
+            }
+        } else {
+            luck
+        };
+        let mut i = self.rnd_internal(x);
+        // 37 + |luck| 중 1의 확률로만 보정 비적용
+        if adjustment != 0 && self.rn2(37 + adjustment.abs()) != 0 {
+            i -= adjustment;
+            if i < 0 {
+                i = 0;
+            } else if i >= x {
+                i = x - 1;
+            }
+        }
+        i
+    }
 }
 
 /// 0 <= rn2_on_display_rng(x) < x
@@ -107,9 +138,136 @@ mod tests {
     fn test_rng_determinism() {
         let mut rng1 = NetHackRng::new(42);
         let mut rng2 = NetHackRng::new(42);
-
         assert_eq!(rng1.rn2(100), rng2.rn2(100));
         assert_eq!(rng1.rnd(10), rng2.rnd(10));
         assert_eq!(rng1.d(3, 6), rng2.d(3, 6));
+    }
+
+    #[test]
+    fn test_rn2_range() {
+        let mut rng = NetHackRng::new(42);
+        for _ in 0..1000 {
+            let v = rng.rn2(10);
+            assert!(v >= 0 && v < 10);
+        }
+    }
+
+    #[test]
+    fn test_rnd_range() {
+        let mut rng = NetHackRng::new(42);
+        for _ in 0..1000 {
+            let v = rng.rnd(6);
+            assert!(v >= 1 && v <= 6);
+        }
+    }
+
+    #[test]
+    fn test_rn1_range() {
+        let mut rng = NetHackRng::new(42);
+        for _ in 0..1000 {
+            let v = rng.rn1(10, 5);
+            assert!(v >= 5 && v < 15);
+        }
+    }
+
+    #[test]
+    fn test_d_range() {
+        let mut rng = NetHackRng::new(42);
+        for _ in 0..100 {
+            let v = rng.d(3, 6);
+            assert!(v >= 3 && v <= 21); // 3d6: 3~21 + n(=3)
+        }
+    }
+
+    #[test]
+    fn test_d_edge_cases() {
+        let mut rng = NetHackRng::new(42);
+        assert_eq!(rng.d(-1, 6), 1); // 음수 → fallback
+        assert_eq!(rng.d(3, -1), 1); // 음수 x → fallback
+    }
+
+    #[test]
+    fn test_rne_range() {
+        let mut rng = NetHackRng::new(42);
+        for _ in 0..100 {
+            let v = rng.rne(4, 10);
+            assert!(v >= 1 && v <= 5); // ulevel<15 → max 5
+        }
+    }
+
+    #[test]
+    fn test_rne_high_level() {
+        let mut rng = NetHackRng::new(42);
+        for _ in 0..100 {
+            let v = rng.rne(4, 30);
+            assert!(v >= 1 && v <= 10); // ulevel/3 = 10
+        }
+    }
+
+    #[test]
+    fn test_rnz_positive() {
+        let mut rng = NetHackRng::new(42);
+        let v = rng.rnz(100, 10);
+        assert!(v > 0); // rnz는 항상 양수 (입력이 양수일 때)
+    }
+
+    #[test]
+    fn test_rnl_no_luck() {
+        let mut rng = NetHackRng::new(42);
+        for _ in 0..100 {
+            let v = rng.rnl(10, 0);
+            assert!(v >= 0 && v < 10);
+        }
+    }
+
+    #[test]
+    fn test_rnl_good_luck() {
+        // 행운이 좋으면 0 쪽으로 편향
+        let mut sum = 0;
+        for seed in 0..1000u64 {
+            let mut rng = NetHackRng::new(seed);
+            sum += rng.rnl(20, 10);
+        }
+        let avg = sum as f64 / 1000.0;
+        // 행운 10 → avg가 9.5(중립)보다 낮아야 함
+        assert!(avg < 9.5);
+    }
+
+    #[test]
+    fn test_rnl_bad_luck() {
+        let mut sum = 0;
+        for seed in 0..1000u64 {
+            let mut rng = NetHackRng::new(seed);
+            sum += rng.rnl(20, -10);
+        }
+        let avg = sum as f64 / 1000.0;
+        assert!(avg > 9.5); // 나쁜 행운 → 높은 값으로 편향
+    }
+
+    #[test]
+    fn test_rnl_small_range() {
+        let mut rng = NetHackRng::new(42);
+        // 작은 범위 (x <= 15)에서 luck/3 조정
+        for _ in 0..100 {
+            let v = rng.rnl(10, 9); // adj = (9+1)/3 = 3
+            assert!(v >= 0 && v < 10);
+        }
+    }
+
+    #[test]
+    fn test_rn2_on_display_rng() {
+        let mut seed = 1u32;
+        for _ in 0..100 {
+            let v = rn2_on_display_rng(10, &mut seed);
+            assert!(v >= 0 && v < 10);
+        }
+    }
+
+    #[test]
+    fn test_rn2_edge() {
+        let mut rng = NetHackRng::new(42);
+        assert_eq!(rng.rn2(0), 0); // 0 입력 → 0
+        assert_eq!(rng.rn2(-1), 0); // 음수 → 0
+        assert_eq!(rng.rn2(1), 0); // x=1 → 항상 0
     }
 }

@@ -11,6 +11,7 @@ pub mod core;
 pub mod dog;
 pub mod mcastu;
 pub mod monmove;
+pub mod muse;
 pub mod wizard;
 
 // [v2.0.0 R3] 기존 경로 호환: ai::XXX 접근 유지

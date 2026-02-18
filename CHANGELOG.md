@@ -2,6 +2,228 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.10.1] - 2026-02-18
+### Added
+- **[이식] lock_ext.rs — lock.c 핵심 이식 (12함수, 18테스트)**:
+  - `lock_action`, `pick_lock_chance`, `picklock_turn`, `forcelock_turn`, `check_force_weapon`, `check_obstruction`, `try_open_door`, `try_close_door`, `boxlock_result`, `doorlock_result`, `chest_shatter_message`
+- **[이식] steal_ext.rs — steal.c 핵심 이식 (8함수, 12테스트)**:
+  - `somegold`, `equipname`, `select_steal_target`, `select_amulet_target`, `maybe_absorb_check`, `should_drop_item`, `is_special_drop_item`
+- **[이식] light_ext.rs — light.c 완전 이식 (15함수, 14테스트)**:
+  - `LightSource`/`LightManager` (연결리스트→Vec 현대화), `add/remove/move/split/merge/adjust/snuff/stats/lit_positions`
+  - `candle_light_range` (7의 거듭제곱), `arti_light_radius` (축복/저주 3단계), `arti_light_description`, `obj_sheds_light/obj_is_burning`
+- **[이식] bones_ext.rs — bones.c 완전 이식 (10함수, 19테스트)**:
+  - `no_bones_level` (6조건), `can_make_bones` (깊이 확률), `sanitize_name` (제어문자 정화), `resetobj_bones_action` (인보케이션 아이템 변환)
+  - `should_curse_on_death` (80% 저주), `getbones_chance` (33% 로드), `BonesRecord` (묘비 정보 구조체)
+- **[이식] were_ext.rs — were.c 완전 이식 (10함수, 9테스트)**:
+  - `counter_were` (형태 전환 매핑), `were_beastie` (유사 몬스터 판정), `were_change_chance` (달/밤 기반 변신 확률)
+  - `should_were_change`, `were_summon_type` (소환 몬스터 결정), `were_heal_amount` (변신 회복량)
+- **[이식] rip_ext.rs — rip.c 완전 이식 (5함수, 8테스트)**:
+  - `tombstone_template` (ASCII 아트), `center_text` (중앙 배치), `split_death_text` (사인 줄 분할), `generate_tombstone` (완성 묘비)
+- **[이식] write_ext.rs — write.c 완전 이식 (7함수, 12테스트)**:
+  - `scroll_cost` (두루마리 비용 매핑), `spellbook_cost`, `write_feasibility_check` (8가지 실패 조건)
+  - `actual_ink_cost` (rn1 기반 비용), `write_curseval`, `book_description_prefix`
+- **[이식] minion_ext.rs — minion.c 완전 이식 (10함수, 12테스트)**:
+  - `demon_demand` (뇌물 계산), `demon_talk_check` (8가지 협상 결과), `summon_minion_type` (정렬별 하수인)
+  - `demon_summon_rank` (3계급 확률), `guardian_angel_stats` (레벨/HP/무기), `guardian_angel_result` (갈등/신앙심 판정)
+
+### Changed
+- 전체 테스트: 1,168 → **1,349** (+181)
+- 전체 Rust 코드: 85,259줄 → **92,296줄** (+7,037줄)
+- 파일 수: 147 → **159** (+12)
+- 이식률: 48.1% → **52.1%** (+4.0pp, 50% 돌파)
+
+
+### Added
+- **[이식] mkroom.rs — mkroom.c 미구현 함수 전량 이식 (718→1,120줄, +402줄)**:
+  - `MkRoom::somex`/`somey`/`inside_room` — 방 내 랜덤·포함 판정 (원본 충실 구현)
+  - `courtmon_result` — 궁정 몬스터 9단계 선택 (`CourtMonsterClass` enum)
+  - `squadmon_result` — 군인 유형 확률 테이블 (Soldier/Sergeant/Lieutenant/Captain)
+  - `morguemon_result` — 묘지 몬스터 5유형 (Demon/Vampire/Ghost/Wraith/Zombie)
+  - `antholemon_result` — 개미굴 3유형 + 제노사이드 처리
+  - `mkundead_result` — 언데드 무리 수량·유형 결정
+  - `throne_king_result` — 왕좌 왕 4유형 (Gnome/Dwarf/Elven/Ogre)
+  - `pick_room_result` — 미사용 방 선택 (strict/loose 모드)
+  - `search_special_result` — 특수 방 탐색 (ANY_TYPE/ANY_SHOP 지원)
+  - `cmap_to_type` — 심볼→TileType 완전 매핑 (41개 심볼 변환)
+  - 테스트 19개 추가
+
+## [2.9.9] - 2026-02-17
+### Added
+- **[이식] fountain.rs — fountain.c 미구현 함수 전량 이식 (405→780줄, +375줄)**:
+  - 마시기 확장: `DrinkFountainEffect`(16종), `drink_fountain_effect` — 축복분수/독물/소환/보석 등
+  - 싱크대: `DrinkSinkEffect`(15종), `drink_sink_effect` — 쬑/포션/반지/파이프 파괴 등
+  - 고갈: `DryupResult`, `dryup_result` — 마을 경고/분수 파괴
+  - 물 분출: `gush_tile_should_pool` — 체커보드 패턴 파도 생성
+  - 담그기 확장: `DipFountainEffect`(15종), `dip_fountain_detail` — 엑스칼리버/저주/해주/코인 등
+  - 기타: `FloatingAboveResult`, `BreakSinkResult`
+  - 테스트 11개 추가
+- **[이식] rng.rs — rnd.c 100% 이식 완료 (116→244줄, +128줄)**:
+  - `rnl` 함수 추가 — 행운 조정 랜덤 (작은 범위 luck/3, 큰 범위 luck 직접 적용)
+  - 테스트 14개 추가 (rn2/rnd/rn1/d/rne/rnz/rnl/display_rng 범위/엣지 테스트)
+
+## [2.9.8] - 2026-02-17
+### Added
+- **[이식] sit.rs — sit.c 미구현 함수 전량 이식 (374→655줄, +281줄)**:
+  - 돈 빼앗기: `TakeGoldResult`, `take_gold_result`
+  - 랜덤 저주: `RndCurseResult`, `rndcurse_result` — Magicbane 흡수(95%), 의구 대상 선택, 탈것 안장 저주
+  - 내재 능력 제거: `IntrinsicAbility`(11종), `AttrCurseResult`, `attrcurse_result` — FALLTHRU 계단식 체크
+  - 왕좌 소멸: `throne_vanishes` — 33% 확률
+  - 알 낳기: `LayEggResult`, `lay_egg_result` — 성별/배고픔/수중 판정
+  - 테스트 12개 추가 (기존 6개 + 신규 12개 = 총 18개, 전체 1,124개)
+
+## [2.9.7] - 2026-02-17
+### Added
+- **[이식] wizard.rs — wizard.c 미구현 함수 전량 이식 (543→996줄, +453줄)**:
+  - 아티팩트: `WantsFlag`, `which_artifact`, `mon_has_amulet_result`, `mon_has_special_result`, `PlayerSpecialItems`, `player_has_item`
+  - 전략: `StrategyGoal`, `TargetOnResult`, `StrategyInput`, `strategy_result` — 코베터스 몰스터 HP/아이템 기반 전략 결정
+  - 전술: `StairsInfo`, `choose_stairs_result`, `TacticsInput`, `TacticsResult`, `tactics_result` — 치유/계단이동/텔포트 판정
+  - 도발: `AggravatableMonster`, `has_aggravatables_result`, `AggravateEffect`, `aggravate_effect_result`
+  - 소환: `pick_nasty_result`, `NastySummonInput`, `NastySummonResult`, `nasty_summon_result`
+  - 사후 개입: `InterveneAction`, `intervene_result`
+  - 사망: `WizdeadResult`, `wizdead_result` — 반신 이벤트 판정
+  - 대사: `CussResult`, `cuss_result` — 28종 모욕/11종 위협 테이블
+  - 분신: `CloneWizResult`, `clonewiz_result`, `WIZARD_APPEARANCES` 12종 변장 테이블
+  - 감지: `AmuletHintResult`, `amulet_hint_result` — 포탈 거리 감지
+  - 테스트 21개 추가 (기존 7개 + 신규 21개 = 총 28개, 전체 1,112개)
+
+## [2.9.6] - 2026-02-17
+### Added
+- **[이식] dog.rs — dog.c + dogmove.c 3차 이식 완결 (2,328→3,519줄, +1,191줄)**:
+  - 드롭 판정: `PetItemType`, `PetInventoryItem`, `DroppablesInput`, `droppables` — 곡괭이/유니콘뿔/열쇠 유지, 매트록-방패 충돌 판정
+  - 저주 아이템: `cursed_object_at` — 위치별 저주 아이템 존재 확인
+  - 인벤토리: `DogInventInput`, `DogInventResult`, `dog_invent_result` — 수면/이동불가 체크, 드롭/먹기/줍기 확률 판정
+  - 목표 설정: `DogGoalInput`, `DogGoalResult`, `dog_goal_result` — 음식/운반/플레이어 목표, 탈것/목줄/도주/혼란 분기
+  - 타겟 탐색: `LineSightQuery`, `LineSightCell`, `LineSightTarget`, `find_targ_result` — 직선 7칸 탐색, 투명 몬스터 스킵
+  - 아군 검색: `FindFriendsQuery`, `FriendCell`, `find_friends_result` — 타겟 뒤 아군·리더·가디언 확인
+  - 최적 타겟: `TargetCandidate`, `best_target_result` — 8방향 점수 집계, 음수 점수 필터링
+  - 문 찾기: `wantdoor_result` — 플레이어 기준 최단 거리 문 좌표
+  - 식사 완료: `FinishMeatingResult`, `finish_meating_result` — 미믹 외형 리셋 판정
+  - 미믹 변장: `MimicAppearance`, `quickmimic_result` — 형태변경 보호, 후보 테이블 매칭
+  - 소환수 판정: `FamiliarResult`, `familiar_disposition` — 피규어 축복/저주별 80/10/10 확률
+  - 초기 펫: `StartingPetType`, `starting_pet_type` — 역할/선호/랜덤 분기
+  - 테스트 25개 추가 (기존 41개 + 신규 25개 = 총 66개, 전체 1,091개)
+
+## [2.9.5] - 2026-02-17
+### Added
+- **[이식] dog.rs — dog.c + dogmove.c 핵심 2차 이식 (736→2,026줄, +1,290줄)**:
+  - 초기화: `InitEdogResult`, `init_edog_result` — initedog(domestic/wild 판정, apport=CHA, hungrytime=1000+turn)
+  - 음식 판정: `DogFoodInput`, `FoodItemInfo`, `dogfood_extended` — 21종 음식유형, 20종 몬스터 속성 조합 판정
+  - 영양가: `DogNutritionResult`, `dog_nutrition_result` — 6단계 크기 배수, 부분 섭취 비율 보정
+  - 식사 효과: `DogEatResult`, `dog_eat_result` — devour 모드, 슬라임/다형/성장/실명치료/미믹 흉내
+  - 배고픔: `HungerResult`, `dog_hunger_result` — 500턴 혼란(HP 1/3), 750턴 기아 사망
+  - 길들이기: `TameDogResult`, `tamedog_result` — 위즈/메두사/보름달/구조충돌 판정 6종 결과
+  - 부활: `WaryDogResult`, `wary_dog_result` — Pet Sematary 확률, 학대/사망 카운터 판정
+  - 학대: `AbuseDogResult`, `abuse_dog_result` — Aggravate 절반/일반 -1, 으르렁/낑낑 소리
+  - 시간 따라잡기: `CatchupResult`, `catchup_elapsed_time` — 13종 상태 일괄 감소/회복
+  - 아이템 접근: `could_reach_item`, `can_reach_location_simple` — 수영/용암/바위 판정
+  - 타겟 점수: `score_target` — 리더/가디언/펫/인접/수동/약한적/강한적, 뱀파이어시프터 레벨 보정
+  - 테스트 31개 추가 (기존 10개 + 신규 31개 = 총 41개)
+
+## [2.9.4] - 2026-02-16
+### Added
+- **[이식] muse.rs — muse.c 핵심 시스템 신규 생성 (0→1,154줄)**:
+  - 방어 아이템: `DefenseUse`(18종), `find_defensive`, `use_defensive` — HP 임계값/치유 우선순위
+  - 공격 아이템: `OffenseUse`(16종), `find_offensive`, `use_offensive` — 반사 보유 회피
+  - 기타 아이템: `MiscUse`(6종), `find_misc`, `use_misc`
+  - 마법봉 사전: `precheck_wand` — 저주 역폭발 판정
+  - 아이템 부여: `rnd_defensive_item`, `rnd_offensive_item` — 몬스터 생성 시 아이템 배분
+  - 통계: `MuseStatistics` — 아이템 사용 추적
+  - 테스트 16개 추가
+- **[이식] zap.rs — zap.c bhitm() 이식 (1,271→1,980줄, +709줄)**:
+  - 즉시 효과: `ImmediateEffect`(16종) — 감속/가속/취소/텔레포트/투명화/탐지/치유/흡수/퇴치
+  - 피격 결과: `BhitResult` — 사망/텔레포트/속도변경/변신/취소 등 종합 결과
+  - 대상 정보: `ZapTarget` — 몬스터 속성 캡슐화
+  - 효과 판별: `classify_immediate_effect` — 즉시/볼트/레이 분류
+  - 아이템 파괴: `try_destroy_item`, `item_destroy_chance` — 불/냉기/전기별 파괴 확률
+  - 테스트 16개 추가
+- **[이식] mon.rs — mon.c 핵심 라이프사이클 이식 (2,262→3,041줄, +779줄)**:
+  - 시체 생성: `MakeCorpseResult`, `make_corpse_result` — 드래곤 비늘/골렘 분해/유니콘 뿔/좀비 원형 등 특수 드롭
+  - 생명 구원: `LifeSaveResult`, `lifesaved_check` — 아뮬렛 판정, 종족 말살 여부
+  - 사망 처리: `MonDeadResult2`, `mondead_result2` — 생명구원→뱀파이어부활→원형복원→사망카운트 전체 흐름
+  - 변신: `NewChamResult`, `newcham_result` — Rider 면역, HP 비율 유지, 성별 변경
+  - 도주: `MonFleeResult`, `monflee_check` — HP 임계값 기반 + 강제 도주
+  - 금속 섭취: `EatMetalCheckResult`, `meatmetal_check` — rust monster 녹방지 처리
+  - 유기물 섭취: `EatObjCheckResult`, `meatobj_check` — Rider 시체 부활/당근 실명 치료
+  - 액체 지형: `MinLiquidResult`, `minliquid_result` — 익사/용암/그렘린 분열/철 골렘 녹
+  - 통계: `MonLifecycleStats` — 라이프사이클 이벤트 추적
+  - 테스트 17개 추가
+- **[이식] mon.rs — mon.c 2차 이식 (3,041→3,913줄, +872줄)**:
+  - 석화: `MonStoneResult`, `monstone_result` — 골렘→돌골렘/뱀파이어 원형 복원/동상·바위 분기
+  - 은신: `RestrapResult`, `restrap_check`, `hideunder_check` — 미믹 위장/뱀장어 물속/오브젝트 아래
+  - 각성: `WakeupResult`, `wakeup_result`, `should_wake_from_noise` — 수면·위장 해제/소음 거리 기반
+  - 반응: `MonRespondResult`, `m_respond_result` — shrieker 비명/메두사 응시/소환 트리거
+  - 줍기: `PickGoldResult`, `mpickgold_check`, `PickStuffResult`, `mpickstuff_check` — 님프 전수/시체 필터
+  - 변신 선택: `pm_to_cham`, `pickvampshape_result`, `select_newcham_form` — 카멜레온·도플갱어·산데스틴·뱀파이어별 후보군
+  - 종족 말살: `kill_genocided_check` — 직접 말살 + 카멜레온 원형 연쇄
+  - 경비병: `AngryGuardsResult`, `angry_guards_result` — 분노/각성/메시지
+  - 과밀: `OvercrowdingResult`, `overcrowding_check`, `elemental_clog_check` — 림보/Endgame 원소
+  - 점착: `UnstuckResult`, `unstuck_check` — 삼킴 탈출
+  - 미믹: `mimic_hit_msg` — 치유 주문 피격 메시지
+  - 테스트 22개 추가
+- **[이식] mon.rs — mon.c 3차 이식 (3,913→4,648줄, +735줄)**:
+  - 이동: `MoveMonTickResult`, `movemon_tick` — 이동포인트 소비/액체/은신/장비교체 판정
+  - 변신 결정: `ShapeshiftDecision`, `decide_to_shapeshift` — 뱀파이어 HP 기반/일반 1/6 확률
+  - 변신 수락: `accept_newcham_form_check` — 종족말살/placeholder/polyok 검증
+  - 유효성: `isspecmon_check`, `validspecmon_check`, `validvamp_check` — 특수몬/손·머리/뱀파이어 형태
+  - 성별: `GenderResult`, `mgender_from_permonst` — 수컷/암컷 고정·중성·10% 변경
+  - 소멸: `MonGoneResult`, `mongone_result` — 기마해제/점착해제/인벤토리 파기
+  - 사망: `mondied_should_corpse` — 시체 생성 여부
+  - 미믹: `SeeMimicResult`, `seemimic_result` — 위장해제/빛차단/시체이름
+  - 카멜레온: `rescham_should_revert`, `restartcham_check`, `restore_cham_should_revert` — 보호마법/레벨로드
+  - 은신: `hide_monst_should_rehide` — 레벨 복귀 시 재은신
+  - 동물: `build_animal_list`, `pick_animal` — 카멜레온용 동물 후보군
+  - 알: `should_kill_egg` — 종족말살 알 변환
+  - 제거: `ok_to_obliterate` — Rider/Wizard/특수역할 보호
+  - 근접: `monnear` — 인접 1칸 판정
+  - 적재: `curr_mon_load` — 바위 제외 무게 계산
+  - 진정: `should_pacify` — 경비병 평화 전환
+  - 테스트 28개 추가
+- **[이식] mon.rs — mon.c 4차 최종 이식 (4,648→5,269줄, +621줄) — mon.c 100% 완료**:
+  - 레벨이동: `MigrateMonResult`, `MigrateXYLoc`, `migrate_mon_result`, `m_into_limbo_result` — 점착해제/특수드롭/이동방식
+  - 근접각성: `WakeNearResult`, `wake_nearby_distance`, `wake_nearto_check` — 범위/유니크/길들임 분기
+  - 배치: `MnextoResult`, `mnexto_result` — 기마동기/과밀/출현메시지
+  - 석화: `MonToStoneResult`, `mon_to_stone_result` — poly_when_stoned/석화사망
+  - 대체: `ReplMonResult`, `replmon_result` — 기마/점착/추적/전투 이전
+  - 분리: `MDetachResult`, `m_detach_result` — 트랩/기마/빛/웜/좌표
+  - 정리: `should_cleanup_dead` — HP ≤ 0 경비병 예외
+  - 생명구원: `has_lifesaver`, `LifeSavedMonResult`, `lifesaved_monster_result` — 아뮬렛소비/HP회복
+  - 사망래퍼: `MonKilledByMonResult`, `monkilled_by_mon_result` — 시체/슬픔/사망메시지
+  - 무결성: `SanityCheckResult`, `sanity_check_single_mon` — 위치/HP/유효성 검사
+  - 테스트 25개 추가 (총 112개)
+  - **mon.c → mon.rs 이식 최종 완료: 2,262줄 → 5,269줄 (+3,007줄, +133%)**
+- **[이식] monmove.rs — monmove.c 1차 이식 (662→1,666줄, +1,004줄)**:
+  - 트랩폭발: `MbTrappedResult`, `mb_trapped_result` — 기절/피해/각성범위
+  - 열쇠: `monhaskey_check` — 신용카드/해골열쇠/자물쇠따개
+  - 공포: `OnScaryResult`, `onscary_check` — Wizard/Rider면역/Elbereth/공포두루마리
+  - 재생: `MonRegenResult`, `mon_regen_result` — HP회복/쿨다운/식사
+  - 각성: `disturb_check` — 에틴/님프/잽버워크/레프리콘/Aggravate
+  - 도주: `MonfleeResult`, `monflee_result` — 시간/해방/메시지
+  - 거리공포: `DistfleeckResult`, `distfleeck_result` — 볼트범위/근접/공포
+  - 점착: `itsstuck_check` — 플레이어 점착 탈출 불가
+  - 밀어내기: `should_displace_check` — 경로 최적화
+  - 인식: `ApparXYResult`, `set_apparxy_result` — 투명/변위/Xorn 금속감지
+  - 비선호: `undesirable_disp_check` — 트랩/저주물건/접근불가
+  - 통과: `can_ooze_check`, `can_fog_check` — 점액/안개 변신
+  - 뱀파이어: `VampShiftResult`, `vamp_shift_result` — 형태변환
+  - 굴착: `DigWeaponNeed`, `m_digweapon_check_result` — 곡괭이/도끼
+  - 전처리: `DochugPreResult`, `dochug_pre_result` — 혼란/기절해제/텔레포트/용기회복
+  - 도어: `closed_door_check`, `accessible_check`, `dissolve_bars_result`
+  - 테스트 27개 추가 (총 39개)
+- **[이식] monmove.rs — monmove.c 2차 이식 (1,666→2,787줄, +1,121줄)**:
+  - 전처리: `MMovePreResult`, `m_move_pre_result` — 트랩/식사/은신
+  - 위임: `SpecialMoveDelegate`, `special_move_delegate` — 애완/상점/경비/탐욕/성직/텐구
+  - 목표: `ApproachResult`, `approach_result` — 접근/도주/무작위/시야차단
+  - 선호도: `ItemLikes`, `item_likes_result` — 금/보석/무기/마법/바위
+  - 플래그: `MoveFlags`, `calc_move_flags` — 벽/바/굴착/문/성소
+  - 위치선택: `PosCandidate`, `BestMoveResult`, `select_best_move` — 최적이동지선택
+  - 문: `DoorAction`, `DoorHandleResult`, `door_handle_result` — 통과/해제/열기/부수기/트랩
+  - 포스트: `PostMoveResult`, `post_move_result` — 금속식사/줍기/은신/뱀파이어안개
+  - 전투: `DochugMainResult`, `dochug_main_result` — 정신파/무기/이동/근접/대화
+  - 충돌: `MoveCollisionResult`, `move_collision_result` — 점착/공격/밀어내기/영역
+  - 철창: `IronBarsAction`, `iron_bars_action` — 녹/부식/통과
+  - 테스트 29개 추가 (총 68개)
+  - **monmove.c → monmove.rs 이식 완료: 662줄 → 2,787줄 (+2,125줄, +321%)**
+
 ## [2.9.3] - 2026-02-17
 ### Added
 - **[이식] mhitu.rs — mhitu.c 핵심 시스템 대량 이식 (751→1,131줄, +380줄)**:

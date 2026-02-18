@@ -9,6 +9,7 @@ pub mod mhitu;
 pub mod throw;
 pub mod uhitm;
 pub mod weapon;
+pub mod weapon_ext;
 
 // [v2.0.0 R3] 기존 경로 호환: combat::CombatEngine 등
 pub use engine::*;

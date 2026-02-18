@@ -2,15 +2,19 @@
 //
 
 pub mod attrib;
+pub mod attrib_ext;
 pub mod death;
 pub mod do_wear;
 pub mod end;
 pub mod equipment;
 pub mod evolution;
 pub mod exper;
+pub mod exper_ext;
 pub mod movement;
 pub mod regeneration;
+pub mod rip_ext;
 pub mod status;
+pub mod were_ext;
 pub mod worn;
 
 // ──────────────────────────────────────────────────────────────

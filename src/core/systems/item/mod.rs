@@ -14,6 +14,7 @@ pub mod pickup;
 pub mod potion;
 pub mod read;
 pub mod weight;
+pub mod write_ext;
 pub mod zap;
 
 // ──────────────────────────────────────────────────────────────

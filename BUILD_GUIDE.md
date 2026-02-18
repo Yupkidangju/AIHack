@@ -72,7 +72,7 @@ cargo build --release
 
 ```
 root/
-├── src/              # Rust 소스 (139개 파일, 40,489라인)
+├── src/              # Rust 소스 (147개 파일, 85,259라인)
 │   ├── main.rs       # 앱 엔트리포인트 + AppState 화면 분기
 │   ├── app.rs        # NetHackApp 구조체 + 초기화
 │   ├── game_loop.rs  # 게임 턴 처리

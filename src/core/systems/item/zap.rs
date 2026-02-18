@@ -615,6 +615,512 @@ pub fn execute_dig(
 }
 
 // =============================================================================
+// [v2.9.4] bhitm() 이식 — 몬스터 대상 즉시 효과 (원본: zap.c L133-481)
+// 볼트/레이가 아닌 즉시 효과 지팡이(감속/가속/취소/텔레포트/투명화 등)의
+// 몬스터 피격 처리. execute_bolt에서 호출하거나 독립적으로 사용 가능.
+// =============================================================================
+
+/// [v2.9.4] 즉시 효과 지팡이 종류 (원본: bhitm switch cases)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImmediateEffect {
+    /// WAN_STRIKING / SPE_FORCE_BOLT (원본: L157-179)
+    Striking,
+    /// WAN_SLOW_MONSTER / SPE_SLOW_MONSTER (원본: L180-193)
+    SlowMonster,
+    /// WAN_SPEED_MONSTER (원본: L194-203)
+    SpeedMonster,
+    /// WAN_UNDEAD_TURNING / SPE_TURN_UNDEAD (원본: L204-223)
+    UndeadTurning,
+    /// WAN_POLYMORPH / SPE_POLYMORPH (원본: L224-288)
+    Polymorph,
+    /// WAN_CANCELLATION / SPE_CANCELLATION (원본: L289-294)
+    Cancellation,
+    /// WAN_TELEPORTATION / SPE_TELEPORT_AWAY (원본: L295-300)
+    Teleportation,
+    /// WAN_MAKE_INVISIBLE (원본: L301-316)
+    MakeInvisible,
+    /// WAN_LOCKING / SPE_WIZARD_LOCK (원본: L317-320)
+    Locking,
+    /// WAN_PROBING (원본: L321-326)
+    Probing,
+    /// WAN_OPENING / SPE_KNOCK (원본: L327-362)
+    Opening,
+    /// SPE_HEALING (원본: L363-371)
+    Healing,
+    /// SPE_EXTRA_HEALING (원본: L364-397)
+    ExtraHealing,
+    /// SPE_DRAIN_LIFE (원본: L428-451)
+    DrainLife,
+    /// SPE_STONE_TO_FLESH (원본: L413-427)
+    StoneToFlesh,
+    /// WAN_NOTHING (원본: L452-454)
+    Nothing,
+}
+
+/// [v2.9.4] 즉시 효과 적용 결과 (원본: bhitm 반환값 + 부수 효과)
+#[derive(Debug, Clone)]
+pub struct BhitResult {
+    /// 대상이 깨어나야 하는지 (원본: wake)
+    pub should_wake: bool,
+    /// 대상이 사망했는지
+    pub target_died: bool,
+    /// 가한 데미지
+    pub damage: i32,
+    /// 투명 몬스터 위치 공개 (원본: reveal_invis)
+    pub reveal_invisible: bool,
+    /// 효과 학습 (원본: learn_it)
+    pub learned: bool,
+    /// 로그 메시지
+    pub message: String,
+    /// 텔레포트 발생 여부
+    pub teleported: bool,
+    /// 속도 변경 (-1=감속, 0=변화없음, 1=가속)
+    pub speed_change: i32,
+    /// 변신 발생 여부
+    pub polymorphed: bool,
+    /// 취소 여부
+    pub cancelled: bool,
+}
+
+impl Default for BhitResult {
+    fn default() -> Self {
+        Self {
+            should_wake: true,
+            target_died: false,
+            damage: 0,
+            reveal_invisible: false,
+            learned: false,
+            message: String::new(),
+            teleported: false,
+            speed_change: 0,
+            polymorphed: false,
+            cancelled: false,
+        }
+    }
+}
+
+/// [v2.9.4] 즉시 효과 대상 정보 (원본: struct monst *mtmp)
+#[derive(Debug, Clone)]
+pub struct ZapTarget {
+    /// 대상 이름
+    pub name: String,
+    /// 현재 HP
+    pub hp: i32,
+    /// 최대 HP
+    pub hp_max: i32,
+    /// 레벨
+    pub level: i32,
+    /// 마법 저항 여부 (원본: resists_magm)
+    pub magic_resistant: bool,
+    /// 생명력 흡수 저항 (원본: resists_drli)
+    pub drain_resistant: bool,
+    /// 언데드인지 (원본: is_undead)
+    pub is_undead: bool,
+    /// 뱀파이어 변신체인지 (원본: is_vampshifter)
+    pub is_vampshifter: bool,
+    /// 석상 골렘인지 (원본: PM_STONE_GOLEM)
+    pub is_stone_golem: bool,
+    /// 길들여진 상태인지 (원본: mtame)
+    pub is_tame: bool,
+    /// 평화적인지 (원본: mpeaceful)
+    pub is_peaceful: bool,
+    /// 위장 중인지 (원본: disguised_mimic)
+    pub is_disguised: bool,
+    /// 투명 상태인지 (원본: minvis)
+    pub is_invisible: bool,
+    /// 취소되었는지 (원본: mcan)
+    pub is_cancelled: bool,
+    /// 속도 상태 (-1: 느림, 0: 보통, 1: 빠름)
+    pub speed: i32,
+}
+
+/// [v2.9.4] 즉시 효과 적용 (원본: bhitm, zap.c L133-481)
+///
+/// 몬스터에 대한 즉시 효과 지팡이/주문의 효과를 계산한다.
+/// 실제 ECS 컴포넌트 수정은 호출부에서 BhitResult를 보고 적용한다.
+pub fn bhitm(
+    effect: ImmediateEffect,
+    target: &ZapTarget,
+    rng: &mut NetHackRng,
+    is_spell: bool,
+    is_blessed_spell: bool,
+    caster_level: i32,
+    is_knight_quest: bool,
+) -> BhitResult {
+    let mut result = BhitResult::default();
+    let dbldam = is_knight_quest; // 기사 퀘스트 아이템 보유 시 2배 데미지
+
+    match effect {
+        // =====================================================================
+        // 타격 (원본: WAN_STRIKING / SPE_FORCE_BOLT, L157-179)
+        // =====================================================================
+        ImmediateEffect::Striking => {
+            result.reveal_invisible = true;
+            if target.magic_resistant {
+                result.message = format!("{}에게 빔이 튕겨나간다! Boing!", target.name);
+                result.learned = false;
+                result.should_wake = true;
+            } else {
+                let mut dmg = rng.d(2, 12);
+                if dbldam {
+                    dmg *= 2;
+                }
+                if is_spell {
+                    dmg += caster_level / 3;
+                } // spell_damage_bonus 근사
+                result.damage = dmg;
+                result.message = format!("{}을(를) 타격한다! ({}dmg)", target.name, dmg);
+                result.learned = true;
+            }
+        }
+
+        // =====================================================================
+        // 감속 (원본: WAN_SLOW_MONSTER, L180-193)
+        // =====================================================================
+        ImmediateEffect::SlowMonster => {
+            if !target.magic_resistant {
+                result.speed_change = -1;
+                result.message = format!("{}이(가) 느려진다!", target.name);
+                result.reveal_invisible = true;
+            } else {
+                result.message = format!("{}은(는) 영향을 받지 않는다.", target.name);
+            }
+        }
+
+        // =====================================================================
+        // 가속 (원본: WAN_SPEED_MONSTER, L194-203)
+        // =====================================================================
+        ImmediateEffect::SpeedMonster => {
+            if !target.magic_resistant {
+                result.speed_change = 1;
+                result.message = format!("{}이(가) 빨라진다!", target.name);
+            } else {
+                result.message = format!("{}은(는) 영향을 받지 않는다.", target.name);
+            }
+            if target.is_tame {
+                result.should_wake = false; // 아군 가속은 깨우지 않음
+            }
+        }
+
+        // =====================================================================
+        // 언데드 퇴치 (원본: WAN_UNDEAD_TURNING, L204-223)
+        // =====================================================================
+        ImmediateEffect::UndeadTurning => {
+            result.should_wake = false; // 기본적으로 깨우지 않음
+            if target.is_undead || target.is_vampshifter {
+                result.reveal_invisible = true;
+                result.should_wake = true;
+                let mut dmg = rng.rnd(8);
+                if dbldam {
+                    dmg *= 2;
+                }
+                if is_spell {
+                    dmg += caster_level / 3;
+                }
+                result.damage = dmg;
+                if !target.magic_resistant {
+                    // 죽지 않았으면 도주 (호출부에서 처리)
+                    result.message = format!(
+                        "{}이(가) 퇴치의 힘에 {}를 입는다! ({}dmg)",
+                        target.name,
+                        if target.hp - dmg <= 0 {
+                            "소멸"
+                        } else {
+                            "피해"
+                        },
+                        dmg
+                    );
+                } else {
+                    result.damage = 0;
+                    result.message = format!("{}은(는) 퇴치에 저항한다.", target.name);
+                }
+            }
+        }
+
+        // =====================================================================
+        // 변신 (원본: WAN_POLYMORPH, L224-288)
+        // =====================================================================
+        ImmediateEffect::Polymorph => {
+            if target.magic_resistant {
+                result.message = format!("{}은(는) 마법 방어막으로 변신을 막는다!", target.name);
+            } else if !target.magic_resistant {
+                // 시스템 쇼크: 4% 확률로 즉사 (원본: !rn2(25))
+                if rng.rn2(25) == 0 {
+                    result.target_died = true;
+                    result.message = format!("{}이(가) 시스템 쇼크로 사망한다!", target.name);
+                    result.learned = true;
+                } else {
+                    result.polymorphed = true;
+                    result.message = format!("{}이(가) 변신한다!", target.name);
+                    result.learned = true;
+                }
+            }
+        }
+
+        // =====================================================================
+        // 취소 (원본: WAN_CANCELLATION, L289-294)
+        // =====================================================================
+        ImmediateEffect::Cancellation => {
+            result.cancelled = true;
+            result.message = format!("{}이(가) 마법이 해제된다!", target.name);
+            result.reveal_invisible = true;
+        }
+
+        // =====================================================================
+        // 텔레포트 (원본: WAN_TELEPORTATION, L295-300)
+        // =====================================================================
+        ImmediateEffect::Teleportation => {
+            result.teleported = true;
+            result.message = format!("{}이(가) 텔레포트된다!", target.name);
+            result.reveal_invisible = true;
+        }
+
+        // =====================================================================
+        // 투명화 (원본: WAN_MAKE_INVISIBLE, L301-316)
+        // =====================================================================
+        ImmediateEffect::MakeInvisible => {
+            if !target.is_invisible {
+                result.message = format!("{}이(가) 투명해진다!", target.name);
+                result.reveal_invisible = true;
+                result.learned = true;
+            } else {
+                result.message = format!("{}은(는) 이미 투명하다.", target.name);
+            }
+        }
+
+        // =====================================================================
+        // 잠금 (원본: WAN_LOCKING, L317-320)
+        // =====================================================================
+        ImmediateEffect::Locking => {
+            result.should_wake = false;
+            result.message = format!("{}에게는 잠금 효과가 없다.", target.name);
+            // 함정에 갇힌 몬스터를 잠그는 효과는 호출부에서 처리
+        }
+
+        // =====================================================================
+        // 탐지 (원본: WAN_PROBING, L321-326)
+        // =====================================================================
+        ImmediateEffect::Probing => {
+            result.should_wake = false;
+            result.reveal_invisible = true;
+            result.learned = true;
+            result.message = format!(
+                "{}을(를) 탐지한다! (HP: {}/{}, Lv: {})",
+                target.name, target.hp, target.hp_max, target.level
+            );
+        }
+
+        // =====================================================================
+        // 열기 (원본: WAN_OPENING / SPE_KNOCK, L327-362)
+        // =====================================================================
+        ImmediateEffect::Opening => {
+            result.should_wake = false;
+            result.message = format!("{}에게는 열기 효과가 없다.", target.name);
+            // 삼킨 몬스터 내부, 안장 분리 등은 호출부에서 처리
+        }
+
+        // =====================================================================
+        // 치유 (원본: SPE_HEALING, L363-388)
+        // =====================================================================
+        ImmediateEffect::Healing => {
+            result.reveal_invisible = true;
+            let heal = rng.d(6, 4);
+            result.damage = -heal; // 음수 = 회복
+            result.should_wake = false;
+            if target.is_tame || target.is_peaceful {
+                result.message = format!("{}이(가) 치유된다. (HP +{})", target.name, heal);
+            } else {
+                result.message = format!("{}이(가) 좋아보인다. (HP +{})", target.name, heal);
+            }
+        }
+
+        // =====================================================================
+        // 고급 치유 (원본: SPE_EXTRA_HEALING, L364-397)
+        // =====================================================================
+        ImmediateEffect::ExtraHealing => {
+            result.reveal_invisible = true;
+            let heal = rng.d(6, 8);
+            result.damage = -heal;
+            result.should_wake = false;
+            result.message = format!("{}이(가) 훨씬 좋아보인다! (HP +{})", target.name, heal);
+        }
+
+        // =====================================================================
+        // 생명력 흡수 (원본: SPE_DRAIN_LIFE, L428-451)
+        // =====================================================================
+        ImmediateEffect::DrainLife => {
+            if target.drain_resistant {
+                result.message = format!("{}은(는) 생명력 흡수에 저항한다!", target.name);
+            } else {
+                // 원본: monhp_per_lvl(mtmp) — 레벨당 HP 근사
+                let mut dmg = target.hp_max.max(1) / target.level.max(1);
+                if dmg < 1 {
+                    dmg = 1;
+                }
+                if dbldam {
+                    dmg *= 2;
+                }
+                if is_spell {
+                    dmg += caster_level / 3;
+                }
+
+                if target.hp - dmg <= 0 || target.level <= 1 {
+                    result.target_died = true;
+                    result.message = format!(
+                        "{}이(가) 생명력을 빼앗겨 소멸한다! ({}dmg)",
+                        target.name, dmg
+                    );
+                } else {
+                    result.damage = dmg;
+                    result.message = format!(
+                        "{}이(가) 갑자기 약해 보인다! ({}dmg, Lv -1)",
+                        target.name, dmg
+                    );
+                }
+            }
+        }
+
+        // =====================================================================
+        // 석화→육화 (원본: SPE_STONE_TO_FLESH, L413-427)
+        // =====================================================================
+        ImmediateEffect::StoneToFlesh => {
+            if target.is_stone_golem {
+                result.polymorphed = true;
+                result.message = format!("{}이(가) 살점 골렘으로 변한다!", target.name);
+            } else {
+                result.should_wake = false;
+                result.message = String::new(); // 효과 없음
+            }
+        }
+
+        // =====================================================================
+        // 무효과 (원본: WAN_NOTHING, L452-454)
+        // =====================================================================
+        ImmediateEffect::Nothing => {
+            result.should_wake = false;
+            result.message = String::new();
+        }
+    }
+
+    result
+}
+
+/// [v2.9.4] 지팡이 이름으로 즉시 효과 유형 판별
+/// 볼트/레이 계열(fire, cold, sleep, death, lightning)은 None 반환
+pub fn classify_immediate_effect(wand_name: &str) -> Option<ImmediateEffect> {
+    if wand_name.contains("striking") {
+        return Some(ImmediateEffect::Striking);
+    }
+    if wand_name.contains("slow") {
+        return Some(ImmediateEffect::SlowMonster);
+    }
+    if wand_name.contains("speed") {
+        return Some(ImmediateEffect::SpeedMonster);
+    }
+    if wand_name.contains("undead") {
+        return Some(ImmediateEffect::UndeadTurning);
+    }
+    if wand_name.contains("polymorph") {
+        return Some(ImmediateEffect::Polymorph);
+    }
+    if wand_name.contains("cancellation") {
+        return Some(ImmediateEffect::Cancellation);
+    }
+    if wand_name.contains("teleportation") || wand_name.contains("teleport") {
+        return Some(ImmediateEffect::Teleportation);
+    }
+    if wand_name.contains("invisible") {
+        return Some(ImmediateEffect::MakeInvisible);
+    }
+    if wand_name.contains("locking") || wand_name.contains("wizard lock") {
+        return Some(ImmediateEffect::Locking);
+    }
+    if wand_name.contains("probing") {
+        return Some(ImmediateEffect::Probing);
+    }
+    if wand_name.contains("opening") || wand_name.contains("knock") {
+        return Some(ImmediateEffect::Opening);
+    }
+    if wand_name.contains("nothing") {
+        return Some(ImmediateEffect::Nothing);
+    }
+    None // 볼트/레이 계열
+}
+
+// =============================================================================
+// [v2.9.4] 아이템 파괴 시스템 (원본: destroy_one_item, zap.c L4700+)
+// 빔이 인벤토리 아이템을 파괴하는 로직
+// =============================================================================
+
+/// [v2.9.4] 빔에 의해 파괴 가능한 아이템 종류 (원본: destroy_one_item)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DestroyableItemType {
+    /// 불꽃 빔 → 두루마리/물약/마법서 파괴
+    Scroll,
+    /// 불꽃 빔 → 물약 파괴 (끓임)
+    Potion,
+    /// 냉기 빔 → 물약 파괴 (동결)
+    PotionFreeze,
+    /// 번개 빔 → 마법봉 파괴 (과부하)
+    Wand,
+    /// 번개 빔 → 반지 파괴 (녹음)
+    Ring,
+}
+
+/// [v2.9.4] 아이템 파괴 확률 (원본: destroy_percentage)
+pub fn item_destroy_chance(dtype: DamageType, item_class: &str) -> i32 {
+    match dtype {
+        DamageType::Fire => {
+            match item_class {
+                "scroll" => 50,    // 두루마리: 50% (원본: L4730)
+                "potion" => 50,    // 물약: 50% (원본: L4735)
+                "spellbook" => 25, // 마법서: 25% (원본: L4740 근사)
+                _ => 0,
+            }
+        }
+        DamageType::Cold => {
+            match item_class {
+                "potion" => 25, // 물약 동결: 25% (원본: L4750)
+                _ => 0,
+            }
+        }
+        DamageType::Elec => {
+            match item_class {
+                "wand" => 25, // 마법봉 과부하: 25% (원본: L4760)
+                "ring" => 25, // 반지: 25%
+                _ => 0,
+            }
+        }
+        _ => 0,
+    }
+}
+
+/// [v2.9.4] 아이템 파괴 판정 (원본: destroy_one_item)
+/// 반환: (파괴 여부, 메시지)
+pub fn try_destroy_item(
+    dtype: DamageType,
+    item_name: &str,
+    item_class: &str,
+    rng: &mut NetHackRng,
+) -> (bool, String) {
+    let chance = item_destroy_chance(dtype, item_class);
+    if chance <= 0 {
+        return (false, String::new());
+    }
+    if rng.rn2(100) < chance {
+        let verb = match dtype {
+            DamageType::Fire => "타버린다",
+            DamageType::Cold => "동결되어 깨진다",
+            DamageType::Elec => "과부하로 파괴된다",
+            _ => "파괴된다",
+        };
+        (true, format!("당신의 {}이(가) {}!", item_name, verb))
+    } else {
+        (false, String::new())
+    }
+}
+
+// =============================================================================
 // [v2.3.1] zap.c 확장 이식
 // 원본: nethack-3.6.7/src/zap.c (5,016줄)
 //
@@ -1269,5 +1775,326 @@ mod zap_extended_tests {
         s.record_reflect();
         assert_eq!(s.beams_fired, 1);
         assert_eq!(s.total_beam_damage, 25);
+    }
+}
+
+// =============================================================================
+// [v2.9.4] bhitm / 아이템 파괴 테스트
+// =============================================================================
+#[cfg(test)]
+mod bhitm_tests {
+    use super::*;
+    use crate::util::rng::NetHackRng;
+
+    /// 테스트용 기본 대상 생성
+    fn make_target() -> ZapTarget {
+        ZapTarget {
+            name: "고블린".to_string(),
+            hp: 20,
+            hp_max: 20,
+            level: 3,
+            magic_resistant: false,
+            drain_resistant: false,
+            is_undead: false,
+            is_vampshifter: false,
+            is_stone_golem: false,
+            is_tame: false,
+            is_peaceful: false,
+            is_disguised: false,
+            is_invisible: false,
+            is_cancelled: false,
+            speed: 0,
+        }
+    }
+
+    #[test]
+    fn test_striking_normal() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::Striking,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(result.damage > 0); // 2d12 최소 2
+        assert!(result.reveal_invisible);
+        assert!(result.learned);
+    }
+
+    #[test]
+    fn test_striking_magic_resistant() {
+        let mut target = make_target();
+        target.magic_resistant = true;
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::Striking,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert_eq!(result.damage, 0);
+        assert!(result.message.contains("Boing"));
+    }
+
+    #[test]
+    fn test_slow_monster() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::SlowMonster,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert_eq!(result.speed_change, -1);
+    }
+
+    #[test]
+    fn test_speed_monster() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::SpeedMonster,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert_eq!(result.speed_change, 1);
+    }
+
+    #[test]
+    fn test_speed_tame_no_wake() {
+        let mut target = make_target();
+        target.is_tame = true;
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::SpeedMonster,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(!result.should_wake);
+    }
+
+    #[test]
+    fn test_undead_turning_non_undead() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::UndeadTurning,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert_eq!(result.damage, 0); // 언데드가 아니면 무효
+        assert!(!result.should_wake);
+    }
+
+    #[test]
+    fn test_undead_turning_on_undead() {
+        let mut target = make_target();
+        target.is_undead = true;
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::UndeadTurning,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(result.damage > 0);
+        assert!(result.should_wake);
+    }
+
+    #[test]
+    fn test_cancellation() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::Cancellation,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(result.cancelled);
+    }
+
+    #[test]
+    fn test_teleportation() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::Teleportation,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(result.teleported);
+    }
+
+    #[test]
+    fn test_make_invisible() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::MakeInvisible,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(result.learned);
+        assert!(result.message.contains("투명"));
+    }
+
+    #[test]
+    fn test_probing() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::Probing,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(!result.should_wake);
+        assert!(result.learned);
+        assert!(result.message.contains("HP: 20/20"));
+    }
+
+    #[test]
+    fn test_healing() {
+        let target = make_target();
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::Healing,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(result.damage < 0); // 음수 = 회복
+        assert!(!result.should_wake);
+    }
+
+    #[test]
+    fn test_drain_life_resistant() {
+        let mut target = make_target();
+        target.drain_resistant = true;
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::DrainLife,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert_eq!(result.damage, 0);
+        assert!(result.message.contains("저항"));
+    }
+
+    #[test]
+    fn test_stone_to_flesh_golem() {
+        let mut target = make_target();
+        target.is_stone_golem = true;
+        let mut rng = NetHackRng::new(42);
+        let result = bhitm(
+            ImmediateEffect::StoneToFlesh,
+            &target,
+            &mut rng,
+            false,
+            false,
+            1,
+            false,
+        );
+        assert!(result.polymorphed);
+        assert!(result.message.contains("살점 골렘"));
+    }
+
+    #[test]
+    fn test_classify_immediate_effect() {
+        assert_eq!(
+            classify_immediate_effect("wand of striking"),
+            Some(ImmediateEffect::Striking)
+        );
+        assert_eq!(
+            classify_immediate_effect("wand of slow monster"),
+            Some(ImmediateEffect::SlowMonster)
+        );
+        assert_eq!(
+            classify_immediate_effect("wand of speed monster"),
+            Some(ImmediateEffect::SpeedMonster)
+        );
+        assert_eq!(
+            classify_immediate_effect("wand of teleportation"),
+            Some(ImmediateEffect::Teleportation)
+        );
+        assert_eq!(
+            classify_immediate_effect("wand of cancellation"),
+            Some(ImmediateEffect::Cancellation)
+        );
+        assert_eq!(
+            classify_immediate_effect("wand of probing"),
+            Some(ImmediateEffect::Probing)
+        );
+        assert_eq!(
+            classify_immediate_effect("wand of nothing"),
+            Some(ImmediateEffect::Nothing)
+        );
+        // 볼트/레이 계열은 None
+        assert_eq!(classify_immediate_effect("wand of fire"), None);
+        assert_eq!(classify_immediate_effect("wand of death"), None);
+    }
+
+    #[test]
+    fn test_item_destroy_fire_scroll() {
+        let mut rng = NetHackRng::new(42);
+        // 여러 번 시도하여 최소 한 번은 파괴 발생 확인
+        let mut destroyed = false;
+        for _ in 0..20 {
+            let (d, _msg) =
+                try_destroy_item(DamageType::Fire, "scroll of identify", "scroll", &mut rng);
+            if d {
+                destroyed = true;
+                break;
+            }
+        }
+        assert!(destroyed, "20번 시도에서 두루마리 파괴가 한 번도 안 일어남");
     }
 }
