@@ -1,10 +1,10 @@
-// [v2.0.0
+// [v2.0.0 Phase R2] 자동 생성된 파일 — 직접 수정하지 마세요!
 // build.rs에 의해 monsters.toml / items.toml에서 생성됨
 
 use serde::{Deserialize, Serialize};
 
-///
-///
+/// 몬스터 종류 enum — TOML 데이터에서 자동 생성
+/// [v2.0.0 R2] String 비교 대신 패턴 매칭으로 타입 안전성 확보
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MonsterKind {
     /// "giant ant"
@@ -44,7 +44,7 @@ pub enum MonsterKind {
 }
 
 impl MonsterKind {
-    ///
+    /// 문자열에서 MonsterKind로 변환 (TOML 로드 시 사용)
     pub fn from_str(s: &str) -> Self {
         match s {
             "giant ant" => Self::GiantAnt,
@@ -67,7 +67,7 @@ impl MonsterKind {
         }
     }
 
-    ///
+    /// MonsterKind를 원본 문자열로 변환 (표시용)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::GiantAnt => "giant ant",
@@ -97,8 +97,8 @@ impl std::fmt::Display for MonsterKind {
     }
 }
 
-///
-///
+/// 아이템 종류 enum — TOML 데이터에서 자동 생성
+/// [v2.0.0 R2] String 비교 대신 패턴 매칭으로 타입 안전성 확보
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ItemKind {
     /// "strange object"
@@ -256,7 +256,7 @@ pub enum ItemKind {
 }
 
 impl ItemKind {
-    ///
+    /// 문자열에서 ItemKind로 변환 (TOML 로드 시 사용)
     pub fn from_str(s: &str) -> Self {
         match s {
             "strange object" => Self::StrangeObject,
@@ -338,7 +338,7 @@ impl ItemKind {
         }
     }
 
-    ///
+    /// ItemKind를 원본 문자열로 변환 (표시용)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::StrangeObject => "strange object",
@@ -420,12 +420,12 @@ impl ItemKind {
         }
     }
 
-    ///
+    /// 시체인지 여부 (corpse 체크)
     pub fn is_corpse(&self) -> bool {
         matches!(self, Self::Corpse)
     }
 
-    ///
+    /// 반지류인지 여부 (이름에 ring 포함 — 추후 ItemClass로 대체 예정)
     pub fn is_ring_name(&self) -> bool {
         self.as_str().contains("ring")
     }

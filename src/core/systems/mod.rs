@@ -14,11 +14,13 @@ pub mod creature;
 pub mod identity;
 ///
 pub mod item;
+/// 마법 시스템 (주문/탐지/순간이동 이식)
+pub mod magic;
 ///
 pub mod misc;
 ///
 pub mod social;
-///
+/// 스폰 시스템
 pub mod spawn;
 ///
 pub mod world;

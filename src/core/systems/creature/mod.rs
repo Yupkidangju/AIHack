@@ -13,8 +13,12 @@ pub mod exper_ext;
 pub mod movement;
 pub mod regeneration;
 pub mod rip_ext;
+pub mod sounds_ext;
 pub mod status;
+pub mod steed_ext;
 pub mod were_ext;
+pub mod wield_ext;
+pub mod worm_ext;
 pub mod worn;
 
 // ──────────────────────────────────────────────────────────────

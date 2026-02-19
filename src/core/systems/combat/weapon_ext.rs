@@ -785,6 +785,649 @@ pub fn select_hwep_result(
 }
 
 // =============================================================================
+// select_rwep — 몬스터 원거리 무기 선택 AI
+// [v2.11.0] weapon.c:504-623 이식
+// =============================================================================
+
+/// 몬스터 인벤토리 아이템 정보 (원거리 무기 선택용)
+#[derive(Debug, Clone)]
+pub struct MonInventoryItem {
+    /// 아이템 이름 (소문자)
+    pub name: String,
+    /// 아티팩트인지 여부
+    pub is_artifact: bool,
+    /// 저주 여부
+    pub cursed: bool,
+    /// 현재 장착된 무기(mw_tmp)인지 여부
+    pub is_wielded: bool,
+    /// 용접(welded) 상태인지 여부
+    pub is_welded: bool,
+}
+
+/// 원거리 무기 선택 결과
+#[derive(Debug, Clone)]
+pub struct SelectRwepResult {
+    /// 선택된 투척/발사 무기 인벤토리 인덱스
+    pub weapon_index: usize,
+    /// 필요한 발사대 인덱스 (활/투석기 등, 없으면 None)
+    pub propellor_index: Option<usize>,
+}
+
+/// 장대무기(polearm) 선호 목록 (원본 pwep[])
+const POLEARM_PREFERENCE: &[&str] = &[
+    "halberd",
+    "bardiche",
+    "spetum",
+    "bill-guisarme",
+    "voulge",
+    "ranseur",
+    "guisarme",
+    "glaive",
+    "lucern hammer",
+    "bec de corbin",
+    "fauchard",
+    "partisan",
+    "lance",
+];
+
+/// 몬스터 원거리 무기 선택 AI (순수 결과 패턴, 원본 select_rwep)
+/// [v2.11.0] weapon.c:504-623 이식
+///
+/// 선택 우선순위:
+/// 1. 코카트리스 알
+/// 2. Kop이면 크림 파이
+/// 3. 바위 던지기 가능하면 바위
+/// 4. 사거리 내 장대무기 (강한 몬스터만)
+/// 5. 투척 무기 (rwep[] 순서대로 + 발사대 매칭)
+pub fn select_rwep_result(
+    inventory: &[MonInventoryItem],
+    is_kop: bool,
+    throws_rocks: bool,
+    is_strong: bool,
+    wearing_shield: bool,
+    hates_silver: bool,
+    distance_sq: i32,
+    can_see_target: bool,
+    wielded_is_welded: bool,
+) -> Option<SelectRwepResult> {
+    // 코카트리스 알 → 최우선 (원본 Oselect(EGG) with touch_petrifies)
+    for (idx, item) in inventory.iter().enumerate() {
+        let l = &item.name;
+        if l.contains("cockatrice egg") || l.contains("chickatrice egg") {
+            return Some(SelectRwepResult {
+                weapon_index: idx,
+                propellor_index: None,
+            });
+        }
+    }
+
+    // Kop이면 크림 파이 우선
+    if is_kop {
+        for (idx, item) in inventory.iter().enumerate() {
+            if item.name.contains("cream pie") {
+                return Some(SelectRwepResult {
+                    weapon_index: idx,
+                    propellor_index: None,
+                });
+            }
+        }
+    }
+
+    // 바위 던지기 가능하면 바위 우선
+    if throws_rocks {
+        for (idx, item) in inventory.iter().enumerate() {
+            if item.name.contains("boulder") {
+                return Some(SelectRwepResult {
+                    weapon_index: idx,
+                    propellor_index: None,
+                });
+            }
+        }
+    }
+
+    // 장대무기 — 사거리 13 이내이고 시야 확보 시
+    if distance_sq <= 13 && can_see_target {
+        for pref in POLEARM_PREFERENCE {
+            for (idx, item) in inventory.iter().enumerate() {
+                if !item.name.contains(pref) {
+                    continue;
+                }
+                // 양손 무기: 강해야 하고 방패 없어야 함
+                if is_two_handed(&item.name) && (!is_strong || wearing_shield) {
+                    continue;
+                }
+                // 은 무기: 은 혐오 몬스터 스킵
+                if item.name.contains("silver") && hates_silver {
+                    continue;
+                }
+                // 장착 무기가 용접되어 다른 무기를 못 드는 상태면 장착 무기만 가능
+                if wielded_is_welded && !item.is_wielded {
+                    continue;
+                }
+                return Some(SelectRwepResult {
+                    weapon_index: idx,
+                    propellor_index: Some(idx), // 장대무기는 직접 장착
+                });
+            }
+        }
+    }
+
+    // 투척 무기 (rwep[] 순서대로)
+    for throw_name in THROWABLE_WEAPONS {
+        // 발사대 필요 무기 처리
+        let propellor_idx = find_propellor(inventory, throw_name);
+
+        // 발사대가 필요한데 없으면 스킵
+        if needs_propellor(throw_name) && propellor_idx.is_none() {
+            continue;
+        }
+
+        // 용접된 무기와 발사대가 다르면 스킵
+        if wielded_is_welded {
+            if let Some(prop_idx) = propellor_idx {
+                if !inventory[prop_idx].is_wielded {
+                    continue;
+                }
+            }
+        }
+
+        for (idx, item) in inventory.iter().enumerate() {
+            if !item.name.contains(throw_name) {
+                continue;
+            }
+            // 아티팩트는 던지지 않음
+            if item.is_artifact {
+                continue;
+            }
+            // 장착 무기가 용접되어 있으면 제외
+            if item.is_wielded && item.is_welded {
+                continue;
+            }
+            // 저주받은 load stone은 자동 발사 금지 (원본에서 !otmp->cursed)
+            if item.name.contains("loadstone") && item.cursed {
+                continue;
+            }
+            return Some(SelectRwepResult {
+                weapon_index: idx,
+                propellor_index: propellor_idx,
+            });
+        }
+    }
+
+    None
+}
+
+/// 발사대가 필요한 탄환인지 판별
+fn needs_propellor(weapon_name: &str) -> bool {
+    weapon_name.contains("arrow")
+        || weapon_name == "ya"
+        || weapon_name.contains("bolt")
+        || weapon_name.contains("rock")
+        || weapon_name.contains("loadstone")
+        || weapon_name.contains("luckstone")
+        || weapon_name.contains("flint")
+}
+
+/// 인벤토리에서 탄환에 맞는 발사대 찾기
+fn find_propellor(inventory: &[MonInventoryItem], ammo_name: &str) -> Option<usize> {
+    if ammo_name.contains("arrow") || ammo_name == "ya" {
+        // 활 계열
+        for name in &["yumi", "elven bow", "bow", "orcish bow"] {
+            if let Some(idx) = inventory.iter().position(|i| i.name.contains(name)) {
+                return Some(idx);
+            }
+        }
+    } else if ammo_name.contains("bolt") {
+        // 석궁
+        if let Some(idx) = inventory.iter().position(|i| i.name.contains("crossbow")) {
+            return Some(idx);
+        }
+    } else if ammo_name.contains("rock")
+        || ammo_name.contains("loadstone")
+        || ammo_name.contains("luckstone")
+        || ammo_name.contains("flint")
+    {
+        // 투석기
+        if let Some(idx) = inventory.iter().position(|i| i.name.contains("sling")) {
+            return Some(idx);
+        }
+    }
+    // 발사대 불필요 무기 (창, 단검, 수리검 등)는 None 반환이 정상
+    if !needs_propellor(ammo_name) {
+        return None; // 발사대 필요 없음 = 그냥 던짐
+    }
+    None
+}
+
+// =============================================================================
+// 스킬 승급 판정 함수군
+// [v2.11.0] weapon.c:1084-1368 이식
+// =============================================================================
+
+/// 스킬 승급 가능 판단 결과 (원본 can_advance)
+/// [v2.11.0] weapon.c:1084-1100
+pub fn can_advance_result(
+    current_level: SkillLevel,
+    max_level: SkillLevel,
+    current_advance: i32,
+    skills_advanced: i32,
+    skill_limit: i32,
+    available_slots: i32,
+    skill: WeaponSkill,
+) -> bool {
+    // 제한 상태거나 이미 최대면 불가
+    if current_level >= max_level {
+        return false;
+    }
+    // 총 승급 회수 제한 도달
+    if skills_advanced >= skill_limit {
+        return false;
+    }
+    // 경험치가 충분하고 슬롯도 충분한지
+    current_advance >= practice_needed(current_level)
+        && available_slots >= slots_required(skill, current_level)
+}
+
+/// 슬롯만 있으면 승급 가능한지 (원본 could_advance)
+/// [v2.11.0] weapon.c:1103-1114
+pub fn could_advance_result(
+    current_level: SkillLevel,
+    max_level: SkillLevel,
+    current_advance: i32,
+    skills_advanced: i32,
+    skill_limit: i32,
+) -> bool {
+    if current_level >= max_level {
+        return false;
+    }
+    if skills_advanced >= skill_limit {
+        return false;
+    }
+    current_advance >= practice_needed(current_level)
+}
+
+/// 스킬이 최대에 도달했고 경험치도 넘치는지 (원본 peaked_skill)
+/// [v2.11.0] weapon.c:1118-1128
+pub fn peaked_skill_result(
+    current_level: SkillLevel,
+    max_level: SkillLevel,
+    current_advance: i32,
+) -> bool {
+    current_level >= max_level && current_advance >= practice_needed(current_level)
+}
+
+/// 스킬 승급 실행 결과 (원본 skill_advance)
+/// [v2.11.0] weapon.c:1130-1141
+#[derive(Debug, Clone)]
+pub struct SkillAdvanceResult {
+    /// 새 스킬 레벨
+    pub new_level: SkillLevel,
+    /// 소비된 슬롯 수
+    pub slots_consumed: i32,
+    /// "most skilled" vs "more skilled" 메시지 분기
+    pub is_most_skilled: bool,
+    /// 스킬 이름
+    pub skill_display_name: &'static str,
+}
+
+pub fn skill_advance_result(
+    skill: WeaponSkill,
+    current_level: SkillLevel,
+    max_level: SkillLevel,
+) -> SkillAdvanceResult {
+    let slots_consumed = slots_required(skill, current_level);
+    let new_level = match current_level {
+        SkillLevel::Unskilled => SkillLevel::Basic,
+        SkillLevel::Basic => SkillLevel::Skilled,
+        SkillLevel::Skilled => SkillLevel::Expert,
+        SkillLevel::Expert => SkillLevel::Master,
+        SkillLevel::Master => SkillLevel::GrandMaster,
+        SkillLevel::GrandMaster => SkillLevel::GrandMaster,
+    };
+    let is_most_skilled = new_level >= max_level;
+    SkillAdvanceResult {
+        new_level,
+        slots_consumed,
+        is_most_skilled,
+        skill_display_name: skill_name(skill),
+    }
+}
+
+/// add_weapon_skill 결과 — 슬롯 추가 후 새로 승급 가능한 스킬이 있는지
+/// [v2.11.0] weapon.c:1329-1344
+pub fn add_weapon_skill_gained_advanceable(
+    skills: &[(WeaponSkill, SkillLevel, SkillLevel, i32)], // (스킬, 현재, 최대, 경험치)
+    old_slots: i32,
+    new_slots: i32,
+    skills_advanced: i32,
+    skill_limit: i32,
+) -> bool {
+    // 추가 전 승급 가능 수
+    let before = skills
+        .iter()
+        .filter(|(sk, lv, mx, adv)| {
+            can_advance_result(*lv, *mx, *adv, skills_advanced, skill_limit, old_slots, *sk)
+        })
+        .count();
+    // 추가 후 승급 가능 수
+    let after = skills
+        .iter()
+        .filter(|(sk, lv, mx, adv)| {
+            can_advance_result(*lv, *mx, *adv, skills_advanced, skill_limit, new_slots, *sk)
+        })
+        .count();
+    before < after
+}
+
+/// lose_weapon_skill 결과 — 레벨 다운 시 슬롯 감소 처리
+/// [v2.11.0] weapon.c:1346-1368
+#[derive(Debug, Clone)]
+pub struct LoseSkillResult {
+    /// 처리 후 남은 슬롯 수
+    pub remaining_slots: i32,
+    /// 처리 후 총 승급 회수
+    pub skills_advanced: i32,
+    /// 강등된 스킬 목록 (스킬, 새 레벨)
+    pub demoted: Vec<(WeaponSkill, SkillLevel)>,
+}
+
+pub fn lose_weapon_skill_result(
+    mut n: i32,
+    mut slots: i32,
+    mut skills_advanced: i32,
+    skill_record: &[(WeaponSkill, SkillLevel)], // 승급 기록 (역순으로 팝)
+) -> LoseSkillResult {
+    let mut demoted = Vec::new();
+    let mut record_idx = skill_record.len();
+
+    while n > 0 {
+        n -= 1;
+        if slots > 0 {
+            // 미사용 슬롯에서 차감
+            slots -= 1;
+        } else if record_idx > 0 {
+            // 마지막 승급된 스킬을 강등
+            record_idx -= 1;
+            let (skill, level) = skill_record[record_idx];
+            skills_advanced -= 1;
+            let new_level = match level {
+                SkillLevel::GrandMaster => SkillLevel::Master,
+                SkillLevel::Master => SkillLevel::Expert,
+                SkillLevel::Expert => SkillLevel::Skilled,
+                SkillLevel::Skilled => SkillLevel::Basic,
+                SkillLevel::Basic => SkillLevel::Unskilled,
+                SkillLevel::Unskilled => SkillLevel::Unskilled,
+            };
+            // 강등된 스킬의 원래 승급에 사용된 슬롯 중 남은 분 환급
+            let refund = slots_required(skill, new_level) - 1;
+            if refund > 0 {
+                slots = refund;
+            }
+            demoted.push((skill, new_level));
+        }
+    }
+
+    LoseSkillResult {
+        remaining_slots: slots,
+        skills_advanced,
+        demoted,
+    }
+}
+
+// =============================================================================
+// skill_init — 게임 시작 시 스킬 초기화
+// [v2.11.0] weapon.c:1587-1659 이식
+// =============================================================================
+
+/// 초기 스킬 상태
+#[derive(Debug, Clone)]
+pub struct SkillInitEntry {
+    pub skill: WeaponSkill,
+    pub level: SkillLevel,
+    pub max_level: SkillLevel,
+    pub advance: i32,
+}
+
+/// 역할, 인벤토리, 역할별 스킬 캡을 기반으로 초기 스킬 테이블 생성 (원본 skill_init)
+/// [v2.11.0] weapon.c:1587-1659
+pub fn skill_init_result(
+    role: &str,
+    inventory_weapons: &[String], // 초기 인벤토리 무기 이름
+    pet_is_pony: bool,
+) -> Vec<SkillInitEntry> {
+    let all_skills = all_weapon_skills();
+    let role_caps = crate::core::systems::combat::weapon::role_skill_caps(role);
+
+    let mut entries: Vec<SkillInitEntry> = all_skills
+        .iter()
+        .map(|sk| {
+            SkillInitEntry {
+                skill: *sk,
+                level: SkillLevel::Unskilled, // 기본: 제한됨 (구현상 Unskilled로 표현)
+                max_level: SkillLevel::Unskilled, // 제한 상태
+                advance: 0,
+            }
+        })
+        .collect();
+
+    // 인벤토리 무기의 스킬을 Basic으로 (탄환 제외)
+    for wep_name in inventory_weapons {
+        if is_ammo(wep_name) {
+            continue;
+        }
+        if let Some(sk) = weapon_type(wep_name) {
+            if let Some(entry) = entries.iter_mut().find(|e| e.skill == sk) {
+                if entry.level < SkillLevel::Basic {
+                    entry.level = SkillLevel::Basic;
+                }
+            }
+        }
+    }
+
+    // 역할별 마법 스킬 초기 설정
+    let lr = role.to_lowercase();
+    match lr.as_str() {
+        "healer" | "monk" => {
+            set_skill_level(&mut entries, WeaponSkill::HealingSpell, SkillLevel::Basic);
+        }
+        "priest" | "priestess" => {
+            set_skill_level(&mut entries, WeaponSkill::ClericalSpell, SkillLevel::Basic);
+        }
+        "wizard" => {
+            set_skill_level(&mut entries, WeaponSkill::AttackSpell, SkillLevel::Basic);
+            set_skill_level(
+                &mut entries,
+                WeaponSkill::EnchantmentSpell,
+                SkillLevel::Basic,
+            );
+        }
+        _ => {}
+    }
+
+    // 역할 스킬 캡 적용
+    for (sk, max_lv) in &role_caps {
+        if let Some(entry) = entries.iter_mut().find(|e| e.skill == *sk) {
+            entry.max_level = *max_lv;
+            // 제한(Unskilled인데 max도 Unskilled)이 아니게 됨 → 최소 Unskilled
+            // (max_level > Unskilled이면 사용 가능 상태)
+        }
+    }
+
+    // 격투 잠재력이 Expert 초과이면 맨손 Basic으로 시작
+    if let Some(entry) = entries
+        .iter_mut()
+        .find(|e| e.skill == WeaponSkill::BareHanded)
+    {
+        if entry.max_level > SkillLevel::Expert && entry.level < SkillLevel::Basic {
+            entry.level = SkillLevel::Basic;
+        }
+    }
+
+    // 말 시작 역할은 기승 Basic
+    if pet_is_pony {
+        set_skill_level(&mut entries, WeaponSkill::Riding, SkillLevel::Basic);
+    }
+
+    // advance를 현재 레벨의 이전 레벨 경험치로 초기화
+    for entry in entries.iter_mut() {
+        if entry.max_level > SkillLevel::Unskilled {
+            let prev_level = match entry.level {
+                SkillLevel::Unskilled => SkillLevel::Unskilled,
+                SkillLevel::Basic => SkillLevel::Unskilled,
+                SkillLevel::Skilled => SkillLevel::Basic,
+                SkillLevel::Expert => SkillLevel::Skilled,
+                SkillLevel::Master => SkillLevel::Expert,
+                SkillLevel::GrandMaster => SkillLevel::Master,
+            };
+            entry.advance = practice_needed(prev_level);
+        }
+    }
+
+    entries
+}
+
+/// 스킬 레벨 설정 헬퍼
+fn set_skill_level(entries: &mut [SkillInitEntry], skill: WeaponSkill, level: SkillLevel) {
+    if let Some(entry) = entries.iter_mut().find(|e| e.skill == skill) {
+        if entry.level < level {
+            entry.level = level;
+        }
+    }
+}
+
+/// 전체 무기 스킬 목록
+fn all_weapon_skills() -> Vec<WeaponSkill> {
+    vec![
+        WeaponSkill::Dagger,
+        WeaponSkill::Knife,
+        WeaponSkill::Axe,
+        WeaponSkill::ShortSword,
+        WeaponSkill::BroadSword,
+        WeaponSkill::LongSword,
+        WeaponSkill::TwoHandedSword,
+        WeaponSkill::Scimitar,
+        WeaponSkill::Saber,
+        WeaponSkill::Club,
+        WeaponSkill::Mace,
+        WeaponSkill::MorningStar,
+        WeaponSkill::Flail,
+        WeaponSkill::Hammer,
+        WeaponSkill::Quarterstaff,
+        WeaponSkill::Polearm,
+        WeaponSkill::Spear,
+        WeaponSkill::Javelin,
+        WeaponSkill::Trident,
+        WeaponSkill::Lance,
+        WeaponSkill::Bow,
+        WeaponSkill::Sling,
+        WeaponSkill::Crossbow,
+        WeaponSkill::Dart,
+        WeaponSkill::Shuriken,
+        WeaponSkill::Boomerang,
+        WeaponSkill::Whip,
+        WeaponSkill::PickAxe,
+        WeaponSkill::Unicorn,
+        WeaponSkill::BareHanded,
+        WeaponSkill::MartialArts,
+        WeaponSkill::AttackSpell,
+        WeaponSkill::HealingSpell,
+        WeaponSkill::DivinationSpell,
+        WeaponSkill::EnchantmentSpell,
+        WeaponSkill::ClericalSpell,
+        WeaponSkill::EscapeSpell,
+        WeaponSkill::MatterSpell,
+        WeaponSkill::Riding,
+        WeaponSkill::TwoWeaponCombat,
+    ]
+}
+
+// =============================================================================
+// enhance_weapon_skill — #enhance 명령 UI 데이터 생성
+// [v2.11.0] weapon.c:1160-1297 이식
+// =============================================================================
+
+/// #enhance 메뉴 스킬 항목
+#[derive(Debug, Clone)]
+pub struct EnhanceSkillEntry {
+    /// 스킬
+    pub skill: WeaponSkill,
+    /// 현재 레벨
+    pub level: SkillLevel,
+    /// 최대 레벨
+    pub max_level: SkillLevel,
+    /// 승급 가능 여부
+    pub can_advance: bool,
+    /// 슬 만 있으면 가능
+    pub could_advance: bool,
+    /// 최대 도달 상태
+    pub peaked: bool,
+    /// 카테고리 ("Fighting Skills", "Weapon Skills", "Spellcasting Skills")
+    pub category: &'static str,
+}
+
+/// #enhance 명령 결과 생성 (원본 enhance_weapon_skill의 순수 결과 버전)
+/// [v2.11.0] weapon.c:1160-1297
+pub fn enhance_weapon_skill_entries(
+    skills: &[(WeaponSkill, SkillLevel, SkillLevel, i32)], // (스킬, 현재, 최대, 경험치)
+    available_slots: i32,
+    skills_advanced: i32,
+    skill_limit: i32,
+) -> Vec<EnhanceSkillEntry> {
+    let mut result = Vec::new();
+
+    for &(skill, level, max_level, advance) in skills {
+        // 제한 상태면 표시 안 함
+        if max_level <= SkillLevel::Unskilled && level <= SkillLevel::Unskilled {
+            continue;
+        }
+
+        let ca = can_advance_result(
+            level,
+            max_level,
+            advance,
+            skills_advanced,
+            skill_limit,
+            available_slots,
+            skill,
+        );
+        let coa = could_advance_result(level, max_level, advance, skills_advanced, skill_limit);
+        let pk = peaked_skill_result(level, max_level, advance);
+
+        let category = skill_category(skill);
+
+        result.push(EnhanceSkillEntry {
+            skill,
+            level,
+            max_level,
+            can_advance: ca,
+            could_advance: coa && !ca,
+            peaked: pk,
+            category,
+        });
+    }
+
+    result
+}
+
+/// 스킬의 카테고리 분류 (원본 skill_ranges[])
+fn skill_category(skill: WeaponSkill) -> &'static str {
+    match skill {
+        WeaponSkill::BareHanded
+        | WeaponSkill::MartialArts
+        | WeaponSkill::Riding
+        | WeaponSkill::TwoWeaponCombat => "Fighting Skills",
+        WeaponSkill::AttackSpell
+        | WeaponSkill::HealingSpell
+        | WeaponSkill::DivinationSpell
+        | WeaponSkill::EnchantmentSpell
+        | WeaponSkill::ClericalSpell
+        | WeaponSkill::EscapeSpell
+        | WeaponSkill::MatterSpell => "Spellcasting Skills",
+        _ => "Weapon Skills",
+    }
+}
+
+// =============================================================================
 // 테스트
 // =============================================================================
 #[cfg(test)]
@@ -1058,5 +1701,362 @@ mod tests {
     fn test_practice_needed() {
         assert_eq!(practice_needed(SkillLevel::Unskilled), 100);
         assert_eq!(practice_needed(SkillLevel::Basic), 200);
+    }
+
+    // =====================================================================
+    // [v2.11.0] 신규 이식 함수 테스트
+    // =====================================================================
+
+    #[test]
+    fn test_select_rwep_cockatrice_egg_priority() {
+        // 코카트리스 알이 인벤토리에 있으면 최우선
+        let inv = vec![
+            MonInventoryItem {
+                name: "long sword".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: true,
+                is_welded: false,
+            },
+            MonInventoryItem {
+                name: "cockatrice egg".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+        ];
+        let r = select_rwep_result(&inv, false, false, true, false, false, 25, true, false);
+        assert!(r.is_some());
+        assert_eq!(r.unwrap().weapon_index, 1); // 코카트리스 알
+    }
+
+    #[test]
+    fn test_select_rwep_kop_cream_pie() {
+        // Kop은 크림 파이 우선
+        let inv = vec![
+            MonInventoryItem {
+                name: "spear".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+            MonInventoryItem {
+                name: "cream pie".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+        ];
+        let r = select_rwep_result(&inv, true, false, true, false, false, 25, true, false);
+        assert!(r.is_some());
+        assert_eq!(r.unwrap().weapon_index, 1);
+    }
+
+    #[test]
+    fn test_select_rwep_arrow_with_bow() {
+        // 활이 있어야 화살 선택 가능
+        let inv = vec![
+            MonInventoryItem {
+                name: "arrow".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+            MonInventoryItem {
+                name: "bow".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+        ];
+        let r = select_rwep_result(&inv, false, false, true, false, false, 25, true, false);
+        assert!(r.is_some());
+        let res = r.unwrap();
+        assert_eq!(res.weapon_index, 0); // 화살
+        assert_eq!(res.propellor_index, Some(1)); // 활
+    }
+
+    #[test]
+    fn test_select_rwep_no_bow_no_arrow() {
+        // 활이 없으면 화살 선택 불가
+        let inv = vec![MonInventoryItem {
+            name: "arrow".into(),
+            is_artifact: false,
+            cursed: false,
+            is_wielded: false,
+            is_welded: false,
+        }];
+        let r = select_rwep_result(&inv, false, false, true, false, false, 25, true, false);
+        // 화살은 발사대가 필요하므로 불가, 다른 투척 무기도 없으므로 None
+        assert!(r.is_none());
+    }
+
+    #[test]
+    fn test_select_rwep_throws_rocks() {
+        // 바위 던지기 가능 몬스터 → 바위 우선
+        let inv = vec![
+            MonInventoryItem {
+                name: "spear".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+            MonInventoryItem {
+                name: "boulder".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+        ];
+        let r = select_rwep_result(&inv, false, true, true, false, false, 25, true, false);
+        assert!(r.is_some());
+        assert_eq!(r.unwrap().weapon_index, 1); // 바위
+    }
+
+    #[test]
+    fn test_select_rwep_skip_artifact() {
+        // 아티팩트 무기는 던지지 않음
+        let inv = vec![
+            MonInventoryItem {
+                name: "spear".into(),
+                is_artifact: true,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+            MonInventoryItem {
+                name: "dagger".into(),
+                is_artifact: false,
+                cursed: false,
+                is_wielded: false,
+                is_welded: false,
+            },
+        ];
+        let r = select_rwep_result(&inv, false, false, true, false, false, 25, true, false);
+        // 아티팩트 창은 스킵, 단검이 선택될 수 있음 (THROWABLE에 silver dagger 있음)
+        // 일반 dagger는 THROWABLE에 포함
+        assert!(r.is_some());
+        let res = r.unwrap();
+        assert_eq!(res.weapon_index, 1); // 단검
+    }
+
+    #[test]
+    fn test_can_advance_result_fn() {
+        // 경험치 충분, 슬롯 충분 → 승급 가능
+        assert!(can_advance_result(
+            SkillLevel::Unskilled,
+            SkillLevel::Expert,
+            150,
+            0,
+            10,
+            5,
+            WeaponSkill::LongSword,
+        ));
+        // 이미 최대 → 불가
+        assert!(!can_advance_result(
+            SkillLevel::Expert,
+            SkillLevel::Expert,
+            999,
+            0,
+            10,
+            5,
+            WeaponSkill::LongSword,
+        ));
+        // 경험치 부족 → 불가
+        assert!(!can_advance_result(
+            SkillLevel::Unskilled,
+            SkillLevel::Expert,
+            50,
+            0,
+            10,
+            5,
+            WeaponSkill::LongSword,
+        ));
+    }
+
+    #[test]
+    fn test_could_advance_result_fn() {
+        // 경험치만 충분하면 could는 true
+        assert!(could_advance_result(
+            SkillLevel::Unskilled,
+            SkillLevel::Expert,
+            150,
+            0,
+            10,
+        ));
+        // 이미 최대면 false
+        assert!(!could_advance_result(
+            SkillLevel::Expert,
+            SkillLevel::Expert,
+            999,
+            0,
+            10,
+        ));
+    }
+
+    #[test]
+    fn test_peaked_skill_result_fn() {
+        // 최대 상태 + 경험치 넘침
+        assert!(peaked_skill_result(
+            SkillLevel::Expert,
+            SkillLevel::Expert,
+            999,
+        ));
+        // 아직 최대 미만
+        assert!(!peaked_skill_result(
+            SkillLevel::Basic,
+            SkillLevel::Expert,
+            999,
+        ));
+    }
+
+    #[test]
+    fn test_skill_advance_result_fn() {
+        let r = skill_advance_result(
+            WeaponSkill::LongSword,
+            SkillLevel::Basic,
+            SkillLevel::Expert,
+        );
+        assert_eq!(r.new_level, SkillLevel::Skilled);
+        assert_eq!(r.slots_consumed, 1); // Basic 슬롯 = 1
+        assert!(!r.is_most_skilled); // Expert가 max인데 Skilled로 올라감
+
+        let r2 = skill_advance_result(
+            WeaponSkill::LongSword,
+            SkillLevel::Skilled,
+            SkillLevel::Expert,
+        );
+        assert_eq!(r2.new_level, SkillLevel::Expert);
+        assert!(r2.is_most_skilled); // 최대 도달
+    }
+
+    #[test]
+    fn test_lose_weapon_skill_result_fn() {
+        // 미사용 슬롯에서 차감
+        let r = lose_weapon_skill_result(1, 3, 2, &[]);
+        assert_eq!(r.remaining_slots, 2);
+        assert_eq!(r.skills_advanced, 2);
+        assert!(r.demoted.is_empty());
+
+        // 슬롯 없으면 강등
+        let record = vec![(WeaponSkill::LongSword, SkillLevel::Skilled)];
+        let r = lose_weapon_skill_result(1, 0, 3, &record);
+        assert_eq!(r.skills_advanced, 2);
+        assert_eq!(r.demoted.len(), 1);
+        assert_eq!(r.demoted[0], (WeaponSkill::LongSword, SkillLevel::Basic));
+    }
+
+    #[test]
+    fn test_skill_init_barbarian() {
+        // 바바리안은 맨손 Expert 이하이므로 BareHanded가 Basic이 되지 않는 게 정상
+        // (Expert 캡이므로 > Expert 미만 → Basic 안 됨)
+        let inv = vec!["two-handed sword".to_string()];
+        let entries = skill_init_result("barbarian", &inv, false);
+
+        // two-handed sword 스킬이 Basic인지 확인
+        let ths = entries
+            .iter()
+            .find(|e| e.skill == WeaponSkill::TwoHandedSword)
+            .unwrap();
+        assert_eq!(ths.level, SkillLevel::Basic);
+        assert_eq!(ths.max_level, SkillLevel::Expert);
+
+        // BareHanded max가 Expert 이므로 > Expert가 아님 → Basic 안 됨
+        let bh = entries
+            .iter()
+            .find(|e| e.skill == WeaponSkill::BareHanded)
+            .unwrap();
+        assert_eq!(bh.max_level, SkillLevel::Expert);
+    }
+
+    #[test]
+    fn test_skill_init_monk() {
+        let inv = vec!["quarterstaff".to_string()];
+        let entries = skill_init_result("monk", &inv, false);
+
+        // 수도승은 맨손 GrandMaster 캡 → Basic으로 시작
+        let bh = entries
+            .iter()
+            .find(|e| e.skill == WeaponSkill::BareHanded)
+            .unwrap();
+        assert!(bh.max_level > SkillLevel::Expert);
+        assert_eq!(bh.level, SkillLevel::Basic);
+
+        // 치유 마법 스킬이 Basic 이상
+        let hs = entries
+            .iter()
+            .find(|e| e.skill == WeaponSkill::HealingSpell)
+            .unwrap();
+        assert!(hs.level >= SkillLevel::Basic);
+    }
+
+    #[test]
+    fn test_skill_init_knight_pony() {
+        let inv = vec!["long sword".to_string()];
+        let entries = skill_init_result("knight", &inv, true);
+
+        // 말 시작 → 기승 Basic
+        let ride = entries
+            .iter()
+            .find(|e| e.skill == WeaponSkill::Riding)
+            .unwrap();
+        assert_eq!(ride.level, SkillLevel::Basic);
+    }
+
+    #[test]
+    fn test_enhance_weapon_skill_entries_fn() {
+        let skills = vec![
+            (
+                WeaponSkill::LongSword,
+                SkillLevel::Unskilled,
+                SkillLevel::Expert,
+                150,
+            ),
+            (
+                WeaponSkill::Dagger,
+                SkillLevel::Basic,
+                SkillLevel::Basic,
+                300,
+            ),
+            (
+                WeaponSkill::Axe,
+                SkillLevel::Unskilled,
+                SkillLevel::Unskilled,
+                0,
+            ), // 제한
+        ];
+        let entries = enhance_weapon_skill_entries(&skills, 5, 0, 10);
+        // Axe는 제한이므로 표시 안 됨
+        assert_eq!(entries.len(), 2);
+        // LongSword은 경험치 충분 → 승급 가능
+        let ls = entries
+            .iter()
+            .find(|e| e.skill == WeaponSkill::LongSword)
+            .unwrap();
+        assert!(ls.can_advance);
+        // Dagger는 이미 최대 → peaked
+        let dg = entries
+            .iter()
+            .find(|e| e.skill == WeaponSkill::Dagger)
+            .unwrap();
+        assert!(dg.peaked);
+        assert!(!dg.can_advance);
+    }
+
+    #[test]
+    fn test_skill_category_fn() {
+        assert_eq!(skill_category(WeaponSkill::BareHanded), "Fighting Skills");
+        assert_eq!(
+            skill_category(WeaponSkill::AttackSpell),
+            "Spellcasting Skills"
+        );
+        assert_eq!(skill_category(WeaponSkill::LongSword), "Weapon Skills");
     }
 }

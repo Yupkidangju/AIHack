@@ -2,7 +2,9 @@
 //
 
 pub mod apply;
+pub mod artifact_ext;
 pub mod eat;
+pub mod eat_ext;
 pub mod item_damage;
 pub mod item_helper;
 pub mod item_tick;
@@ -12,7 +14,9 @@ pub mod mkobj;
 pub mod objnam;
 pub mod pickup;
 pub mod potion;
+pub mod potion_ext;
 pub mod read;
+pub mod read_ext;
 pub mod weight;
 pub mod write_ext;
 pub mod zap;
