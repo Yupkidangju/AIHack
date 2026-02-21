@@ -2,6 +2,7 @@
 //
 
 pub mod apply;
+pub mod apply_ext;
 pub mod artifact_ext;
 pub mod eat;
 pub mod eat_ext;

@@ -5,6 +5,7 @@ pub mod attrib;
 pub mod attrib_ext;
 pub mod death;
 pub mod do_wear;
+pub mod do_wear_ext;
 pub mod end;
 pub mod equipment;
 pub mod evolution;

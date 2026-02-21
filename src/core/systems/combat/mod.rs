@@ -9,9 +9,11 @@ pub mod explode_ext;
 pub mod kick;
 pub mod mhitm;
 pub mod mhitu;
+pub mod mhitu_ext;
 pub mod mthrowu_ext;
 pub mod throw;
 pub mod uhitm;
+pub mod uhitm_ext;
 pub mod weapon;
 pub mod weapon_ext;
 

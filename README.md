@@ -1,4 +1,4 @@
-# AIHack v2.11.0
+# AIHack v2.19.0
 
 > **A Modern Rust Roguelike — Based on NetHack 3.6.7**
 
@@ -21,7 +21,7 @@
 ### 프로젝트 개요
 AIHack은 클래식 로그라이크 게임인 NetHack 3.6.7의 C 소스 코드를 Rust로 이식하는 현대화 프로젝트입니다. 원본의 복잡한 로직을 Rust의 안정성 위에서 재구현하며, TUI(Ratatui)와 GUI(egui)가 결합된 하이브리드 인터페이스를 제공하는 것을 목표로 합니다.
 
-**현재 상태**: 93,224줄 / 159파일 / 1,365개 테스트 통과 / 이식률 52.6%
+**현재 상태**: 114,280줄 / 192파일 / 2,186개 테스트 통과 / 이식률 64.5%
 
 ### 주요 기능
 - **Legacy Porting**: NetHack 3.6.7 C 소스 로직의 100% Rust 이식 추진.
@@ -44,7 +44,7 @@ AIHack은 클래식 로그라이크 게임인 NetHack 3.6.7의 C 소스 코드�
 ### Project Overview
 AIHack is a modernization project that ports the C source code of the classic roguelike game NetHack 3.6.7 to Rust. It aims to reimplement the original's complex logic on top of Rust's stability and provide a hybrid interface combining TUI (Ratatui) and GUI (egui).
 
-**Current Status**: 93,224 lines / 159 files / 1,365 tests passing / 52.6% ported
+**Current Status**: 108,900 lines / 186 files / 1,996 tests passing / 61.4% ported
 
 ### Key Features
 - **Legacy Porting**: 100% Rust porting of NetHack 3.6.7 C source logic.

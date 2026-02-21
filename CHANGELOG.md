@@ -2,6 +2,83 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.19.0] - 2026-02-20
+### Added
+- **[이식] uhitm_ext.rs — uhitm.c 핵심 함수 이식 (신규 ~700줄, 32테스트)**:
+  - `erode_armor_result` — 녹슬기/부식 방어구 대상 결정 (5슬롯 랜덤 선택, 그리스 보호)
+  - `check_caitiff_result` — 기사도/사무라이 명예 위반 판정 (성향 페널티)
+  - `joust_result` — 마상 창 돌격 판정 (스킬별 확률: 20%~80%, 창 파괴)
+  - `shade_aware_check` — 그림자 면역 무기 판정 (바위/쇠공/은/거울/마늘)
+  - `slips_free_result` — 미끄러운 방어구 잡기 실패 (그리스/기름가죽, 저주 시 33% 통과)
+  - `damageum_result` — 변신 공격 데미지 유형 분기 (물리/화염/냉기/전기/산/독/드레인 등 20+ 유형)
+  - `explum_result` — 폭발 공격 결과 (실명/혼란/원소 폭발)
+  - `demonpet_chance` — 악마 펫 소환 확률 판정 (1/13)
+  - `attack_checks_result` — 공격 전 확인 (평화/숨은/보이지 않는 몬스터, Stormbringer 강제)
+  - `check_magic_negation` — 마법 무효화 판정
+- **[이식] invent_ext.rs — invent.c 핵심 함수 이식 (신규 ~550줄, 23테스트)**:
+  - `loot_classify_result` — 전리품 분류 키 생성 (클래스/하위분류/발견상태)
+  - `sortloot_compare` — 전리품 정렠 비교 (클래스/이름/BUC/침식/강화 다단계)
+  - `can_merge` / `merge_result` — 아이템 병합 판정 및 결과 계산
+  - `addinv_special_check` — 특수 아이템 소지 플래그 (예더부적/촛대/종/사자의서)
+  - `inv_count` / `compactify_classes` — 인벤토리 슬롯/클래스 관리
+  - `encumber_change_message` — 짐 무게 변경 메시지 (다국어)
+  - `carrying_check` / `have_lizard` — 특정 아이템 소지 판정
+- **[이식] shk_ext.rs — shk.c 핵심 함수 이식 (신규 ~700줄, 31테스트)**:
+  - `get_cost_result` — 상점 가격 계산 (카리스마/축복/저주/할증/관광객 보정)
+  - `get_pricing_units` — 가격 단위 계산 (탄약/글롭/일반)
+  - `cost_per_charge` — 충전당 비용 (지팡이/뿔나팔)
+  - `check_credit_result` — 크레딧 차감 판정 (전액/부분/없음)
+  - `addup_bill` / `shop_debt_total` — 청구서 합산 및 총 부채
+  - `rob_shop_result` — 도둑질 판정 (크레딧 vs 부채, 성향 페널티)
+  - `rile_prices` / `pacify_prices` — 분노/화해 가격 조정 (33% 할증/25% 복원)
+  - `is_special_stock` — 전문 품목 판정
+  - `price_embellish` — 가격대별 상점 주인 코멘트
+  - `shop_entry_reaction` / `shop_exit_reaction` — 상점 진입/탈출 반응
+- **[확장] trap_ext.rs — trap.c 추가 함수 이식 (+540줄, 25테스트)**:
+  - `magic_trap_effect` — 마법 함정 8가지 효과 (구덩이/저주/축복/소환/텔레포트/화염/미사일)
+  - `fire_trap_damage` — 화염 함정 데미지 (저항 판정)
+  - `web_escape_check` — 거미줄 탈출 (비정형/거미/무기/힘)
+  - `landmine_damage` / `landmine_creates_pit` — 지뢰 폭발/구덩이 생성
+  - `rolling_boulder_damage` / `rolling_boulder_dodge` — 구르는 바위
+  - `untrap_prob` — 함정 해제 확률 (민첩/레벨/도적/난이도)
+  - `arrow_trap_hit` / `arrow_trap_damage` / `dart_trap_damage` — 화살/다트 명중+데미지
+  - `poly_trap_result` — 변이 함정 (변신/저항/시스템쇼크)
+  - `level_tele_destination` — 레벨 텔레포트 목적지
+  - `steed_trap_check` — 탈 것 함정 판정 (걸림/낙마/통과)
+  - `squeaky_board_note` / `random_squeaky_note` — 샐깁이는 판자 음계
+- **[이식] mhitu_ext.rs — mhitu.c 핵심 함수 이식 (신규 ~770줄, 33테스트)**:
+  - `getmattk_result` — 공격 종류 대체 판정 (연속 질병 방지/에너지 드레인 조정/삼킴 쿨다운)
+  - `mattacku_precheck` — 공격 전 사전 조건 (사망/수중/삼킴/무적/탈것)
+  - `demon_summon_check` — 악마 소환 확률 (1/13)
+  - `were_transform_check` — 수인 변신 (인간↔동물, 동료 소환)
+  - `wildmiss_type` — 빗나간 공격 유형 (시각/전위/수중)
+  - `gulpmu_damage` / `explmu_damage` — 삼킴/자폭 데미지
+  - `passiveum_result` — 패시브 반격 (산/전기/화염/석화)
+  - `disease_check` — 질병 감염 (1/8, 유니콘 끝 면역)
+  - `u_slip_free_check` — 미끄러져 풀려남 (그리스/비정형/작은 폼/민첩)
+- **[이식] apply_ext.rs — apply.c 핵심 함수 이식 (신규 ~590줄, 32테스트)**:
+  - `camera_flash_result` — 카메라 플래시 (촩전/저주/삼킴/몰스터/빗나감)
+  - `towel_use_result` — 수건 (닦기/비비는 손/얼굴/저주)
+  - `leashable_check` — 목줄 대상 판정
+  - `jump_range` — 점프 범위 (부츠/스킬/짐)
+  - `tinning_result` — 통조림 도구 (턴/축복/충전)
+  - `figurine_result` — 조각상 (소환/저주/위치)
+  - `whip_use_result` — 채찍 (낙아채기/끌기/자기공격)
+  - `polearm_range_check` / `polearm_max_range` — 장창 사거리
+  - `cream_pie_result` — 파이 (눈가림/몰스터)
+  - `grapple_result` — 갈고리 (끌기/공격/걸림)
+- **[이식] do_wear_ext.rs — do_wear.c 핵심 함수 이식 (신규 ~540줄, 16테스트)**:
+  - `can_wear_check` — 착용 가능 판정 (슬롯/변신/양손/발굽/손/머리/저주)
+  - `armor_on_effect` — 방어구 작용 효과 (AC/속성/축복저주)
+  - `ring_on_effect` — 반지 15종 속성 + 스탯 + 텔레포티티스
+  - `amulet_on_effect` — 목걸이 9종 효과
+  - `wear_delay` / `takeoff_delay` — 착탈 소요 턴
+  - `select_off_blockers` — 탈의 순서 판정
+
+### Changed
+- 전체 라인: 108,900 → 114,280줄 (+5,380), 파일: 186 → 192파일, 테스트: 1,996 → 2,186개 (+190)
+- 이식률: 61.4% → 64.5%
+
 ## [2.18.0] - 2026-02-19
 ### Added
 - **[이식] ball_ext.rs  ball.c + worm.c 핵심 함수 이식 (신규 ~380줄, 22테스트)**:

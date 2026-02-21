@@ -330,6 +330,331 @@ pub fn rust_trap_slot(rng: &mut NetHackRng) -> RustTrapSlot {
 }
 
 // ============================================================
+// [v2.19.0] 13. magic_trap_effect — 마법 함정 효과
+// 원본: trap.c domagictrap() L1455-1567
+// ============================================================
+
+/// 마법 함정 효과 종류
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MagicTrapEffect {
+    /// 구덩이로 변환 (함정 소멸)
+    TurnIntoPit,
+    /// 아이템 저주
+    CurseItems,
+    /// 아이템 축복 (행운)
+    BlessItems,
+    /// 몬스터 소환
+    SummonMonster,
+    /// 셔플 (텔레포트 등)
+    TeleportShuffle,
+    /// 불꽃 기둥
+    TowerOfFlame,
+    /// 마법 미사일 피격
+    MagicMissile,
+    /// 아무 일 없음
+    Nothing,
+}
+
+/// [v2.19.0] 마법 함정 효과 결정 (원본: domagictrap L1455-1567)
+/// 여러 갈래 중 확률적으로 하나를 선택
+pub fn magic_trap_effect(rng: &mut NetHackRng) -> MagicTrapEffect {
+    // 원본: rn2(30) + rn2(5) 조합
+    let roll = rng.rn2(30);
+    match roll {
+        0..=4 => MagicTrapEffect::TurnIntoPit,
+        5..=9 => MagicTrapEffect::CurseItems,
+        10..=11 => MagicTrapEffect::BlessItems,
+        12..=15 => MagicTrapEffect::SummonMonster,
+        16..=19 => MagicTrapEffect::TeleportShuffle,
+        20..=23 => MagicTrapEffect::TowerOfFlame,
+        24..=27 => MagicTrapEffect::MagicMissile,
+        _ => MagicTrapEffect::Nothing,
+    }
+}
+
+// ============================================================
+// [v2.19.0] 14. fire_trap_damage — 화염 함정 데미지
+// 원본: trap.c dofiretrap() L1569-1620
+// ============================================================
+
+/// [v2.19.0] 화염 함정 데미지 (원본: dofiretrap L1569-1620)
+/// 화염 저항 시 0, 아니면 d(2,4)
+pub fn fire_trap_damage(has_fire_resistance: bool, rng: &mut NetHackRng) -> i32 {
+    if has_fire_resistance {
+        0
+    } else {
+        rng.d(2, 4)
+    }
+}
+
+// ============================================================
+// [v2.19.0] 15. web_escape_check — 거미줄 탈출 판정
+// 원본: trap.c dotrap() L1340-1380
+// ============================================================
+
+/// [v2.19.0] 거미줄 탈출 판정 (원본: dotrap ~L1340)
+/// 거미(amorphous), 절단 무기, 불 → 탈출 가능
+pub fn web_escape_check(
+    is_amorphous: bool,
+    is_whirly: bool,
+    has_fire_resistance: bool,
+    is_spider: bool,
+    has_edged_weapon: bool,
+    strength: i32,
+    rng: &mut NetHackRng,
+) -> bool {
+    // 거미는 무조건 통과
+    if is_spider {
+        return true;
+    }
+    // 비정형체/회오리는 통과
+    if is_amorphous || is_whirly {
+        return true;
+    }
+    // 날카로운 무기로 자름
+    if has_edged_weapon {
+        return true;
+    }
+    // 힘으로 탈출: str >= 18이면 1/3 확률, 아니면 1/6
+    if strength >= 18 {
+        rng.rn2(3) == 0
+    } else {
+        rng.rn2(6) == 0
+    }
+}
+
+// ============================================================
+// [v2.19.0] 16. landmine_damage — 지뢰 데미지
+// 원본: trap.c dotrap() L1392-1454
+// ============================================================
+
+/// [v2.19.0] 지뢰 데미지 (원본: dotrap ~L1392)
+/// 기본 d(16,1) = 16 데미지, 부양 시 절반
+pub fn landmine_damage(is_levitating: bool, is_flying: bool, rng: &mut NetHackRng) -> i32 {
+    let base = rng.rnd(16);
+    if is_levitating || is_flying {
+        base / 2 // 폭풍 약화
+    } else {
+        base
+    }
+}
+
+/// [v2.19.0] 지뢰 폭발 시 주변 구덩이 생성 여부
+pub fn landmine_creates_pit(is_levitating: bool, is_flying: bool) -> bool {
+    !is_levitating && !is_flying
+}
+
+// ============================================================
+// [v2.19.0] 17. rolling_boulder_damage — 구르는 바위 데미지
+// 원본: trap.c dotrap() ~L880-920
+// ============================================================
+
+/// [v2.19.0] 구르는 바위 데미지 (원본: dotrap ~L880)
+/// d(2,10) = 2~20
+pub fn rolling_boulder_damage(rng: &mut NetHackRng) -> i32 {
+    rng.d(2, 10)
+}
+
+/// [v2.19.0] 구르는 바위 회피 (원본: dotrap ~L880 — rn2(10))
+/// 10% 확률로 회피
+pub fn rolling_boulder_dodge(rng: &mut NetHackRng) -> bool {
+    rng.rn2(10) == 0
+}
+
+// ============================================================
+// [v2.19.0] 18. untrap_prob — 함정 해제 확률
+// 원본: trap.c untrap_prob() ~L4600
+// ============================================================
+
+/// [v2.19.0] 함정 해제 난이도 (원본: untrap_prob ~L4600)
+/// 민첩성(dex), 레벨, 도적 직업 여부로 성공률 결정
+/// 반환: 1~100 범위의 성공 확률 (%)
+pub fn untrap_prob(dexterity: i32, player_level: i32, is_rogue: bool, trap_type: TrapType) -> i32 {
+    // 기본 확률: (dex + level) / 2
+    let mut prob = (dexterity + player_level) / 2;
+
+    // 도적 보너스 (+25%)
+    if is_rogue {
+        prob += 25;
+    }
+
+    // 함정 종류별 난이도 보정
+    let difficulty = match trap_type {
+        TrapType::Arrow | TrapType::Dart => 5,
+        TrapType::BearTrap => 10,
+        TrapType::SqueakyBoard => 0,
+        TrapType::Landmine => 20,
+        TrapType::Web => 5,
+        TrapType::FireTrap => 15,
+        TrapType::SleepGas => 10,
+        TrapType::RustTrap => 5,
+        TrapType::Pit | TrapType::SpikedPit => 5,
+        TrapType::RollingBoulder => 15,
+        TrapType::PolyTrap => 20,
+        _ => 10,
+    };
+
+    prob -= difficulty;
+    prob.clamp(5, 95) // 최소 5%, 최대 95%
+}
+
+// ============================================================
+// [v2.19.0] 19. arrow_trap_hit — 화살/다트 함정 명중
+// 원본: trap.c thitm() ~L5250
+// ============================================================
+
+/// [v2.19.0] 화살/다트 함정 명중 판정 (원본: thitm ~L5250)
+/// AC 기반 명중 판정
+pub fn arrow_trap_hit(target_ac: i32, rng: &mut NetHackRng) -> bool {
+    // 원본: rnd(20) + 4 > AC
+    // 명중 기준: d20 + 4 vs AC (낮을수록 방어 좋음)
+    let roll = rng.rnd(20) + 4;
+    roll > target_ac
+}
+
+/// [v2.19.0] 화살 함정 데미지 (원본: dotrap ~L950)
+pub fn arrow_trap_damage(rng: &mut NetHackRng) -> i32 {
+    rng.d(1, 6) // 1d6
+}
+
+/// [v2.19.0] 다트 함정 데미지 (원본: dotrap ~L980)
+pub fn dart_trap_damage(rng: &mut NetHackRng) -> i32 {
+    rng.d(1, 3) // 1d3
+}
+
+// ============================================================
+// [v2.19.0] 20. poly_trap_result — 변이 함정 결과
+// 원본: trap.c dotrap() L1624-1650
+// ============================================================
+
+/// 변이 함정 결과
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PolyTrapResult {
+    /// 뉴 폼 (변칙적 변신)
+    Polymorph,
+    /// 마법 저항으로 무효화
+    Resisted,
+    /// 시스템 쇼크 (4% 확률 사망)
+    SystemShock,
+}
+
+/// [v2.19.0] 변이 함정 결과 (원본: dotrap ~L1624)
+pub fn poly_trap_result(
+    has_magic_resistance: bool,
+    has_unchanging: bool,
+    rng: &mut NetHackRng,
+) -> PolyTrapResult {
+    if has_magic_resistance || has_unchanging {
+        return PolyTrapResult::Resisted;
+    }
+    // 원본: 1/25 확률로 시스템 쇼크 (사망 가능)
+    if rng.rn2(25) == 0 {
+        PolyTrapResult::SystemShock
+    } else {
+        PolyTrapResult::Polymorph
+    }
+}
+
+// ============================================================
+// [v2.19.0] 21. level_tele_trap — 레벨 텔레포트 함정
+// 원본: trap.c dotrap() L1195-1220
+// ============================================================
+
+/// [v2.19.0] 레벨 텔레포트 함정 목적지 (원본: dotrap ~L1195)
+/// 현재 레벨에서 무작위 레벨로 이동
+pub fn level_tele_destination(
+    current_level: i32,
+    max_level: i32,
+    has_tele_control: bool,
+    rng: &mut NetHackRng,
+) -> i32 {
+    if has_tele_control {
+        // 컨트롤이 있으면 현재 레벨로 (호출자가 입력 요청)
+        current_level
+    } else {
+        // 무작위 레벨 (원본: rnd(max) 후 보정)
+        let dest = rng.rnd(max_level);
+        if dest == current_level {
+            // 같은 레벨이면 재도전
+            (current_level + 1).min(max_level)
+        } else {
+            dest
+        }
+    }
+}
+
+// ============================================================
+// [v2.19.0] 22. steed_trap_check — 탈 것 함정 판정
+// 원본: trap.c steedintrap() ~L5100
+// ============================================================
+
+/// [v2.19.0] 탈 것 함정 판정 결과
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SteedTrapResult {
+    /// 탈 것이 함정에 걸림
+    SteedTrapped,
+    /// 기수가 낙마
+    RiderUnseated,
+    /// 함정 통과
+    Passed,
+}
+
+/// [v2.19.0] 탈 것 함정 판정 (원본: steedintrap ~L5100)
+pub fn steed_trap_check(
+    trap_type: TrapType,
+    steed_flying: bool,
+    steed_levitating: bool,
+    rng: &mut NetHackRng,
+) -> SteedTrapResult {
+    // 비행/부양 탈 것은 구덩이 유형 회피
+    if (steed_flying || steed_levitating)
+        && matches!(
+            trap_type,
+            TrapType::Pit | TrapType::SpikedPit | TrapType::Hole | TrapType::Trapdoor
+        )
+    {
+        return SteedTrapResult::Passed;
+    }
+
+    match trap_type {
+        TrapType::BearTrap => SteedTrapResult::SteedTrapped,
+        TrapType::Pit | TrapType::SpikedPit => {
+            // 50% 확률로 낙마
+            if rng.rn2(2) == 0 {
+                SteedTrapResult::RiderUnseated
+            } else {
+                SteedTrapResult::SteedTrapped
+            }
+        }
+        TrapType::Web => {
+            // 큰 탈 것은 걸림
+            SteedTrapResult::SteedTrapped
+        }
+        _ => SteedTrapResult::Passed,
+    }
+}
+
+// ============================================================
+// [v2.19.0] 23. squeaky_board_note — 삐걱이는 판자 노트
+// 원본: trap.c trapnote() ~L350
+// ============================================================
+
+/// [v2.19.0] 삐걱이는 판자 음계 노트 (원본: trapnote ~L350)
+/// 12개 노트 중 하나 반환 (C3~B3)
+pub fn squeaky_board_note(note_index: i32) -> &'static str {
+    const NOTES: [&str; 12] = [
+        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+    ];
+    let idx = (note_index.abs() % 12) as usize;
+    NOTES[idx]
+}
+
+/// [v2.19.0] 삐걱이는 판자 음계 노트 랜덤 선택
+pub fn random_squeaky_note(rng: &mut NetHackRng) -> &'static str {
+    squeaky_board_note(rng.rn2(12))
+}
+
+// ============================================================
 // 테스트
 // ============================================================
 
@@ -592,5 +917,245 @@ mod tests {
         }
         // Body = 2/5 = 40%
         assert!(body_count > 140 && body_count < 260, "몸: {}", body_count);
+    }
+
+    // ============================================================
+    // [v2.19.0] 추가 함수 테스트
+    // ============================================================
+
+    // --- magic_trap_effect ---
+    #[test]
+    fn test_magic_trap_various() {
+        let mut rng = test_rng();
+        let mut effects = std::collections::HashSet::new();
+        for _ in 0..500 {
+            effects.insert(format!("{:?}", magic_trap_effect(&mut rng)));
+        }
+        // 다양한 효과 발생 확인
+        assert!(effects.len() >= 5, "최소 5가지 효과: {:?}", effects);
+    }
+
+    // --- fire_trap_damage ---
+    #[test]
+    fn test_fire_trap_resist() {
+        let mut rng = test_rng();
+        assert_eq!(fire_trap_damage(true, &mut rng), 0);
+    }
+
+    #[test]
+    fn test_fire_trap_no_resist() {
+        let mut rng = test_rng();
+        let dmg = fire_trap_damage(false, &mut rng);
+        assert!(dmg >= 2 && dmg <= 8, "화염 데미지: {}", dmg);
+    }
+
+    // --- web_escape_check ---
+    #[test]
+    fn test_web_spider_escapes() {
+        let mut rng = test_rng();
+        assert!(web_escape_check(
+            false, false, false, true, false, 10, &mut rng
+        ));
+    }
+
+    #[test]
+    fn test_web_amorphous_escapes() {
+        let mut rng = test_rng();
+        assert!(web_escape_check(
+            true, false, false, false, false, 10, &mut rng
+        ));
+    }
+
+    #[test]
+    fn test_web_edged_weapon_escapes() {
+        let mut rng = test_rng();
+        assert!(web_escape_check(
+            false, false, false, false, true, 10, &mut rng
+        ));
+    }
+
+    // --- landmine ---
+    #[test]
+    fn test_landmine_full_damage() {
+        let mut rng = test_rng();
+        let dmg = landmine_damage(false, false, &mut rng);
+        assert!(dmg >= 1 && dmg <= 16, "지뢰: {}", dmg);
+    }
+
+    #[test]
+    fn test_landmine_flying_reduced() {
+        let mut rng = test_rng();
+        let mut flying_total = 0;
+        let mut ground_total = 0;
+        for _ in 0..200 {
+            flying_total += landmine_damage(false, true, &mut rng);
+            ground_total += landmine_damage(false, false, &mut rng);
+        }
+        assert!(flying_total < ground_total, "비행 < 지상");
+    }
+
+    #[test]
+    fn test_landmine_pit_creation() {
+        assert!(landmine_creates_pit(false, false));
+        assert!(!landmine_creates_pit(true, false));
+        assert!(!landmine_creates_pit(false, true));
+    }
+
+    // --- rolling_boulder ---
+    #[test]
+    fn test_boulder_damage() {
+        let mut rng = test_rng();
+        for _ in 0..100 {
+            let dmg = rolling_boulder_damage(&mut rng);
+            assert!(dmg >= 2 && dmg <= 20, "바위: {}", dmg);
+        }
+    }
+
+    #[test]
+    fn test_boulder_dodge_rare() {
+        let mut rng = test_rng();
+        let mut dodges = 0;
+        for _ in 0..1000 {
+            if rolling_boulder_dodge(&mut rng) {
+                dodges += 1;
+            }
+        }
+        // ~10% 확률
+        assert!(dodges > 50 && dodges < 150, "회피: {}", dodges);
+    }
+
+    // --- untrap_prob ---
+    #[test]
+    fn test_untrap_rogue_bonus() {
+        let prob_norm = untrap_prob(15, 10, false, TrapType::Arrow);
+        let prob_rogue = untrap_prob(15, 10, true, TrapType::Arrow);
+        assert!(prob_rogue > prob_norm, "도적 보너스");
+    }
+
+    #[test]
+    fn test_untrap_min_max() {
+        let prob_low = untrap_prob(3, 1, false, TrapType::Landmine);
+        assert!(prob_low >= 5);
+        let prob_high = untrap_prob(25, 30, true, TrapType::SqueakyBoard);
+        assert!(prob_high <= 95);
+    }
+
+    // --- arrow_trap_hit ---
+    #[test]
+    fn test_arrow_hit_low_ac() {
+        let mut rng = test_rng();
+        let mut hits = 0;
+        for _ in 0..200 {
+            if arrow_trap_hit(-5, &mut rng) {
+                hits += 1;
+            }
+        }
+        // AC -5는 매우 좋은 방어, 거의 모든 화살이 명중
+        assert!(hits > 150, "AC-5 명중: {}", hits);
+    }
+
+    #[test]
+    fn test_arrow_damage_range() {
+        let mut rng = test_rng();
+        for _ in 0..100 {
+            let dmg = arrow_trap_damage(&mut rng);
+            assert!(dmg >= 1 && dmg <= 6, "화살 데미지: {}", dmg);
+        }
+    }
+
+    #[test]
+    fn test_dart_damage_range() {
+        let mut rng = test_rng();
+        for _ in 0..100 {
+            let dmg = dart_trap_damage(&mut rng);
+            assert!(dmg >= 1 && dmg <= 3, "다트 데미지: {}", dmg);
+        }
+    }
+
+    // --- poly_trap ---
+    #[test]
+    fn test_poly_trap_resist() {
+        let mut rng = test_rng();
+        assert_eq!(
+            poly_trap_result(true, false, &mut rng),
+            PolyTrapResult::Resisted
+        );
+        assert_eq!(
+            poly_trap_result(false, true, &mut rng),
+            PolyTrapResult::Resisted
+        );
+    }
+
+    #[test]
+    fn test_poly_trap_mostly_polymorph() {
+        let mut rng = test_rng();
+        let mut poly_count = 0;
+        let mut shock_count = 0;
+        for _ in 0..500 {
+            match poly_trap_result(false, false, &mut rng) {
+                PolyTrapResult::Polymorph => poly_count += 1,
+                PolyTrapResult::SystemShock => shock_count += 1,
+                _ => {}
+            }
+        }
+        assert!(poly_count > shock_count * 10, "변이 >> 쇼크");
+    }
+
+    // --- level_tele ---
+    #[test]
+    fn test_level_tele_control() {
+        let mut rng = test_rng();
+        assert_eq!(level_tele_destination(5, 25, true, &mut rng), 5);
+    }
+
+    #[test]
+    fn test_level_tele_random() {
+        let mut rng = test_rng();
+        let dest = level_tele_destination(5, 25, false, &mut rng);
+        assert!(dest >= 1 && dest <= 25, "목적지: {}", dest);
+    }
+
+    // --- steed_trap ---
+    #[test]
+    fn test_steed_flying_passes_pit() {
+        let mut rng = test_rng();
+        assert_eq!(
+            steed_trap_check(TrapType::Pit, true, false, &mut rng),
+            SteedTrapResult::Passed
+        );
+    }
+
+    #[test]
+    fn test_steed_bear_trap() {
+        let mut rng = test_rng();
+        assert_eq!(
+            steed_trap_check(TrapType::BearTrap, false, false, &mut rng),
+            SteedTrapResult::SteedTrapped
+        );
+    }
+
+    #[test]
+    fn test_steed_web() {
+        let mut rng = test_rng();
+        assert_eq!(
+            steed_trap_check(TrapType::Web, false, false, &mut rng),
+            SteedTrapResult::SteedTrapped
+        );
+    }
+
+    // --- squeaky_board ---
+    #[test]
+    fn test_squeaky_notes() {
+        assert_eq!(squeaky_board_note(0), "C");
+        assert_eq!(squeaky_board_note(4), "E");
+        assert_eq!(squeaky_board_note(11), "B");
+        assert_eq!(squeaky_board_note(12), "C"); // 순환
+    }
+
+    #[test]
+    fn test_random_squeaky() {
+        let mut rng = test_rng();
+        let note = random_squeaky_note(&mut rng);
+        assert!(!note.is_empty());
     }
 }
