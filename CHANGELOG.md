@@ -2,6 +2,15 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.20.0] - 2026-02-22
+### Added
+- **[아키텍처] InteractionProvider Trait (R7-5)**: LLM 연동을 위한 상호작용 추상화 트레이트 도입 (대화, 기도, 상호작용 등 하드코딩 동적 대체).
+- **[아키텍처] 통합 에러 처리 (R7-6)**: `thiserror` 기반 `GameError` enum 정의, 구조체 변환 체계 구축.
+
+### Changed
+- **[리팩토링] ActionQueue 큐 기반 실행 전환 (R7-1~3)**: 즉시 실행 처리 로직을 중앙 집중된 `ActionQueue` 시스템으로 완전히 분리 및 순차 처리 효율성 강화.
+- **[안정성] `unwrap()` 및 `expect()` 안전 로직 대체 (R7-6)**: `game_loop.rs` 및 `app.rs`를 중심으로 코어 루프와 구동부의 패닉 유발 코드 전면 퇴출 및 `match`/`if let` 분기 처리.
+
 ## [2.19.0] - 2026-02-20
 ### Added
 - **[이식] uhitm_ext.rs — uhitm.c 핵심 함수 이식 (신규 ~700줄, 32테스트)**:

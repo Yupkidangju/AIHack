@@ -34,11 +34,11 @@ pub enum ItemAction {
     Drop(Entity),
     // [v2.2.0 M5] 장비 화면용 액션
     Unequip(Entity),
-    WearPrompt,      // 착용 선택 모드 진입
-    TakeOffPrompt,   // 해제 선택 모드 진입
-    WieldPrompt,     // 무기 착용 선택 모드 진입
-    PutOnPrompt,     // 반지/부적 착용 선택 모드 진입
-    RemovePrompt,    // 반지/부적 해제 선택 모드 진입
+    WearPrompt,    // 착용 선택 모드 진입
+    TakeOffPrompt, // 해제 선택 모드 진입
+    WieldPrompt,   // 무기 착용 선택 모드 진입
+    PutOnPrompt,   // 반지/부적 착용 선택 모드 진입
+    RemovePrompt,  // 반지/부적 해제 선택 모드 진입
 }
 
 ///
@@ -53,10 +53,14 @@ pub fn item_input(
     #[resource] cmd: &Command,
     #[resource] assets: &AssetManager,
     #[resource] grid: &crate::core::dungeon::Grid,
-    #[resource] action: &mut Option<ItemAction>,
+    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
     #[resource] log: &mut GameLog,
 ) {
-    if action.is_some() {
+    if action_queue
+        .actions
+        .iter()
+        .any(|a| matches!(a, crate::core::action_queue::GameAction::Item(_)))
+    {
         return;
     }
 
@@ -70,7 +74,9 @@ pub fn item_input(
     // 장비 해제 명령 처리
     if *cmd == Command::TakeOff {
         if let Some((_slot, entity)) = equipment.slots.iter().next() {
-            *action = Some(ItemAction::TakeOff(*entity));
+            action_queue.push(crate::core::action_queue::GameAction::Item(
+                ItemAction::TakeOff(*entity),
+            ));
         } else {
             log.add("You are not wearing anything.", log.current_turn);
         }
@@ -128,7 +134,7 @@ pub fn item_input(
                 if let Some(template) = assets.items.get_by_kind(item.kind) {
                     if target_classes.contains(&template.class) {
                         // 액션 생성
-                        *action = match cmd {
+                        let action = match cmd {
                             Command::Quaff => Some(ItemAction::Drink(*item_ent)),
                             Command::Read => Some(ItemAction::Read(*item_ent)),
                             Command::Wear => Some(ItemAction::Wear(*item_ent)),
@@ -141,7 +147,8 @@ pub fn item_input(
                             _ => None,
                         };
 
-                        if action.is_some() {
+                        if let Some(a) = action {
+                            action_queue.push(crate::core::action_queue::GameAction::Item(a));
                             return;
                         }
                     }
@@ -194,13 +201,26 @@ pub fn item_use(
     #[resource] grid: &mut crate::core::dungeon::Grid,
     #[resource] log: &mut GameLog,
     #[resource] ident_table: &crate::core::entity::identity::IdentityTable,
-    #[resource] action: &Option<ItemAction>,
+    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
     #[resource] state: &mut crate::core::game_state::GameState,
     #[resource] altar_update: &mut Option<crate::core::systems::pray::PendingAltarUpdate>,
     #[resource] event_queue: &mut EventQueue, // [v2.0.0 R5] 상태 이벤트
     command_buffer: &mut CommandBuffer,
 ) {
-    let action = match action {
+    let mut to_keep = Vec::new();
+    let mut action_to_process = None;
+    while let Some(game_action) = action_queue.pop() {
+        if let crate::core::action_queue::GameAction::Item(a) = game_action {
+            action_to_process = Some(a);
+        } else {
+            to_keep.push(game_action);
+        }
+    }
+    for a in to_keep {
+        action_queue.push(a);
+    }
+
+    let action = match action_to_process {
         Some(a) => a,
         None => return,
     };
@@ -242,7 +262,7 @@ pub fn item_use(
         ItemAction::TakeOut { container, item } => {
             //
             let mut container_inv = None;
-            if let Ok(entry) = world.entry_ref(*container) {
+            if let Ok(entry) = world.entry_ref(container) {
                 if let Ok(inv) = entry.get_component::<Inventory>() {
                     container_inv = Some(inv.clone());
                 }
@@ -250,17 +270,17 @@ pub fn item_use(
 
             if let Some(mut inv) = container_inv {
                 //
-                if let Some(pos) = inv.items.iter().position(|&e| e == *item) {
+                if let Some(pos) = inv.items.iter().position(|&e| e == item) {
                     inv.items.remove(pos);
-                    command_buffer.add_component(*container, inv);
+                    command_buffer.add_component(container, inv);
                     //
-                    command_buffer.remove_component::<crate::core::entity::InContainerTag>(*item);
+                    command_buffer.remove_component::<crate::core::entity::InContainerTag>(item);
 
                     //
                     let mut player_query =
                         <&mut Inventory>::query().filter(component::<PlayerTag>());
                     if let Some(p_inv) = player_query.iter_mut(world).next() {
-                        p_inv.items.push(*item);
+                        p_inv.items.push(item);
                         log.add("You take the item out of the container.", log.current_turn);
                     }
                 }
@@ -270,7 +290,7 @@ pub fn item_use(
         ItemAction::PutIn { container, item } => {
             // 2. 마법 가방(Bag of Holding) 폭발 체크 (Phase 48.2 - 정규화)
             if crate::core::systems::inventory::InventorySystem::check_boh_explosion(
-                world, *container, *item,
+                world, container, item,
             ) {
                 log.add_colored(
                     "Magical energies clash! The bag explodes!",
@@ -279,7 +299,7 @@ pub fn item_use(
                 );
 
                 // 재귀적 파괴: 가방 내부의 모든 아이템 소멸 (NetHack 100% 이식)
-                if let Ok(c_entry) = world.entry_ref(*container) {
+                if let Ok(c_entry) = world.entry_ref(container) {
                     if let Ok(c_inv) = c_entry.get_component::<Inventory>() {
                         for &inner_item in &c_inv.items {
                             command_buffer.remove(inner_item);
@@ -288,13 +308,13 @@ pub fn item_use(
                 }
 
                 //
-                command_buffer.remove(*container);
-                command_buffer.remove(*item);
+                command_buffer.remove(container);
+                command_buffer.remove(item);
 
                 //
                 let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
                 if let Some(inv) = query.iter_mut(world).next() {
-                    inv.items.retain(|&e| e != *container && e != *item);
+                    inv.items.retain(|&e| e != container && e != item);
                 }
 
                 log.add(
@@ -305,20 +325,20 @@ pub fn item_use(
             }
 
             //
-            if let Ok(mut entry) = world.entry_mut(*container) {
+            if let Ok(mut entry) = world.entry_mut(container) {
                 if let Ok(c_inv) = entry.get_component_mut::<Inventory>() {
-                    c_inv.items.push(*item);
+                    c_inv.items.push(item);
                     command_buffer.add_component(
-                        *item,
+                        item,
                         crate::core::entity::InContainerTag {
-                            container: *container,
+                            container: container,
                         },
                     );
 
                     //
                     let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
                     if let Some(p_inv) = query.iter_mut(world).next() {
-                        if let Some(pos) = p_inv.items.iter().position(|&e| e == *item) {
+                        if let Some(pos) = p_inv.items.iter().position(|&e| e == item) {
                             p_inv.items.remove(pos);
                         }
                     }
@@ -330,7 +350,7 @@ pub fn item_use(
         }
         ItemAction::Apply(e) => {
             crate::core::systems::apply::item_apply(
-                *e,
+                e,
                 world,
                 _assets,
                 grid,
@@ -343,14 +363,14 @@ pub fn item_use(
         }
         ItemAction::Name(e) => {
             *state = crate::core::game_state::GameState::Naming {
-                entity: Some(*e),
+                entity: Some(e),
                 is_call: false,
             };
             return;
         }
         ItemAction::Call(e) => {
             *state = crate::core::game_state::GameState::Naming {
-                entity: Some(*e),
+                entity: Some(e),
                 is_call: true,
             };
             return;
@@ -360,7 +380,7 @@ pub fn item_use(
 
     // 아이템 정보 수집 (Borrow 충돌 방지)
     use crate::core::systems::item_helper::ItemHelper;
-    let (item_inst, display_name, item_class) = match world.entry_ref(*item_ent) {
+    let (item_inst, display_name, item_class) = match world.entry_ref(item_ent) {
         Ok(entry) => {
             let item = entry.get_component::<Item>().ok().cloned();
             let (d_name, class) = if let Some(i) = &item {
@@ -484,9 +504,9 @@ pub fn item_use(
 
                 item_inst.known = true;
                 item_inst.bknown = true;
-                command_buffer.add_component(*item_ent, item_inst.clone());
+                command_buffer.add_component(item_ent, item_inst.clone());
 
-                consume_item(p_inv, *item_ent, command_buffer);
+                consume_item(p_inv, item_ent, command_buffer);
             }
             ItemAction::Eat(_) => {
                 log.add(format!("You eat a {}.", display_name), log.current_turn);
@@ -596,8 +616,8 @@ pub fn item_use(
                 p_health.current = (p_health.current + 2).min(p_health.max);
                 item_inst.known = true;
                 item_inst.bknown = true;
-                command_buffer.add_component(*item_ent, item_inst.clone());
-                consume_item(p_inv, *item_ent, command_buffer);
+                command_buffer.add_component(item_ent, item_inst.clone());
+                consume_item(p_inv, item_ent, command_buffer);
             }
             ItemAction::Read(_) => {
                 log.add(format!("You read a {}.", display_name), log.current_turn);
@@ -669,7 +689,7 @@ pub fn item_use(
 
                         if count > 0 {
                             *state = crate::core::game_state::GameState::IdentifySelect {
-                                scroll: *item_ent,
+                                scroll: item_ent,
                                 count,
                             };
                             log.add("Select an item to identify.", log.current_turn);
@@ -750,13 +770,13 @@ pub fn item_use(
                 }
                 item_inst.known = true;
                 item_inst.bknown = true;
-                command_buffer.add_component(*item_ent, item_inst.clone());
-                consume_item(p_inv, *item_ent, command_buffer);
+                command_buffer.add_component(item_ent, item_inst.clone());
+                consume_item(p_inv, item_ent, command_buffer);
             }
             ItemAction::Offer(item_ent) => {
                 let mut rng = NetHackRng::new(log.current_turn);
                 if let Some(new_align) = crate::core::systems::pray::try_offer(
-                    *item_ent,
+                    item_ent,
                     world,
                     grid,
                     _assets,
@@ -790,7 +810,7 @@ pub fn item_use(
                 let mut player_inv = None;
                 let mut inv_query = <&mut Inventory>::query().filter(component::<PlayerTag>());
                 if let Some(inv) = inv_query.iter_mut(world).next() {
-                    if let Some(pos) = inv.items.iter().position(|&e| e == *item_ent) {
+                    if let Some(pos) = inv.items.iter().position(|&e| e == item_ent) {
                         inv.items.remove(pos);
                         player_inv = Some(inv.clone());
                     }
@@ -803,7 +823,7 @@ pub fn item_use(
                         if let Some(tile) = grid.get_tile(px as usize, py as usize) {
                             if tile.typ == crate::core::dungeon::tile::TileType::Sink {
                                 handled_by_sink = crate::core::systems::sink::try_drop_into_sink(
-                                    *item_ent,
+                                    item_ent,
                                     world,
                                     log,
                                     log.current_turn,
@@ -816,14 +836,14 @@ pub fn item_use(
                     if !handled_by_sink {
                         log.add("You drop the item.", log.current_turn);
                         if let Some((px, py)) = p_pos {
-                            command_buffer.add_component(*item_ent, Position { x: px, y: py });
+                            command_buffer.add_component(item_ent, Position { x: px, y: py });
                         }
                     } else {
                         //
                         // SubWorld에서는 remove가 안 될 수 있음.
                         //
                         //
-                        command_buffer.remove(*item_ent);
+                        command_buffer.remove(item_ent);
                     }
                 }
             }

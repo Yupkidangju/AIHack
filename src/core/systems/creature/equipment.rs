@@ -20,12 +20,25 @@ use legion::{component, Entity, EntityStore, IntoQuery};
 pub fn equipment(
     world: &mut SubWorld,
     #[resource] assets: &AssetManager,
-    #[resource] action: &mut Option<ItemAction>,
+    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
     #[resource] log: &mut GameLog,
     #[resource] turn: &u64,
     #[resource] event_queue: &mut EventQueue, // [v2.0.0 R5] 장비 이벤트
 ) {
-    let current_action = match *action {
+    let mut to_keep = Vec::new();
+    let mut action_to_process = None;
+    while let Some(game_action) = action_queue.pop() {
+        if let crate::core::action_queue::GameAction::Item(a) = game_action {
+            action_to_process = Some(a);
+        } else {
+            to_keep.push(game_action);
+        }
+    }
+    for a in to_keep {
+        action_queue.push(a);
+    }
+
+    let current_action = match action_to_process {
         Some(a) => a,
         None => return,
     };
@@ -82,7 +95,7 @@ pub fn equipment(
                     if health.current <= 0 {
                         log.add("You died from the blast...", *turn);
                     }
-                    *action = None;
+                    // *action = None;
                     return;
                 }
             }
@@ -103,10 +116,10 @@ pub fn equipment(
                             *turn,
                             event_queue,
                         );
-                        *action = None;
+                        // *action = None;
                     } else {
                         log.add("You can only wield weapons.", *turn);
-                        *action = None;
+                        // *action = None;
                     }
                 }
             }
@@ -116,7 +129,7 @@ pub fn equipment(
                         // Check Shield slot
                         if equipment.slots.contains_key(&EquipmentSlot::Shield) {
                             log.add("You cannot dual-wield while wearing a shield.", *turn);
-                            *action = None;
+                            // *action = None;
                             return;
                         }
 
@@ -131,10 +144,10 @@ pub fn equipment(
                             event_queue,
                         );
                         player.two_weapon = true;
-                        *action = None;
+                        // *action = None;
                     } else {
                         log.add("You can only wield weapons in your off-hand.", *turn);
-                        *action = None;
+                        // *action = None;
                     }
                 }
             }
@@ -157,7 +170,7 @@ pub fn equipment(
                                 && equipment.slots.contains_key(&EquipmentSlot::Offhand)
                             {
                                 log.add("You cannot wear a shield while dual-wielding.", *turn);
-                                *action = None;
+                                // *action = None;
                                 return;
                             }
 
@@ -171,14 +184,14 @@ pub fn equipment(
                                 *turn,
                                 event_queue,
                             );
-                            *action = None;
+                            // *action = None;
                         } else {
                             log.add("You cannot wear that.", *turn);
-                            *action = None;
+                            // *action = None;
                         }
                     } else {
                         log.add("You can only wear armor.", *turn);
-                        *action = None;
+                        // *action = None;
                     }
                 }
             }
@@ -201,16 +214,16 @@ pub fn equipment(
                             *turn,
                             event_queue,
                         );
-                        *action = None;
+                        // *action = None;
                     } else {
                         log.add("You cannot quiver that.", *turn);
-                        *action = None;
+                        // *action = None;
                     }
                 }
             }
             ItemAction::TakeOff(_) => {
                 unequip_item(item_ent, inventory, equipment, log, *turn, event_queue);
-                *action = None;
+                // *action = None;
             }
             _ => {}
         }

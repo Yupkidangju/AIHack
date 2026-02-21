@@ -19,6 +19,7 @@ pub fn try_open_door(
     log: &mut GameLog,
     turn: u64,
     direction: Direction,
+    provider: &dyn super::InteractionProvider,
 ) -> bool {
     //
     let mut player_pos: Option<(i32, i32)> = None;
@@ -30,7 +31,7 @@ pub fn try_open_door(
     let (px, py) = match player_pos {
         Some(p) => p,
         None => {
-            log.add("You don't exist!", turn);
+            log.add(provider.generate_dialogue("player_not_exist"), turn);
             return false;
         }
     };
@@ -42,7 +43,7 @@ pub fn try_open_door(
 
     //
     if tx < 0 || tx >= COLNO as i32 || ty < 0 || ty >= ROWNO as i32 {
-        log.add("You see no door there.", turn);
+        log.add(provider.generate_dialogue("no_door_there"), turn);
         return false;
     }
 
@@ -55,20 +56,20 @@ pub fn try_open_door(
                 //
                 tile.typ = TileType::OpenDoor;
                 tile.doormas = 1;
-                log.add("The door opens.", turn);
+                log.add(provider.generate_dialogue("door_opens"), turn);
                 true
             }
             TileType::OpenDoor => {
-                log.add("This door is already open.", turn);
+                log.add(provider.generate_dialogue("door_already_open"), turn);
                 false
             }
             _ => {
-                log.add("You see no door there.", turn);
+                log.add(provider.generate_dialogue("no_door_there"), turn);
                 false
             }
         }
     } else {
-        log.add("You see no door there.", turn);
+        log.add(provider.generate_dialogue("no_door_there"), turn);
         false
     }
 }
@@ -81,6 +82,7 @@ pub fn try_close_door(
     log: &mut GameLog,
     turn: u64,
     direction: Direction,
+    provider: &dyn super::InteractionProvider,
 ) -> bool {
     //
     let mut player_pos: Option<(i32, i32)> = None;
@@ -92,7 +94,7 @@ pub fn try_close_door(
     let (px, py) = match player_pos {
         Some(p) => p,
         None => {
-            log.add("You don't exist!", turn);
+            log.add(provider.generate_dialogue("player_not_exist"), turn);
             return false;
         }
     };
@@ -104,7 +106,7 @@ pub fn try_close_door(
 
     //
     if tx < 0 || tx >= COLNO as i32 || ty < 0 || ty >= ROWNO as i32 {
-        log.add("You see no door there.", turn);
+        log.add(provider.generate_dialogue("no_door_there"), turn);
         return false;
     }
 
@@ -116,20 +118,20 @@ pub fn try_close_door(
                 //
                 tile.typ = TileType::Door;
                 tile.doormas = 0;
-                log.add("The door closes.", turn);
+                log.add(provider.generate_dialogue("door_closes"), turn);
                 true
             }
             TileType::Door => {
-                log.add("This door is already closed.", turn);
+                log.add(provider.generate_dialogue("door_already_closed"), turn);
                 false
             }
             _ => {
-                log.add("You see no door there.", turn);
+                log.add(provider.generate_dialogue("no_door_there"), turn);
                 false
             }
         }
     } else {
-        log.add("You see no door there.", turn);
+        log.add(provider.generate_dialogue("no_door_there"), turn);
         false
     }
 }
@@ -143,17 +145,18 @@ pub fn execute_direction_action(
     log: &mut GameLog,
     turn: u64,
     rng: &mut NetHackRng,
+    provider: &dyn super::InteractionProvider,
 ) -> bool {
     match action {
-        DirectionAction::Open => try_open_door(world, grid, log, turn, direction),
-        DirectionAction::Close => try_close_door(world, grid, log, turn, direction),
+        DirectionAction::Open => try_open_door(world, grid, log, turn, direction, provider),
+        DirectionAction::Close => try_close_door(world, grid, log, turn, direction, provider),
         DirectionAction::Kick => {
             //
             crate::core::systems::kick::try_kick(world, grid, log, turn, direction, rng)
         }
         DirectionAction::Search => {
             //
-            log.add("You search the area but find nothing.", turn);
+            log.add(provider.generate_dialogue("search_nothing"), turn);
             true
         }
         DirectionAction::Throw { .. } => {

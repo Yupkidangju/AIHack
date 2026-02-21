@@ -46,7 +46,7 @@ impl eframe::App for NetHackApp {
         self.apply_global_style(ctx);
 
         // [v2.3.0
-        match self.app_state.clone() {
+        match self.ctx.app_state.clone() {
             crate::core::role::AppState::Title => {
                 self.handle_title_screen(ctx);
                 return;

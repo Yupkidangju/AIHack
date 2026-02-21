@@ -29,17 +29,28 @@ pub struct TeleportAction {
 #[write_component(Position)]
 pub fn teleport(
     world: &mut SubWorld,
-    #[resource] tele_action_res: &mut Option<TeleportAction>,
+    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
     #[resource] log: &mut GameLog,
     #[resource] grid: &Grid,
     #[resource] rng: &mut NetHackRng,
     #[resource] level_req: &mut Option<LevelChange>,
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
-    //
-    let action_opt = tele_action_res.take();
+    // ActionQueue에서 Teleport 액션 추출
+    let mut to_keep = Vec::new();
+    let mut action_opt = None;
+    while let Some(game_action) = action_queue.pop() {
+        if let crate::core::action_queue::GameAction::Teleport(a) = game_action {
+            action_opt = Some(a);
+        } else {
+            to_keep.push(game_action);
+        }
+    }
+    for a in to_keep {
+        action_queue.push(a);
+    }
 
-    //
+    // 큐에 액션이 없으면 컴포넌트에서 찾음
     let action = if let Some(a) = action_opt {
         Some(a)
     } else {

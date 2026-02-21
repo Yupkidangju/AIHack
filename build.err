@@ -1,0 +1,684 @@
+﻿cargo : warning: only one of `license` or `license-file` is necessary
+위치 줄:1 문자:1
++ cargo check --color never 2>&1 | Out-File -Encoding utf8 build.err
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: only o...e` is necessary: 
+   String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+`license` should be used if the package license can be expressed with a standard
+ SPDX expression.
+`license-file` should be used if the package uses a non-standard license.
+See https://doc.rust-lang.org/cargo/reference/manifest.html#the-license-and-lice
+nse-file-fields for more information.
+warning: aihack@2.11.0: Generated src/generated\kinds.rs with 16 monsters and 75
+ items
+    Checking aihack v2.11.0 (D:\LocalDev\Rust\AIHack)
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:259:48
+    |
+259 |             if let Ok(entry) = world.entry_ref(*container) {
+    |                                                ^^^^^^^^^^ can't be derefer
+enced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:267:72
+    |
+267 |                 if let Some(pos) = inv.items.iter().position(|&e| e == *it
+em) {
+    |                                                                        ^^^
+^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:269:50
+    |
+269 |                     command_buffer.add_component(*container, inv);
+    |                                                  ^^^^^^^^^^ can't be deref
+erenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:271:92
+    |
+271 |                     command_buffer.remove_component::<crate::core::entity:
+:InContainerTag>(*item);
+    |                                                                           
+                 ^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:277:42
+    |
+277 |                         p_inv.items.push(*item);
+    |                                          ^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:287:24
+    |
+287 |                 world, *container, *item,
+    |                        ^^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:287:36
+    |
+287 |                 world, *container, *item,
+    |                                    ^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:296:54
+    |
+296 |                 if let Ok(c_entry) = world.entry_ref(*container) {
+    |                                                      ^^^^^^^^^^ can't be d
+ereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:305:39
+    |
+305 |                 command_buffer.remove(*container);
+    |                                       ^^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:306:39
+    |
+306 |                 command_buffer.remove(*item);
+    |                                       ^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:311:48
+    |
+311 |                     inv.items.retain(|&e| e != *container && e != *item);
+    |                                                ^^^^^^^^^^ can't be derefer
+enced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:311:67
+    |
+311 |                     inv.items.retain(|&e| e != *container && e != *item);
+    |                                                                   ^^^^^ ca
+n't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:322:52
+    |
+322 |             if let Ok(mut entry) = world.entry_mut(*container) {
+    |                                                    ^^^^^^^^^^ can't be der
+eferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:324:38
+    |
+324 |                     c_inv.items.push(*item);
+    |                                      ^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:326:25
+    |
+326 |                         *item,
+    |                         ^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:328:40
+    |
+328 | ...                   container: *container,
+    |                                  ^^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:335:82
+    |
+335 |                         if let Some(pos) = p_inv.items.iter().position(|&e
+| e == *item) {
+    |                                                                           
+       ^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:347:17
+    |
+347 |                 *e,
+    |                 ^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:360:30
+    |
+360 |                 entity: Some(*e),
+    |                              ^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:367:30
+    |
+367 |                 entity: Some(*e),
+    |                              ^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:377:71
+    |
+377 |     let (item_inst, display_name, item_class) = match world.entry_ref(*ite
+m_ent) {
+    |                                                                       ^^^^
+^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:501:46
+    |
+501 |                 command_buffer.add_component(*item_ent, item_inst.clone())
+;
+    |                                              ^^^^^^^^^ can't be dereferenc
+ed
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:503:37
+    |
+503 |                 consume_item(p_inv, *item_ent, command_buffer);
+    |                                     ^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:613:46
+    |
+613 |                 command_buffer.add_component(*item_ent, item_inst.clone())
+;
+    |                                              ^^^^^^^^^ can't be dereferenc
+ed
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:614:37
+    |
+614 |                 consume_item(p_inv, *item_ent, command_buffer);
+    |                                     ^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:686:41
+    |
+686 | ...                   scroll: *item_ent,
+    |                               ^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:767:46
+    |
+767 |                 command_buffer.add_component(*item_ent, item_inst.clone())
+;
+    |                                              ^^^^^^^^^ can't be dereferenc
+ed
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:768:37
+    |
+768 |                 consume_item(p_inv, *item_ent, command_buffer);
+    |                                     ^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:773:21
+    |
+773 |                     *item_ent,
+    |                     ^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:807:76
+    |
+807 |                     if let Some(pos) = inv.items.iter().position(|&e| e ==
+ *item_ent) {
+    |                                                                           
+ ^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:820:37
+    |
+820 | ...                   *item_ent,
+    |                       ^^^^^^^^^ can't be dereferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:833:58
+    |
+833 | ...                   command_buffer.add_component(*item_ent, Position { x
+: px, y: py });
+    |                                                    ^^^^^^^^^ can't be dere
+ferenced
+
+error[E0614]: type `legion::Entity` cannot be dereferenced
+   --> src\core\systems\item\item_use.rs:840:47
+    |
+840 |                         command_buffer.remove(*item_ent);
+    |                                               ^^^^^^^^^ can't be dereferen
+ced
+
+warning: unused variable: `template`
+   --> src\core\entity\mon.rs:127:21
+    |
+127 | pub fn is_invisible(template: &MonsterTemplate) -> bool {
+    |                     ^^^^^^^^ help: if this is intentional, prefix it with 
+an underscore: `_template`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by defaul
+t
+
+warning: unused variable: `total_deaths_of_type`
+    --> src\core\entity\mon.rs:1466:5
+     |
+1466 |     total_deaths_of_type: u32,
+     |     ^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an 
+underscore: `_total_deaths_of_type`
+
+warning: unused variable: `template`
+    --> src\core\entity\mon.rs:1851:5
+     |
+1851 |     template: &MonsterTemplate,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_template`
+
+warning: unused variable: `template`
+    --> src\core\entity\mon.rs:3363:5
+     |
+3363 |     template: &MonsterTemplate,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_template`
+
+warning: unused variable: `current_is_female`
+    --> src\core\entity\mon.rs:3507:5
+     |
+3507 |     current_is_female: bool,
+     |     ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an und
+erscore: `_current_is_female`
+
+warning: variable does not need to be mutable
+    --> src\core\entity\mon.rs:3838:9
+     |
+3838 |     let mut r = migrate_mon_result(current_level, MigrateXYLoc::ApproxXY,
+ is_stuck);
+     |         ----^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `item_name`
+   --> src\core\systems\action\do_actions.rs:420:5
+    |
+420 |     item_name: &str,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_item_name`
+
+warning: unused variable: `item_name`
+   --> src\core\systems\action\do_actions.rs:449:5
+    |
+449 |     item_name: &str,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_item_name`
+
+warning: unused variable: `x`
+   --> src\core\systems\action\hack.rs:733:5
+    |
+733 |     x: i32,
+    |     ^ help: if this is intentional, prefix it with an underscore: `_x`
+
+warning: unused variable: `y`
+   --> src\core\systems\action\hack.rs:734:5
+    |
+734 |     y: i32,
+    |     ^ help: if this is intentional, prefix it with an underscore: `_y`
+
+warning: unused variable: `is_pool`
+    --> src\core\systems\action\hack.rs:1277:5
+     |
+1277 |     is_pool: bool,
+     |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `
+_is_pool`
+
+warning: unused variable: `is_lava`
+    --> src\core\systems\action\hack.rs:1278:5
+     |
+1278 |     is_lava: bool,
+     |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `
+_is_lava`
+
+warning: variable does not need to be mutable
+   --> src\core\systems\ai\core.rs:125:9
+    |
+125 |     let mut pickups_to_apply = Vec::new();
+    |         ----^^^^^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `was_dead`
+    --> src\core\systems\ai\dog.rs:1434:5
+     |
+1434 |     was_dead: bool,
+     |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_was_dead`
+
+warning: unused variable: `is_peaceful`
+   --> src\core\systems\ai\monmove.rs:115:5
+    |
+115 |     is_peaceful: bool,
+    |     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore
+: `_is_peaceful`
+
+warning: unused variable: `mx`
+   --> src\core\systems\ai\monmove.rs:567:5
+    |
+567 |     mx: i32,
+    |     ^^ help: if this is intentional, prefix it with an underscore: `_mx`
+
+warning: unused variable: `my`
+   --> src\core\systems\ai\monmove.rs:568:5
+    |
+568 |     my: i32,
+    |     ^^ help: if this is intentional, prefix it with an underscore: `_my`
+
+warning: variable does not need to be mutable
+    --> src\core\systems\ai\monmove.rs:1836:9
+     |
+1836 |     let mut gx = target_x;
+     |         ----^^
+     |         |
+     |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src\core\systems\ai\monmove.rs:1837:9
+     |
+1837 |     let mut gy = target_y;
+     |         ----^^
+     |         |
+     |         help: remove this `mut`
+
+warning: unused variable: `vs_large`
+   --> src\core\systems\combat\weapon.rs:482:5
+    |
+482 |     vs_large: bool,
+    |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `
+_vs_large`
+
+warning: unused variable: `item_name`
+   --> src\core\systems\combat\weapon.rs:984:29
+    |
+984 | pub fn weapon_identify_hint(item_name: &str, enchantment: i32) -> &'static
+ str {
+    |                             ^^^^^^^^^ help: if this is intentional, prefix
+ it with an underscore: `_item_name`
+
+warning: unused variable: `current_extrinsics`
+    --> src\core\systems\creature\equipment.rs:1176:5
+     |
+1176 |     current_extrinsics: u16,
+     |     ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an un
+derscore: `_current_extrinsics`
+
+warning: unused variable: `item_name`
+    --> src\core\systems\creature\equipment.rs:1639:63
+     |
+1639 | pub fn erosion_message(erosion_type: ErosionType, level: i32, item_name: 
+&str) -> &'static str {
+     |                                                               ^^^^^^^^^ h
+elp: if this is intentional, prefix it with an underscore: `_item_name`
+
+warning: unused variable: `is_sleeping`
+   --> src\core\systems\creature\steed_ext.rs:307:23
+    |
+307 | pub fn maybewakesteed(is_sleeping: bool, frozen: i32, rng: &mut NetHackRng
+) -> (bool, i32) {
+    |                       ^^^^^^^^^^^ help: if this is intentional, prefix it 
+with an underscore: `_is_sleeping`
+
+warning: value assigned to `player_pos` is never read
+   --> src\core\systems\item\apply.rs:401:26
+    |
+401 |     let mut player_pos = Position { x: 0, y: 0 };
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by defa
+ult
+
+warning: unused variable: `cursed`
+   --> src\core\systems\item\read.rs:348:5
+    |
+348 |     cursed: bool,
+    |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_c
+ursed`
+
+warning: unused variable: `confused`
+   --> src\core\systems\item\read.rs:735:5
+    |
+735 |     confused: bool,
+    |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `
+_confused`
+
+warning: unused variable: `hallucinating`
+   --> src\core\systems\item\read.rs:736:5
+    |
+736 |     hallucinating: bool,
+    |     ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an undersco
+re: `_hallucinating`
+
+warning: variable does not need to be mutable
+  --> src\core\systems\item\weight.rs:68:9
+   |
+68 |     let mut cap = (s + c) * 25 + 50;
+   |         ----^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `log`
+  --> src\core\systems\item\weight.rs:99:17
+   |
+99 |     #[resource] log: &mut crate::ui::log::GameLog,
+   |                 ^^^ help: if this is intentional, prefix it with an undersc
+ore: `_log`
+
+warning: unused variable: `turn`
+   --> src\core\systems\item\weight.rs:100:17
+    |
+100 |     #[resource] turn: &u64,
+    |                 ^^^^ help: if this is intentional, prefix it with an under
+score: `_turn`
+
+warning: unused variable: `is_blessed_spell`
+   --> src\core\systems\item\zap.rs:746:5
+    |
+746 |     is_blessed_spell: bool,
+    |     ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an under
+score: `_is_blessed_spell`
+
+warning: unused variable: `wand_name`
+    --> src\core\systems\item\zap.rs:1668:27
+     |
+1668 | pub fn wand_identify_hint(wand_name: &str, charges: i32) -> &'static str 
+{
+     |                           ^^^^^^^^^ help: if this is intentional, prefix 
+it with an underscore: `_wand_name`
+
+warning: variable does not need to be mutable
+   --> src\core\systems\magic\teleport_ext.rs:230:9
+    |
+230 |     let mut max_depth = input.dungeon_start + input.dungeon_levels - 1;
+    |         ----^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: value assigned to `player_pos` is never read
+  --> src\core\systems\social\shop.rs:69:26
+   |
+69 |     let mut player_pos = Position { x: 0, y: 0 };
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: maybe it is overwritten before being read?
+
+warning: value assigned to `gold` is never read
+  --> src\core\systems\social\shop.rs:70:20
+   |
+70 |     let mut gold = 0;
+   |                    ^
+   |
+   = help: maybe it is overwritten before being read?
+
+warning: unused variable: `slot`
+   --> src\core\systems\social\steal.rs:138:10
+    |
+138 |     let (slot, ref name, _class) = items[idx];
+    |          ^^^^ help: if this is intentional, prefix it with an underscore: 
+`_slot`
+
+warning: unused variable: `slot`
+   --> src\core\systems\social\steal.rs:208:10
+    |
+208 |     let (slot, ref name) = worn_armor[idx];
+    |          ^^^^ help: if this is intentional, prefix it with an underscore: 
+`_slot`
+
+warning: unused variable: `player_charisma`
+   --> src\core\systems\social\steal.rs:229:5
+    |
+229 |     player_charisma: i32,
+    |     ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an unders
+core: `_player_charisma`
+
+warning: unused variable: `monster_name`
+   --> src\core\systems\social\steal.rs:347:5
+    |
+347 |     monster_name: &str,
+    |     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscor
+e: `_monster_name`
+
+warning: unused variable: `quest_artifact_count`
+   --> src\core\systems\social\steal_ext.rs:194:5
+    |
+194 |     quest_artifact_count: i32,
+    |     ^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an u
+nderscore: `_quest_artifact_count`
+
+warning: unused variable: `rng`
+   --> src\core\systems\social\steal_ext.rs:199:5
+    |
+199 |     rng: &mut NetHackRng,
+    |     ^^^ help: if this is intentional, prefix it with an underscore: `_rng`
+
+warning: unused variable: `is_dead`
+   --> src\core\systems\social\steal_ext.rs:280:5
+    |
+280 |     is_dead: bool,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_
+is_dead`
+
+warning: unused variable: `shop_room`
+   --> src\core\systems\spawn\makemon.rs:361:40
+    |
+361 | pub fn make_shopkeeper(x: i32, y: i32, shop_room: u8, rng: &mut NetHackRng
+) -> MakeMonResult {
+    |                                        ^^^^^^^^^ help: if this is intentio
+nal, prefix it with an underscore: `_shop_room`
+
+warning: unused variable: `idx`
+   --> src\core\systems\spawn\makemon.rs:371:9
+    |
+371 |     let idx = rng.rn2(names.len() as i32) as usize;
+    |         ^^^ help: if this is intentional, prefix it with an underscore: `_
+idx`
+
+warning: unused variable: `turn`
+  --> src\core\systems\spawn\spawn_manager.rs:68:5
+   |
+68 |     turn: u64,
+   |     ^^^^ help: if this is intentional, prefix it with an underscore: `_turn
+`
+
+warning: unused variable: `tool`
+   --> src\core\systems\world\dig.rs:581:25
+    |
+581 | fn dig_progress_message(tool: DigTool, progress: i32, max: i32) -> String 
+{
+    |                         ^^^^ help: if this is intentional, prefix it with 
+an underscore: `_tool`
+
+warning: unused variable: `surface`
+   --> src\core\systems\world\engrave_ext.rs:397:5
+    |
+397 |     surface: &str,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_
+surface`
+
+warning: unused variable: `is_water`
+   --> src\core\systems\world\teleport.rs:393:5
+    |
+393 |     is_water: bool,
+    |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `
+_is_water`
+
+warning: unused variable: `is_lava`
+   --> src\core\systems\world\teleport.rs:394:5
+    |
+394 |     is_lava: bool,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_
+is_lava`
+
+warning: unused variable: `has_trap`
+   --> src\core\systems\world\teleport.rs:396:5
+    |
+396 |     has_trap: bool,
+    |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `
+_has_trap`
+
+warning: unused variable: `rng`
+   --> src\core\systems\world\teleport.rs:514:5
+    |
+514 |     rng: &mut crate::util::rng::NetHackRng,
+    |     ^^^ help: if this is intentional, prefix it with an underscore: `_rng`
+
+warning: unused variable: `x`
+   --> src\core\systems\world\trap.rs:755:23
+    |
+755 | pub fn can_place_trap(x: i32, y: i32, is_walkable: bool, has_trap: bool, i
+s_door: bool) -> bool {
+    |                       ^ help: if this is intentional, prefix it with an un
+derscore: `_x`
+
+warning: unused variable: `y`
+   --> src\core\systems\world\trap.rs:755:31
+    |
+755 | pub fn can_place_trap(x: i32, y: i32, is_walkable: bool, has_trap: bool, i
+s_door: bool) -> bool {
+    |                               ^ help: if this is intentional, prefix it wi
+th an underscore: `_y`
+
+warning: unused variable: `has_cold_res`
+   --> src\core\systems\world\trap.rs:856:5
+    |
+856 |     has_cold_res: bool,
+    |     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscor
+e: `_has_cold_res`
+
+warning: unused variable: `shock_res`
+    --> src\core\systems\world\trap.rs:1127:5
+     |
+1127 |     shock_res: bool,
+     |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore:
+ `_shock_res`
+
+warning: unused variable: `shock_resistant`
+    --> src\core\systems\world\trap.rs:1639:5
+     |
+1639 |     shock_resistant: bool,
+     |     ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an under
+score: `_shock_resistant`
+
+warning: unused variable: `erode_type`
+  --> src\core\systems\world\trap_ext.rs:99:5
+   |
+99 |     erode_type: ErodeType,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: 
+`_erode_type`
+
+warning: unused variable: `has_fire_resistance`
+   --> src\core\systems\world\trap_ext.rs:400:5
+    |
+400 |     has_fire_resistance: bool,
+    |     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an un
+derscore: `_has_fire_resistance`
+
+warning: unused variable: `inventory`
+  --> src\ui\widgets\equipment.rs:51:5
+   |
+51 |     inventory: &Inventory,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `
+_inventory`
+
+For more information about this error, try `rustc --explain E0614`.
+warning: `aihack` (bin "aihack") generated 60 warnings
+warning: aihack@2.11.0: Generated src/generated\kinds.rs with 16 monsters and 75
+ items
+error: could not compile `aihack` (bin "aihack") due to 33 previous errors; 60 w
+arnings emitted

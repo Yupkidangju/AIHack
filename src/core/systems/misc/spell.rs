@@ -36,12 +36,25 @@ pub struct CastAction {
 #[read_component(MonsterTag)]
 pub fn spell_cast(
     world: &mut SubWorld,
-    #[resource] cast_action: &mut Option<CastAction>,
+    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
     #[resource] log: &mut GameLog,
     #[resource] turn: &u64,
     #[resource] grid: &Grid,
 ) {
-    let action = match cast_action.take() {
+    let mut to_keep = Vec::new();
+    let mut action_to_process = None;
+    while let Some(game_action) = action_queue.pop() {
+        if let crate::core::action_queue::GameAction::Cast(a) = game_action {
+            action_to_process = Some(a);
+        } else {
+            to_keep.push(game_action);
+        }
+    }
+    for a in to_keep {
+        action_queue.push(a);
+    }
+
+    let action = match action_to_process {
         Some(a) => a,
         None => return,
     };

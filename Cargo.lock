@@ -119,7 +119,7 @@ dependencies = [
 
 [[package]]
 name = "aihack"
-version = "2.11.0"
+version = "2.20.0"
 dependencies = [
  "bitflags 2.10.0",
  "crossterm",
@@ -132,6 +132,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_repr",
+ "thiserror 2.0.18",
  "toml",
 ]
 

@@ -1,6 +1,6 @@
 [package]
 name = "aihack"
-version = "2.11.0"
+version = "2.20.0"
 edition = "2021"
 authors = ["Yupkidangju"]
 license = "Apache-2.0"
@@ -26,6 +26,7 @@ rand = "0.8"
 bitflags = { version = "2.4", features = ["serde"] }
 serde_repr = "0.1"
 lazy_static = "1.4"
+thiserror = "2.0.18"
 
 [dev-dependencies]
 pretty_assertions = "1.4"

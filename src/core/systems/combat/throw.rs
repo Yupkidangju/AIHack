@@ -11,6 +11,7 @@ use legion::world::SubWorld;
 use legion::*;
 
 /// 던지기 액션 리소스
+#[derive(Clone, Debug)]
 pub struct ThrowAction {
     pub item: Entity,
     pub dir: Direction,
@@ -24,14 +25,27 @@ pub struct ThrowAction {
 #[write_component(Health)]
 pub fn throw(
     world: &mut SubWorld,
-    #[resource] throw_action: &mut Option<ThrowAction>,
+    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
     #[resource] grid: &Grid,
     #[resource] log: &mut GameLog,
     #[resource] turn: &u64,
     #[resource] _assets: &AssetManager,
     command_buffer: &mut CommandBuffer,
 ) {
-    let action = match throw_action {
+    let mut to_keep = Vec::new();
+    let mut action_to_process = None;
+    while let Some(game_action) = action_queue.pop() {
+        if let crate::core::action_queue::GameAction::Throw(a) = game_action {
+            action_to_process = Some(a);
+        } else {
+            to_keep.push(game_action);
+        }
+    }
+    for a in to_keep {
+        action_queue.push(a);
+    }
+
+    let action = match action_to_process {
         Some(a) => a,
         None => return,
     };
@@ -243,8 +257,7 @@ pub fn throw(
         );
     }
 
-    // 액션 소비
-    *throw_action = None;
+    // 액션 소비 완료
 }
 
 // =============================================================================

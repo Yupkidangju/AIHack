@@ -126,6 +126,7 @@ pub fn try_talk(
     turn: u64,
     rng: &mut NetHackRng,
     rumors: &Rumors,
+    provider: &dyn super::InteractionProvider,
 ) -> bool {
     let mut p_query = <&Position>::query().filter(component::<PlayerTag>());
     let p_pos = match p_query.iter(world).next() {
@@ -183,12 +184,12 @@ pub fn try_talk(
                 <&crate::core::entity::player::Player>::query().filter(component::<PlayerTag>());
             if let Some(p) = p_query.iter(world).next() {
                 if p.exp_level < 14 {
+                    log.add(provider.generate_dialogue("quest_leader_not_ready"), turn);
+                } else {
                     log.add(
-                        "The Leader says: 'You are not yet strong enough for this quest.'",
+                        provider.generate_dialogue(&format!("quest_leader_ready_{:?}", p.role)),
                         turn,
                     );
-                } else {
-                    log.add(format!("The Leader says: 'Greetings, fellow {:?}. The time has come to fulfill your destiny.'", p.role), turn);
                 }
                 return true;
             }
@@ -199,13 +200,15 @@ pub fn try_talk(
             if m.kind == crate::generated::MonsterKind::Oracle {
                 // 1/3 확률로 Oracle Advice, 2/3 확률로 Rumor
                 if rng.rn2(3) == 0 {
+                    let oracle_msg = rumors.get_random_oracle(rng);
                     log.add(
-                        format!("The Oracle speaks: '{}'", rumors.get_random_oracle(rng)),
+                        provider.generate_dialogue(&format!("oracle_advice:{}", oracle_msg)),
                         turn,
                     );
                 } else {
+                    let rumor_msg = rumors.get_random_rumor(rng);
                     log.add(
-                        format!("The Oracle whispers: '{}'", rumors.get_random_rumor(rng)),
+                        provider.generate_dialogue(&format!("oracle_rumor:{}", rumor_msg)),
                         turn,
                     );
                 }
@@ -213,25 +216,30 @@ pub fn try_talk(
             }
         }
 
-        //
         if let Some(d) = diag {
             if !d.messages.is_empty() {
                 //
                 let msg = &d.messages[rng.rn2(d.messages.len() as i32) as usize];
-                log.add(format!("The inhabitant says: '{}'", msg), turn);
+                log.add(
+                    provider.generate_dialogue(&format!("inhabitant_says:{}", msg)),
+                    turn,
+                );
             } else {
-                log.add("They have nothing to say to you.", turn);
+                log.add(
+                    provider.generate_dialogue("inhabitant_nothing_to_say"),
+                    turn,
+                );
             }
         } else {
-            log.add("They don't seem interested in talking.", turn);
+            log.add(provider.generate_dialogue("inhabitant_uninterested"), turn);
         }
     }
 
     if !talked {
         if dir == Direction::Here {
-            log.add("You talk to yourself. It's a lonely dungeon.", turn);
+            log.add(provider.generate_dialogue("talk_to_self"), turn);
         } else {
-            log.add("There is no one there to talk to.", turn);
+            log.add(provider.generate_dialogue("no_one_to_talk_to"), turn);
         }
     }
 

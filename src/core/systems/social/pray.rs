@@ -100,6 +100,7 @@ pub fn try_pray(
     log: &mut GameLog,
     turn: u64,
     rng: &mut NetHackRng,
+    provider: &dyn super::InteractionProvider,
 ) -> bool {
     //
     let (p_pos_val, p_align_val, p_role_val, p_piety_val) = {
@@ -114,7 +115,10 @@ pub fn try_pray(
         (p_pos_val, p_align_val, p_role_val, p_piety_val)
     {
         let god_name = get_god_name(p_role, p_align);
-        log.add(format!("당신은 {}에게 기도를 시작합니다.", god_name), turn);
+        log.add(
+            provider.generate_dialogue(&format!("pray_start:{}", god_name)),
+            turn,
+        );
 
         // 현재 위치 타일 및 제단 성향 확인
         let mut on_altar = false;
@@ -170,14 +174,14 @@ pub fn try_pray(
             // 기도 쿨다운 체크 (u.ublesscnt)
             if p_stats.prayer_cooldown > 0 {
                 log.add(
-                    format!("{}께서 당신의 너무 빈번한 기도에 분노하셨습니다!", god_name),
+                    provider.generate_dialogue(&format!("pray_angry_cooldown:{}", god_name)),
                     turn,
                 );
                 let dmg = rng.rn1(10, 10);
                 p_health.current -= dmg;
                 p_stats.luck -= 1;
                 log.add_colored(
-                    format!("당신은 신의 분노로 {}의 피해를 입었습니다!", dmg),
+                    provider.generate_dialogue(&format!("pray_wrath_damage:{}", dmg)),
                     [255, 0, 0],
                     turn,
                 );
@@ -189,17 +193,17 @@ pub fn try_pray(
             if on_altar {
                 if altar_align == p_stats.alignment {
                     log.add(
-                        format!("{}의 존재감이 당신을 평온하게 감쌉니다.", god_name),
+                        provider.generate_dialogue(&format!("pray_altar_peace:{}", god_name)),
                         turn,
                     );
                     p_stats.piety += 10;
                 } else {
                     let other_god = get_god_name(p_role, altar_align);
                     log.add(
-                        format!(
-                            "{}께서 당신이 {}의 제단에 있는 것에 분노하셨습니다!",
+                        provider.generate_dialogue(&format!(
+                            "pray_altar_wrong:{}:{}",
                             god_name, other_god
-                        ),
+                        )),
                         turn,
                     );
                     let dmg = rng.rn1(6, 5);
@@ -234,12 +238,12 @@ pub fn try_pray(
                 fixed = true;
             } else if p_health.current < p_health.max / 4 {
                 p_health.current = p_health.max;
-                log.add("당신의 상처가 기적적으로 치유되었습니다!", turn);
+                log.add(provider.generate_dialogue("pray_fix_health"), turn);
                 fixed = true;
             } else if p_stats.nutrition <= 150 {
                 p_stats.nutrition = 900;
                 log.add(
-                    format!("{}께서 당신의 허기를 채워주셨습니다!", god_name),
+                    provider.generate_dialogue(&format!("pray_fix_hunger:{}", god_name)),
                     turn,
                 );
                 fixed = true;
@@ -279,11 +283,14 @@ pub fn try_pray(
             if fixed {
                 p_stats.piety -= 20;
                 log.add(
-                    format!("{}께서 당신의 기도에 응답하셨습니다!", god_name),
+                    provider.generate_dialogue(&format!("pray_answered:{}", god_name)),
                     turn,
                 );
             } else {
-                log.add(format!("{}께서 당신을 흡족해하십니다.", god_name), turn);
+                log.add(
+                    provider.generate_dialogue(&format!("pray_pleased:{}", god_name)),
+                    turn,
+                );
                 p_stats.luck = (p_stats.luck + 1).min(10);
             }
 
@@ -720,13 +727,21 @@ pub enum DivineFavor {
 /// [v2.9.1] 신앙도로부터 호감도 계산
 pub fn divine_favor_level(piety: i32, alignment_record: i32) -> DivineFavor {
     let combined = piety + alignment_record * 2;
-    if combined < -30 { DivineFavor::Enraged }
-    else if combined < -15 { DivineFavor::Angry }
-    else if combined < -5 { DivineFavor::Displeased }
-    else if combined < 10 { DivineFavor::Indifferent }
-    else if combined < 25 { DivineFavor::Pleased }
-    else if combined < 50 { DivineFavor::VeryPleased }
-    else { DivineFavor::Pious }
+    if combined < -30 {
+        DivineFavor::Enraged
+    } else if combined < -15 {
+        DivineFavor::Angry
+    } else if combined < -5 {
+        DivineFavor::Displeased
+    } else if combined < 10 {
+        DivineFavor::Indifferent
+    } else if combined < 25 {
+        DivineFavor::Pleased
+    } else if combined < 50 {
+        DivineFavor::VeryPleased
+    } else {
+        DivineFavor::Pious
+    }
 }
 
 /// [v2.9.1] 문제 우선순위 (원본: pray.c:400-500 in_trouble/fix_worst_trouble)
@@ -765,30 +780,64 @@ pub enum TroubleType {
 
 /// [v2.9.1] 현재 문제 목록 스캔 (원본: in_trouble)
 pub fn scan_troubles(
-    hp: i32, max_hp: i32,
+    hp: i32,
+    max_hp: i32,
     nutrition: i32,
-    is_stoning: bool, is_sliming: bool, is_strangled: bool,
-    is_food_poisoning: bool, is_sick: bool,
-    is_blind: bool, is_confused: bool, is_stunned: bool,
+    is_stoning: bool,
+    is_sliming: bool,
+    is_strangled: bool,
+    is_food_poisoning: bool,
+    is_sick: bool,
+    is_blind: bool,
+    is_confused: bool,
+    is_stunned: bool,
     is_hallucinating: bool,
     has_attribute_loss: bool,
 ) -> Vec<TroubleType> {
     let mut troubles = Vec::new();
 
-    if is_stoning { troubles.push(TroubleType::Stoning); }
-    if is_sliming { troubles.push(TroubleType::Sliming); }
-    if is_strangled { troubles.push(TroubleType::Strangled); }
-    if is_food_poisoning { troubles.push(TroubleType::FoodPoisoning); }
-    if is_sick { troubles.push(TroubleType::Sick); }
-    if hp <= max_hp / 7 { troubles.push(TroubleType::DyingHP); }
-    if nutrition <= 0 { troubles.push(TroubleType::Starving); }
-    if is_blind { troubles.push(TroubleType::Blind); }
-    if is_confused { troubles.push(TroubleType::Confused); }
-    if has_attribute_loss { troubles.push(TroubleType::AttributeLoss); }
-    if hp <= max_hp / 4 && hp > max_hp / 7 { troubles.push(TroubleType::LowHP); }
-    if nutrition > 0 && nutrition <= 150 { troubles.push(TroubleType::Hungry); }
-    if is_stunned { troubles.push(TroubleType::Stunned); }
-    if is_hallucinating { troubles.push(TroubleType::Hallucinating); }
+    if is_stoning {
+        troubles.push(TroubleType::Stoning);
+    }
+    if is_sliming {
+        troubles.push(TroubleType::Sliming);
+    }
+    if is_strangled {
+        troubles.push(TroubleType::Strangled);
+    }
+    if is_food_poisoning {
+        troubles.push(TroubleType::FoodPoisoning);
+    }
+    if is_sick {
+        troubles.push(TroubleType::Sick);
+    }
+    if hp <= max_hp / 7 {
+        troubles.push(TroubleType::DyingHP);
+    }
+    if nutrition <= 0 {
+        troubles.push(TroubleType::Starving);
+    }
+    if is_blind {
+        troubles.push(TroubleType::Blind);
+    }
+    if is_confused {
+        troubles.push(TroubleType::Confused);
+    }
+    if has_attribute_loss {
+        troubles.push(TroubleType::AttributeLoss);
+    }
+    if hp <= max_hp / 4 && hp > max_hp / 7 {
+        troubles.push(TroubleType::LowHP);
+    }
+    if nutrition > 0 && nutrition <= 150 {
+        troubles.push(TroubleType::Hungry);
+    }
+    if is_stunned {
+        troubles.push(TroubleType::Stunned);
+    }
+    if is_hallucinating {
+        troubles.push(TroubleType::Hallucinating);
+    }
 
     // 우선순위 정렬 (이미 enum 순서로 됨)
     troubles.sort();
@@ -806,8 +855,11 @@ pub fn determine_prayer_response(
     match favor {
         DivineFavor::Enraged | DivineFavor::Angry => PrayerResult::Furious,
         DivineFavor::Displeased => {
-            if rng.rn2(3) == 0 { PrayerResult::Furious }
-            else { PrayerResult::Ignored }
+            if rng.rn2(3) == 0 {
+                PrayerResult::Furious
+            } else {
+                PrayerResult::Ignored
+            }
         }
         DivineFavor::Indifferent => {
             if !troubles.is_empty() && rng.rn2(2) == 0 {
@@ -895,10 +947,7 @@ pub fn can_convert(
 }
 
 /// [v2.9.1] 개종 시 효과 (원본: pray.c altar_conversion effects)
-pub fn conversion_effects(
-    old_alignment: Alignment,
-    new_alignment: Alignment,
-) -> Vec<&'static str> {
+pub fn conversion_effects(old_alignment: Alignment, new_alignment: Alignment) -> Vec<&'static str> {
     let mut effects = Vec::new();
 
     effects.push("Your soul shudders as you convert!");
@@ -976,7 +1025,10 @@ pub fn sacrifice_message(
 ) -> String {
     if accepted {
         if altar_alignment == player_alignment {
-            format!("The {} vanishes in a burst of flame! Your god is pleased.", corpse_name)
+            format!(
+                "The {} vanishes in a burst of flame! Your god is pleased.",
+                corpse_name
+            )
         } else {
             format!("The {} disappears in a flash!", corpse_name)
         }
@@ -1016,19 +1068,25 @@ mod pray_v291_tests {
 
     #[test]
     fn test_scan_troubles_empty() {
-        let t = scan_troubles(100, 100, 900, false, false, false, false, false, false, false, false, false, false);
+        let t = scan_troubles(
+            100, 100, 900, false, false, false, false, false, false, false, false, false, false,
+        );
         assert!(t.is_empty());
     }
 
     #[test]
     fn test_scan_troubles_priority() {
-        let t = scan_troubles(5, 100, 0, true, false, false, false, true, true, false, false, false, false);
+        let t = scan_troubles(
+            5, 100, 0, true, false, false, false, true, true, false, false, false, false,
+        );
         assert_eq!(t[0], TroubleType::Stoning); // 최우선
     }
 
     #[test]
     fn test_scan_troubles_starving() {
-        let t = scan_troubles(50, 100, 0, false, false, false, false, false, false, false, false, false, false);
+        let t = scan_troubles(
+            50, 100, 0, false, false, false, false, false, false, false, false, false, false,
+        );
         assert!(t.contains(&TroubleType::Starving));
     }
 
@@ -1051,13 +1109,21 @@ mod pray_v291_tests {
     fn test_select_blessing_cursed() {
         let items = vec![(0, true, false, 0), (1, false, false, 1)];
         let targets = select_blessing_targets(&items);
-        assert!(targets.iter().any(|(idx, effect)| *idx == 0 && *effect == BlessingEffect::Uncurse));
+        assert!(targets
+            .iter()
+            .any(|(idx, effect)| *idx == 0 && *effect == BlessingEffect::Uncurse));
     }
 
     #[test]
     fn test_can_convert_same_align() {
         let mut rng = NetHackRng::new(42);
-        assert!(!can_convert(50, 5, Alignment::Lawful, Alignment::Lawful, &mut rng));
+        assert!(!can_convert(
+            50,
+            5,
+            Alignment::Lawful,
+            Alignment::Lawful,
+            &mut rng
+        ));
     }
 
     #[test]

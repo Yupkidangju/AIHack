@@ -29,13 +29,26 @@ pub struct ZapAction {
 #[read_component(crate::core::entity::status::StatusBundle)]
 pub fn zap(
     world: &mut SubWorld,
-    #[resource] zap_action: &mut Option<ZapAction>,
+    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
     #[resource] log: &mut GameLog,
     #[resource] turn: &u64,
     #[resource] grid: &mut Grid,
     #[resource] rng: &mut NetHackRng,
 ) {
-    let action = match zap_action.take() {
+    let mut to_keep = Vec::new();
+    let mut action_to_process = None;
+    while let Some(game_action) = action_queue.pop() {
+        if let crate::core::action_queue::GameAction::Zap(a) = game_action {
+            action_to_process = Some(a);
+        } else {
+            to_keep.push(game_action);
+        }
+    }
+    for a in to_keep {
+        action_queue.push(a);
+    }
+
+    let action = match action_to_process {
         Some(a) => a,
         None => return,
     };

@@ -219,7 +219,7 @@ impl super::NetHackApp {
 
         // 특수 처리: Shift+C 토글 (캐릭터 시트)
         if ctx.input(|i| i.modifiers.shift && i.key_pressed(egui::Key::C)) {
-            self.show_character = !self.show_character;
+            self.ui.show_character = !self.ui.show_character;
         }
 
         (cmd, spell_key)

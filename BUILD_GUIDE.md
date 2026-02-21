@@ -72,7 +72,7 @@ cargo build --release
 
 ```
 root/
-├── src/              # Rust 소스 (159개 파일, 92,296라인)
+├── src/              # Rust 소스 (192개 파일, 114,280라인)
 │   ├── main.rs       # 앱 엔트리포인트 + AppState 화면 분기
 │   ├── app.rs        # NetHackApp 구조체 + 초기화
 │   ├── game_loop.rs  # 게임 턴 처리
@@ -117,5 +117,5 @@ Failed to load assets/data/monsters.toml
 
 ---
 
-**문서 버전**: v2.1
-**최종 업데이트**: 2026-02-15
+**문서 버전**: v2.19.0
+**최종 업데이트**: 2026-02-21

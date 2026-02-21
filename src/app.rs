@@ -10,48 +10,94 @@ use crate::core::game_state::GameState;
 use legion::*;
 use std::sync::{Arc, Mutex};
 
-/// NetHack-RS Main Application Structure
-///
-pub(crate) struct NetHackApp {
-    // === [v1.9.0] 앱 상태 머신 (타이틀/캐릭터 생성/플레이) ===
+// ============================================================================
+// [v2.20.0 Phase R7-1] 하위 구조체 정의
+// NetHackApp의 22개 필드를 4개 논리 그룹으로 분해하기 위한 구조체.
+// R7-1-A: 정의만 추가, R7-1-B에서 NetHackApp 필드를 이동.
+// ============================================================================
+
+/// 앱 흐름 제어 (타이틀 → 캐릭터 생성 → 플레이 → 게임 오버)
+pub(crate) struct AppContext {
+    /// 현재 앱 상태 (Title/CharCreation/Playing/GameOver)
     pub(crate) app_state: crate::core::role::AppState,
+    /// 캐릭터 생성 단계
     pub(crate) char_creation_step: crate::core::role::CharCreationStep,
+    /// 캐릭터 생성 선택 결과
     pub(crate) char_creation_choices: crate::core::role::CharCreationChoices,
+    /// 캐릭터 이름 입력 버퍼
     pub(crate) char_name_buf: String,
-    // === 기존 게임 필드 ===
-    pub(crate) grid: Grid,           // 던전 맵 정보
-    pub(crate) assets: AssetManager, // 심볼 및 데이터 에셋
+    /// 게임 초기화 완료 여부
+    pub(crate) game_initialized: bool,
+}
+
+/// ECS World + Resources + 게임 데이터
+/// 주의: world와 resources를 동시에 &mut로 빌려야 할 경우,
+/// 직접 필드 접근(self.game.world, self.game.resources)을 사용하면
+/// Rust가 필드별 독립 차용을 허용합니다.
+pub(crate) struct GameWorld {
+    /// Legion ECS World — 모든 엔티티(플레이어, 몬스터, 아이템)의 컨테이너
+    pub(crate) world: World,
+    /// Legion ECS Resources — 싱글톤 데이터(RNG, GameLog, VisionSystem 등)
+    pub(crate) resources: Resources,
+    /// 현재 층의 던전 맵 정보
+    pub(crate) grid: Grid,
+    /// 전체 던전 관리자 (층 간 전환, 레벨 저장/로드)
+    pub(crate) dungeon: crate::core::dungeon::dungeon::Dungeon,
+    /// 심볼 및 데이터 에셋 (몬스터/아이템 템플릿)
+    pub(crate) assets: AssetManager,
+    /// 터미널 버퍼 (레거시, 현재 미사용)
     pub(crate) _terminal_buffer: Arc<Mutex<Vec<u8>>>,
-    pub(crate) world: World,         // Legion ECS World
-    pub(crate) resources: Resources, // Legion ECS Resources
-    pub(crate) renderer: crate::ui::renderer::HybridRenderer, // Ratatui 렌더러
-    pub(crate) dungeon: crate::core::dungeon::dungeon::Dungeon, // 던전 매니저
-    pub(crate) game_state: crate::core::game_state::GameState, // 게임 상태 머신
-    pub(crate) show_character: bool, // 캐릭터 시트 표시 여부
-    pub(crate) show_log_history: bool, // 메시지 히스토리 표시 여부
-    pub(crate) options: crate::core::options::Options, // 게임 옵션
-    pub(crate) naming_input: String, // 이름 입력을 위한 버퍼
-    pub(crate) engraving_input: String, // 새기기 입력을 위한 버퍼 (Phase 40)
-    pub(crate) game_initialized: bool, // [v1.9.0] 게임 초기화 완료 여부
-    //
+}
+
+/// UI 표시 상태 (렌더러, 레이아웃, 컨텍스트 메뉴 등)
+pub(crate) struct UiState {
+    /// Ratatui 하이브리드 렌더러
+    pub(crate) renderer: crate::ui::renderer::HybridRenderer,
+    /// 캐릭터 시트 표시 여부
+    pub(crate) show_character: bool,
+    /// 메시지 히스토리 표시 여부
+    pub(crate) show_log_history: bool,
+    /// 레이아웃 설정 (패널 토글 등)
     pub(crate) layout_settings: crate::ui::layout::menu_bar::LayoutSettings,
-    //
+    /// 우클릭 컨텍스트 메뉴 상태
     pub(crate) context_menu_state: crate::ui::context_menu::ContextMenuState,
-    /// Travel 모드 경로 큐 (남은 이동 목록)
-    pub(crate) travel_path: Vec<(i32, i32)>,
-    // === [v1.9.0 M4] 확장 명령 입력 모드 ===
+}
+
+/// 입력 처리 및 게임 상태 머신
+pub(crate) struct InputState {
+    /// 게임 상태 머신 (Normal/WaitingForDirection/Inventory 등)
+    pub(crate) game_state: crate::core::game_state::GameState,
+    /// 마지막으로 처리된 커맨드
+    pub(crate) last_cmd: crate::ui::input::Command,
+    /// 마법 주문 단축키 입력 (a-z)
+    pub(crate) spell_key_input: Option<char>,
     /// 확장 명령(#) 입력 모드 활성 여부
     pub(crate) ext_cmd_mode: bool,
     /// 확장 명령 입력 버퍼
     pub(crate) ext_cmd_input: String,
-    ///
-    ///
+    /// Run(Shift+방향) 달리기 방향
     pub(crate) run_direction: Option<crate::core::game_state::Direction>,
-    // === [v2.0.0 R1] 프레임 간 공유 입력 상태 ===
-    ///
-    pub(crate) last_cmd: crate::ui::input::Command,
-    /// 마법 주문 단축키 입력 (a-z)
-    pub(crate) spell_key_input: Option<char>,
+    /// Travel 모드 경로 큐 (남은 이동 목록)
+    pub(crate) travel_path: Vec<(i32, i32)>,
+    /// 이름 입력을 위한 버퍼
+    pub(crate) naming_input: String,
+    /// 새기기 입력을 위한 버퍼
+    pub(crate) engraving_input: String,
+    /// 게임 옵션
+    pub(crate) options: crate::core::options::Options,
+}
+
+/// NetHack-RS Main Application Structure
+/// [v2.20.0 R7-1-B] 22개 개별 필드 → 4개 하위 구조체로 분해
+pub(crate) struct NetHackApp {
+    /// 앱 흐름 제어 (타이틀/캐릭터 생성/플레이/게임 오버)
+    pub(crate) ctx: AppContext,
+    /// ECS World + Resources + 게임 데이터
+    pub(crate) game: GameWorld,
+    /// UI 표시 상태
+    pub(crate) ui: UiState,
+    /// 입력 처리 및 게임 상태 머신
+    pub(crate) input: InputState,
 }
 
 impl NetHackApp {
@@ -77,37 +123,48 @@ impl NetHackApp {
                         .unwrap_or_else(crate::core::entity::identity::IdentityTable::new);
 
                     return Self {
-                        // [v1.9.0] 세이브 로드 시 바로 Playing 상태
-                        app_state: crate::core::role::AppState::Playing,
-                        char_creation_step: crate::core::role::CharCreationStep::SelectRole,
-                        char_creation_choices: crate::core::role::CharCreationChoices::new(),
-                        char_name_buf: String::new(),
-                        grid: dungeon
-                            .levels
-                            .get(&dungeon.current_level)
-                            .expect("Current level missing in save")
-                            .clone(),
-                        assets,
-                        _terminal_buffer: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
-                        world,
-                        resources,
-                        renderer: crate::ui::renderer::HybridRenderer::new(),
-                        dungeon,
-                        game_state: crate::core::game_state::GameState::default(),
-                        show_character: false,
-                        show_log_history: false,
-                        options: crate::core::options::Options::load(),
-                        naming_input: String::new(),
-                        engraving_input: String::new(),
-                        game_initialized: true,
-                        layout_settings: crate::ui::layout::menu_bar::LayoutSettings::default(),
-                        context_menu_state: crate::ui::context_menu::ContextMenuState::default(),
-                        travel_path: Vec::new(),
-                        ext_cmd_mode: false,
-                        ext_cmd_input: String::new(),
-                        run_direction: None,
-                        last_cmd: crate::ui::input::Command::Unknown,
-                        spell_key_input: None,
+                        ctx: AppContext {
+                            // 세이브 로드 시 바로 Playing 상태
+                            app_state: crate::core::role::AppState::Playing,
+                            char_creation_step: crate::core::role::CharCreationStep::SelectRole,
+                            char_creation_choices: crate::core::role::CharCreationChoices::new(),
+                            char_name_buf: String::new(),
+                            game_initialized: true,
+                        },
+                        game: GameWorld {
+                            grid: dungeon
+                                .levels
+                                .get(&dungeon.current_level)
+                                .cloned()
+                                .unwrap_or_else(|| crate::core::dungeon::Grid::new()),
+                            assets,
+                            _terminal_buffer: std::sync::Arc::new(
+                                std::sync::Mutex::new(Vec::new()),
+                            ),
+                            world,
+                            resources,
+                            dungeon,
+                        },
+                        ui: UiState {
+                            renderer: crate::ui::renderer::HybridRenderer::new(),
+                            show_character: false,
+                            show_log_history: false,
+                            layout_settings: crate::ui::layout::menu_bar::LayoutSettings::default(),
+                            context_menu_state: crate::ui::context_menu::ContextMenuState::default(
+                            ),
+                        },
+                        input: InputState {
+                            game_state: crate::core::game_state::GameState::default(),
+                            options: crate::core::options::Options::load(),
+                            naming_input: String::new(),
+                            engraving_input: String::new(),
+                            travel_path: Vec::new(),
+                            ext_cmd_mode: false,
+                            ext_cmd_input: String::new(),
+                            run_direction: None,
+                            last_cmd: crate::ui::input::Command::Unknown,
+                            spell_key_input: None,
+                        },
                     };
                 }
                 Err(e) => eprintln!("세이브 로드 실패: {}", e),
@@ -231,11 +288,7 @@ impl NetHackApp {
         resources.insert(log);
         resources.insert(0u64); // Turn counter
         resources.insert(crate::core::systems::talk::Rumors::new()); // Rumors 시스템
-        resources.insert(None::<crate::core::systems::item_use::ItemAction>); // Pending item action
-        resources.insert(None::<crate::core::systems::throw::ThrowAction>); // Pending throw action
-        resources.insert(None::<crate::core::systems::spell::CastAction>); // Pending cast action
-        resources.insert(None::<crate::core::systems::zap::ZapAction>); // Pending zap action
-        resources.insert(None::<crate::core::systems::teleport::TeleportAction>); // Pending teleport action
+        resources.insert(crate::core::action_queue::ActionQueue::new()); // 신규 ActionQueue 병행
         resources.insert(None::<crate::core::dungeon::LevelChange>); // Level change request
         resources.insert(None::<crate::core::systems::pray::PendingAltarUpdate>); // Altar conversion
                                                                                   // [v1.9.0
@@ -243,6 +296,7 @@ impl NetHackApp {
         resources.insert(crate::core::systems::death::DeathResults::default()); // [v2.0.0] 시체/드롭 요청
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5] 이벤트 큐
         resources.insert(crate::core::events::EventHistory::default()); // [v2.0.0 R5] 이벤트 히스토리
+        resources.insert(crate::core::systems::social::DefaultInteractionProvider);
 
         // 던전 매니저 초기화 및 1층 등록
         let mut dungeon = crate::core::dungeon::dungeon::Dungeon::new();
@@ -275,40 +329,48 @@ impl NetHackApp {
         let renderer = crate::ui::renderer::HybridRenderer::new();
 
         Self {
-            // [v1.9.0
-            app_state: crate::core::role::AppState::Title,
-            char_creation_step: crate::core::role::CharCreationStep::SelectRole,
-            char_creation_choices: crate::core::role::CharCreationChoices::new(),
-            char_name_buf: String::new(),
-            grid,
-            assets,
-            _terminal_buffer: Arc::new(Mutex::new(Vec::new())),
-            world,
-            resources,
-            renderer,
-            dungeon,
-            game_state: crate::core::game_state::GameState::default(),
-            show_character: false,
-            show_log_history: false,
-            options,
-            naming_input: String::new(),
-            engraving_input: String::new(),
-            game_initialized: false,
-            layout_settings: crate::ui::layout::menu_bar::LayoutSettings::default(),
-            context_menu_state: crate::ui::context_menu::ContextMenuState::default(),
-            travel_path: Vec::new(),
-            ext_cmd_mode: false,
-            ext_cmd_input: String::new(),
-            run_direction: None,
-            last_cmd: crate::ui::input::Command::Unknown,
-            spell_key_input: None,
+            ctx: AppContext {
+                // [v1.9.0
+                app_state: crate::core::role::AppState::Title,
+                char_creation_step: crate::core::role::CharCreationStep::SelectRole,
+                char_creation_choices: crate::core::role::CharCreationChoices::new(),
+                char_name_buf: String::new(),
+                game_initialized: false,
+            },
+            game: GameWorld {
+                grid,
+                assets,
+                _terminal_buffer: Arc::new(Mutex::new(Vec::new())),
+                world,
+                resources,
+                dungeon,
+            },
+            ui: UiState {
+                renderer,
+                show_character: false,
+                show_log_history: false,
+                layout_settings: crate::ui::layout::menu_bar::LayoutSettings::default(),
+                context_menu_state: crate::ui::context_menu::ContextMenuState::default(),
+            },
+            input: InputState {
+                game_state: crate::core::game_state::GameState::default(),
+                options,
+                naming_input: String::new(),
+                engraving_input: String::new(),
+                travel_path: Vec::new(),
+                ext_cmd_mode: false,
+                ext_cmd_input: String::new(),
+                run_direction: None,
+                last_cmd: crate::ui::input::Command::Unknown,
+                spell_key_input: None,
+            },
         }
     }
 
     pub(crate) fn restart_game(&mut self) {
         let mut world = World::default();
         let mut resources = Resources::default();
-        let assets = self.assets.clone();
+        let assets = self.game.assets.clone();
 
         let mut rng = crate::util::rng::NetHackRng::new(rand::random());
         let (grid, _up_pos, _down_pos, _rooms) =
@@ -325,11 +387,7 @@ impl NetHackApp {
         resources.insert(crate::ui::log::GameLog::new(100));
         resources.insert(0u64);
         resources.insert(crate::core::systems::talk::Rumors::new());
-        resources.insert(None::<crate::core::systems::item_use::ItemAction>);
-        resources.insert(None::<crate::core::systems::throw::ThrowAction>);
-        resources.insert(None::<crate::core::systems::spell::CastAction>);
-        resources.insert(None::<crate::core::systems::zap::ZapAction>);
-        resources.insert(None::<crate::core::systems::teleport::TeleportAction>);
+        resources.insert(crate::core::action_queue::ActionQueue::new()); // 신규 ActionQueue 병행
         resources.insert(None::<crate::core::dungeon::LevelChange>);
         resources.insert(crate::core::systems::death::DeathResults::default());
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5]
@@ -346,16 +404,16 @@ impl NetHackApp {
         identity.shuffle(&mut rng, &assets.items.templates);
         resources.insert(identity.clone());
 
-        self.world = world;
-        self.resources = resources;
-        self.grid = grid;
-        self.dungeon = dungeon;
-        self.game_state = GameState::default();
+        self.game.world = world;
+        self.game.resources = resources;
+        self.game.grid = grid;
+        self.game.dungeon = dungeon;
+        self.input.game_state = GameState::default();
         // [M3/M4] 리셋
-        self.travel_path.clear();
-        self.ext_cmd_mode = false;
-        self.ext_cmd_input.clear();
-        self.run_direction = None;
+        self.input.travel_path.clear();
+        self.input.ext_cmd_mode = false;
+        self.input.ext_cmd_input.clear();
+        self.input.run_direction = None;
     }
 
     ///
@@ -366,10 +424,22 @@ impl NetHackApp {
     ) {
         use crate::core::role::{get_race_data, get_role_data};
 
-        let role = choices.role.expect("직업이 선택되어야 함");
-        let race = choices.race.expect("종족이 선택되어야 함");
-        let _gender = choices.gender.expect("성별이 선택되어야 함");
-        let _alignment = choices.alignment.expect("성향이 선택되어야 함");
+        let role = match choices.role {
+            Some(r) => r,
+            None => return,
+        };
+        let race = match choices.race {
+            Some(r) => r,
+            None => return,
+        };
+        let _gender = match choices.gender {
+            Some(r) => r,
+            None => return,
+        };
+        let _alignment = match choices.alignment {
+            Some(r) => r,
+            None => return,
+        };
 
         let role_data = get_role_data(role);
         let race_data = get_race_data(race);
@@ -377,7 +447,7 @@ impl NetHackApp {
         //
         let mut world = World::default();
         let mut resources = Resources::default();
-        let assets = self.assets.clone();
+        let assets = self.game.assets.clone();
 
         let mut rng = crate::util::rng::NetHackRng::new(rand::random());
 
@@ -498,7 +568,7 @@ impl NetHackApp {
         resources.insert(vision);
         resources.insert(rng.clone());
         resources.insert(assets.clone());
-        resources.insert(self.options.clone());
+        resources.insert(self.input.options.clone());
 
         let mut log = crate::ui::log::GameLog::new(100);
         // 환영 메시지 (직업/종족 반영)
@@ -512,27 +582,20 @@ impl NetHackApp {
             0,
         );
         log.add(
-            format!(
-                "You are a {} {}.",
-                choices.alignment.unwrap(),
-                choices.role_display_name()
-            ),
+            format!("You are a {} {}.", _alignment, choices.role_display_name()),
             0,
         );
         resources.insert(log);
         resources.insert(0u64);
         resources.insert(crate::core::systems::talk::Rumors::new());
-        resources.insert(None::<crate::core::systems::item_use::ItemAction>);
-        resources.insert(None::<crate::core::systems::throw::ThrowAction>);
-        resources.insert(None::<crate::core::systems::spell::CastAction>);
-        resources.insert(None::<crate::core::systems::zap::ZapAction>);
-        resources.insert(None::<crate::core::systems::teleport::TeleportAction>);
+        resources.insert(crate::core::action_queue::ActionQueue::new()); // 신규 ActionQueue 병행
         resources.insert(None::<crate::core::dungeon::LevelChange>);
         resources.insert(None::<crate::core::systems::pray::PendingAltarUpdate>);
         resources.insert(crate::core::entity::status::StatusFlags::empty());
         resources.insert(crate::core::systems::death::DeathResults::default());
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5]
         resources.insert(crate::core::events::EventHistory::default()); // [v2.0.0 R5]
+        resources.insert(crate::core::systems::social::DefaultInteractionProvider);
 
         let mut dungeon = crate::core::dungeon::dungeon::Dungeon::new();
         dungeon.set_level(
@@ -546,11 +609,11 @@ impl NetHackApp {
         resources.insert(identity.clone());
 
         // 5. 앱 상태 갱신
-        self.world = world;
-        self.resources = resources;
-        self.grid = grid;
-        self.dungeon = dungeon;
-        self.game_state = crate::core::game_state::GameState::default();
-        self.game_initialized = true;
+        self.game.world = world;
+        self.game.resources = resources;
+        self.game.grid = grid;
+        self.game.dungeon = dungeon;
+        self.input.game_state = crate::core::game_state::GameState::default();
+        self.ctx.game_initialized = true;
     }
 }
