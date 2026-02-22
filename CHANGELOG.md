@@ -2,6 +2,18 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.21.0] - 2026-02-23
+### Added
+- **[R9-1] 특수 레벨 파서 엔진 (`sp_lev.rs`)**: `evaluate_special_level` 파서 — 문/몬스터/트랩/아이템 생성 배열 파싱 및 Sokoban 보상 방 단위 테스트 완료.
+- **[R9-2] 확장 커맨드 디스패처 (`cmd.rs` 고도화)**: `Rub`, `Dip` 커맨드 → `GameState::RubSelection`/`DipSelection` 전환 + UI 셀렉터 윈도우(`show_rub_selector`, `show_dip_selector`) 구현.
+- **[R9-3] 인벤토리 슬롯 체계 이식 (`invent.rs` 고도화)**: `BTreeMap` 기반 인벤토리 슬롯 관리자 도입. `assign_letter`/`remove_item`/`letters_in_order` 메서드. `Item::can_merge_with` 스태킹 병합 알고리즘 (BUC/저주/강화/부식 등 14필드 비교). `ItemHelper::try_find_merge_target` 제네릭 함수 (`EntityStore` 트레이트). TakeOut/PutIn 시 자동 머징/레터 할당.
+- **[R9-4] 빔 반사 물리 엔진 (`zap_ext.rs`, 신규 ~880줄, 26테스트)**: `ReflectionContext` 기반 반사 소스 판별 시스템 (갑옷 > 방패 > 아뮬렛 > 거울). `simulate_bhit()` 순수 궤적 시뮬레이션 (ECS 비의존 콜백). `calc_wall_bounce()` 벽면 각도 기반 대각선/산란 반사. `check_beam_trap_chain()` 화염↔지뢰 폭발/냉기→화염트랩 무력화/전격→수중 전도/분해→트랩 소멸. `beam_terrain_effect_ext()` 확장 지형 상호작용 (용암 냉각/문 부식/나무 소각 등 10종). `try_mirror_reflect()` 저주 거울 25% 파손. `dragon_scale_reflects()/resistance()` 드래곤 비늘 컬러별 반사/저항 테이블.
+
+### Changed
+- **[리팩토링] `Inventory` 구조체 `HashMap` → `BTreeMap` 전환**: 알파벳 순서 보존을 위해 `letter_map`을 `BTreeMap`으로 교체.
+- **[리팩토링] 인벤토리 아이템 제거 통합**: `game_loop.rs`, `item_use.rs`, `pray.rs`, `equipment.rs`, `throw.rs` 등 전역에서 `items.remove(pos)` 패턴을 `inv.remove_item()` 호출로 통일.
+- **[리팩토링] `ItemHelper` 제네릭화**: `calculate_weight`, `try_find_merge_target` 함수의 `&World` 매개변수를 `EntityStore` 트레이트 바운드로 변경하여 `SubWorld` 환경에서도 호출 가능.
+
 ## [2.20.0] - 2026-02-22
 ### Added
 - **[아키텍처] InteractionProvider Trait (R7-5, R8-3)**: LLM 연동을 위한 상호작용 추상화 트레이트 도입. `social/mod.rs`에 8개 확장 메서드 추가 (`generate_death_epitaph`, `generate_shop_reaction`, `generate_tombstone_text` 등).
