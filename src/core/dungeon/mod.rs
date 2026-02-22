@@ -2,6 +2,7 @@ pub mod dungeon;
 pub mod gen;
 pub mod mkroom;
 pub mod rect;
+pub mod sp_lev;
 pub mod tile;
 
 use crate::core::dungeon::tile::{Tile, TileType};
