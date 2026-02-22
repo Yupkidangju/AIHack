@@ -4,12 +4,15 @@
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
 ## [2.20.0] - 2026-02-22
 ### Added
-- **[아키텍처] InteractionProvider Trait (R7-5)**: LLM 연동을 위한 상호작용 추상화 트레이트 도입 (대화, 기도, 상호작용 등 하드코딩 동적 대체).
+- **[아키텍처] InteractionProvider Trait (R7-5, R8-3)**: LLM 연동을 위한 상호작용 추상화 트레이트 도입. `social/mod.rs`에 8개 확장 메서드 추가 (`generate_death_epitaph`, `generate_shop_reaction`, `generate_tombstone_text` 등).
 - **[아키텍처] 통합 에러 처리 (R7-6)**: `thiserror` 기반 `GameError` enum 정의, 구조체 변환 체계 구축.
+- **[아키텍처] CommandBuffer 패턴 (R8-1)**: `DeathResults` 브릿지를 제거하고 ECS의 `CommandBuffer`를 활용하도록 `death.rs` 전면 개편.
+- **[기능] `bot_status_str()` 및 `stat_update()` (R8-5)**: 상태바(`botl.rs`) 원본 NetHack 포맷 완전 직렬화 기능 및 개별 Stat 증감 표시 기능 추가 (`Deaf` 상태 추가).
+- **[기능] `SaveState` 버전 인지 구조 (R8-5)**: 세이브 데이터에 버전 필드 및 자동 하위 호환 매핑 체계 추가. `save_dungeon` 및 `save_timeout` 등 원본 책임 어댑터 완비.
 
 ### Changed
 - **[리팩토링] ActionQueue 큐 기반 실행 전환 (R7-1~3)**: 즉시 실행 처리 로직을 중앙 집중된 `ActionQueue` 시스템으로 완전히 분리 및 순차 처리 효율성 강화.
-- **[안정성] `unwrap()` 및 `expect()` 안전 로직 대체 (R7-6)**: `game_loop.rs` 및 `app.rs`를 중심으로 코어 루프와 구동부의 패닉 유발 코드 전면 퇴출 및 `match`/`if let` 분기 처리.
+- **[안정성] 프로덕션 `unwrap()` 전면 제거 (R8-2)**: `ui`, `save`, 12+ Core 시스템에서 잠속된 모든 패닉 유발(`expect()`, `unwrap()`) 로직을 `match` 및 `if let`으로 교체. 프로덕션 패닉 경로 0개 달성.
 
 ## [2.19.0] - 2026-02-20
 ### Added

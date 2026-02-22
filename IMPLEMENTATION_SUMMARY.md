@@ -99,9 +99,10 @@
 - **Phase 18**: 지팡이 물리 정밀 (반사/폭탄)
 - **Phase 19**: 텔레포트/층간 이동
 
-### 아키텍처 현대화 및 확장 (Phase R1-R7)
+### 아키텍처 현대화 및 확장 (Phase R1-R8)
 - **Phase R1-R6**: 기반 모듈/아키텍처 스캐폴딩 변경 적용 및 뷰어 통합.
-- **Phase R7 (v2.20.0)**: **[현재 완료 단계]** ActionQueue 방식 액션 처리 통합, 안전성(`unwrap` 제거 및 `thiserror` 연동) 개선, LLM 상호작용(`InteractionProvider`) 구조 추상화 도입.
+- **Phase R7 (v2.20.0)**: **[완료]** ActionQueue 방식 액션 처리 통합, 안전성(`unwrap` 제거 및 `thiserror` 연동) 개선, LLM 상호작용(`InteractionProvider`) 구조 추상화 도입.
+- **Phase R8 (v2.20.0)**: **[현재 완료 단계]** `DeathResults` → `CommandBuffer` 전환, 프로덕션 로직 `unwrap()` 완전 제거, `InteractionProvider` 8곳 교체, `botl.rs` & `save.rs` 이식 품질 고도화.
 
 ### 콘텐츠 이식 (Phase 20-49) — 대수 완료
 - **Phase 20-49**: 가변 출력치, 식사, 도구, 용기, 기도, 명칭, 스킬, 아티팩트, 특수 전술, 던전 분기, 감정, 방어, 상점 AI, 지팡이, 상태 복구, 특수 공격, 몬스터 마법, 특수 레벨, 장기전, 지형, 조명, 트랩, 상태 이상, 아이템 보상, 경제, 컨테이너, 고급 AI
@@ -148,6 +149,7 @@
 | v2.17.0 | 107,556 | 1,936 | dbridge_ext/timeout_ext/region_ext 이식 |
 | **v2.18.0** | **108,900** | **1,996** | **ball_ext/vault_ext/worm_ext 이식 — 총 27개 _ext 모듈, 61.4%** |
 | **v2.19.0** | **114,280** | **2,186** | **uhitm_ext/invent_ext/shk_ext/trap_ext확장/mhitu_ext/apply_ext/do_wear_ext (75함수, 190테스트) — 총 33개 _ext 모듈, 64.5%** |
+| **v2.20.0** | **125,787** | **2,189** | **R7, R8 아키텍처 리팩토링 통합 (ActionQueue, InteractionProvider, CommandBuffer, unwrap 제거, botl/save 고도화) — 71.0%** |
 
 ---
 
@@ -204,6 +206,14 @@
 - zap.rs 확장 이식: `buzz`, `bhitpile`, `effect`, `weffects` (원본 39.5%)
 - 핵심 시스템 파일의 지속 확장 (이식률 64.5%, 60% 돌파 완료)
 - 테스트 커버리지 증가 (현재 2,186개)
+
+### v2.20.0 아키텍처 리팩토링 완료 모듈 (R7, R8 통합)
+- **social/mod.rs**: `InteractionProvider` 및 `DefaultInteractionProvider` 추상화 도입
+- **app.rs**, **game_loop.rs**: `ActionQueue` 기반 단일 큐 처리 아키텍처 교체 및 `unwrap()` 모두 제거
+- **death.rs**: `DeathResults` 제거 및 ECS `CommandBuffer`로 이벤트 발생 변경, LLM 주입점 적용.
+- **identity/botl.rs**: 상태바 모델과 원본 `botl.c`의 NetHack 직렬화 포맷(`bot_status_str`), 변경 추적기(`stat_update`) 구체화 완료.
+- **save.rs**: `SaveState`에 버전 부여 및 하위 호환 매핑 체계(dummy structure calls) 완비, 프로덕션 unwrap() 제거.
+- **총 변경점**: 12개 주요 파일 패닉 방지 및 `GameError` 처리 기반 71.0% 이식 달성.
 
 ### v2.19.0 이식 완료 모듈 (6개 신규 _ext 모듈 + 1개 확장)
 - **uhitm_ext.rs**: uhitm.c 핵심 이식 — 녹슬기/기사도/마상창/그림자/변신공격 데미지 (10함수, 32테스트)
