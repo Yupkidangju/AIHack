@@ -12,7 +12,14 @@ pub struct SpecialLevelSpec {
     pub width: i32,
     pub height: i32,
     pub rooms: Vec<SpRoomSpec>,
-    // TODO: doors, traps, monsters, objects, stairs, coords, altars 등 추가 확장 예정
+    #[serde(default)]
+    pub objects: Vec<SpObjectSpec>,
+    #[serde(default)]
+    pub monsters: Vec<SpMonsterSpec>,
+    #[serde(default)]
+    pub traps: Vec<SpTrapSpec>,
+    #[serde(default)]
+    pub doors: Vec<SpDoorSpec>,
 }
 
 /// 특수 레벨 내 특정 방 명세
@@ -24,6 +31,44 @@ pub struct SpRoomSpec {
     pub h: i32,
     pub flags: u32,    // 밝음(LIT), 미로형(IS_AMAZEMAP) 등 비트마스크
     pub room_type: u8, // OROOM, COURT, SHOP 등 방 타입 상수
+}
+
+/// 특수 레벨 내 특정 아이템 명세
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpObjectSpec {
+    pub object_class: char,
+    pub object_name: String,
+    pub x: i32,
+    pub y: i32,
+    pub amount: i32,
+    pub status: i32, // BUC 등 상태
+}
+
+/// 특수 레벨 내 특정 몬스터 명세
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpMonsterSpec {
+    pub monster_class: char,
+    pub monster_name: String,
+    pub x: i32,
+    pub y: i32,
+    pub peaceful: i32,
+    pub asleep: i32,
+}
+
+/// 특수 레벨 내 특정 트랩 명세
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpTrapSpec {
+    pub trap_type: u8,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// 특수 레벨 내 특정 문 명세
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpDoorSpec {
+    pub x: i32,
+    pub y: i32,
+    pub mask: i8, // D_ISOPEN, D_LOCKED 등 플래그
 }
 
 /// 특수 레벨 파서 및 지형 변환 어셈블러 클래스 (원본 sp_lev.c 전역 변수/로직 캡슐화)
@@ -129,10 +174,48 @@ impl SpecialLevelParser {
     pub fn evaluate_special_level(
         grid: &mut Grid,
         spec: &SpecialLevelSpec,
+        mut command_buffer: Option<&mut legion::systems::CommandBuffer>,
         _rng: &mut NetHackRng,
     ) -> bool {
-        // TODO: 스펙에 명시된 모든 rooms, obj, mon, trap 순차 생성 컴파일
-        false
+        // [1] 방앗간 (Rooms) 생성
+        for (i, room_spec) in spec.rooms.iter().enumerate() {
+            Self::create_room(grid, room_spec, 0, 0, i as u8 + 1);
+        }
+
+        // [2] 통로 및 벽 생성 (단순화: 전체 맵기준)
+        Self::wallify(
+            grid,
+            0,
+            0,
+            crate::core::dungeon::COLNO as i32,
+            crate::core::dungeon::ROWNO as i32,
+        );
+
+        // [3] 문 (Doors) 설정
+        for door in &spec.doors {
+            if let Some(tile) = grid.get_tile_mut(door.x as usize, door.y as usize) {
+                tile.typ = crate::core::dungeon::tile::TileType::Door;
+                tile.doormas = door.mask;
+            }
+        }
+
+        // [4] 함정 (Traps), 몬스터 (Monsters), 아이템 (Objects) 엔티티 대기열 생성
+        // AIHack에서는 CommandBuffer를 통해 ECS 엔티티로 승급시킴.
+        if let Some(ref mut cb) = command_buffer {
+            for trap in &spec.traps {
+                // TODO: cb.push()
+                // cb.push((Position { x: trap.x, y: trap.y }, Trap { kind: trap.trap_type }));
+                let _ = trap;
+            }
+            for mon in &spec.monsters {
+                let _ = mon; // TODO: spawn monster
+            }
+            for obj in &spec.objects {
+                let _ = obj; // TODO: spawn object
+            }
+        }
+
+        true
     }
 }
 
@@ -195,5 +278,42 @@ mod sp_lev_tests {
 
         assert_eq!(grid.get_tile(1, 1).unwrap().typ, TileType::Water);
         assert_eq!(grid.get_tile(2, 2).unwrap().typ, TileType::Water);
+    }
+
+    #[test]
+    fn test_evaluate() {
+        let mut grid = make_test_grid();
+        let spec = SpecialLevelSpec {
+            name: "test_sp".to_string(),
+            width: 80,
+            height: 21,
+            rooms: vec![SpRoomSpec {
+                x: 4,
+                y: 4,
+                w: 4,
+                h: 4,
+                flags: 1,
+                room_type: 1,
+            }],
+            objects: vec![],
+            monsters: vec![],
+            traps: vec![],
+            doors: vec![SpDoorSpec {
+                x: 4,
+                y: 4,
+                mask: 1,
+            }],
+        };
+        let mut rng = crate::util::rng::NetHackRng::new(0);
+
+        let result = SpecialLevelParser::evaluate_special_level(&mut grid, &spec, None, &mut rng);
+        assert!(result);
+
+        // 문 자리
+        assert_eq!(grid.get_tile(4, 4).unwrap().typ, TileType::Door);
+        assert_eq!(grid.get_tile(4, 4).unwrap().doormas, 1);
+
+        // 방 자리
+        assert_eq!(grid.get_tile(5, 5).unwrap().typ, TileType::Room);
     }
 }
