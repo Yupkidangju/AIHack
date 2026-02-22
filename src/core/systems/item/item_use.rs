@@ -39,6 +39,10 @@ pub enum ItemAction {
     WieldPrompt,   // 무기 착용 선택 모드 진입
     PutOnPrompt,   // 반지/부적 착용 선택 모드 진입
     RemovePrompt,  // 반지/부적 해제 선택 모드 진입
+
+    // [v2.21.0 R9-2] Extended Commands
+    Rub(Entity),
+    Dip(Entity),
 }
 
 ///
@@ -235,6 +239,8 @@ pub fn item_use(
         | ItemAction::Call(e)
         | ItemAction::Offer(e)
         | ItemAction::Drop(e)
+        | ItemAction::Rub(e)
+        | ItemAction::Dip(e)
         | ItemAction::Unequip(e) => e,
         ItemAction::Wield(e)
         | ItemAction::Wear(e)
@@ -846,6 +852,12 @@ pub fn item_use(
                         command_buffer.remove(item_ent);
                     }
                 }
+            }
+            ItemAction::Rub(_) => {
+                log.add("You rub it.", log.current_turn);
+            }
+            ItemAction::Dip(_) => {
+                log.add("You dip it.", log.current_turn);
             }
             _ => {}
         }

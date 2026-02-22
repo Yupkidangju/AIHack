@@ -115,6 +115,8 @@ pub enum GameState {
         lamp: Entity,
         oil: Entity,
     },
+    RubSelection,
+    DipSelection,
 }
 
 impl Default for GameState {

@@ -1,7 +1,6 @@
 // cmd.rs — NetHack 원본 cmd.c 1:1 디스패치 매핑
 // [v2.21.0 R9-2] Command -> ActionQueue 매핑 및 매크로(반복키) 엔진
 use crate::core::action_queue::{ActionQueue, GameAction};
-use crate::core::entity::object::ItemManager;
 use crate::core::game_state::GameState;
 use crate::ui::input::Command;
 use legion::World;
@@ -30,12 +29,12 @@ impl CommandDispatcher {
             }
             Command::Rub => {
                 // TODO: 램프 등을 문지르기 위해 아이템 선별 모드 진입
-                *current_state = GameState::Normal;
+                *current_state = GameState::RubSelection;
                 true
             }
             Command::Dip => {
                 // TODO: ItemSelection으로 먼저 포션(담그는 액체)을 선택하게 함
-                *current_state = GameState::Normal;
+                *current_state = GameState::DipSelection;
                 true
             }
             Command::Wipe => {

@@ -67,6 +67,8 @@ impl super::NetHackApp {
             GameState::SelectOffhand
             | GameState::SelectEngraveTool
             | GameState::EngravingText { .. }
+            | GameState::RubSelection
+            | GameState::DipSelection
             | GameState::Help
             | GameState::Looting { .. }
             | GameState::Enhance => {
@@ -504,7 +506,20 @@ impl super::NetHackApp {
                 };
             }
             _ => {
-                // 기타 명령 처리 (상태 변화 없음)
+                // 확장 명령 및 기타 (R9-2) 디스패치 루프 매핑
+                let cmd = self.input.last_cmd;
+                let world = &mut self.game.world;
+                let mut action_queue = self
+                    .game
+                    .resources
+                    .get_mut::<crate::core::action_queue::ActionQueue>()
+                    .unwrap();
+                let _handled = crate::core::systems::action::cmd::CommandDispatcher::dispatch(
+                    cmd,
+                    &mut self.input.game_state,
+                    &mut action_queue,
+                    world,
+                );
             }
         }
         _action_executed
@@ -874,7 +889,9 @@ impl super::NetHackApp {
         match &self.input.game_state {
             GameState::SelectOffhand
             | GameState::SelectEngraveTool
-            | GameState::EngravingText { .. } => {
+            | GameState::EngravingText { .. }
+            | GameState::RubSelection
+            | GameState::DipSelection => {
                 if self.input.last_cmd == Command::Cancel
                     || self.input.last_cmd == Command::Inventory
                 {

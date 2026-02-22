@@ -1762,6 +1762,76 @@ impl super::NetHackApp {
             }
         }
 
+        // [v2.21.0 R9-2] Extended Command: Rub
+        if self.input.game_state == GameState::RubSelection {
+            let mut selected_action = None;
+            egui::Window::new("Rub Item").show(ctx, |ui| {
+                let ident_table_opt = self
+                    .game
+                    .resources
+                    .get::<crate::core::entity::identity::IdentityTable>();
+                if let Some(ident_table) = ident_table_opt {
+                    let mut query =
+                        <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
+                    for inv in query.iter(&self.game.world) {
+                        if let Some(action) = crate::ui::widgets::inventory::show_rub_selector(
+                            ui,
+                            &self.game.world,
+                            inv,
+                            &self.game.assets.items,
+                            &ident_table,
+                        ) {
+                            selected_action = Some(action);
+                        }
+                    }
+
+                    if ui.button("Cancel").clicked() {
+                        self.input.game_state = GameState::Normal;
+                    }
+                }
+            });
+
+            if let Some(action) = selected_action {
+                self.game.resources.insert(Some(action));
+                self.input.game_state = GameState::Normal;
+            }
+        }
+
+        // [v2.21.0 R9-2] Extended Command: Dip
+        if self.input.game_state == GameState::DipSelection {
+            let mut selected_action = None;
+            egui::Window::new("Dip Item").show(ctx, |ui| {
+                let ident_table_opt = self
+                    .game
+                    .resources
+                    .get::<crate::core::entity::identity::IdentityTable>();
+                if let Some(ident_table) = ident_table_opt {
+                    let mut query =
+                        <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
+                    for inv in query.iter(&self.game.world) {
+                        if let Some(action) = crate::ui::widgets::inventory::show_dip_selector(
+                            ui,
+                            &self.game.world,
+                            inv,
+                            &self.game.assets.items,
+                            &ident_table,
+                        ) {
+                            selected_action = Some(action);
+                        }
+                    }
+
+                    if ui.button("Cancel").clicked() {
+                        self.input.game_state = GameState::Normal;
+                    }
+                }
+            });
+
+            if let Some(action) = selected_action {
+                self.game.resources.insert(Some(action));
+                self.input.game_state = GameState::Normal;
+            }
+        }
+
         // Engrave Tool Selection Window (#engrave)
         if self.input.game_state == GameState::SelectEngraveTool {
             let mut selected_tool = None;

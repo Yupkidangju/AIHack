@@ -596,6 +596,94 @@ pub fn show_offer_selector(
     pending_action
 }
 
+/// [v2.21.0 R9-2] Extended Commands - Rub
+pub fn show_rub_selector(
+    ui: &mut eframe::egui::Ui,
+    world: &World,
+    inventory: &Inventory,
+    item_manager: &crate::core::entity::object::ItemManager,
+    ident_table: &IdentityTable,
+) -> Option<ItemAction> {
+    let mut pending_action = None;
+
+    ui.vertical(|ui| {
+        ui.heading("Rub which item:");
+        ui.separator();
+
+        use crate::core::systems::item_helper::ItemHelper;
+        let mut items_found = false;
+
+        for &item_ent in &inventory.items {
+            if let Some(entry) = world.entry_ref(item_ent).ok() {
+                if let Ok(item) = entry.get_component::<Item>() {
+                    items_found = true;
+                    if let Some(template) = item_manager.get_by_kind(item.kind) {
+                        let display_name = ItemHelper::get_name(item, template, Some(ident_table));
+                        let letter = inventory.get_letter(item_ent);
+
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} - {}", letter, display_name));
+                            if ui.button("Rub").clicked() {
+                                pending_action = Some(ItemAction::Rub(item_ent));
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        if !items_found {
+            ui.label("You have nothing to rub.");
+        }
+    });
+
+    pending_action
+}
+
+/// [v2.21.0 R9-2] Extended Commands - Dip
+pub fn show_dip_selector(
+    ui: &mut eframe::egui::Ui,
+    world: &World,
+    inventory: &Inventory,
+    item_manager: &crate::core::entity::object::ItemManager,
+    ident_table: &IdentityTable,
+) -> Option<ItemAction> {
+    let mut pending_action = None;
+
+    ui.vertical(|ui| {
+        ui.heading("Dip which item:");
+        ui.separator();
+
+        use crate::core::systems::item_helper::ItemHelper;
+        let mut items_found = false;
+
+        for &item_ent in &inventory.items {
+            if let Some(entry) = world.entry_ref(item_ent).ok() {
+                if let Ok(item) = entry.get_component::<Item>() {
+                    items_found = true;
+                    if let Some(template) = item_manager.get_by_kind(item.kind) {
+                        let display_name = ItemHelper::get_name(item, template, Some(ident_table));
+                        let letter = inventory.get_letter(item_ent);
+
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} - {}", letter, display_name));
+                            if ui.button("Dip").clicked() {
+                                pending_action = Some(ItemAction::Dip(item_ent));
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        if !items_found {
+            ui.label("You have nothing to dip.");
+        }
+    });
+
+    pending_action
+}
+
 ///
 pub fn show_engrave_tool_selector(
     ui: &mut eframe::egui::Ui,
