@@ -795,10 +795,9 @@ impl super::NetHackApp {
                         let mut p_inv_query =
                             <&mut Inventory>::query().filter(component::<PlayerTag>());
                         if let Some(p_inv) = p_inv_query.iter_mut(&mut self.game.world).next() {
-                            if let Some(pos) = p_inv.items.iter().position(|&e| e == scroll) {
-                                p_inv.items.remove(pos);
+                            if p_inv.items.contains(&scroll) {
+                                p_inv.remove_item(scroll);
                             }
-                            p_inv.letter_map.retain(|_, &mut v| v != scroll);
                         }
                         self.game.world.remove(scroll);
                         if let Some(mut log) =
@@ -839,8 +838,8 @@ impl super::NetHackApp {
                     let mut oil_used = false;
 
                     if let Some(inv) = inv_q.iter_mut(&mut self.game.world).next() {
-                        if let Some(pos) = inv.items.iter().position(|&e| e == *oil) {
-                            inv.items.remove(pos);
+                        if inv.items.contains(oil) {
+                            inv.remove_item(*oil);
                             oil_used = true;
                         }
                     }

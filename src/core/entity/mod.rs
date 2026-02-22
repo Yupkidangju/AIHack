@@ -150,17 +150,18 @@ pub struct CombatStats {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Inventory {
     pub items: Vec<Entity>,
-    pub letter_map: std::collections::HashMap<char, Entity>,
+    pub letter_map: std::collections::BTreeMap<char, Entity>,
 }
 
 impl Inventory {
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
-            letter_map: std::collections::HashMap::new(),
+            letter_map: std::collections::BTreeMap::new(),
         }
     }
 
+    /// [v2.21.0 R9-3] assigninvlet() 포팅: 편의상 a-z를 우선하고 그 다음 A-Z 할당
     pub fn assign_letter(&mut self, entity: Entity) -> char {
         // 이미 할당된 문자가 있는지 확인
         for (&c, &e) in &self.letter_map {
@@ -179,6 +180,23 @@ impl Inventory {
         '?'
     }
 
+    /// [v2.21.0 R9-3] freeinv(): 인벤토리에서 지정된 아이템 제거 후 슬롯 반환
+    pub fn remove_item(&mut self, entity: Entity) {
+        if let Some(pos) = self.items.iter().position(|&e| e == entity) {
+            self.items.remove(pos);
+            let mut key_to_remove = None;
+            for (&c, &e) in &self.letter_map {
+                if e == entity {
+                    key_to_remove = Some(c);
+                    break;
+                }
+            }
+            if let Some(c) = key_to_remove {
+                self.letter_map.remove(&c);
+            }
+        }
+    }
+
     pub fn get_letter(&self, entity: Entity) -> char {
         for (&c, &e) in &self.letter_map {
             if e == entity {
@@ -186,6 +204,25 @@ impl Inventory {
             }
         }
         '?'
+    }
+
+    /// [v2.21.0 R9-3] NetHack 고유의 인벤토리 알파벳 순서 반환 (a-z -> A-Z)
+    pub fn letters_in_order(&self) -> Vec<(char, Entity)> {
+        let mut lower = Vec::new();
+        let mut upper = Vec::new();
+
+        for (&c, &e) in &self.letter_map {
+            if c.is_ascii_lowercase() {
+                lower.push((c, e));
+            } else if c.is_ascii_uppercase() {
+                upper.push((c, e));
+            }
+        }
+
+        lower.sort_by_key(|(c, _)| *c);
+        upper.sort_by_key(|(c, _)| *c);
+
+        lower.into_iter().chain(upper).collect()
     }
 }
 
@@ -214,6 +251,26 @@ pub struct Item {
     pub user_name: Option<String>, // 플레이어가 붙인 개별 이름 (oname)
     pub artifact: Option<String>,  // 아티팩트 식별자 (oartifact)
     pub owet: u8,                  // 젖음 정도 (owet) - Phase 42
+}
+
+impl Item {
+    /// [v2.21.0 R9-3] Stacking / Merging 검사 알고리즘
+    pub fn can_merge_with(&self, other: &Item) -> bool {
+        self.kind == other.kind
+            && self.blessed == other.blessed
+            && self.cursed == other.cursed
+            && self.bknown == other.bknown
+            && self.spe == other.spe
+            && self.oeroded == other.oeroded
+            && self.oeroded2 == other.oeroded2
+            && self.corpsenm == other.corpsenm
+            && self.unpaid == other.unpaid
+            && self.user_name == other.user_name
+            && self.artifact == other.artifact
+            && self.oeaten == other.oeaten
+            && self.olocked == other.olocked
+            && self.oopened == other.oopened
+    }
 }
 
 impl Default for Item {

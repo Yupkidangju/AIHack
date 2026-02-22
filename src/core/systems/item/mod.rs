@@ -21,6 +21,7 @@ pub mod read_ext;
 pub mod weight;
 pub mod write_ext;
 pub mod zap;
+pub mod zap_ext;
 
 // ──────────────────────────────────────────────────────────────
 // [v2.0.0

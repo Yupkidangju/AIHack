@@ -89,7 +89,7 @@ impl ItemHelper {
     }
 
     ///
-    pub fn calculate_weight(item_ent: legion::Entity, world: &legion::World) -> i32 {
+    pub fn calculate_weight<W: EntityStore>(item_ent: legion::Entity, world: &W) -> i32 {
         if let Ok(entry) = world.entry_ref(item_ent) {
             if let Ok(item) = entry.get_component::<Item>() {
                 let mut contents_weight: i32 = 0;
@@ -115,5 +115,23 @@ impl ItemHelper {
             }
         }
         0
+    }
+
+    /// [v2.21.0 R9-3] 스태킹 가능한 대상을 인벤토리에서 찾아 반환
+    pub fn try_find_merge_target<W: EntityStore>(
+        inv: &crate::core::entity::Inventory,
+        new_item: &crate::core::entity::Item,
+        world: &W,
+    ) -> Option<legion::Entity> {
+        for &existing_ent in &inv.items {
+            if let Ok(entry) = world.entry_ref(existing_ent) {
+                if let Ok(exist_item) = entry.get_component::<Item>() {
+                    if exist_item.can_merge_with(new_item) {
+                        return Some(existing_ent);
+                    }
+                }
+            }
+        }
+        None
     }
 }

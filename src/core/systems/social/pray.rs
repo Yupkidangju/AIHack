@@ -441,8 +441,8 @@ pub fn try_offer(
             let mut inv_query =
                 <&mut crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
             for inv in inv_query.iter_mut(world) {
-                if let Some(pos) = inv.items.iter().position(|&e| e == item_ent) {
-                    inv.items.remove(pos);
+                if inv.items.contains(&item_ent) {
+                    inv.remove_item(item_ent);
                 }
             }
         }

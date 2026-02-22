@@ -86,8 +86,8 @@ pub fn throw(
         log.add(format!("You throw the {}.", item_name), *turn);
 
         //
-        if let Some(pos) = p_inv.items.iter().position(|&e| e == item_ent) {
-            p_inv.items.remove(pos);
+        if p_inv.items.contains(&item_ent) {
+            p_inv.remove_item(item_ent);
         } else {
             // Equipment 슬롯 순회
             let mut slot_to_remove = None;

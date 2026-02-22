@@ -266,7 +266,6 @@ pub fn item_use(
         | ItemAction::EquipOffhand(_)
         | ItemAction::QuiverSelect(_) => return,
         ItemAction::TakeOut { container, item } => {
-            //
             let mut container_inv = None;
             if let Ok(entry) = world.entry_ref(container) {
                 if let Ok(inv) = entry.get_component::<Inventory>() {
@@ -275,19 +274,46 @@ pub fn item_use(
             }
 
             if let Some(mut inv) = container_inv {
-                //
-                if let Some(pos) = inv.items.iter().position(|&e| e == item) {
-                    inv.items.remove(pos);
+                if inv.items.contains(&item) {
+                    inv.remove_item(item);
                     command_buffer.add_component(container, inv);
-                    //
                     command_buffer.remove_component::<crate::core::entity::InContainerTag>(item);
 
-                    //
-                    let mut player_query =
-                        <&mut Inventory>::query().filter(component::<PlayerTag>());
-                    if let Some(p_inv) = player_query.iter_mut(world).next() {
-                        p_inv.items.push(item);
-                        log.add("You take the item out of the container.", log.current_turn);
+                    // [v2.21.0 R9-3] 플레이어 인벤토리 편입 시 Stacking 처리
+                    let mut merge_target = None;
+                    let mut qty_to_add = 0;
+                    if let Ok(item_entry) = world.entry_ref(item) {
+                        if let Ok(item_comp) = item_entry.get_component::<Item>() {
+                            qty_to_add = item_comp.quantity;
+                            let mut p_query =
+                                <&Inventory>::query().filter(component::<PlayerTag>());
+                            if let Some(p_inv) = p_query.iter(world).next() {
+                                merge_target = crate::core::systems::item_helper::ItemHelper::try_find_merge_target(p_inv, item_comp, world);
+                            }
+                        }
+                    }
+
+                    if let Some(target) = merge_target {
+                        if let Ok(target_entry) = world.entry_ref(target) {
+                            if let Ok(exist_comp) = target_entry.get_component::<Item>() {
+                                let mut merged = exist_comp.clone();
+                                merged.quantity += qty_to_add;
+                                command_buffer.add_component(target, merged);
+                                command_buffer.remove(item);
+                            }
+                        }
+                        log.add(
+                            "You take the item out and it merges with your items.",
+                            log.current_turn,
+                        );
+                    } else {
+                        let mut player_query =
+                            <&mut Inventory>::query().filter(component::<PlayerTag>());
+                        if let Some(p_inv) = player_query.iter_mut(world).next() {
+                            p_inv.items.push(item);
+                            p_inv.assign_letter(item);
+                            log.add("You take the item out of the container.", log.current_turn);
+                        }
                     }
                 }
             }
@@ -313,11 +339,9 @@ pub fn item_use(
                     }
                 }
 
-                //
                 command_buffer.remove(container);
                 command_buffer.remove(item);
 
-                //
                 let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
                 if let Some(inv) = query.iter_mut(world).next() {
                     inv.items.retain(|&e| e != container && e != item);
@@ -330,26 +354,49 @@ pub fn item_use(
                 return;
             }
 
-            //
-            if let Ok(mut entry) = world.entry_mut(container) {
-                if let Ok(c_inv) = entry.get_component_mut::<Inventory>() {
-                    c_inv.items.push(item);
-                    command_buffer.add_component(
-                        item,
-                        crate::core::entity::InContainerTag {
-                            container: container,
-                        },
-                    );
+            // 플레이어 인벤토리에서 아이템 제거
+            let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
+            if let Some(p_inv) = query.iter_mut(world).next() {
+                if p_inv.items.contains(&item) {
+                    p_inv.remove_item(item);
+                }
+            }
 
-                    //
-                    let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
-                    if let Some(p_inv) = query.iter_mut(world).next() {
-                        if let Some(pos) = p_inv.items.iter().position(|&e| e == item) {
-                            p_inv.items.remove(pos);
+            // [v2.21.0 R9-3] 컨테이너 인벤토리 안에서 Stacking
+            let mut merge_target = None;
+            let mut qty_to_add = 0;
+            if let Ok(item_entry) = world.entry_ref(item) {
+                if let Ok(item_comp) = item_entry.get_component::<Item>() {
+                    qty_to_add = item_comp.quantity;
+                    if let Ok(c_entry) = world.entry_ref(container) {
+                        if let Ok(c_inv) = c_entry.get_component::<Inventory>() {
+                            merge_target = crate::core::systems::item_helper::ItemHelper::try_find_merge_target(c_inv, item_comp, world);
                         }
                     }
+                }
+            }
 
-                    log.add("You put the item into the container.", log.current_turn);
+            if let Some(target) = merge_target {
+                if let Ok(target_entry) = world.entry_ref(target) {
+                    if let Ok(exist_comp) = target_entry.get_component::<Item>() {
+                        let mut merged = exist_comp.clone();
+                        merged.quantity += qty_to_add;
+                        command_buffer.add_component(target, merged);
+                        command_buffer.remove(item);
+                        log.add(
+                            "You put the item in and it merges with other items.",
+                            log.current_turn,
+                        );
+                    }
+                }
+            } else {
+                if let Ok(mut entry) = world.entry_mut(container) {
+                    if let Ok(c_inv) = entry.get_component_mut::<Inventory>() {
+                        c_inv.items.push(item);
+                        command_buffer
+                            .add_component(item, crate::core::entity::InContainerTag { container });
+                        log.add("You put the item into the container.", log.current_turn);
+                    }
                 }
             }
             return;
@@ -816,8 +863,8 @@ pub fn item_use(
                 let mut player_inv = None;
                 let mut inv_query = <&mut Inventory>::query().filter(component::<PlayerTag>());
                 if let Some(inv) = inv_query.iter_mut(world).next() {
-                    if let Some(pos) = inv.items.iter().position(|&e| e == item_ent) {
-                        inv.items.remove(pos);
+                    if inv.items.contains(&item_ent) {
+                        inv.remove_item(item_ent);
                         player_inv = Some(inv.clone());
                     }
                 }
@@ -895,8 +942,8 @@ pub fn item_use(
 }
 
 fn consume_item(inv: &mut Inventory, item_ent: Entity, command_buffer: &mut CommandBuffer) {
-    if let Some(pos) = inv.items.iter().position(|&e| e == item_ent) {
-        inv.items.remove(pos);
+    if inv.items.contains(&item_ent) {
+        inv.remove_item(item_ent);
     }
     command_buffer.remove(item_ent);
 }

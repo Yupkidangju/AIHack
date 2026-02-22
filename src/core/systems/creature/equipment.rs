@@ -251,8 +251,8 @@ fn equip_item(
         return;
     }
 
-    if let Some(pos) = inventory.items.iter().position(|&e| e == item) {
-        inventory.items.remove(pos);
+    if inventory.items.contains(&item) {
+        inventory.remove_item(item);
         equipment.slots.insert(slot, item);
         log.add(format!("You equip {}.", name), turn);
 
