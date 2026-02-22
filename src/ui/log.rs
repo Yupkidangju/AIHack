@@ -43,9 +43,11 @@ impl GameLog {
         }
 
         //
-        if !self.messages.is_empty() && self.messages.last().unwrap().turn != turn {
-            self.turn_message_count = 0;
-            self.needs_more = false;
+        if let Some(last_msg) = self.messages.last() {
+            if last_msg.turn != turn {
+                self.turn_message_count = 0;
+                self.needs_more = false;
+            }
         }
         self.turn_message_count += 1;
         if self.turn_message_count >= 8 {
@@ -57,7 +59,7 @@ impl GameLog {
             if last.text == text_str && last.color == color {
                 last.count += 1;
                 last.turn = turn;
-                                  //
+                //
                 if let Some(last_hist) = self.history.last_mut() {
                     if last_hist.text == text_str && last_hist.color == color {
                         last_hist.count += 1;

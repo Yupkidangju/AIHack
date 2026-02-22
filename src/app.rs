@@ -293,7 +293,6 @@ impl NetHackApp {
         resources.insert(None::<crate::core::systems::pray::PendingAltarUpdate>); // Altar conversion
                                                                                   // [v1.9.0
         resources.insert(crate::core::entity::status::StatusFlags::empty());
-        resources.insert(crate::core::systems::death::DeathResults::default()); // [v2.0.0] 시체/드롭 요청
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5] 이벤트 큐
         resources.insert(crate::core::events::EventHistory::default()); // [v2.0.0 R5] 이벤트 히스토리
         resources.insert(crate::core::systems::social::DefaultInteractionProvider);

@@ -1206,54 +1206,9 @@ impl super::NetHackApp {
             );
         }
 
-        // [v2.0.0] 몬스터 사망 후 시체/아이템 드롭 처리 (SubWorld 제약 우회)
-        // death_system에서 DeathResults에 쌓인 요청을 &mut World로 실제 실행
-        if let Some(death_res) = self
-            .game
-            .resources
-            .get::<crate::core::systems::death::DeathResults>()
-        {
-            let corpse_reqs = death_res.corpse_requests.clone();
-            let _drop_reqs = death_res.item_drop_requests.clone();
-            drop(death_res); // 빌림 해제
-
-            // 시체 엔티티 생성 (원본: mon.c:make_corpse)
-            //
-            let current_level = {
-                let mut lvl_query = <&crate::core::entity::Level>::query()
-                    .filter(legion::query::component::<crate::core::entity::PlayerTag>());
-                lvl_query
-                    .iter(&self.game.world)
-                    .next()
-                    .map(|l| l.0)
-                    .unwrap_or(crate::core::dungeon::LevelID::new(
-                        crate::core::dungeon::DungeonBranch::Main,
-                        1,
-                    ))
-            };
-            for req in &corpse_reqs {
-                self.game.world.push((
-                    crate::core::entity::ItemTag,
-                    crate::core::entity::Position { x: req.x, y: req.y },
-                    crate::core::entity::Renderable {
-                        glyph: '%',
-                        color: req.color,
-                    },
-                    crate::core::entity::Item {
-                        kind: crate::generated::ItemKind::from_str(&format!(
-                            "{} corpse",
-                            req.monster_name
-                        )),
-                        weight: req.weight,
-                        quantity: 1,
-                        corpsenm: Some(req.monster_name.clone()),
-                        age: req.corpse_age,
-                        ..Default::default()
-                    },
-                    crate::core::entity::Level(current_level),
-                ));
-            }
-        }
+        // [v2.20.0 R8] DeathResults 브릿지 제거됨
+        // 시체/아이템 드롭은 death_system 내부의 CommandBuffer.push()로 직접 처리
+        // 기존 game_loop.rs의 DeathResults 소비 로직은 더 이상 불필요
 
         // [v2.0.0 R5] 이벤트 소비: EventQueue → EventHistory 기록 후 clear
         //

@@ -172,7 +172,7 @@ pub fn try_talk(
         if is_shk {
             // 상점 서비스 메뉴 (Phase 47.3)
             //
-            if crate::core::systems::shop::try_identify_service(world, log, turn) {
+            if crate::core::systems::shop::try_identify_service(world, log, turn, provider) {
                 return true;
             }
             // 감정할 것이 없거나 돈이 없으면 일반 대사로 넘어감

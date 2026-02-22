@@ -648,10 +648,10 @@ pub fn item_use(
                     }
                     "Scroll of magic mapping" => {
                         log.add("A map coalesces in your mind!", log.current_turn);
-                        command_buffer.add_component(
-                            player_ent.unwrap(),
-                            crate::core::entity::MagicMapRequest,
-                        );
+                        if let Some(p_ent) = player_ent {
+                            command_buffer
+                                .add_component(p_ent, crate::core::entity::MagicMapRequest);
+                        }
                     }
                     "Scroll of light" => {
                         log.add(

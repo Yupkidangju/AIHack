@@ -61,14 +61,10 @@ pub fn death(
     #[resource] rng: &mut crate::util::rng::NetHackRng,
     #[resource] turn: &u64,
     #[resource] game_state: &mut crate::core::game_state::GameState,
-    #[resource] death_results: &mut DeathResults,
     #[resource] event_queue: &mut EventQueue, // [v2.0.0 R5] 이벤트 큐
+    #[resource] provider: &crate::core::systems::social::DefaultInteractionProvider, // [R8-3] LLM 교체 포인트
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
-    // 결과 초기화
-    death_results.corpse_requests.clear();
-    death_results.item_drop_requests.clear();
-
     // =========================================================================
     //
     // =========================================================================
@@ -204,26 +200,42 @@ pub fn death(
             total_xp_gain += (dead.level * 10) as u64;
         }
 
-        //
+        // --- 3-3. 아이템 드롭 — CommandBuffer로 위치 변경 (R8-1: DeathResults 대체) ---
+        // [v2.20.0 R8] SubWorld 제약 우회: CommandBuffer로 아이템 드롭 위치 컴포넌트 추가
         for &item_ent in &dead.items {
-            death_results.item_drop_requests.push(ItemDropRequest {
-                item_entity: item_ent,
-                x: dead.pos_x,
-                y: dead.pos_y,
-            });
-        }
-
-        // --- 3-4. 시체 생성 요청 (원본: mon.c:make_corpse) ---
-        if let Some(template) = template_opt {
-            if crate::core::entity::mon::corpse_chance(template) {
-                death_results.corpse_requests.push(CorpseRequest {
-                    monster_name: mon_name.clone(),
+            command_buffer.add_component(
+                item_ent,
+                crate::core::entity::Position {
                     x: dead.pos_x,
                     y: dead.pos_y,
-                    color: template.color,
-                    weight: (template.weight / 10).max(1) as u32,
-                    corpse_age: *turn,
-                });
+                },
+            );
+        }
+
+        // --- 3-4. 시체 생성 — CommandBuffer.push()로 직접 Entity 생성 (R8-1) ---
+        // [v2.20.0 R8] DeathResults 브릿지 제거: SubWorld 제약을 CommandBuffer로 완전 해소
+        if let Some(template) = template_opt {
+            if crate::core::entity::mon::corpse_chance(template) {
+                command_buffer.push((
+                    crate::core::entity::ItemTag,
+                    crate::core::entity::Position {
+                        x: dead.pos_x,
+                        y: dead.pos_y,
+                    },
+                    crate::core::entity::Renderable {
+                        glyph: '%',
+                        color: template.color,
+                    },
+                    crate::core::entity::Item {
+                        kind: crate::generated::ItemKind::from_str(&format!("{} corpse", mon_name)),
+                        weight: (template.weight / 10).max(1) as u32,
+                        quantity: 1,
+                        corpsenm: Some(mon_name.clone()),
+                        age: *turn,
+                        ..Default::default()
+                    },
+                    crate::core::entity::Level(player_level),
+                ));
             }
         }
 
@@ -285,14 +297,18 @@ pub fn death(
         let mut pq = <(Entity, &Health)>::query().filter(component::<PlayerTag>());
         for (_e, health) in pq.iter(world) {
             if health.current <= 0 {
-                log.add_colored("You have died... DYWYPI?", [255, 0, 0], *turn);
+                // [R8-3] provider 경유 사망 에필로그
+                use crate::core::systems::social::InteractionProvider;
+                let cause_str = format!("killed on level {} of the Dungeon", player_level.depth);
+                let epitaph = provider.generate_death_epitaph(&cause_str, "You");
+                log.add_colored(&epitaph, [255, 0, 0], *turn);
 
-                let epitaph = assets.rumors.get_random_epitaph(rng);
-                log.add_colored(format!("Tombstone: {}", epitaph), [200, 200, 200], *turn);
+                let tombstone = provider.generate_tombstone_text("Adventurer", &cause_str, 0);
+                log.add_colored(format!("Tombstone: {}", tombstone), [200, 200, 200], *turn);
 
                 // [v2.0.0 R5] PlayerDied 이벤트 발행
                 event_queue.push(GameEvent::PlayerDied {
-                    cause: format!("killed on level {} of the Dungeon", player_level.depth),
+                    cause: cause_str.clone(),
                 });
 
                 *game_state = crate::core::game_state::GameState::GameOver {

@@ -291,7 +291,7 @@ pub fn an(name: &str) -> String {
     if name.is_empty() {
         return name.to_string();
     }
-    let first = name.chars().next().unwrap().to_ascii_lowercase();
+    let first = name.chars().next().unwrap_or('a').to_ascii_lowercase();
     if "aeiou".contains(first) {
         format!("an {}", name)
     } else {

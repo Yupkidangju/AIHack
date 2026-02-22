@@ -20,11 +20,15 @@ impl super::NetHackApp {
                 q.iter(&self.game.world).next().map(|(e, p)| (*e, p.x, p.y))
             };
             if let Some((ent, px, py)) = player_info {
-                let has_inv = self.game.world
+                let has_inv = self
+                    .game
+                    .world
                     .entry_ref(ent)
                     .map(|e| e.get_component::<Inventory>().is_ok())
                     .unwrap_or(false);
-                let has_health = self.game.world
+                let has_health = self
+                    .game
+                    .world
                     .entry_ref(ent)
                     .map(|e| e.get_component::<Health>().is_ok())
                     .unwrap_or(false);
@@ -384,7 +388,8 @@ impl super::NetHackApp {
                     }
                     _ => format!(
                         "{:?}:{}",
-                        self.game.dungeon.current_level.branch, self.game.dungeon.current_level.depth
+                        self.game.dungeon.current_level.branch,
+                        self.game.dungeon.current_level.depth
                     ),
                 };
 
@@ -482,7 +487,9 @@ impl super::NetHackApp {
                             }
                         }
 
-                        if let Some(vision) = self.game.resources
+                        if let Some(vision) = self
+                            .game
+                            .resources
                             .get::<crate::core::systems::vision::VisionSystem>()
                         {
                             let minimap_data = crate::ui::layout::minimap::MinimapData {
@@ -524,11 +531,17 @@ impl super::NetHackApp {
                 .rect_filled(rect, 0.0, egui::Color32::from_rgb(10, 10, 10));
 
             // 프레임 렌더링 실행
-            if let Some(vision) = self.game.resources
+            if let Some(vision) = self
+                .game
+                .resources
                 .get::<crate::core::systems::vision::VisionSystem>()
             {
-                self.ui.renderer
-                    .render_frame(&self.game.grid, &self.game.world, &self.game.assets, &vision);
+                self.ui.renderer.render_frame(
+                    &self.game.grid,
+                    &self.game.world,
+                    &self.game.assets,
+                    &vision,
+                );
             }
 
             // Ratatui 버퍼 내용을 egui Painter로 복사
@@ -586,7 +599,8 @@ impl super::NetHackApp {
                     egui::ScrollArea::vertical()
                         .stick_to_bottom(true)
                         .show(ui, |ui| {
-                            if let Some(log) = self.game.resources.get::<crate::ui::log::GameLog>() {
+                            if let Some(log) = self.game.resources.get::<crate::ui::log::GameLog>()
+                            {
                                 for msg in &log.history {
                                     ui.horizontal(|ui| {
                                         ui.colored_label(
@@ -626,7 +640,9 @@ impl super::NetHackApp {
                         // 시야 정보 확인
                         let mut is_visible = false;
                         let mut is_memorized = false;
-                        if let Some(vision) = self.game.resources
+                        if let Some(vision) = self
+                            .game
+                            .resources
                             .get::<crate::core::systems::vision::VisionSystem>()
                         {
                             let flags = vision.viz_array[gx as usize][gy as usize];
@@ -639,7 +655,9 @@ impl super::NetHackApp {
                                 ui.label(format!("Location: ({}, {})", gx, gy));
 
                                 // 타일 정보
-                                if let Some(tile) = self.game.grid.get_tile(gx as usize, gy as usize) {
+                                if let Some(tile) =
+                                    self.game.grid.get_tile(gx as usize, gy as usize)
+                                {
                                     ui.label(format!("Terrain: {:?}", tile.typ));
                                 }
 
@@ -810,10 +828,16 @@ impl super::NetHackApp {
                     ui.add_space(4.0);
 
                     // 표시 옵션
-                    ui.checkbox(&mut self.input.options.show_exp, "Show Experience (경험치 표시)");
+                    ui.checkbox(
+                        &mut self.input.options.show_exp,
+                        "Show Experience (경험치 표시)",
+                    );
                     ui.checkbox(&mut self.input.options.show_score, "Show Score (점수 표시)");
                     ui.checkbox(&mut self.input.options.color, "Use Colors (색상 사용)");
-                    ui.checkbox(&mut self.input.options.hilite_pet, "Highlight Pets (펫 강조)");
+                    ui.checkbox(
+                        &mut self.input.options.hilite_pet,
+                        "Highlight Pets (펫 강조)",
+                    );
 
                     ui.add_space(4.0);
                     ui.separator();
@@ -849,7 +873,9 @@ impl super::NetHackApp {
                     // 저장 버튼
                     if ui.button("?? Save Options").clicked() {
                         self.input.options.save();
-                        if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                        if let Some(mut log) =
+                            self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                        {
                             let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
                             log.add("Options saved.", turn);
                         }
@@ -1027,7 +1053,9 @@ impl super::NetHackApp {
 
                 //
                 if can_continue {
-                    if let Some(vision) = self.game.resources
+                    if let Some(vision) = self
+                        .game
+                        .resources
                         .get::<crate::core::systems::vision::VisionSystem>()
                     {
                         let mut mq = <&Position>::query().filter(
@@ -1173,7 +1201,9 @@ impl super::NetHackApp {
                     let mut mq = <&Position>::query().filter(
                         !component::<PlayerTag>() & component::<crate::core::entity::Monster>(),
                     );
-                    if let Some(vision) = self.game.resources
+                    if let Some(vision) = self
+                        .game
+                        .resources
                         .get::<crate::core::systems::vision::VisionSystem>()
                     {
                         for mpos in mq.iter(&self.game.world) {
@@ -1196,7 +1226,8 @@ impl super::NetHackApp {
                     // 몬스터 감지 → Travel 중단
                     self.input.travel_path.clear();
                     let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
-                    if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                    if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                    {
                         log.add_colored(
                             "You stop traveling. A monster is nearby!",
                             [255, 200, 100],
@@ -1292,18 +1323,23 @@ impl super::NetHackApp {
                         };
 
                     let action = {
-                        let identity = self.game.resources
-                            .get::<crate::core::entity::identity::IdentityTable>()
-                            .unwrap();
-                        crate::ui::widgets::inventory::show_inventory(
-                            ui,
-                            &self.game.world,
-                            inv,
-                            equip,
-                            &self.game.assets.items,
-                            &identity,
-                            looting_container,
-                        )
+                        if let Some(identity) =
+                            self.game
+                                .resources
+                                .get::<crate::core::entity::identity::IdentityTable>()
+                        {
+                            crate::ui::widgets::inventory::show_inventory(
+                                ui,
+                                &self.game.world,
+                                inv,
+                                equip,
+                                &self.game.assets.items,
+                                &identity,
+                                looting_container,
+                            )
+                        } else {
+                            None
+                        }
                     };
 
                     if let Some(action) = action {
@@ -1318,22 +1354,25 @@ impl super::NetHackApp {
             egui::Window::new("Looting").show(ctx, |ui| {
                 if let Ok(entry) = self.game.world.entry_ref(container) {
                     if let Ok(inv) = entry.get_component::<crate::core::entity::Inventory>() {
-                        let identity = self.game.resources
+                        let identity = self
+                            .game
+                            .resources
                             .get::<crate::core::entity::identity::IdentityTable>()
-                            .map(|id| (*id).clone())
-                            .unwrap();
-                        if let Some(action) = crate::ui::widgets::loot::show_loot_menu(
-                            ui,
-                            &self.game.world,
-                            container,
-                            inv,
-                            &self.game.assets.items,
-                            &identity,
-                        ) {
-                            self.game.resources.insert(Some(action));
-                        }
-                    }
-                }
+                            .map(|id| (*id).clone());
+                        if let Some(identity) = identity {
+                            if let Some(action) = crate::ui::widgets::loot::show_loot_menu(
+                                ui,
+                                &self.game.world,
+                                container,
+                                inv,
+                                &self.game.assets.items,
+                                &identity,
+                            ) {
+                                self.game.resources.insert(Some(action));
+                            }
+                        } // if let Some(identity)
+                    } // if let Ok(inv)
+                } // if let Ok(entry)
 
                 if ui.button("Close").clicked() {
                     self.input.game_state = GameState::Normal;
@@ -1371,17 +1410,20 @@ impl super::NetHackApp {
                         <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
                     let mut selected = None;
                     for inv in query.iter(&self.game.world) {
-                        let identity = self.game.resources
-                            .get::<crate::core::entity::identity::IdentityTable>()
-                            .unwrap();
-                        selected = crate::ui::widgets::inventory::show_naming_selector(
-                            ui,
-                            &self.game.world,
-                            inv,
-                            &self.game.assets.items,
-                            &identity,
-                        );
-                    }
+                        if let Some(identity) =
+                            self.game
+                                .resources
+                                .get::<crate::core::entity::identity::IdentityTable>()
+                        {
+                            selected = crate::ui::widgets::inventory::show_naming_selector(
+                                ui,
+                                &self.game.world,
+                                inv,
+                                &self.game.assets.items,
+                                &identity,
+                            );
+                        } // if let Some(identity)
+                    } // for inv
                     if let Some(target) = selected {
                         self.input.game_state = GameState::Naming {
                             entity: Some(target),
@@ -1407,10 +1449,11 @@ impl super::NetHackApp {
                                     if let Ok(item) = entry.get_component::<crate::core::entity::Item>() {
                                         if let Some(template) = self.game.assets.items.get_by_kind(item.kind) {
                                             if let Some(desc) = crate::core::systems::item_helper::ItemHelper::get_description(item, template) {
-                                                let mut ident_table = self.game.resources.get_mut::<crate::core::entity::identity::IdentityTable>().unwrap();
-                                                if let Some(ident) = ident_table.mapping.get_mut(&desc) {
-                                                    ident.call_name = name_to_set;
-                                                }
+                                                if let Some(mut ident_table) = self.game.resources.get_mut::<crate::core::entity::identity::IdentityTable>() {
+                                                    if let Some(ident) = ident_table.mapping.get_mut(&desc) {
+                                                        ident.call_name = name_to_set;
+                                                    }
+                                                } // if let Some(mut ident_table)
                                             }
                                         }
                                     }
@@ -1430,17 +1473,18 @@ impl super::NetHackApp {
                                     let mut p_query = <&crate::core::entity::player::Player>::query().filter(component::<PlayerTag>());
                                     let player_opt = p_query.iter(&self.game.world).next().cloned();
                                     if let Some(player) = player_opt {
-                                        let mut log = self.game.resources.get_mut::<crate::ui::log::GameLog>().unwrap();
-                                        let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
-                                        crate::core::systems::artifact::ArtifactSystem::try_artifact_promotion(
-                                            target,
-                                            n,
-                                            &mut self.game.world,
-                                            &self.game.assets,
-                                            &player,
-                                            &mut log,
-                                            turn,
-                                        );
+                                        if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                                            let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
+                                            crate::core::systems::artifact::ArtifactSystem::try_artifact_promotion(
+                                                target,
+                                                n,
+                                                &mut self.game.world,
+                                                &self.game.assets,
+                                                &player,
+                                                &mut log,
+                                                turn,
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -1465,16 +1509,19 @@ impl super::NetHackApp {
                     <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
                 let mut selected = None;
                 for inv in query.iter(&self.game.world) {
-                    let identity = self.game.resources
+                    if let Some(identity) = self
+                        .game
+                        .resources
                         .get::<crate::core::entity::identity::IdentityTable>()
-                        .unwrap();
-                    selected = crate::ui::widgets::inventory::show_invoke_selector(
-                        ui,
-                        &self.game.world,
-                        inv,
-                        &self.game.assets.items,
-                        &identity,
-                    );
+                    {
+                        selected = crate::ui::widgets::inventory::show_invoke_selector(
+                            ui,
+                            &self.game.world,
+                            inv,
+                            &self.game.assets.items,
+                            &identity,
+                        );
+                    }
                 }
 
                 if let Some(target) = selected {
@@ -1482,16 +1529,19 @@ impl super::NetHackApp {
                     let player_ent = p_query.iter(&self.game.world).next().cloned();
 
                     if let Some(p_entity) = player_ent {
-                        let mut log = self.game.resources.get_mut::<crate::ui::log::GameLog>().unwrap();
-                        let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
-                        crate::core::systems::artifact::ArtifactSystem::invoke_artifact(
-                            target,
-                            &mut self.game.world,
-                            &self.game.assets,
-                            p_entity,
-                            &mut log,
-                            turn,
-                        );
+                        if let Some(mut log) =
+                            self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                        {
+                            let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
+                            crate::core::systems::artifact::ArtifactSystem::invoke_artifact(
+                                target,
+                                &mut self.game.world,
+                                &self.game.assets,
+                                p_entity,
+                                &mut log,
+                                turn,
+                            );
+                        } // if let Some(mut log)
                     }
                     self.input.game_state = GameState::Normal;
                 }
@@ -1550,7 +1600,8 @@ impl super::NetHackApp {
 
                 if advanced {
                     let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
-                    if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                    if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                    {
                         log.add("You feel more confident in your skills.", turn);
                     }
                 }
@@ -1577,10 +1628,14 @@ impl super::NetHackApp {
                         )>::query(
                         ));
 
-                        if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                        if let Some(mut log) =
+                            self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                        {
                             let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
-                            if let Some(mut rng) =
-                                self.game.resources.get_mut::<crate::util::rng::NetHackRng>()
+                            if let Some(mut rng) = self
+                                .game
+                                .resources
+                                .get_mut::<crate::util::rng::NetHackRng>()
                             {
                                 crate::core::systems::fountain::try_drink_fountain(
                                     &mut subworld,
@@ -1606,26 +1661,29 @@ impl super::NetHackApp {
         if self.input.game_state == GameState::SelectOffhand {
             let mut selected_action = None;
             egui::Window::new("Dual Wield").show(ctx, |ui| {
-                let ident_table = self.game.resources
-                    .get::<crate::core::entity::identity::IdentityTable>()
-                    .unwrap();
-                let mut query =
-                    <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
-                for inv in query.iter(&self.game.world) {
-                    if let Some(action) = crate::ui::widgets::inventory::show_offhand_selector(
-                        ui,
-                        &self.game.world,
-                        inv,
-                        &self.game.assets.items,
-                        &ident_table,
-                    ) {
-                        selected_action = Some(action);
+                let ident_table_opt = self
+                    .game
+                    .resources
+                    .get::<crate::core::entity::identity::IdentityTable>();
+                if let Some(ident_table) = ident_table_opt {
+                    let mut query =
+                        <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
+                    for inv in query.iter(&self.game.world) {
+                        if let Some(action) = crate::ui::widgets::inventory::show_offhand_selector(
+                            ui,
+                            &self.game.world,
+                            inv,
+                            &self.game.assets.items,
+                            &ident_table,
+                        ) {
+                            selected_action = Some(action);
+                        }
                     }
-                }
 
-                if ui.button("Cancel").clicked() {
-                    self.input.game_state = GameState::Normal;
-                }
+                    if ui.button("Cancel").clicked() {
+                        self.input.game_state = GameState::Normal;
+                    }
+                } // if let Some(ident_table)
             });
 
             if let Some(action) = selected_action {
@@ -1638,26 +1696,29 @@ impl super::NetHackApp {
         if self.input.game_state == GameState::SelectQuiver {
             let mut selected_action = None;
             egui::Window::new("Quiver Selection").show(ctx, |ui| {
-                let ident_table = self.game.resources
-                    .get::<crate::core::entity::identity::IdentityTable>()
-                    .unwrap();
-                let mut query =
-                    <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
-                for inv in query.iter(&self.game.world) {
-                    if let Some(action) = crate::ui::widgets::inventory::show_quiver_selector(
-                        ui,
-                        &self.game.world,
-                        inv,
-                        &self.game.assets.items,
-                        &ident_table,
-                    ) {
-                        selected_action = Some(action);
+                let ident_table_opt = self
+                    .game
+                    .resources
+                    .get::<crate::core::entity::identity::IdentityTable>();
+                if let Some(ident_table) = ident_table_opt {
+                    let mut query =
+                        <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
+                    for inv in query.iter(&self.game.world) {
+                        if let Some(action) = crate::ui::widgets::inventory::show_quiver_selector(
+                            ui,
+                            &self.game.world,
+                            inv,
+                            &self.game.assets.items,
+                            &ident_table,
+                        ) {
+                            selected_action = Some(action);
+                        }
                     }
-                }
 
-                if ui.button("Cancel").clicked() {
-                    self.input.game_state = GameState::Normal;
-                }
+                    if ui.button("Cancel").clicked() {
+                        self.input.game_state = GameState::Normal;
+                    }
+                } // if let Some(ident_table)
             });
 
             if let Some(action) = selected_action {
@@ -1670,26 +1731,29 @@ impl super::NetHackApp {
         if self.input.game_state == GameState::OfferSelection {
             let mut selected_action = None;
             egui::Window::new("Sacrifice Corpse").show(ctx, |ui| {
-                let ident_table = self.game.resources
-                    .get::<crate::core::entity::identity::IdentityTable>()
-                    .unwrap();
-                let mut query =
-                    <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
-                for inv in query.iter(&self.game.world) {
-                    if let Some(action) = crate::ui::widgets::inventory::show_offer_selector(
-                        ui,
-                        &self.game.world,
-                        inv,
-                        &self.game.assets.items,
-                        &ident_table,
-                    ) {
-                        selected_action = Some(action);
+                let ident_table_opt = self
+                    .game
+                    .resources
+                    .get::<crate::core::entity::identity::IdentityTable>();
+                if let Some(ident_table) = ident_table_opt {
+                    let mut query =
+                        <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
+                    for inv in query.iter(&self.game.world) {
+                        if let Some(action) = crate::ui::widgets::inventory::show_offer_selector(
+                            ui,
+                            &self.game.world,
+                            inv,
+                            &self.game.assets.items,
+                            &ident_table,
+                        ) {
+                            selected_action = Some(action);
+                        }
                     }
-                }
 
-                if ui.button("Cancel").clicked() {
-                    self.input.game_state = GameState::Normal;
-                }
+                    if ui.button("Cancel").clicked() {
+                        self.input.game_state = GameState::Normal;
+                    }
+                } // if let Some(ident_table)
             });
 
             if let Some(action) = selected_action {
@@ -1702,25 +1766,30 @@ impl super::NetHackApp {
         if self.input.game_state == GameState::SelectEngraveTool {
             let mut selected_tool = None;
             egui::Window::new("Engrave Tool").show(ctx, |ui| {
-                let ident_table = self.game.resources
-                    .get::<crate::core::entity::identity::IdentityTable>()
-                    .unwrap();
-                let mut query =
-                    <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
-                for inv in query.iter(&self.game.world) {
-                    if let Some(tool) = crate::ui::widgets::inventory::show_engrave_tool_selector(
-                        ui,
-                        &self.game.world,
-                        inv,
-                        &self.game.assets.items,
-                        &ident_table,
-                    ) {
-                        selected_tool = Some(tool);
+                let ident_table_opt = self
+                    .game
+                    .resources
+                    .get::<crate::core::entity::identity::IdentityTable>();
+                if let Some(ident_table) = ident_table_opt {
+                    let mut query =
+                        <&crate::core::entity::Inventory>::query().filter(component::<PlayerTag>());
+                    for inv in query.iter(&self.game.world) {
+                        if let Some(tool) =
+                            crate::ui::widgets::inventory::show_engrave_tool_selector(
+                                ui,
+                                &self.game.world,
+                                inv,
+                                &self.game.assets.items,
+                                &ident_table,
+                            )
+                        {
+                            selected_tool = Some(tool);
+                        }
                     }
-                }
-                if ui.button("Cancel").clicked() {
-                    self.input.game_state = GameState::Normal;
-                }
+                    if ui.button("Cancel").clicked() {
+                        self.input.game_state = GameState::Normal;
+                    }
+                } // if let Some(ident_table)
             });
 
             if let Some(tool) = selected_tool {
@@ -1738,37 +1807,39 @@ impl super::NetHackApp {
                 {
                     let text = self.input.engraving_input.clone();
                     let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
-                    let mut log = self.game.resources.get_mut::<crate::ui::log::GameLog>().unwrap();
-                    let mut p_pos = (0, 0);
-                    let mut query = <&Position>::query().filter(component::<PlayerTag>());
-                    for pos in query.iter(&self.game.world) {
-                        p_pos = (pos.x, pos.y);
+                    let mut log_opt = self.game.resources.get_mut::<crate::ui::log::GameLog>();
+                    if let Some(mut log) = log_opt {
+                        let mut p_pos = (0, 0);
+                        let mut query = <&Position>::query().filter(component::<PlayerTag>());
+                        for pos in query.iter(&self.game.world) {
+                            p_pos = (pos.x, pos.y);
+                        }
+
+                        // World를 SubWorld로 사용
+                        let eng_type = crate::core::systems::engrave::get_engrave_type(
+                            tool,
+                            &self.game.world,
+                            &self.game.assets,
+                        );
+                        crate::core::systems::engrave::engrave_at(
+                            &text,
+                            eng_type,
+                            p_pos,
+                            &mut self.game.grid,
+                            &mut log,
+                            turn,
+                        );
+
+                        self.input.engraving_input.clear();
+                        self.input.game_state = GameState::Normal;
+
+                        //
+                        if let Some(mut t) = self.game.resources.get_mut::<u64>() {
+                            *t += 1;
+                            log.current_turn = *t;
+                        }
                     }
-
-                    // World를 SubWorld로 사용
-                    let eng_type = crate::core::systems::engrave::get_engrave_type(
-                        tool,
-                        &self.game.world,
-                        &self.game.assets,
-                    );
-                    crate::core::systems::engrave::engrave_at(
-                        &text,
-                        eng_type,
-                        p_pos,
-                        &mut self.game.grid,
-                        &mut log,
-                        turn,
-                    );
-
-                    self.input.engraving_input.clear();
-                    self.input.game_state = GameState::Normal;
-
-                    //
-                    if let Some(mut t) = self.game.resources.get_mut::<u64>() {
-                        *t += 1;
-                        log.current_turn = *t;
-                    }
-                }
+                } // if let Some(mut log)
                 if ui.button("Cancel").clicked() {
                     self.input.engraving_input.clear();
                     self.input.game_state = GameState::Normal;

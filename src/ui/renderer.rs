@@ -19,7 +19,7 @@ impl HybridRenderer {
     pub fn new() -> Self {
         //
         let backend = TestBackend::new(COLNO as u16, ROWNO as u16);
-        let terminal = Terminal::new(backend).unwrap();
+        let terminal = Terminal::new(backend).expect("[R8] 터미널 백엔드 초기화 실패");
 
         Self { terminal }
     }
@@ -130,7 +130,7 @@ impl HybridRenderer {
                     }
                 }
             })
-            .unwrap();
+            .expect("[R8] 터미널 프레임 렌더링 실패");
     }
 }
 

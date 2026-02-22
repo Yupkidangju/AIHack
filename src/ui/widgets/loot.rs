@@ -78,29 +78,30 @@ pub fn show_loot_menu(
                 for item_ent in item_entities {
                     if let Ok(entry) = world.entry_ref(item_ent) {
                         if let Ok(item) = entry.get_component::<Item>() {
-                            let template = item_manager.get_by_kind(item.kind).unwrap();
-                            let display_name =
-                                ItemHelper::get_name(item, template, Some(ident_table));
+                            if let Some(template) = item_manager.get_by_kind(item.kind) {
+                                let display_name =
+                                    ItemHelper::get_name(item, template, Some(ident_table));
 
-                            ui.horizontal(|ui| {
-                                ui.label(display_name);
+                                ui.horizontal(|ui| {
+                                    ui.label(display_name);
 
-                                ui.with_layout(
-                                    eframe::egui::Layout::right_to_left(
-                                        eframe::egui::Align::Center,
-                                    ),
-                                    |ui| {
-                                        if ui.button("Take").clicked() {
-                                            pending_action = Some(ItemAction::TakeOut {
-                                                container: container_ent,
-                                                item: item_ent,
-                                            });
-                                        }
-                                    },
-                                );
-                            });
-                        }
-                    }
+                                    ui.with_layout(
+                                        eframe::egui::Layout::right_to_left(
+                                            eframe::egui::Align::Center,
+                                        ),
+                                        |ui| {
+                                            if ui.button("Take").clicked() {
+                                                pending_action = Some(ItemAction::TakeOut {
+                                                    container: container_ent,
+                                                    item: item_ent,
+                                                });
+                                            }
+                                        },
+                                    );
+                                });
+                            } // if let Some(template)
+                        } // if let Ok(item)
+                    } // if let Ok(entry)
                 }
             }
         }

@@ -311,21 +311,21 @@ impl MHitM {
         if mdef_t_name.is_none() || magr_t_name.is_none() {
             return 0;
         }
-        let mdef_t = if let Some(t) = assets
-            .monsters
-            .templates
-            .get(mdef_t_name.as_ref().unwrap().as_str())
-        {
-            t
+        let mdef_t = if let Some(ref name) = mdef_t_name {
+            if let Some(t) = assets.monsters.templates.get(name.as_str()) {
+                t
+            } else {
+                return 0;
+            }
         } else {
             return 0;
         };
-        let magr_t = if let Some(t) = assets
-            .monsters
-            .templates
-            .get(magr_t_name.as_ref().unwrap().as_str())
-        {
-            t
+        let magr_t = if let Some(ref name) = magr_t_name {
+            if let Some(t) = assets.monsters.templates.get(name.as_str()) {
+                t
+            } else {
+                return 0;
+            }
         } else {
             return 0;
         };

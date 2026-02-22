@@ -616,12 +616,18 @@ pub static RACES: &[RaceData] = &[
 
 ///
 pub fn get_role_data(role: Role) -> &'static RoleData {
-    ROLES.iter().find(|r| r.role == role).unwrap()
+    ROLES
+        .iter()
+        .find(|r| r.role == role)
+        .expect("[R8] 정적 ROLES 배열에 누락된 직업")
 }
 
 ///
 pub fn get_race_data(race: Race) -> &'static RaceData {
-    RACES.iter().find(|r| r.race == race).unwrap()
+    RACES
+        .iter()
+        .find(|r| r.race == race)
+        .expect("[R8] 정적 RACES 배열에 누락된 종족")
 }
 
 ///
@@ -780,7 +786,6 @@ impl Default for AppState {
         AppState::Title
     }
 }
-
 
 // ============================================================
 // 7. 직업별 표시 문자 (AIHack UI용)

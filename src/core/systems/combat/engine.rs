@@ -287,9 +287,11 @@ impl CombatEngine {
             tmp += Self::weapon_dam_bonus(player, None);
 
             //
-        } else {
-            let (w_inst, w_tmpl) = weapon.unwrap();
+        } else if let Some((w_inst, w_tmpl)) = weapon {
             tmp = Self::dmgval(rng, player, w_inst, w_tmpl, monster, offhand_attack);
+        } else {
+            // [R8] weapon.is_none()은 위에서 처리됨 — 여기에 도달 불가
+            tmp = 1;
         }
 
         // 로그의 배후 공격 (uhitm.c:775)

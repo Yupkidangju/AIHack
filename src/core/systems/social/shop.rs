@@ -1,5 +1,6 @@
 // Copyright 2026 Yupkidangju. Licensed under Apache-2.0.
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
+use super::InteractionProvider; // [R8-3] trait 메서드 접근용
 use crate::core::dungeon::Grid;
 use crate::core::entity::{Inventory, Item, PlayerTag, Position, ShopkeeperTag};
 use crate::ui::log::GameLog;
@@ -9,8 +10,12 @@ use legion::world::SubWorld;
 use legion::*;
 
 /// 상점(Shop) 시스템
-///
-pub fn try_pay(world: &mut SubWorld, log: &mut GameLog) -> bool {
+/// [v2.20.0 R8-3] InteractionProvider 경유로 상점 대사 생성
+pub fn try_pay(
+    world: &mut SubWorld,
+    log: &mut GameLog,
+    provider: &dyn super::InteractionProvider,
+) -> bool {
     //
     let (mut gold, inv_items, _cha) = {
         let mut p_query = <(&mut crate::core::entity::player::Player, &Inventory)>::query()
@@ -28,14 +33,19 @@ pub fn try_pay(world: &mut SubWorld, log: &mut GameLog) -> bool {
     collect_unpaid_recursive(world, &inv_items, &mut total_due, &mut items_to_pay);
 
     if total_due == 0 {
-        log.add("You don't owe anything.", log.current_turn);
+        // [R8-3] provider 경유 대사
+        log.add(
+            provider.generate_shop_reaction("nothing_owed", "Shopkeeper", 0),
+            log.current_turn,
+        );
         return false;
     }
 
     if gold >= total_due as u64 {
         gold -= total_due as u64;
+        // [R8-3] provider 경유 대사
         log.add(
-            format!("You pay {} gold for your purchases.", total_due),
+            provider.generate_shop_reaction("paid", "Shopkeeper", total_due as i64),
             log.current_turn,
         );
 
@@ -56,8 +66,9 @@ pub fn try_pay(world: &mut SubWorld, log: &mut GameLog) -> bool {
         }
         return true;
     } else {
+        // [R8-3] provider 경유 대사
         log.add(
-            format!("You don't have enough gold! (Due: {} gold)", total_due),
+            provider.generate_shop_reaction("too_poor", "Shopkeeper", total_due as i64),
             log.current_turn,
         );
         return false;
@@ -65,7 +76,12 @@ pub fn try_pay(world: &mut SubWorld, log: &mut GameLog) -> bool {
 }
 
 ///
-pub fn try_identify_service(world: &mut SubWorld, log: &mut GameLog, turn: u64) -> bool {
+pub fn try_identify_service(
+    world: &mut SubWorld,
+    log: &mut GameLog,
+    turn: u64,
+    provider: &dyn super::InteractionProvider,
+) -> bool {
     let mut player_pos = Position { x: 0, y: 0 };
     let mut gold = 0;
 
@@ -97,14 +113,17 @@ pub fn try_identify_service(world: &mut SubWorld, log: &mut GameLog, turn: u64) 
     }
 
     if !shk_found {
-        log.add("There is no shopkeeper nearby to provide services.", turn);
+        log.add(
+            provider.generate_shop_reaction("no_shopkeeper", "", 0),
+            turn,
+        );
         return false;
     }
 
     let id_cost = 500;
     if gold < id_cost {
         log.add(
-            format!("Identification costs {} gold. You are too poor.", id_cost),
+            provider.generate_shop_reaction("too_poor", "Shopkeeper", id_cost as i64),
             turn,
         );
         return false;
@@ -128,7 +147,10 @@ pub fn try_identify_service(world: &mut SubWorld, log: &mut GameLog, turn: u64) 
                     item.bknown = true;
                     identified = true;
 
-                    log.add(format!("The shopkeeper identifies an item for you."), turn);
+                    log.add(
+                        provider.generate_shop_reaction("identify", "Shopkeeper", 0),
+                        turn,
+                    );
                     break;
                 }
             }
@@ -164,6 +186,7 @@ pub fn shopkeeper_update(
     #[resource] log: &mut GameLog,
     #[resource] turn: &u64,
     #[resource] rng: &mut NetHackRng,
+    #[resource] provider: &super::DefaultInteractionProvider,
     command_buffer: &mut legion::systems::CommandBuffer,
 ) {
     //
@@ -194,11 +217,14 @@ pub fn shopkeeper_update(
             if dist_sq < 9 && rng.rn2(10) == 0 {
                 if has_unpaid_player {
                     log.add(
-                        format!("{}: \"Please pay before leaving!\"", sk_mon.kind),
+                        provider.generate_shop_reaction("pay_reminder", sk_mon.kind.as_str(), 0),
                         *turn,
                     );
                 } else {
-                    log.add(format!("{}: \"Welcome to my shop!\"", sk_mon.kind), *turn);
+                    log.add(
+                        provider.generate_shop_reaction("welcome", sk_mon.kind.as_str(), 0),
+                        *turn,
+                    );
                 }
             }
 
@@ -258,7 +284,7 @@ pub fn shopkeeper_update(
         // 3. 도둑질 즉각 판정 (상점을 이미 벗어난 경우)
         if !u_in_shop && !sk_mon.hostile {
             if has_unpaid_player {
-                stop_thief(*sk_ent, sk_mon, log, *turn, command_buffer);
+                stop_thief(*sk_ent, sk_mon, log, *turn, command_buffer, provider);
             }
         }
     }
@@ -292,8 +318,14 @@ fn stop_thief(
     log: &mut GameLog,
     turn: u64,
     command_buffer: &mut CommandBuffer,
+    provider: &dyn super::InteractionProvider,
 ) {
-    log.add_colored("The shopkeeper yells: 'Stop, thief!'", [255, 50, 50], turn);
+    // [R8-3] provider 경유 대사
+    log.add_colored(
+        provider.generate_shop_reaction("thief", sk_mon.kind.as_str(), 0),
+        [255, 50, 50],
+        turn,
+    );
     let mut new_mon = sk_mon.clone();
     new_mon.hostile = true;
     command_buffer.add_component(sk_ent, new_mon);

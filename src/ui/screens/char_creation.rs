@@ -276,7 +276,7 @@ fn render_race_selection(
     choices: &mut CharCreationChoices,
     step: &mut CharCreationStep,
 ) {
-    let role = choices.role.expect("Role must be selected");
+    let Some(role) = choices.role else { return };
     let valid_races = valid_races_for_role(role);
 
     ui.label(
@@ -327,7 +327,7 @@ fn render_gender_selection(
     choices: &mut CharCreationChoices,
     step: &mut CharCreationStep,
 ) {
-    let role = choices.role.expect("Role must be selected");
+    let Some(role) = choices.role else { return };
     let valid_genders = valid_genders_for_role(role);
 
     ui.label(
@@ -384,8 +384,8 @@ fn render_alignment_selection(
     choices: &mut CharCreationChoices,
     step: &mut CharCreationStep,
 ) {
-    let role = choices.role.expect("Role must be selected");
-    let race = choices.race.expect("Race must be selected");
+    let Some(role) = choices.role else { return };
+    let Some(race) = choices.race else { return };
     let valid_aligns = valid_alignments_for(role, race);
 
     ui.label(
@@ -515,8 +515,12 @@ fn render_confirmation(ui: &mut egui::Ui, choices: &CharCreationChoices) -> bool
     ui.add_space(15.0);
 
     //
-    let role = choices.role.unwrap();
-    let race = choices.race.unwrap();
+    let Some(role) = choices.role else {
+        return false;
+    };
+    let Some(race) = choices.race else {
+        return false;
+    };
     let role_data = get_role_data(role);
     let race_data = get_race_data(race);
     let stats = &role_data.base_stats;
@@ -544,8 +548,14 @@ fn render_confirmation(ui: &mut egui::Ui, choices: &CharCreationChoices) -> bool
             ui.label(
                 egui::RichText::new(format!(
                     "Gender: {}  |  Alignment: {}",
-                    choices.gender.unwrap(),
-                    choices.alignment.unwrap(),
+                    choices
+                        .gender
+                        .map(|g| format!("{}", g))
+                        .unwrap_or_else(|| "???".to_string()),
+                    choices
+                        .alignment
+                        .map(|a| format!("{}", a))
+                        .unwrap_or_else(|| "???".to_string()),
                 ))
                 .size(14.0)
                 .color(egui::Color32::from_rgb(180, 180, 200)),
@@ -642,31 +652,37 @@ fn random_fill_current_step(step: &mut CharCreationStep, choices: &mut CharCreat
             *step = CharCreationStep::SelectRace;
         }
         CharCreationStep::SelectRace => {
-            let valid = valid_races_for_role(choices.role.unwrap());
-            if !valid.is_empty() {
-                let idx = rng.gen_range(0..valid.len());
-                choices.race = Some(valid[idx]);
-                choices.gender = None;
-                choices.alignment = None;
-                *step = CharCreationStep::SelectGender;
-            }
+            if let Some(role) = choices.role {
+                let valid = valid_races_for_role(role);
+                if !valid.is_empty() {
+                    let idx = rng.gen_range(0..valid.len());
+                    choices.race = Some(valid[idx]);
+                    choices.gender = None;
+                    choices.alignment = None;
+                    *step = CharCreationStep::SelectGender;
+                }
+            } // if let Some(role)
         }
         CharCreationStep::SelectGender => {
-            let valid = valid_genders_for_role(choices.role.unwrap());
-            if !valid.is_empty() {
-                let idx = rng.gen_range(0..valid.len());
-                choices.gender = Some(valid[idx]);
-                choices.alignment = None;
-                *step = CharCreationStep::SelectAlignment;
-            }
+            if let Some(role) = choices.role {
+                let valid = valid_genders_for_role(role);
+                if !valid.is_empty() {
+                    let idx = rng.gen_range(0..valid.len());
+                    choices.gender = Some(valid[idx]);
+                    choices.alignment = None;
+                    *step = CharCreationStep::SelectAlignment;
+                }
+            } // if let Some(role)
         }
         CharCreationStep::SelectAlignment => {
-            let valid = valid_alignments_for(choices.role.unwrap(), choices.race.unwrap());
-            if !valid.is_empty() {
-                let idx = rng.gen_range(0..valid.len());
-                choices.alignment = Some(valid[idx]);
-                *step = CharCreationStep::EnterName;
-            }
+            if let (Some(role), Some(race)) = (choices.role, choices.race) {
+                let valid = valid_alignments_for(role, race);
+                if !valid.is_empty() {
+                    let idx = rng.gen_range(0..valid.len());
+                    choices.alignment = Some(valid[idx]);
+                    *step = CharCreationStep::EnterName;
+                }
+            } // if let (Some(role), Some(race))
         }
         _ => {}
     }
