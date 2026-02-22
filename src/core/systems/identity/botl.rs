@@ -52,7 +52,7 @@ pub struct StatusLine2 {
     pub con: i32,
     pub int: i32,
     pub wis: i32,
-    pub cha: i32,                         // 留ㅻ젰
+    pub cha: i32, // 留ㅻ젰
     pub alignment: Alignment,
     pub hunger: HungerState,
     pub conditions: Vec<StatusCondition>,
@@ -63,6 +63,7 @@ pub struct StatusLine2 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusCondition {
     Blind,
+    Deaf, // [R8-5] Deaf 추가
     Confused,
     Stunned,
     Hallucinating,
@@ -70,7 +71,7 @@ pub enum StatusCondition {
     Stoning,
     Strangled,
     FoodPoisoned,
-    TerminallyIll, // 吏덈퀝
+    TerminallyIll, // 질병
     Levitating,
     Flying,
     Riding,
@@ -210,6 +211,7 @@ fn hunger_str(hunger: HungerState) -> &'static str {
 fn condition_str(cond: StatusCondition) -> &'static str {
     match cond {
         StatusCondition::Blind => "Blind",
+        StatusCondition::Deaf => "Deaf",
         StatusCondition::Confused => "Conf",
         StatusCondition::Stunned => "Stun",
         StatusCondition::Hallucinating => "Hallu",
@@ -222,6 +224,59 @@ fn condition_str(cond: StatusCondition) -> &'static str {
         StatusCondition::Flying => "Fly",
         StatusCondition::Riding => "Ride",
     }
+}
+
+// =============================================================================
+// [v2.20.0 R8-5] bot_status_str 완전 직렬화 (classic NetHack format)
+// =============================================================================
+
+/// NetHack classic botl 직렬화 문자열 생성 (bot1(), bot2() 통합본)
+pub fn bot_status_str(s1: &StatusLine1, s2: &StatusLine2) -> (String, String) {
+    // bot1() format
+    let bot1 = format!(
+        "{} the {}      St:{} Dx:{} Co:{} In:{} Wi:{} Ch:{}  {}",
+        s1.rank,
+        s1.role_name,
+        s2.str_val,
+        s2.dex,
+        s2.con,
+        s2.int,
+        s2.wis,
+        s2.cha,
+        alignment_str(s2.alignment)
+    );
+
+    // bot2() format
+    let mut bot2 = format!(
+        "{}:{}  $:{}  HP:{}({}) Pw:{}({}) AC:{}  Exp:{}",
+        s1.dungeon_name,
+        s1.depth,
+        s1.gold,
+        s1.hp,
+        s1.hp_max,
+        s1.energy,
+        s1.energy_max,
+        s1.ac,
+        s1.level
+    );
+
+    if s2.turn > 0 {
+        bot2.push_str(&format!("  T:{}", s2.turn));
+    }
+
+    let hunger = hunger_str(s2.hunger);
+    if !hunger.is_empty() {
+        bot2.push_str(&format!("  {}", hunger));
+    }
+
+    for cond in &s2.conditions {
+        let cond_s = condition_str(*cond);
+        if !cond_s.is_empty() {
+            bot2.push_str(&format!("  {}", cond_s));
+        }
+    }
+
+    (bot1, bot2)
 }
 
 // =============================================================================
@@ -332,6 +387,9 @@ pub fn conditions_from_mask(mask: u32) -> Vec<StatusCondition> {
     }
     if mask & BL_MASK_BLIND != 0 {
         conds.push(StatusCondition::Blind);
+    }
+    if mask & BL_MASK_DEAF != 0 {
+        conds.push(StatusCondition::Deaf);
     }
     if mask & BL_MASK_STUN != 0 {
         conds.push(StatusCondition::Stunned);
@@ -656,6 +714,28 @@ pub fn detect_status_changes(
     events
 }
 
+/// [v2.20.0 R8-5] 개별 능력치/상태 증감 표시 (원본: stat_update)
+pub fn stat_update(event: &StatusChangeEvent) -> Option<String> {
+    match event {
+        StatusChangeEvent::LevelUp {
+            old_level,
+            new_level,
+        } => Some(format!("Level: {} -> {}", old_level, new_level)),
+        StatusChangeEvent::LevelDown {
+            old_level,
+            new_level,
+        } => Some(format!("Level: {} -> {}", old_level, new_level)),
+        StatusChangeEvent::AcChanged { old, new } => Some(format!("AC: {} -> {}", old, new)),
+        StatusChangeEvent::StrChanged { old, new } => Some(format!(
+            "Str: {} -> {}",
+            format_strength(*old),
+            format_strength(*new)
+        )),
+        // Hp, Pw, Gold 등은 보통 실시간으로 작게 바뀌므로 메시지로는 출력하지 않음 (선택적)
+        _ => None,
+    }
+}
+
 // =============================================================================
 // [v2.3.2
 // =============================================================================
@@ -850,11 +930,11 @@ pub fn hp_danger_color(danger: HpDanger) -> [u8; 3] {
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnergyLevel {
-    Empty,  // 0
+    Empty, // 0
     Low,
     Medium,
     High,
-    Full,   // 75%+
+    Full, // 75%+
 }
 
 ///

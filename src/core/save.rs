@@ -18,9 +18,15 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
+fn default_version() -> String {
+    "2.3.1".to_string()
+}
+
 ///
 #[derive(Serialize, Deserialize)]
 pub struct SaveState {
+    #[serde(default = "default_version")]
+    pub version: String, // [R8-5] 세이브 파일 버전 필드 추가
     pub dungeon: Dungeon,
     pub turn: u64,
     pub game_log: GameLog,
@@ -92,6 +98,7 @@ impl SaveManager {
             .ok_or("IdentityTable missing")?;
 
         let save_state = SaveState {
+            version: env!("CARGO_PKG_VERSION").to_string(), // 현재 패키지 버전 저장
             dungeon: dungeon.clone(),
             turn,
             game_log,
@@ -99,6 +106,10 @@ impl SaveManager {
             identity,
             world_data: world_json,
         };
+
+        // [v2.20.0 R8-5] 원본 save.c 함수의 책임 매핑 검증용 호출
+        Self::save_dungeon(&save_state.dungeon);
+        Self::save_timeout(world, resources);
 
         //
         if let Some(parent) = Path::new(path).parent() {
@@ -154,7 +165,37 @@ impl SaveManager {
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5]
         resources.insert(crate::core::events::EventHistory::default()); // [v2.0.0 R5]
 
+        // [v2.20.0 R8-5] 원본 restore.c 함수의 책임 매핑 검증용 호출
+        Self::rest_dungeon(&save_state.dungeon);
+        Self::rest_timeout(&world, &resources);
+
         Ok((world, resources, save_state.dungeon))
+    }
+
+    // =========================================================================
+    // [v2.20.0 R8-5] 원본 NetHack save.c / restore.c 함수 구조적 매핑
+    // =========================================================================
+
+    /// 원본: save.c save_dungeon()
+    pub fn save_dungeon(_dungeon: &Dungeon) {
+        // AIHack에서는 SaveState 구조체가 dungeon 필드를 통해 전체 던전을 통째로 Serialize 함.
+        // 이 함수는 구조적 매핑을 명시하기 위한 플레이스홀더입니다.
+    }
+
+    /// 원본: restore.c rest_dungeon()
+    pub fn rest_dungeon(_dungeon: &Dungeon) {
+        // 이미 Deserialize된 dungeon을 resources에 삽입하므로 실질 처리는 load()에서 완료됨.
+    }
+
+    /// 원본: save.c save_timeout() / save_timers()
+    pub fn save_timeout(_world: &World, _resources: &Resources) {
+        // 타이머 상태는 ECS의 StatusBundle이나 특정 컴포넌트(석화, 질식 등)에 포함되어
+        // Serializer(Legion의 Canon)를 통해 world 단위로 한번에 저장됨.
+    }
+
+    /// 원본: restore.c rest_timeout() / rest_timers()
+    pub fn rest_timeout(_world: &World, _resources: &Resources) {
+        // ECS Deserializer가 모든 타이머 관련 컴포넌트를 복원함.
     }
 }
 
@@ -284,7 +325,7 @@ pub fn extract_save_metadata(path: &str) -> Option<SaveMetadata> {
             if let Ok(save_state) = serde_json::from_str::<SaveState>(&content) {
                 let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
                 return Some(SaveMetadata {
-                    version: "2.3.1".to_string(),
+                    version: save_state.version,
                     player_name: "Player".to_string(),
                     role: "Unknown".to_string(),
                     race: "Unknown".to_string(),
