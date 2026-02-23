@@ -1,4 +1,4 @@
-// [v2.0.0 Phase R4] 생물 공통 시스템 (status + attrib + equipment + movement)
+﻿// [v2.0.0 Phase R4] 생물 공통 시스템 (status + attrib + equipment + movement)
 //
 
 pub mod attrib;
@@ -12,12 +12,15 @@ pub mod evolution;
 pub mod exper;
 pub mod exper_ext;
 pub mod movement;
+pub mod polymorph_ext;
 pub mod regeneration;
 pub mod rip_ext;
 pub mod sounds_ext;
 pub mod status;
 pub mod steed_ext;
 pub mod were_ext;
+pub mod worn_ext;
+pub mod end_ext;
 pub mod wield_ext;
 pub mod worm_ext;
 pub mod worn;
