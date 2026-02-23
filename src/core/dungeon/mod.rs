@@ -1,4 +1,5 @@
 pub mod dungeon;
+pub mod dungeon_ext;
 pub mod gen;
 pub mod mkroom;
 pub mod rect;
