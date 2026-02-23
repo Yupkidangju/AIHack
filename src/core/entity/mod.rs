@@ -1,10 +1,11 @@
-pub mod artifact;
+﻿pub mod artifact;
 pub mod capability; // [v2.0.0 R6] MonsterCapability + StatusCategory
 pub mod identity;
 pub mod mon;
 pub mod monster;
 pub mod object;
 pub mod object_data;
+pub mod mondata_ext;
 pub mod objnam;
 pub mod player;
 pub mod player_view; // [v2.0.0 R6] Player God Object 뷰 타입

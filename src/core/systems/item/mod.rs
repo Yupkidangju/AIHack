@@ -1,4 +1,4 @@
-// [v2.0.0 Phase R4] 아이템 사용/관리 시스템 (eat.c + read.c + potion.c + apply.c + zap.c + mkobj.c)
+﻿// [v2.0.0 Phase R4] 아이템 사용/관리 시스템 (eat.c + read.c + potion.c + apply.c + zap.c + mkobj.c)
 //
 
 pub mod apply;
@@ -13,6 +13,7 @@ pub mod item_use;
 pub mod loot;
 pub mod mkobj;
 pub mod objnam;
+pub mod objnam_ext;
 pub mod pickup;
 pub mod pickup_ext;
 pub mod potion;

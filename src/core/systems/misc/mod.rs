@@ -1,6 +1,7 @@
-// 기타 시스템 (artifact + luck + timeout + spell + role)
+﻿// 기타 시스템 (artifact + luck + timeout + spell + role)
 
 pub mod artifact;
+pub mod do_name_ext;
 pub mod invent_ext;
 pub mod inventory;
 pub mod luck;
