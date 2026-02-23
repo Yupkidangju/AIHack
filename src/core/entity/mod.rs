@@ -10,6 +10,7 @@ pub mod player;
 pub mod player_view; // [v2.0.0 R6] Player God Object 뷰 타입
 pub mod skills;
 pub mod spawn;
+pub mod spawn_ext;
 pub mod status;
 
 use legion::Entity;
