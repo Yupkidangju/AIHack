@@ -25,4 +25,5 @@ pub mod timeout_ext;
 pub mod trap;
 pub mod trap_ext;
 pub mod vision;
+pub mod vision_ext;
 pub mod vision_system;

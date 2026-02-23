@@ -8,6 +8,7 @@ pub mod explode;
 pub mod explode_ext;
 pub mod kick;
 pub mod mhitm;
+pub mod mhitm_ext;
 pub mod mhitu;
 pub mod mhitu_ext;
 pub mod mthrowu_ext;

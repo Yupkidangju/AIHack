@@ -8,6 +8,7 @@ pub mod priest_ext;
 pub mod quest_ext;
 pub mod shk_ext;
 pub mod shop;
+pub mod shop_ext;
 pub mod steal;
 pub mod steal_ext;
 pub mod talk;
