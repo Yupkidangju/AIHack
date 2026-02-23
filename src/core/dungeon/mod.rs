@@ -2,6 +2,7 @@
 pub mod dungeon_ext;
 pub mod mklev_ext;
 pub mod mkmaze_ext;
+pub mod mkroom_ext;
 pub mod gen;
 pub mod mkroom;
 pub mod rect;
