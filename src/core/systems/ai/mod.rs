@@ -1,4 +1,4 @@
-// [v2.0.0 Phase R4] 몬스터 AI 시스템 (monmove.c + dog.c + muse.c + mcastu.c + wizard.c)
+﻿// [v2.0.0 Phase R4] 몬스터 AI 시스템 (monmove.c + dog.c + muse.c + mcastu.c + wizard.c)
 //
 
 pub mod ai_helper;
@@ -12,6 +12,7 @@ pub mod dog;
 pub mod mcastu;
 pub mod monmove;
 pub mod muse;
+pub mod muse_ext;
 pub mod wizard;
 
 // [v2.0.0 R3] 기존 경로 호환: ai::XXX 접근 유지

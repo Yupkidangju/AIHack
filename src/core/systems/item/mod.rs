@@ -14,6 +14,7 @@ pub mod loot;
 pub mod mkobj;
 pub mod objnam;
 pub mod objnam_ext;
+pub mod o_init_ext;
 pub mod pickup;
 pub mod pickup_ext;
 pub mod potion;

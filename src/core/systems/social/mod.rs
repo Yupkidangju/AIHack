@@ -1,4 +1,4 @@
-//
+﻿//
 
 pub mod interaction;
 pub mod minion_ext;
@@ -6,6 +6,7 @@ pub mod pray;
 pub mod pray_ext;
 pub mod priest_ext;
 pub mod quest_ext;
+pub mod shk_ai_ext;
 pub mod shk_ext;
 pub mod shop;
 pub mod shop_ext;
