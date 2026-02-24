@@ -14,6 +14,7 @@ pub mod monmove;
 pub mod muse;
 pub mod muse_ext;
 pub mod track_ext;
+pub mod ai_brain_ext;
 pub mod mcastu_ext;
 pub mod wizard;
 

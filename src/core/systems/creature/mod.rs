@@ -12,6 +12,7 @@ pub mod evolution;
 pub mod exper;
 pub mod exper_ext;
 pub mod movement;
+pub mod armor_enhance_ext;
 pub mod polymorph_ext;
 pub mod regeneration;
 pub mod rip_ext;
