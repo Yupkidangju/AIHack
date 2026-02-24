@@ -20,6 +20,7 @@ pub mod gem_ext;
 pub mod o_init_ext;
 pub mod invent_sort_ext;
 pub mod potion_mix_ext;
+pub mod potion_quaff_ext;
 pub mod wish_ext;
 pub mod pickup;
 pub mod pickup_ext;

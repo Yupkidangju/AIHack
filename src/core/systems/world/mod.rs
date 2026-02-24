@@ -31,5 +31,6 @@ pub mod door_ext;
 pub mod fountain_effect_ext;
 pub mod engrave_calc_ext;
 pub mod light_source_ext;
+pub mod trap_detect_ext;
 pub mod vision_ext;
 pub mod vision_system;
