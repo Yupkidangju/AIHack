@@ -3,6 +3,8 @@
 
 pub mod artifact_combat_ext;
 pub mod dokick_ext;
+pub mod music_combat_ext;
+pub mod mthrowu_ext;
 pub mod theft_ext;
 pub mod dothrow_ext;
 pub mod engine;
@@ -13,7 +15,6 @@ pub mod mhitm;
 pub mod mhitm_ext;
 pub mod mhitu;
 pub mod mhitu_ext;
-pub mod mthrowu_ext;
 pub mod throw;
 pub mod uhitm;
 pub mod uhitm_ext;
