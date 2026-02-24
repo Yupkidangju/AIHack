@@ -20,6 +20,7 @@ pub mod sounds_ext;
 pub mod status;
 pub mod steed_ext;
 pub mod were_ext;
+pub mod experience_ext;
 pub mod stat_change_ext;
 pub mod worn_ext;
 pub mod end_ext;
