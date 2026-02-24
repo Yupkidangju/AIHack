@@ -14,6 +14,7 @@ pub mod loot;
 pub mod mkobj;
 pub mod objnam;
 pub mod objnam_ext;
+pub mod corpse_ext;
 pub mod gem_ext;
 pub mod o_init_ext;
 pub mod potion_mix_ext;
