@@ -4,6 +4,7 @@ pub mod input;
 pub mod layout;
 pub mod log;
 pub mod mouse;
+pub mod mapsymbol_ext;
 pub mod pline_ext;
 pub mod renderer;
 pub mod screens;

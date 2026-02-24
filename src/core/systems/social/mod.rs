@@ -7,6 +7,7 @@ pub mod pray_ext;
 pub mod priest_ext;
 pub mod quest_ext;
 pub mod priest_temple_ext;
+pub mod quest_branch_ext;
 pub mod questpgr_ext;
 pub mod shk_ai_ext;
 pub mod shk_price_ext;
