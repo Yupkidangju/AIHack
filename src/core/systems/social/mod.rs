@@ -9,6 +9,7 @@ pub mod quest_ext;
 pub mod priest_temple_ext;
 pub mod questpgr_ext;
 pub mod shk_ai_ext;
+pub mod shk_price_ext;
 pub mod shk_ext;
 pub mod shop;
 pub mod shop_ext;

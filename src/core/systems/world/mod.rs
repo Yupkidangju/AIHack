@@ -27,6 +27,7 @@ pub mod trap_ext;
 pub mod vision;
 pub mod altar_ext;
 pub mod door_ext;
+pub mod engrave_calc_ext;
 pub mod light_source_ext;
 pub mod vision_ext;
 pub mod vision_system;
