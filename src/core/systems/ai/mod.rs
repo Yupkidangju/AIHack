@@ -13,6 +13,8 @@ pub mod mcastu;
 pub mod monmove;
 pub mod muse;
 pub mod muse_ext;
+pub mod track_ext;
+pub mod mcastu_ext;
 pub mod wizard;
 
 // [v2.0.0 R3] 기존 경로 호환: ai::XXX 접근 유지

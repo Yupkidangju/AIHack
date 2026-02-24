@@ -1,7 +1,9 @@
-// [v2.0.0 Phase R4] 전투 시스템 (uhitm.c + mhitu.c + mhitm.c + weapon.c + throw.c + explode.c + kick.c)
+﻿// [v2.0.0 Phase R4] 전투 시스템 (uhitm.c + mhitu.c + mhitm.c + weapon.c + throw.c + explode.c + kick.c)
 //
 
+pub mod artifact_combat_ext;
 pub mod dokick_ext;
+pub mod theft_ext;
 pub mod dothrow_ext;
 pub mod engine;
 pub mod explode;
