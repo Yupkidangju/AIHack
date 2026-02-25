@@ -163,7 +163,7 @@ pub enum GameEvent {
 
     //
     ///
-    Message { text: String },
+    Message { text: String, priority: bool },
 }
 
 impl GameEvent {
@@ -242,7 +242,7 @@ impl GameEvent {
                 old_hp,
                 new_hp,
                 max_hp,
-            } => format!("{} HP: {} ??{} / {}.", target, old_hp, new_hp, max_hp),
+            } => format!("{} HP: {}→{} / {}.", target, old_hp, new_hp, max_hp),
             Self::Moved {
                 name, to_x, to_y, ..
             } => format!("{} moved to ({}, {}).", name, to_x, to_y),
@@ -266,7 +266,7 @@ impl GameEvent {
             Self::Prayed { result } => format!("Prayed. Result: {}.", result),
             Self::LevelUp { new_level } => format!("Leveled up to {}!", new_level),
             Self::ExperienceGained { amount } => format!("Gained {} XP.", amount),
-            Self::Message { text } => text.clone(),
+            Self::Message { text, .. } => text.clone(),
         }
     }
 }
@@ -275,10 +275,6 @@ impl GameEvent {
 //
 // =============================================================================
 
-///
-///
-///
-///
 ///
 #[derive(Debug, Default)]
 pub struct EventQueue {
