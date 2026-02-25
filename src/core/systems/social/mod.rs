@@ -80,3 +80,5 @@ impl InteractionProvider for DefaultInteractionProvider {
         format!("Here lies {}\nScore: {}\n{}", player_name, score, cause)
     }
 }
+
+pub mod shop_stock_ext;
