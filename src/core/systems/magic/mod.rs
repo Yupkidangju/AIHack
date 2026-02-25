@@ -10,3 +10,6 @@ pub mod spell_ext;
 pub mod teleport_ext;
 
 pub mod recharge_ext;
+
+pub mod spell_school_ext;
+pub mod wand_effect_ext;

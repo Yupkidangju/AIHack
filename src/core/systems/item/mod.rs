@@ -17,6 +17,7 @@ pub mod objnam_ext;
 pub mod buc_spread_ext;
 pub mod container_ext;
 pub mod corpse_ext;
+pub mod curse_system_ext;
 pub mod food_spoil_ext;
 pub mod gem_ext;
 pub mod o_init_ext;

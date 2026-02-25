@@ -4,6 +4,7 @@
 pub mod area_attack_ext;
 pub mod elemental_ext;
 pub mod artifact_combat_ext;
+pub mod artifact_table_ext;
 pub mod dokick_ext;
 pub mod music_combat_ext;
 pub mod mthrowu_ext;
