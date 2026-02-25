@@ -10,3 +10,5 @@ pub mod role;
 pub mod save;
 pub mod save_ext;
 pub mod systems;
+
+pub mod game_state_ext;

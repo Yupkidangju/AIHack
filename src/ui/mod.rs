@@ -4,6 +4,7 @@ pub mod input;
 pub mod layout;
 pub mod log;
 pub mod mouse;
+pub mod glyph_ext;
 pub mod keybind_ext;
 pub mod mapsymbol_ext;
 pub mod memory_map_ext;

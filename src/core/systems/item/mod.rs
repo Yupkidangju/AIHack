@@ -19,6 +19,7 @@ pub mod container_ext;
 pub mod corpse_ext;
 pub mod curse_system_ext;
 pub mod food_spoil_ext;
+pub mod identify_ext;
 pub mod gem_ext;
 pub mod o_init_ext;
 pub mod invent_sort_ext;
