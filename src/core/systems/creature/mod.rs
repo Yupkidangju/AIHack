@@ -13,6 +13,7 @@ pub mod exper;
 pub mod exper_ext;
 pub mod movement;
 pub mod accessory_ext;
+pub mod armor_data_ext;
 pub mod armor_enhance_ext;
 pub mod death_check_ext;
 pub mod polymorph_ext;
@@ -193,3 +194,5 @@ pub trait DamageReceiver {
     /// 사망 처리
     fn on_death(&mut self);
 }
+
+pub mod unique_mon_ext;

@@ -15,6 +15,7 @@ pub mod mkobj;
 pub mod objnam;
 pub mod objnam_ext;
 pub mod buc_spread_ext;
+pub mod container_ext;
 pub mod corpse_ext;
 pub mod food_spoil_ext;
 pub mod gem_ext;

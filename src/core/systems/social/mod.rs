@@ -6,6 +6,7 @@ pub mod pray;
 pub mod pray_ext;
 pub mod priest_ext;
 pub mod quest_ext;
+pub mod prayer_calc_ext;
 pub mod priest_temple_ext;
 pub mod quest_branch_ext;
 pub mod questpgr_ext;
