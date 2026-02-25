@@ -8,3 +8,5 @@ pub mod detect_map_ext;
 pub mod spell_ext;
 /// 순간이동/위치 판정/레벨 이동 등 핵심 로직 (teleport.c 이식)
 pub mod teleport_ext;
+
+pub mod recharge_ext;
