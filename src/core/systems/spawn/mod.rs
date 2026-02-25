@@ -4,3 +4,5 @@ pub mod makemon;
 pub mod spawn_manager;
 
 pub mod summon_ext;
+
+pub mod spawn_rule_ext;

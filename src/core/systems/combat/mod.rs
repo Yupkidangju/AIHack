@@ -101,3 +101,5 @@ impl CombatResult {
         self
     }
 }
+
+pub mod weapon_class_ext;

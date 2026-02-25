@@ -36,3 +36,5 @@ pub mod vision_ext;
 pub mod vision_system;
 
 pub mod world_time_ext;
+
+pub mod weather_ext;
