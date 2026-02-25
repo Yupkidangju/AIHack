@@ -3,6 +3,7 @@
 
 pub mod area_attack_ext;
 pub mod elemental_ext;
+pub mod hit_calc_ext;
 pub mod artifact_combat_ext;
 pub mod artifact_table_ext;
 pub mod dokick_ext;

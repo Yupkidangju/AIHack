@@ -24,6 +24,7 @@ pub mod status;
 pub mod steed_ext;
 pub mod were_ext;
 pub mod experience_ext;
+pub mod hunger_ext;
 pub mod mount_ext;
 pub mod polymorph_rule_ext;
 pub mod prop_calc_ext;

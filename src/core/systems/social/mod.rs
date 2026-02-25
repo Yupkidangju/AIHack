@@ -4,6 +4,7 @@ pub mod interaction;
 pub mod minion_ext;
 pub mod pray;
 pub mod pray_ext;
+pub mod alignment_ext;
 pub mod priest_ext;
 pub mod quest_ext;
 pub mod prayer_calc_ext;

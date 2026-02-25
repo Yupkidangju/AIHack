@@ -5,6 +5,7 @@ pub mod mkmaze_ext;
 pub mod boundary_ext;
 pub mod dungeon_feature_ext;
 pub mod extralev_ext;
+pub mod level_change_ext;
 pub mod mkroom_ext;
 pub mod stairs_ext;
 pub mod gen;
