@@ -27,6 +27,21 @@
 - **배경**: ECS 브릿지가 완성되더라도 C와 동일한 수치적 결과를 보장하는 방어 체계가 필요.
 - **근거**: 구현 비용이 거대한 FFI 테스트를 최소화하면서도, Snapshot을 통해 강력한 통합 회귀망을 구성할 수 있다.
 
+### BRIDGE-5. DeferredCommand Apply 단계 Collision Validation 의무화
+- **결정**: `DeferredCommand`를 Apply 단계에서 일괄 처리할 때, 각 Command 실행기 내부에 **사전 검증(Validation) 로직**을 반드시 포함한다. 검증 실패 시 panic 대신 자연스럽게 skip한다.
+- **배경**: 복수 엔티티가 동일 대상에 상충되는 명령을 내릴 수 있음 (예: 두 몬스터가 동시에 같은 아이템을 줍겠다는 요청).
+- **근거**: FIFO 순서로 먼저 도착한 Command가 성공하고, 이후 Command는 Validation 단계에서 대상 상태가 변경되었음을 감지하여 실패 처리. unwrap/panic 경로를 원천 차단.
+
+### BRIDGE-6. LLM 비동기 개입을 위한 EventPriority 확장 설계 공간 확보
+- **결정**: 현재의 `Immediate`/`Deferred` 2-Phase 이벤트 큐에 향후 LLM 비동기 통합을 위한 `AsyncPending`(외부 응답 대기)/`Narrative`(텍스트 묘사) 우선순위를 설계 공간으로 예약한다.
+- **배경**: 동기적 게임 루프 안에서 LLM이 비동기로 응답을 생성할 때, 응답이 어느 시점에 큐에 삽입되어야 하는지 기준이 부재.
+- **근거**: 물리적 턴 처리(Immediate→Deferred)가 완전히 끝난 후 Narrative를 처리하면 로직과 묘사가 분리되어 안전. AsyncPending은 IO 완료 시 Narrative로 승격.
+
+### BRIDGE-7. Delta 직렬화를 통한 Snapshot/LLM Context 최적화
+- **결정**: 전체 GameState를 매 턴 직렬화하는 대신, `DirtyMarker` 컴포넌트를 통해 변경된 엔티티만 Delta 추출하는 방식을 아키텍처 기본 방침으로 채택한다.
+- **배경**: 전체 World JSON 덤프는 I/O 병목 유발. 동일한 문제가 LLM Context Builder에서도 반복될 것.
+- **근거**: 체크포인트(10턴 등)에서만 전체 스냅샷, 중간 턴은 Delta만 기록하여 I/O 최소화. LLM에게는 Delta + 고정 컨텍스트(플레이어/현재 층)만 전달.
+
 ---
 
 ## [2026-02-15] - v2.3.4~v2.3.5: 대규모 시스템 확장 전략
