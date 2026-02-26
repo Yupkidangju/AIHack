@@ -104,6 +104,8 @@ pub struct Player {
     pub two_weapon: bool,   // #twoweapon active state
     pub skills: HashMap<WeaponSkill, SkillRecord>,
     pub equip_hunger_bonus: i32,
+    /// [v2.22.0 R34-P2-1] 상태이상 번들
+    pub status_bundle: super::status::StatusBundle,
 }
 
 impl Player {
@@ -159,6 +161,7 @@ impl Player {
                 );
                 map
             },
+            status_bundle: super::status::StatusBundle::new(),
         }
     }
 

@@ -2,6 +2,18 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.23.0] - 2026-02-26
+### Added
+- **[Phase 2-1] 상태 타이머 Bridge (`status_bridge.rs`, 신규 ~175줄, 4테스트)**: StatusBundle.tick_effects() → TurnEngine StatusTimers 페이즈 연결. 석화/질식 단계별 메시지, 만료 이벤트, 석화/슬라임 사망 처리.
+- **[Phase 2-2] 지형 이벤트 Bridge (`terrain_bridge.rs`, 신규 ~310줄, 7테스트)**: trap_ext + trap_ext2 통합. 함정 유형별(화살/다트/바위/수면/곰/구덩이/화염/텔레포트 등) 데미지/상태이상/텔레포트 분기, 이벤트 큐 발행.
+- **[Phase 2-3] 주문 시전 Bridge (`spell_bridge.rs`, 신규 ~190줄, 4테스트)**: spell_ext2 순수 함수 통합. 에너지 체크 → SpellSuccessInput 성공률 → 혼란 반감 → 역발(Confusion/Damage/EnergyLoss) 전 과정 처리.
+- **[Phase 2-4] 몬스터 AI Bridge (`monster_ai_bridge.rs`, 신규 ~380줄, 6테스트)**: monmove_ext(HP재생/혼란회복/도주/각성) + mcastu_ext(공격/방어/저주 주문) + muse_ext(아이템 AI) 통합. 단일 몬스터 턴 + 전체 순회 + 이벤트 발행.
+- **[Phase 2-5] 사회 상호작용 Bridge (`social_bridge.rs`, 신규 ~330줄, 4테스트)**: shk_ext(가격/크레딧/부채) + pray_ext(기도/분노/보상) 통합. 상점 구매 + 기도 전 과정 처리.
+- **[Phase 2-int] 통합 시나리오 (`integration_r34.rs`, 신규 ~155줄, 5테스트)**: 석화 사망, 함정→사망 판정, 혼란 주문, 가속 만료, 주문→포션 연쇄 5개 시나리오.
+
+### Changed
+- **[메트릭 갱신]** 148,644줄 / 344파일 / 3,318테스트 / 이식률 85.8% / Bridge 12개 (+5)
+
 ## [2.22.0] - 2026-02-26
 ### Added
 - **[R34-1] 몬스터 생성 확장 (`makemon_ext.rs`, 신규 ~550줄, 36테스트)**: `is_home_elemental()`, `wrong_elem_type()`, `golemhp()`, `monhp_per_lvl()`, `mbirth_limit()`, `propagate()`, `adj_lev()`, `align_shift()`, `peace_minded()`, `calc_malign()`, `grow_up_calc()`, `mkclass_select()`, `clone_mon_calc()` — 원본 `makemon.c`의 16개 순수 계산 함수 이식.

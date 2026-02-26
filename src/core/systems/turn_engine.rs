@@ -71,7 +71,8 @@ pub fn execute_phase(phase: TurnPhase, ctx: &mut TurnContext) -> Option<TurnResu
             None
         }
         TurnPhase::StatusTimers => {
-            // TODO R33: status timer 연결
+            // [v2.22.0 R34-P2-1] 상태 타이머 연결
+            crate::core::systems::bridges::status_bridge::tick_status_timers(ctx);
             None
         }
         TurnPhase::PlayerAction => {

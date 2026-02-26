@@ -1,9 +1,15 @@
 pub mod combat_bridge;
 pub mod hunger_bridge;
 pub mod integration_r33;
+pub mod integration_r34;
 pub mod integration_tests;
 pub mod luck_align_bridge;
+pub mod monster_ai_bridge;
 pub mod potion_bridge;
 pub mod scroll_bridge;
+pub mod social_bridge;
+pub mod spell_bridge;
+pub mod status_bridge;
+pub mod terrain_bridge;
 pub mod wand_bridge;
 pub mod xp_bridge;
