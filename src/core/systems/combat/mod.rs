@@ -2,23 +2,23 @@
 //
 
 pub mod area_attack_ext;
-pub mod elemental_ext;
-pub mod hit_calc_ext;
 pub mod artifact_combat_ext;
 pub mod artifact_table_ext;
 pub mod dokick_ext;
-pub mod music_combat_ext;
-pub mod mthrowu_ext;
-pub mod theft_ext;
 pub mod dothrow_ext;
+pub mod elemental_ext;
 pub mod engine;
 pub mod explode;
 pub mod explode_ext;
+pub mod hit_calc_ext;
 pub mod kick;
 pub mod mhitm;
 pub mod mhitm_ext;
 pub mod mhitu;
 pub mod mhitu_ext;
+pub mod mthrowu_ext;
+pub mod music_combat_ext;
+pub mod theft_ext;
 pub mod throw;
 pub mod uhitm;
 pub mod uhitm_ext;
@@ -106,3 +106,5 @@ impl CombatResult {
 }
 
 pub mod weapon_class_ext;
+// [v2.22.0 R34-3] 아티팩트 확장 (원본: artifact.c 순수 계산 함수)
+pub mod artifact_ext;

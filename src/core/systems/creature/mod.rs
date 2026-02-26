@@ -1,42 +1,42 @@
 ﻿// [v2.0.0 Phase R4] 생물 공통 시스템 (status + attrib + equipment + movement)
 //
 
+pub mod accessory_ext;
+pub mod armor_data_ext;
+pub mod armor_enhance_ext;
 pub mod attrib;
 pub mod attrib_ext;
 pub mod death;
+pub mod death_check_ext;
 pub mod do_wear;
 pub mod do_wear_ext;
 pub mod end;
+pub mod end_ext;
 pub mod equipment;
 pub mod evolution;
 pub mod exper;
 pub mod exper_ext;
-pub mod movement;
-pub mod accessory_ext;
-pub mod armor_data_ext;
-pub mod armor_enhance_ext;
-pub mod death_check_ext;
-pub mod polymorph_ext;
-pub mod regeneration;
-pub mod rip_ext;
-pub mod sounds_ext;
-pub mod status;
-pub mod steed_ext;
-pub mod were_ext;
 pub mod experience_ext;
 pub mod hunger_ext;
 pub mod mount_ext;
+pub mod movement;
+pub mod polymorph_ext;
 pub mod polymorph_rule_ext;
 pub mod prop_calc_ext;
+pub mod regeneration;
 pub mod resist_calc_ext;
+pub mod rip_ext;
 pub mod skill_tree_ext;
+pub mod sounds_ext;
 pub mod stat_change_ext;
+pub mod status;
 pub mod status_timer_ext;
-pub mod worn_ext;
-pub mod end_ext;
+pub mod steed_ext;
+pub mod were_ext;
 pub mod wield_ext;
 pub mod worm_ext;
 pub mod worn;
+pub mod worn_ext;
 
 // ──────────────────────────────────────────────────────────────
 // [v2.0.0
@@ -198,3 +198,7 @@ pub trait DamageReceiver {
 }
 
 pub mod unique_mon_ext;
+// [v2.22.0 R34-2] 능력치 관리 확장 (원본: attrib.c 순수 계산 함수)
+pub mod attrib_ext2;
+// [v2.22.0 R34-5] 폴리모프 확장 (원본: polyself.c + botl.c 순수 계산)
+pub mod polyself_ext;

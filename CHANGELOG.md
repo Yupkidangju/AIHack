@@ -2,6 +2,28 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.22.0] - 2026-02-26
+### Added
+- **[R34-1] 몬스터 생성 확장 (`makemon_ext.rs`, 신규 ~550줄, 36테스트)**: `is_home_elemental()`, `wrong_elem_type()`, `golemhp()`, `monhp_per_lvl()`, `mbirth_limit()`, `propagate()`, `adj_lev()`, `align_shift()`, `peace_minded()`, `calc_malign()`, `grow_up_calc()`, `mkclass_select()`, `clone_mon_calc()` — 원본 `makemon.c`의 16개 순수 계산 함수 이식.
+- **[R34-1] 던전 탐험 기록 (`mapseen_ext.rs`, 신규 ~280줄, 3테스트)**: `Mapseen`, `MapseenFeat`, `MapseenFlags`, `MapseenRoom` 구조체 — `dungeon.c`의 `#overview` 정보 기록 시스템 이식.
+- **[R34-2] 능력치 확장2 (`attrib_ext2.rs`, 신규 ~660줄, 20테스트)**: 운/훈련/독/내재능력 — `attrib.c` 확장 순수 함수 이식.
+- **[R34-3] 아티팩트 확장 (`artifact_ext.rs`, 신규 ~700줄, 17테스트)**: 피해보너스/Magicbane/참수/면역 — `artifact.c` 핵심 판정 이식.
+- **[R34-4] 탐지 확장 (`detect_ext.rs`, 확장 ~590줄, 22테스트)**: 탐색확률/탐지분류/투시/매직매핑 — `detect.c` 순수 함수 이식.
+- **[R34-5] 변신/상태바 확장 (`polyself_ext.rs`, 신규 ~520줄, 19테스트)**: HP/MP/쇼크/성별/직위/점수 — `polyself.c`+`botl.c` 이식.
+- **[R34-6] 역할 선택 확장 (`role_selection_ext.rs`, 신규 ~340줄, 16테스트)**: 비트마스크 호환성/필터/매칭 — `role.c` 검증 로직 이식.
+- **[R34-7] 정보 표시 확장 (`pager_ext.rs`, 신규 ~400줄, 18테스트)**: 이름정규화/감지설명/위치접미사 — `pager.c` 문자열 처리 이식.
+- **[R34-8] 플레이어 몬스터 확장 (`mplayer_ext.rs`, 신규 ~360줄, 8테스트)**: 역할별 장비/확률테이블 — `mplayer.c`+`mkobj.c` 이식.
+- **[R34-9] 초기 장비 확장 (`u_init_ext.rs`, 신규 ~250줄, 10테스트)**: 초기 장비/종족 치환/초기 금화 — `u_init.c` 순수 테이블 이식.
+- **[R34-10] 펫 동반 확장 (`dog_ext.rs`, 신규 ~300줄, 11테스트)**: 경과시간 회복/학대/부활/음식품질 — `dog.c` 순수 계산 이식.
+- **[R34-11] 펫 이동 AI (`dogmove_ext.rs`, 신규 ~340줄, 8테스트)**: 펫 영양 크기 보정/공격 대상 점수/허기 판정 — `dogmove.c` 핵심 AI 이식.
+- **[R34-12] 몬스터 이동 확장 (`monmove_ext.rs`, 신규 ~320줄, 8테스트)**: HP 재생/혼란·기절 회복/도주/각성 판정 — `monmove.c` 순수 계산 이식.
+- **[R34-13] 몬스터 핵심 확장 (`mon_ext.rs`, 신규 ~280줄, 13테스트)**: 이동 속도 계산/언데드→시체 변환/퀘스트 가디언 종족·역할 판별/턴당 타이머 — `mon.c` 이식.
+- **[R34-14] 핵심 이동 판정 (`hack_ext.rs`, 신규 ~250줄, 15테스트)**: 대각선 통과/과로 판정/굴착·통벽 판정/좌표 거리 계산 — `hack.c` 이식.
+
+### Changed
+- **[메트릭 갱신]** 144,082줄 / 330파일 / 3,199테스트 / 이식률 83.2% (+6,012줄, +13파일, +187테스트)
+
+
 ## [2.21.0] - 2026-02-23
 ### Added
 - **[R9-1] 특수 레벨 파서 엔진 (`sp_lev.rs`)**: `evaluate_special_level` 파서 — 문/몬스터/트랩/아이템 생성 배열 파싱 및 Sokoban 보상 방 단위 테스트 완료.

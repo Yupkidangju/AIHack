@@ -3,15 +3,21 @@
 pub mod ball_ext;
 pub mod bones_ext;
 
+pub mod altar_ext;
 pub mod dbridge_ext;
 pub mod detect;
 pub mod dig;
+pub mod dig_calc_ext;
 pub mod dig_ext;
+pub mod door_ext;
 pub mod engrave;
+pub mod engrave_calc_ext;
 pub mod engrave_ext;
 pub mod fountain;
+pub mod fountain_effect_ext;
 pub mod fountain_ext;
 pub mod light_ext;
+pub mod light_source_ext;
 pub mod lock;
 pub mod lock_ext;
 pub mod music_ext;
@@ -23,18 +29,14 @@ pub mod stairs;
 pub mod teleport;
 pub mod timeout_ext;
 pub mod trap;
+pub mod trap_detect_ext;
 pub mod trap_ext;
 pub mod vision;
-pub mod altar_ext;
-pub mod dig_calc_ext;
-pub mod door_ext;
-pub mod fountain_effect_ext;
-pub mod engrave_calc_ext;
-pub mod light_source_ext;
-pub mod trap_detect_ext;
 pub mod vision_ext;
 pub mod vision_system;
 
 pub mod world_time_ext;
 
 pub mod weather_ext;
+// [v2.22.0 R34-4] 탐지/탐색 확장 (원본: detect.c 순수 판정 함수)
+pub mod detect_ext;

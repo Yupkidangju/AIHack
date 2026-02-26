@@ -1,4 +1,4 @@
-﻿// [v2.0.0 Phase R4] 몬스터 AI 시스템 (monmove.c + dog.c + muse.c + mcastu.c + wizard.c)
+// [v2.0.0 Phase R4] 몬스터 AI 시스템 (monmove.c + dog.c + muse.c + mcastu.c + wizard.c)
 //
 
 pub mod ai_helper;
@@ -18,6 +18,12 @@ pub mod track_ext;
 pub mod ai_brain_ext;
 pub mod ai_tactic_ext;
 pub mod mcastu_ext;
+// [v2.22.0 R34-10] 펫/동반 몬스터 확장 (원본: dog.c 순수 계산)
+pub mod dog_ext;
+// [v2.22.0 R34-11] 펫 이동 AI 확장 (원본: dogmove.c 순수 계산)
+pub mod dogmove_ext;
+// [v2.22.0 R34-12] 몬스터 이동 확장 (원본: monmove.c 순수 계산)
+pub mod monmove_ext;
 pub mod wizard;
 
 // [v2.0.0 R3] 기존 경로 호환: ai::XXX 접근 유지
@@ -113,7 +119,7 @@ pub enum AiAction {
 /// }
 /// ```
 pub trait Behavior: Send + Sync {
-    /// 행동 결정 (매 턴 호출 — 반드시 0ms 이내 반환)
+    /// 행동 결정 (매 턴 호출 ? 반드시 0ms 이내 반환)
     fn decide(&self, obs: &Observation) -> AiAction;
 
     ///

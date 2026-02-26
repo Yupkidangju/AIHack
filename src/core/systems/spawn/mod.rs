@@ -6,3 +6,8 @@ pub mod spawn_manager;
 pub mod summon_ext;
 
 pub mod spawn_rule_ext;
+
+// [v2.21.0 R34-1] 몬스터 생성 확장 (원본: makemon.c 순수 함수 이식)
+pub mod makemon_ext;
+// [v2.22.0 R34-8] 플레이어 몬스터 장비/확률 (원본: mplayer.c + mkobj.c)
+pub mod mplayer_ext;

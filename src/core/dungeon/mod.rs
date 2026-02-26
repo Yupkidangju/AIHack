@@ -1,17 +1,18 @@
-﻿pub mod dungeon;
+﻿pub mod boundary_ext;
+pub mod dungeon;
 pub mod dungeon_ext;
-pub mod mklev_ext;
-pub mod mkmaze_ext;
-pub mod boundary_ext;
 pub mod dungeon_feature_ext;
 pub mod extralev_ext;
-pub mod level_change_ext;
-pub mod mkroom_ext;
-pub mod stairs_ext;
 pub mod gen;
+pub mod level_change_ext;
+pub mod mapseen_ext;
+pub mod mklev_ext;
+pub mod mkmaze_ext;
 pub mod mkroom;
+pub mod mkroom_ext;
 pub mod rect;
 pub mod sp_lev;
+pub mod stairs_ext;
 pub mod tile;
 
 use crate::core::dungeon::tile::{Tile, TileType};

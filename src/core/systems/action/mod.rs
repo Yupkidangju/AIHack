@@ -1,4 +1,4 @@
-﻿// [v2.3.0
+// [v2.3.0
 pub mod allmain_ext;
 pub mod ascend_ext;
 pub mod autotravel_ext;
@@ -8,3 +8,4 @@ pub mod cmd_ext;
 pub mod do_actions;
 ///
 pub mod hack;
+pub mod hack_ext;
