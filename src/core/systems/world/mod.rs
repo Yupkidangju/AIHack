@@ -1,4 +1,4 @@
-﻿// 월드/환경 시스템 (stairs + teleport + trap + dig + fountain + vision)
+// 월드/환경 시스템 (stairs + teleport + trap + dig + fountain + vision)
 
 pub mod ball_ext;
 pub mod bones_ext;
@@ -31,6 +31,7 @@ pub mod timeout_ext;
 pub mod trap;
 pub mod trap_detect_ext;
 pub mod trap_ext;
+pub mod trap_ext2;
 pub mod vision;
 pub mod vision_ext;
 pub mod vision_system;

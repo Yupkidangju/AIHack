@@ -6,6 +6,7 @@ pub mod direction_ext;
 pub mod cmd;
 pub mod cmd_ext;
 pub mod do_actions;
+pub mod do_ext;
 ///
 pub mod hack;
 pub mod hack_ext;

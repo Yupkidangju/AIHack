@@ -1,4 +1,4 @@
-﻿pub mod context_menu;
+pub mod context_menu;
 pub mod display_ext;
 pub mod input;
 pub mod layout;
@@ -9,6 +9,7 @@ pub mod keybind_ext;
 pub mod mapsymbol_ext;
 pub mod memory_map_ext;
 pub mod pline_ext;
+pub mod botl_ext;
 pub mod renderer;
 pub mod screens;
 pub mod widgets;
