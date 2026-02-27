@@ -4,40 +4,42 @@
 pub mod apply;
 pub mod apply_ext;
 pub mod artifact_ext;
+pub mod buc_spread_ext;
+pub mod container_ext;
+pub mod corpse_ext;
+pub mod curse_system_ext;
 pub mod eat;
 pub mod eat_ext;
+pub mod food_spoil_ext;
+pub mod gem_ext;
+pub mod identify_ext;
+pub mod invent_sort_ext;
 pub mod item_damage;
 pub mod item_helper;
 pub mod item_tick;
 pub mod item_use;
 pub mod loot;
 pub mod mkobj;
+pub mod o_init_ext;
 pub mod objnam;
 pub mod objnam_ext;
 pub mod objnam_ext2;
-pub mod buc_spread_ext;
-pub mod container_ext;
-pub mod corpse_ext;
-pub mod curse_system_ext;
-pub mod food_spoil_ext;
-pub mod identify_ext;
-pub mod gem_ext;
-pub mod o_init_ext;
-pub mod invent_sort_ext;
-pub mod potion_mix_ext;
-pub mod potion_quaff_ext;
-pub mod scroll_effect_ext;
-pub mod wish_ext;
 pub mod pickup;
 pub mod pickup_ext;
 pub mod potion;
 pub mod potion_ext;
+pub mod potion_mix_ext;
+pub mod potion_quaff_ext;
 pub mod read;
 pub mod read_ext;
+pub mod scroll_effect_ext;
 pub mod weight;
+pub mod wish_ext;
 pub mod write_ext;
 pub mod zap;
 pub mod zap_ext;
+// [v2.37.0 Phase 101] BUC 시스템
+pub mod buc_phase101_ext;
 
 // ──────────────────────────────────────────────────────────────
 // [v2.0.0
@@ -167,3 +169,14 @@ pub trait UseEffect: Send + Sync {
 }
 
 pub mod write_scroll_ext;
+// [v2.26.0 Phase 90] 음식 시스템 확장
+pub mod eat_phase90_ext;
+pub mod read_phase91_ext;
+// [v2.28.0 Phase 92] 포션 효과 확장
+pub mod potion_phase92_ext;
+// [v2.29.0 Phase 93] 아이템 사용 확장
+pub mod apply_phase93_ext;
+// [v2.32.0 Phase 96] 아이템 식별 확장
+pub mod objnam_phase96_ext;
+// [v2.33.0 Phase 97] 음식/영양 확장
+pub mod eat_phase97_ext;

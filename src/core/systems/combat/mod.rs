@@ -108,3 +108,22 @@ impl CombatResult {
 pub mod weapon_class_ext;
 // [v2.22.0 R34-3] 아티팩트 확장 (원본: artifact.c 순수 계산 함수)
 pub mod artifact_ext;
+// [v2.26.0 Phase 90] 전투/장비/마법 확장
+pub mod do_wear_phase90_ext;
+pub mod mcastu_phase91_ext;
+pub mod mhitm_phase91_ext;
+// [v2.28.0 Phase 92] 던지기 확장
+pub mod dothrow_phase92_ext;
+// [v2.31.0 Phase 95] 전투 공식 통합
+pub mod combat_formula_phase95_ext;
+// [v2.34.0 Phase 98] 파괴/교란 확장
+pub mod destroy_phase98_ext;
+// [v2.35.0 Phase 99] 아티팩트 통합 확장
+pub mod artifact_phase99_ext;
+pub mod mhitu_phase90_ext;
+pub mod uhitm_phase90_ext;
+pub mod zap_phase90_ext;
+// [v2.40.0 Phase 104] 스킬/직업
+pub mod skill_phase104_ext;
+// [v2.41.0 Phase FINAL] 🏆 전투 최종 마무리
+pub mod final_combat_ext;

@@ -202,3 +202,17 @@ pub mod unique_mon_ext;
 pub mod attrib_ext2;
 // [v2.22.0 R34-5] 폴리모프 확장 (원본: polyself.c + botl.c 순수 계산)
 pub mod polyself_ext;
+// [v2.30.0 Phase 94] 장비 관리 확장
+pub mod worn_phase94_ext;
+// [v2.30.0 Phase 94] 다형성 확장
+pub mod polymorph_phase94_ext;
+// [v2.34.0 Phase 98] 상태이상/포션 통합
+pub mod status_phase98_ext;
+// [v2.37.0 Phase 101] 레벨업/경험치
+pub mod levelup_phase101_ext;
+// [v2.38.0 Phase 102] 몬스터 생태/습성
+pub mod ecology_phase102_ext;
+// [v2.39.0 Phase 103] 능력치/속성
+pub mod attribute_phase103_ext;
+// [v2.40.0 Phase 104] 음식/영양
+pub mod nutrition_phase104_ext;

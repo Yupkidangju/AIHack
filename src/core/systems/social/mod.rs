@@ -1,25 +1,36 @@
 ﻿//
 
+pub mod alignment_ext;
 pub mod interaction;
 pub mod minion_ext;
 pub mod pray;
 pub mod pray_ext;
-pub mod alignment_ext;
-pub mod priest_ext;
-pub mod quest_ext;
 pub mod prayer_calc_ext;
+pub mod priest_ext;
 pub mod priest_temple_ext;
 pub mod quest_branch_ext;
+pub mod quest_ext;
 pub mod questpgr_ext;
 pub mod shk_ai_ext;
-pub mod shk_price_ext;
 pub mod shk_ext;
+pub mod shk_price_ext;
 pub mod shop;
 pub mod shop_ext;
 pub mod steal;
 pub mod steal_ext;
 pub mod talk;
 pub mod vault_ext;
+// [v2.27.0 Phase 91] 기도 확장
+pub mod pray_phase91_ext;
+pub mod steal_phase91_ext;
+// [v2.29.0 Phase 93] 상점 경제 확장
+pub mod shk_phase93_ext;
+// [v2.30.0 Phase 94] 봉헌/제단 확장
+pub mod altar_phase94_ext;
+// [v2.35.0 Phase 99] 상점 경제 확장
+pub mod economy_phase99_ext;
+// [v2.40.0 Phase 104] 신/종교
+pub mod religion_phase104_ext;
 
 /// [v2.20.0 R8-3] LLM 교체 포인트 — 게임 내 모든 동적 텍스트 생성 인터페이스
 /// 현재 적용 영역: talk, pray, interaction, death, shop (7곳+)
@@ -83,3 +94,5 @@ impl InteractionProvider for DefaultInteractionProvider {
 }
 
 pub mod shop_stock_ext;
+// [v2.24.0 Phase 3-4] 상점 확장 (상점 주인 행동/흥정/매입/처벌/서비스)
+pub mod shk_phase3_ext;

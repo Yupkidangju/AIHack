@@ -15,6 +15,17 @@ pub mod rect;
 pub mod sp_lev;
 pub mod stairs_ext;
 pub mod tile;
+// [v2.29.0 Phase 93] 던전 생성 확장
+pub mod mklev_phase93_ext;
+// [v2.31.0 Phase 95] 특수방/레벨 확장
+pub mod mkroom_phase95_ext;
+pub mod sp_lev_phase95_ext;
+// [v2.34.0 Phase 98] 던전 분기 확장
+pub mod branch_phase98_ext;
+// [v2.36.0 Phase 100] 🏆 맵 생성 통합
+pub mod mapgen_phase100_ext;
+// [v2.39.0 Phase 103] 특수 층/분기
+pub mod special_level_phase103_ext;
 
 use crate::core::dungeon::tile::{Tile, TileType};
 

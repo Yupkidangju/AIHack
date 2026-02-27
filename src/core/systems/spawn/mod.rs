@@ -11,3 +11,7 @@ pub mod spawn_rule_ext;
 pub mod makemon_ext;
 // [v2.22.0 R34-8] 플레이어 몬스터 장비/확률 (원본: mplayer.c + mkobj.c)
 pub mod mplayer_ext;
+// [v2.29.0 Phase 93] 몬스터 생성 확장
+pub mod makemon_phase93_ext;
+// [v2.34.0 Phase 98] 몬스터 생성 확장
+pub mod mkmon_phase98_ext;

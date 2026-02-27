@@ -8,22 +8,28 @@ pub mod core;
 // pub mod ai_part1;
 // pub mod ai_part2;
 // pub mod ai_part3;
+pub mod ai_brain_ext;
+pub mod ai_tactic_ext;
 pub mod dog;
 pub mod mcastu;
+pub mod mcastu_ext;
 pub mod monmove;
 pub mod muse;
 pub mod muse_ext;
 pub mod pet_ai_ext;
 pub mod track_ext;
-pub mod ai_brain_ext;
-pub mod ai_tactic_ext;
-pub mod mcastu_ext;
 // [v2.22.0 R34-10] 펫/동반 몬스터 확장 (원본: dog.c 순수 계산)
 pub mod dog_ext;
 // [v2.22.0 R34-11] 펫 이동 AI 확장 (원본: dogmove.c 순수 계산)
 pub mod dogmove_ext;
 // [v2.22.0 R34-12] 몬스터 이동 확장 (원본: monmove.c 순수 계산)
 pub mod monmove_ext;
+// [v2.30.0 Phase 94] 몬스터 AI 확장
+pub mod monmove_phase94_ext;
+// [v2.32.0 Phase 96] 몬스터 마법 확장
+pub mod mcastu_phase96_ext;
+// [v2.37.0 Phase 101] AI 전략 시스템
+pub mod strategy_phase101_ext;
 pub mod wizard;
 
 // [v2.0.0 R3] 기존 경로 호환: ai::XXX 접근 유지

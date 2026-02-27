@@ -14,3 +14,10 @@ pub mod recharge_ext;
 
 pub mod spell_school_ext;
 pub mod wand_effect_ext;
+// [v2.29.0 Phase 93] 마법 시스템 확장
+pub mod spell_phase93_ext;
+// [v2.38.0 Phase 102] 마법/주문 통합
+pub mod spellbook_phase102_ext;
+// [v2.33.0 Phase 97] 스크롤/완드 확장
+pub mod read_phase97_ext;
+pub mod wand_phase97_ext;
