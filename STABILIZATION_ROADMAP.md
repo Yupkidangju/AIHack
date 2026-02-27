@@ -18,6 +18,9 @@
 | ActionQueue→EventQueue 동기화 검증 | **수용** | post_turn_processing의 borrow 패턴이 런타임에서 안전한지 미확인 |
 | NetHack 특화 Edge Case 테스트 | **부분 수용** | 중요하나 E2E가 먼저. Phase 2로 배치 |
 | 점진적 LLM 주입 전략 | **수용** | death.rs 묘비명부터 시작하는 전략이 합리적 |
+| 커스텀 패닉 훅(Panic Hook) 설정 | **수용** | eframe/ratatui 혼용 환경에서 패닉 시 터미널 꼬임 방지 및 트레이스 확보 필수 |
+| 큐 연쇄 액션(Cascade) 무한 루프 방지 | **수용** | 이벤트 큐 아키텍처 다발성 데드락 방지를 위한 Safe Limit(상한선) 도입 필수 |
+| 세이브/로드(Save/Load) 엣지 케이스 | **수용** | ECS 직렬화/역직렬화 패닉은 가장 치명적이므로 최우선 엣지 케이스로 포함 |
 
 ### ❌ 수정/보완하는 항목
 | 제안 | 수정 | 이유 |
@@ -86,6 +89,7 @@ Phase S7: LLM 최소 주입 (묘비명 → NPC 대사 → 상점)
 3. ECS Resources 초기화 순서 문제
 
 **작업**:
+- [ ] `main.rs` 기동 시 가장 먼저 `std::panic::set_hook` 설정 (터미널 복구 및 에러 로그 파일/콘솔 명확히 출력)
 - [ ] `cargo run` 실행 → 패닉 메시지 수집
 - [ ] AssetManager TOML 로딩 경로 확인/수정
 - [ ] NetHackApp::new() 내 Resources 등록 순서 검증
@@ -159,6 +163,7 @@ execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
 3. EventQueue 누적 (clear 시점 오류)
 
 **작업**:
+- [ ] `drain_action_queue()` 내 처리 횟수 카운터 도입 (예: 한 턴에 100회 초과 시 데드락으로 간주하고 강제 종료 및 에러 출력)
 - [ ] 10턴 자동 실행 (또는 방향키 10회 연타)
 - [ ] 턴 카운터 증가 확인
 - [ ] 몬스터 AI 이동 확인
@@ -189,6 +194,7 @@ execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
 
 **목표**: 복합 상호작용에서 패닉/데드락 없음
 
+- [ ] **세이브/로드 (중요)**: 10턴 진행 후 Save & Quit → 앱 완전 종료 → 재시작 후 Load → 1턴 생존 (ECS Entity 직렬화 검증)
 - [ ] 사망 → GameOver 화면 → New Game → 재시작
 - [ ] 레벨 변경 (계단 내려가기 → 2층 생성 → 올라가기)
 - [ ] 상점 진입 (상점 타일 위 이동 시 메시지)
@@ -196,7 +202,7 @@ execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
 - [ ] 마법 주문(비상 존: zap 계열)
 - [ ] 다중 상태이상 (독+혼란+실명 중첩)
 
-**판정 기준**: 위 항목에서 패닉 0건
+**판정 기준**: 위 항목에서 패닉(특히 Save/Load 관련) 0건
 
 ---
 
@@ -252,14 +258,26 @@ Step 25: 전체 활성화
 
 각 Step에서 패닉 발생 시 **해당 시스템만 디버깅** → 원인 격리 용이
 
-### 3.3 ActionQueue/EventQueue 추적
+### 3.3 ActionQueue/EventQueue 추적 방어
 
 ```rust
+// 무한 연쇄 방지 (Cascade Limit)
+const MAX_QUEUE_DEPTH: usize = 100;
+let mut processed_count = 0;
+while let Some(action) = queue.pop() {
+    processed_count += 1;
+    if processed_count > MAX_QUEUE_DEPTH {
+        panic!("Cascade Limit Exceeded! Possible infinite loop detected in ActionQueue.");
+    }
+    // ...
+}
+
 // 디버그 모드에서 큐 상태 로깅
 println!("[T{}] ActionQueue: {} / EventQueue: {}", 
     turn, action_queue.len(), event_queue.len());
 ```
 
+- 한 턴 안의 연쇄 상호작용(예: 피격 -> 산성 반응 -> 장비파괴 -> 피격 로그)의 무한루프 방지벽 설치
 - 매 턴 큐 크기 출력 → 누적/누수 감지
 - EventQueue가 clear되지 않으면 메모리 누수 경고
 
