@@ -981,7 +981,26 @@ impl super::NetHackApp {
             .add_system(crate::core::systems::weight::update_encumbrance_system())
             .build();
 
-        schedule.execute(&mut self.game.world, &mut self.game.resources);
+        // [v2.42.0] 턴 시스템 실행을 catch_unwind로 감싸서 패닉 방지
+        // Legion의 SubWorld borrow conflict(AccessDenied)가 발생해도
+        // 앱이 종료되지 않고 다음 턴으로 넘어갈 수 있도록 방어합니다.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            schedule.execute(&mut self.game.world, &mut self.game.resources);
+        }));
+
+        if let Err(e) = result {
+            let msg = if let Some(s) = e.downcast_ref::<String>() {
+                s.clone()
+            } else if let Some(s) = e.downcast_ref::<&str>() {
+                s.to_string()
+            } else {
+                "Unknown panic in turn systems".to_string()
+            };
+            eprintln!("[WARN] 턴 시스템 패닉 발생 (게임은 계속됩니다): {}", msg);
+            if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                log.add(format!("[System Error] {}", msg), 0);
+            }
+        }
     }
 
     fn handle_level_change(&mut self) {

@@ -28,12 +28,12 @@ pub struct CastAction {
 
 ///
 #[legion::system]
-#[write_component(PlayerTag)]
+#[read_component(PlayerTag)]
 #[write_component(Player)]
-#[write_component(SpellKnowledge)]
-#[write_component(Position)]
+#[read_component(SpellKnowledge)]
+#[read_component(Position)]
 #[write_component(Health)]
-#[write_component(MonsterTag)]
+#[read_component(MonsterTag)]
 pub fn spell_cast(
     world: &mut SubWorld,
     #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
