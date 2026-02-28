@@ -272,7 +272,7 @@ pub fn restore_attrib(player: &mut Player, log: &mut GameLog, turn: u64) {
 
 ///
 #[legion::system]
-#[write_component(Player)]
+#[write_component(crate::core::entity::player::Player)]
 pub fn attrib_maintenance(
     world: &mut SubWorld,
     #[resource] log: &mut GameLog,

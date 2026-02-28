@@ -103,8 +103,8 @@ impl<'a> LevelGen<'a> {
                     continue;
                 }
 
-                let r_w = self.rng.rnz(4, width.min(15) as i32) as usize;
-                let r_h = self.rng.rnz(3, height.min(10) as i32) as usize;
+                let r_w = (self.rng.rnd((width.min(15) - 2) as i32) as usize) + 2;
+                let r_h = (self.rng.rnd((height.min(10) - 2) as i32) as usize) + 2;
 
                 let rx = rect.lx + self.rng.rn2((width - r_w + 1) as i32) as usize;
                 let ry = rect.ly + self.rng.rn2((height - r_h + 1) as i32) as usize;
@@ -144,8 +144,8 @@ impl<'a> LevelGen<'a> {
                 //
                 if self.rng.rn2(10) == 0 && r_w > 6 && r_h > 5 {
                     //
-                    let sw = self.rng.rnz(3, (r_w - 2) as i32) as usize;
-                    let sh = self.rng.rnz(2, (r_h - 2) as i32) as usize;
+                    let sw = (self.rng.rnd((r_w - 4) as i32) as usize) + 2;
+                    let sh = (self.rng.rnd((r_h - 4) as i32) as usize) + 2;
                     let sx = rx + 1 + self.rng.rn2((r_w - sw - 1) as i32) as usize;
                     let sy = ry + 1 + self.rng.rn2((r_h - sh - 1) as i32) as usize;
 

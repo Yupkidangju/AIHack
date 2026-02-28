@@ -2,6 +2,16 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.42.0] - 2026-02-27
+### Fixed
+- **[E2E Stabilization] 통합 테스트 패닉 수정**: `s0_world_initialization`부터 `s5_wait_action`까지 E2E 테스트 안정화
+  - `monsters.toml` 파싱 에러 수정 (flags3 OOB 에러)
+  - 서브룸 넓이/높이 계산 내 정수 오버플로우를 막기 위해 `rnz` 대신 `rnd` 사용 (`aihack::core::dungeon::gen::LevelGen::makesrooms`)
+  - `aihack::core::systems::ai::core`의 `monster_ai_system` 내 `Position` 접근 충돌(`AccessDenied`)을 `write_component`로 수정.
+  - 리소스 `ItemManager`, `Option<TeleportAction>`, `GameState::Normal` 등을 `e2e_stabilize` 테스트 환경에 주입.
+  - `aihack::core::systems::creature::attrib`의 `attrib_maintenance_system`에서 `Player` 매크로 해석 문제를 회피하기 위해 `crate::core::entity::player::Player` 풀네임 명시, 시스템 22번째 패닉 해결.
+- **모든 E2E 테스트(s0~s5) PASS 확인 완료!**
+
 ## [2.41.0] - 2026-02-27
 ### Added
 - **[🏆 Phase FINAL] 100% 달성!** religion_신(7t)/hazard_함정(7t)/skill_스킬(7t)/nutrition_영양(7t)/finale_마무리(7t)/final_misc_잔여(9t)/final_combat_전투(9t)/centennial_100%(9t) — 총 62테스트

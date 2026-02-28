@@ -316,7 +316,7 @@ resists = 255 # MR_FIRE | MR_COLD | MR_ELEC | MR_DISINT | MR_SLEEP | MR_POISON |
 conveys = 0
 flags1 = 0x00000001 # M1_FLY (Simplified)
 flags2 = 0x00100000 # M2_HOSTILE
-flags3 = 0x00010000 # M3_INFRAVISIBLE
+flags3 = 0x0200 # M3_INFRAVISIBLE
 difficulty = 5
 color = 11 # CLR_YELLOW
 

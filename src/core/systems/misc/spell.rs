@@ -28,12 +28,12 @@ pub struct CastAction {
 
 ///
 #[legion::system]
-#[read_component(PlayerTag)]
+#[write_component(PlayerTag)]
 #[write_component(Player)]
-#[read_component(SpellKnowledge)]
-#[read_component(Position)]
+#[write_component(SpellKnowledge)]
+#[write_component(Position)]
 #[write_component(Health)]
-#[read_component(MonsterTag)]
+#[write_component(MonsterTag)]
 pub fn spell_cast(
     world: &mut SubWorld,
     #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
@@ -827,7 +827,7 @@ pub enum SpellBackfire {
     EnergyDrain,
     SelfDamage,
     Confusion,
-    Paralyze,    // 留덈퉬
+    Paralyze, // 留덈퉬
     BlindSelf,
     Amnesia,
 }
