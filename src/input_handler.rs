@@ -47,29 +47,41 @@ impl super::NetHackApp {
             // Shift 조합 — 달리기 + 기존 Shift 명령
             // ================================================
             if mods.shift {
-                // [M4] 달리기 (Shift+이동키)
-                if i.key_pressed(egui::Key::H) || i.key_pressed(egui::Key::ArrowLeft) {
+                // [M4] 달리기 (Shift+이동키 또는 Shift+넘패드)
+                if i.key_pressed(egui::Key::H)
+                    || i.key_pressed(egui::Key::ArrowLeft)
+                    || i.key_pressed(egui::Key::Num4)
+                {
                     return Command::RunW;
                 }
-                if i.key_pressed(egui::Key::J) || i.key_pressed(egui::Key::ArrowDown) {
+                if i.key_pressed(egui::Key::J)
+                    || i.key_pressed(egui::Key::ArrowDown)
+                    || i.key_pressed(egui::Key::Num2)
+                {
                     return Command::RunS;
                 }
-                if i.key_pressed(egui::Key::K) || i.key_pressed(egui::Key::ArrowUp) {
+                if i.key_pressed(egui::Key::K)
+                    || i.key_pressed(egui::Key::ArrowUp)
+                    || i.key_pressed(egui::Key::Num8)
+                {
                     return Command::RunN;
                 }
-                if i.key_pressed(egui::Key::L) || i.key_pressed(egui::Key::ArrowRight) {
+                if i.key_pressed(egui::Key::L)
+                    || i.key_pressed(egui::Key::ArrowRight)
+                    || i.key_pressed(egui::Key::Num6)
+                {
                     return Command::RunE;
                 }
-                if i.key_pressed(egui::Key::Y) {
+                if i.key_pressed(egui::Key::Y) || i.key_pressed(egui::Key::Num7) {
                     return Command::RunNW;
                 }
-                if i.key_pressed(egui::Key::U) {
+                if i.key_pressed(egui::Key::U) || i.key_pressed(egui::Key::Num9) {
                     return Command::RunNE;
                 }
-                if i.key_pressed(egui::Key::B) {
+                if i.key_pressed(egui::Key::B) || i.key_pressed(egui::Key::Num1) {
                     return Command::RunSW;
                 }
-                if i.key_pressed(egui::Key::N) {
+                if i.key_pressed(egui::Key::N) || i.key_pressed(egui::Key::Num3) {
                     return Command::RunSE;
                 }
 
@@ -122,31 +134,51 @@ impl super::NetHackApp {
 
             // ================================================
             // 이동 (일반 — Shift 없이)
+            // [v2.42.0] 넘패드(Num1~Num9) 지원 추가
+            // 7=NW  8=N  9=NE
+            // 4=W   5=.  6=E
+            // 1=SW  2=S  3=SE
             // ================================================
             if !mods.shift {
-                if i.key_pressed(egui::Key::H) || i.key_pressed(egui::Key::ArrowLeft) {
+                if i.key_pressed(egui::Key::H)
+                    || i.key_pressed(egui::Key::ArrowLeft)
+                    || i.key_pressed(egui::Key::Num4)
+                {
                     return Command::MoveW;
                 }
-                if i.key_pressed(egui::Key::J) || i.key_pressed(egui::Key::ArrowDown) {
+                if i.key_pressed(egui::Key::J)
+                    || i.key_pressed(egui::Key::ArrowDown)
+                    || i.key_pressed(egui::Key::Num2)
+                {
                     return Command::MoveS;
                 }
-                if i.key_pressed(egui::Key::K) || i.key_pressed(egui::Key::ArrowUp) {
+                if i.key_pressed(egui::Key::K)
+                    || i.key_pressed(egui::Key::ArrowUp)
+                    || i.key_pressed(egui::Key::Num8)
+                {
                     return Command::MoveN;
                 }
-                if i.key_pressed(egui::Key::L) || i.key_pressed(egui::Key::ArrowRight) {
+                if i.key_pressed(egui::Key::L)
+                    || i.key_pressed(egui::Key::ArrowRight)
+                    || i.key_pressed(egui::Key::Num6)
+                {
                     return Command::MoveE;
                 }
-                if i.key_pressed(egui::Key::Y) {
+                if i.key_pressed(egui::Key::Y) || i.key_pressed(egui::Key::Num7) {
                     return Command::MoveNW;
                 }
-                if i.key_pressed(egui::Key::U) {
+                if i.key_pressed(egui::Key::U) || i.key_pressed(egui::Key::Num9) {
                     return Command::MoveNE;
                 }
-                if i.key_pressed(egui::Key::B) {
+                if i.key_pressed(egui::Key::B) || i.key_pressed(egui::Key::Num1) {
                     return Command::MoveSW;
                 }
-                if i.key_pressed(egui::Key::N) {
+                if i.key_pressed(egui::Key::N) || i.key_pressed(egui::Key::Num3) {
                     return Command::MoveSE;
+                }
+                // 넘패드 5 = 대기
+                if i.key_pressed(egui::Key::Num5) {
+                    return Command::Wait;
                 }
             }
 
