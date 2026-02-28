@@ -478,8 +478,21 @@ pub fn movement(
                         ));
                     }
                 }
-                continue; // 공격했으므로 이동은 건너뜀
+            } else {
+                // [v2.42.0] 템플릿을 찾지 못한 몬스터에 대한 폴백 공격
+                // 기본 맨손 데미지(1d4)를 적용하여 플레이어가 몬스터를 관통하는 버그 방지
+                let base_dmg = rng.rn2(4) + 1;
+                if let Ok(mut m_entry) = world.entry_mut(m_ent) {
+                    if let Ok(m_health) = m_entry.get_component_mut::<Health>() {
+                        m_health.current -= base_dmg;
+                        log.add(
+                            format!("You hit the {} for {} damage!", m_display_name, base_dmg),
+                            *turn,
+                        );
+                    }
+                }
             }
+            continue; // 몬스터와 조우하면 항상 이동 차단 (공격 또는 폴백)
         }
 
         // 2.5 바위/석상 체크 (Obstacles)

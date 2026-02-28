@@ -430,28 +430,18 @@ fn t2_attack_monster() {
     resources.insert(Command::MoveE);
     run_movement_only(&mut world, &mut resources);
 
-    // 공격 결과 확인
+    // 몬스터와 조우하면 이동 차단되어야 함
     let (nx, ny) = get_player_pos(&world);
-    let attack_logged = log_contains(&resources, "hit") || log_contains(&resources, "miss");
+    assert_eq!(
+        (nx, ny),
+        (px, py),
+        "공격 시 플레이어 위치는 변하지 않아야 함 (continue 보장)"
+    );
 
-    if (nx, ny) == (px, py) {
-        // 플레이어가 이동하지 않았으면 → 공격이 발생한 것
-        println!("✅ T2-1: 몬스터 공격 — 위치 불변 (전투 발생)");
-    } else if attack_logged {
-        // 이동했지만 공격 메시지가 있으면 → 공격 후 이동 (일부 경우)
-        println!(
-            "✅ T2-1: 몬스터 공격 — 공격 메시지 확인 (위치: ({},{}))",
-            nx, ny
-        );
-    } else {
-        // 알려진 한계: template이 assets에 없으면 공격이 skip됨
-        // movement_system line 241: if let Some(m_tmpl_ptr) = m_tmpl
-        // 이 경우 이동이 발생하지만 크래시는 아님
-        println!(
-            "⚠️ T2-1: 몬스터 공격 미발생 — template 미발견으로 이동됨 (위치: ({},{})). 수정 필요!",
-            nx, ny
-        );
-    }
+    // 공격 메시지(hit/miss)가 로그에 있어야 함
+    let attack_logged = log_contains(&resources, "hit") || log_contains(&resources, "miss");
+    assert!(attack_logged, "공격 메시지(hit/miss)가 로그에 존재해야 함");
+    println!("✅ T2-1: 몬스터 공격 — 위치 불변, 전투 메시지 확인");
 }
 
 /// T2-2: 문 열기 — 이동 시 닫힌 문 자동 오픈
