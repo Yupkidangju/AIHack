@@ -296,6 +296,12 @@ impl NetHackApp {
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5] 이벤트 큐
         resources.insert(crate::core::events::EventHistory::default()); // [v2.0.0 R5] 이벤트 히스토리
         resources.insert(crate::core::systems::social::DefaultInteractionProvider);
+        // [v2.42.0] E2E 안정화: 턴 시스템이 요구하는 누락 리소스 보강
+        resources.insert(assets.items.clone()); // ItemManager
+        resources.insert(crate::core::game_state::GameState::default()); // GameState
+        resources.insert(None::<crate::core::systems::world::teleport::TeleportAction>); // TeleportAction
+        resources.insert(crate::core::systems::death::DeathResults::default());
+        resources.insert(crate::ui::input::Command::Wait); // 초기 커맨드
 
         // 던전 매니저 초기화 및 1층 등록
         let mut dungeon = crate::core::dungeon::dungeon::Dungeon::new();
@@ -386,11 +392,21 @@ impl NetHackApp {
         resources.insert(crate::ui::log::GameLog::new(100));
         resources.insert(0u64);
         resources.insert(crate::core::systems::talk::Rumors::new());
-        resources.insert(crate::core::action_queue::ActionQueue::new()); // 신규 ActionQueue 병행
+        resources.insert(crate::core::action_queue::ActionQueue::new());
         resources.insert(None::<crate::core::dungeon::LevelChange>);
         resources.insert(crate::core::systems::death::DeathResults::default());
-        resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5]
-        resources.insert(crate::core::events::EventHistory::default()); // [v2.0.0 R5]
+        resources.insert(crate::core::events::EventQueue::new());
+        resources.insert(crate::core::events::EventHistory::default());
+        // [v2.42.0] E2E 안정화: 턴 시스템이 요구하는 누락 리소스 보강
+        resources.insert(assets.items.clone()); // ItemManager
+        resources.insert(crate::core::game_state::GameState::default()); // GameState
+        resources.insert(None::<crate::core::systems::world::teleport::TeleportAction>);
+        resources.insert(None::<crate::core::systems::pray::PendingAltarUpdate>);
+        resources.insert(crate::core::entity::status::StatusFlags::empty());
+        resources.insert(crate::core::systems::social::DefaultInteractionProvider);
+        resources.insert(self.input.options.clone());
+        resources.insert(assets.clone());
+        resources.insert(crate::ui::input::Command::Wait);
 
         let mut dungeon = crate::core::dungeon::dungeon::Dungeon::new();
         dungeon.set_level(
@@ -595,6 +611,11 @@ impl NetHackApp {
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5]
         resources.insert(crate::core::events::EventHistory::default()); // [v2.0.0 R5]
         resources.insert(crate::core::systems::social::DefaultInteractionProvider);
+        // [v2.42.0] E2E 안정화: 턴 시스템이 요구하는 누락 리소스 보강
+        resources.insert(assets.items.clone()); // ItemManager
+        resources.insert(crate::core::game_state::GameState::default()); // GameState
+        resources.insert(None::<crate::core::systems::world::teleport::TeleportAction>);
+        resources.insert(crate::ui::input::Command::Wait); // 초기 커맨드
 
         let mut dungeon = crate::core::dungeon::dungeon::Dungeon::new();
         dungeon.set_level(
