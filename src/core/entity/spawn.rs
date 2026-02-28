@@ -363,7 +363,9 @@ impl Spawner {
         }
         Self::m_initweap(entity, template, items, world, rng);
         Self::m_initinv(entity, template, items, world, rng);
-        if mmflags & MM_NOGRP == 0 {
+        // [v2.42.0] 그룹 스폰은 depth 4 이상에서만 허용
+        // 1~3층에서 그룹이 우르르 나오면 게임 진입 자체가 불가능해짐
+        if mmflags & MM_NOGRP == 0 && level_id.depth >= 4 {
             let geno = template.geno;
             if (geno & crate::core::entity::monster::G_SGROUP) != 0
                 || (geno & crate::core::entity::monster::G_LGROUP) != 0

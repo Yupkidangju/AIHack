@@ -854,9 +854,11 @@ impl<'a> LevelGen<'a> {
         let nroom = self.rooms.rooms.len().max(1);
         let depth = id.depth;
 
-        //
-        //
-        let extra_monsters = nroom * (1 + self.rng.rn2(3) as usize);
+        // [v2.42.0] 몬스터 스폰 수 밸런스 조정
+        // 원본 NetHack makelevel(): (depth + 1 + rn2(6)) 마리
+        // 1층 기준: 2~7마리, 깊은 층일수록 자연 증가
+        let base_count = (depth as usize).min(10) + 1 + self.rng.rn2(6) as usize;
+        let extra_monsters = base_count.min(nroom * 2); // 방 수의 2배를 초과하지 않도록 제한
         let mut spawned = 0;
         let mut attempts = 0;
         while spawned < extra_monsters && attempts < extra_monsters * 10 {
