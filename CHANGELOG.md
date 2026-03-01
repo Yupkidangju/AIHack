@@ -2,6 +2,19 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+## [2.42.1] - 2026-03-01
+### Added
+- **E2E 핵심 동사 테스트 (e2e_verbs.rs)**: Tier 1-3 자동 검증 12개 테스트 작성 및 전량 통과
+  - Tier 1: 이동(N/S/E/NE), 벽 충돌, 대기(Wait), 줍기(Pickup)
+  - Tier 2: 몬스터 공격(자동 전투), 문 자동 열기(Door→OpenDoor)
+  - Tier 3: 사망(HP=0 → DeathResults), 계단 하강(LevelChange)
+  - 통합: 5턴 연속 이동 시퀀스
+- **줍기(Pickup) 실제 연결**: `Command::Pickup`에 바닥 아이템 조회 → 인벤토리 추가 → Position/Level 컴포넌트 제거 로직 구현
+
+### Fixed
+- **몬스터 관통 버그 수정**: `movement_system`에서 몬스터 template을 찾지 못하면 공격을 건너뛰고 이동이 발생하던 문제 — 폴백 맨손 공격(1d4) 추가 및 `continue`를 `if let` 블록 밖으로 이동하여 항상 이동 차단
+- **디버그 스팸 제거**: `game_ui.rs`에서 매 프레임 `[Debug] Player Entity: ...` 출력하던 `println!` 제거 (초당 60회 이상 콘솔 스팸 유발)
+
 ## [2.42.0] - 2026-02-27
 ### Fixed
 - **[E2E Stabilization] 통합 테스트 패닉 수정**: `s0_world_initialization`부터 `s5_wait_action`까지 E2E 테스트 안정화
