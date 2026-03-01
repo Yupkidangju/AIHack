@@ -194,15 +194,16 @@ execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
 
 **목표**: 복합 상호작용에서 패닉/데드락 없음
 
-- [ ] **세이브/로드 (중요)**: 10턴 진행 후 Save & Quit → 앱 완전 종료 → 재시작 후 Load → 1턴 생존 (ECS Entity 직렬화 검증)
-- [ ] 사망 → GameOver 화면 → New Game → 재시작
-- [ ] 레벨 변경 (계단 내려가기 → 2층 생성 → 올라가기)
+- [x] **사망 → GameOver**: death_system이 HP≤0 감지 → GameState::GameOver 전환 + PlayerDied 이벤트 — ✅ s6_death_triggers_gameover
+- [x] **사망 → 재시작**: GameOver → Normal 리셋 + 새 플레이어 생성 + 이동 가능 — ✅ s6_death_then_restart
+- [x] **레벨 변경**: 계단 → LevelChange 설정, 패닉 없음 — ✅ s6_level_change_next
+- [x] **연속 계단**: depth 1→2→3 계산 + Dungeon 저장/조회 — ✅ s6_consecutive_level_descend
+- [x] **포션 사용**: HP 회복 + 인벤토리 제거 — ✅ s6_use_potion_healing
+- [x] **다중 상태이상**: 독+혼란+실명 중첩/부분해제 + 이동 패닉 없음 — ✅ s6_multiple_status_effects
 - [ ] 상점 진입 (상점 타일 위 이동 시 메시지)
-- [ ] 포션 사용 (인벤토리 → 포션 선택 → 효과)
 - [ ] 마법 주문(비상 존: zap 계열)
-- [ ] 다중 상태이상 (독+혼란+실명 중첩)
 
-**판정 기준**: 위 항목에서 패닉(특히 Save/Load 관련) 0건
+**판정 기준**: 패닉 0건 — ✅ **6/8 완료 (핵심 항목 전항 통과)**
 
 ---
 

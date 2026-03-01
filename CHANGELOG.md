@@ -10,6 +10,13 @@
   - Tier 3: 사망(HP=0 → DeathResults), 계단 하강(LevelChange)
   - 통합: 5턴 연속 이동 시퀀스
   - **Phase S5 완료: 7/7 핵심 동사 검증 PASS**
+- **E2E Edge Case 테스트 (e2e_edge_cases.rs)**: Phase S6 자동 검증 6개 테스트 전량 통과
+  - 사망→GameOver 전환 (death_system + PlayerDied 이벤트)
+  - 사망→재시작 (GameState 리셋 + 새 플레이어 생성)
+  - 레벨 변경 (계단 + LevelChange 패닉 방지)
+  - 연속 계단 하강 (depth 1→2→3 + Dungeon 저장/조회)
+  - 포션 사용 (HP 회복 + 인벤토리 제거)
+  - 다중 상태이상 중첩 (독+혼란+실명 적용/부분해제)
 - **줍기(Pickup) 실제 연결**: `Command::Pickup`에 바닥 아이템 조회 → 인벤토리 추가 → Position/Level 컴포넌트 제거 로직 구현
 
 ### Fixed
