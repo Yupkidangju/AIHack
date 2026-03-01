@@ -4,11 +4,12 @@
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
 ## [2.42.1] - 2026-03-01
 ### Added
-- **E2E 핵심 동사 테스트 (e2e_verbs.rs)**: Tier 1-3 자동 검증 12개 테스트 작성 및 전량 통과
-  - Tier 1: 이동(N/S/E/NE), 벽 충돌, 대기(Wait), 줍기(Pickup)
+- **E2E 핵심 동사 테스트 (e2e_verbs.rs)**: Tier 1-3 자동 검증 15개 테스트 작성 및 전량 통과
+  - Tier 1: 이동(N/S/E/NE), 벽 충돌, 대기(Wait), 줍기(Pickup), 인벤토리(상태전환/아이템조회/줍기→인벤토리)
   - Tier 2: 몬스터 공격(자동 전투), 문 자동 열기(Door→OpenDoor)
   - Tier 3: 사망(HP=0 → DeathResults), 계단 하강(LevelChange)
   - 통합: 5턴 연속 이동 시퀀스
+  - **Phase S5 완료: 7/7 핵심 동사 검증 PASS**
 - **줍기(Pickup) 실제 연결**: `Command::Pickup`에 바닥 아이템 조회 → 인벤토리 추가 → Position/Level 컴포넌트 제거 로직 구현
 
 ### Fixed
