@@ -17,6 +17,9 @@
   - 연속 계단 하강 (depth 1→2→3 + Dungeon 저장/조회)
   - 포션 사용 (HP 회복 + 인벤토리 제거)
   - 다중 상태이상 중첩 (독+혼란+실명 적용/부분해제)
+  - 상점 진입 (shop_type 타일 식별 + 진입/탈출 반응 9개 시나리오)
+  - 마법(Zap) 완드 검색 (빈 인벤토리/Weapon 인벤토리 미발견 확인)
+  - **Phase S6 완료: 8/8 Edge Case 검증 PASS**
 - **줍기(Pickup) 실제 연결**: `Command::Pickup`에 바닥 아이템 조회 → 인벤토리 추가 → Position/Level 컴포넌트 제거 로직 구현
 
 ### Fixed

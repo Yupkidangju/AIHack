@@ -290,7 +290,7 @@ fn s6_level_change_next() {
 // ============================================================================
 #[test]
 fn s6_use_potion_healing() {
-    let (mut world, mut resources, _grid, player_ent) = create_controlled_world();
+    let (mut world, _resources, _grid, player_ent) = create_controlled_world();
 
     // 1. 플레이어 HP를 절반으로 낮춤
     if let Some(mut entry) = world.entry(player_ent) {
@@ -537,7 +537,7 @@ fn s6_death_then_restart() {
 // ============================================================================
 #[test]
 fn s6_consecutive_level_descend() {
-    let (_world, mut resources, _grid, _player_ent) = create_controlled_world();
+    let (_world, resources, _grid, _player_ent) = create_controlled_world();
 
     // 레벨 ID 연속 증가 시뮬레이션
     let start_level = LevelID::new(DungeonBranch::Main, 1);
@@ -594,7 +594,7 @@ fn s6_consecutive_level_descend() {
 // ============================================================================
 #[test]
 fn s6_shop_entry_reaction() {
-    let (_world, mut resources, mut grid, _player_ent) = create_controlled_world();
+    let (_world, _resources, mut grid, _player_ent) = create_controlled_world();
 
     // 1. 상점 타일 설정: Room 타일에 shop_type 부여
     grid.locations[11][10].typ = TileType::Room;

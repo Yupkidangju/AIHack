@@ -200,10 +200,10 @@ execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
 - [x] **연속 계단**: depth 1→2→3 계산 + Dungeon 저장/조회 — ✅ s6_consecutive_level_descend
 - [x] **포션 사용**: HP 회복 + 인벤토리 제거 — ✅ s6_use_potion_healing
 - [x] **다중 상태이상**: 독+혼란+실명 중첩/부분해제 + 이동 패닉 없음 — ✅ s6_multiple_status_effects
-- [ ] 상점 진입 (상점 타일 위 이동 시 메시지)
-- [ ] 마법 주문(비상 존: zap 계열)
+- [x] **상점 진입**: shop_type 타일 식별 + shop_entry_reaction 6개 시나리오 + shop_exit_reaction 3개 시나리오 — ✅ s6_shop_entry_reaction
+- [x] **마법(Zap)**: 인벤토리 Wand 클래스 검색 + 미발견 시 패닉 없음 — ✅ s6_zap_no_wand
 
-**판정 기준**: 패닉 0건 — ✅ **6/8 완료 (핵심 항목 전항 통과)**
+**판정 기준**: 패닉 0건 — ✅ **8/8 완료! Phase S6 PASS**
 
 ---
 
