@@ -3,7 +3,7 @@
 //
 //
 
-use crate::core::entity::{Health, Inventory, PlayerTag, Position};
+use crate::core::entity::{Health, Inventory, Item, ItemTag, Level, PlayerTag, Position};
 use crate::core::game_state::{Direction, DirectionAction, GameState};
 use crate::ui::input::Command;
 use eframe::egui;
@@ -119,7 +119,84 @@ impl super::NetHackApp {
                 _action_executed = true;
             }
             Command::Pickup => {
-                _action_executed = true;
+                // [v2.42.0] 줍기 구현: 플레이어 위치의 바닥 아이템을 인벤토리에 넣기
+                let level_id = self.game.dungeon.current_level;
+                let mut p_pos = None;
+                let mut p_ent = None;
+                {
+                    let mut q = <(Entity, &Position)>::query().filter(component::<PlayerTag>());
+                    for (e, pos) in q.iter(&self.game.world) {
+                        p_pos = Some((pos.x, pos.y));
+                        p_ent = Some(*e);
+                    }
+                }
+
+                if let (Some((px, py)), Some(player_entity)) = (p_pos, p_ent) {
+                    // 바닥 아이템 찾기 (ItemTag가 있고 Position이 플레이어와 같은 것)
+                    let mut floor_items = Vec::new();
+                    {
+                        let mut iq =
+                            <(Entity, &Position, &Level)>::query().filter(component::<ItemTag>());
+                        for (ie, ipos, ilvl) in iq.iter(&self.game.world) {
+                            if ipos.x == px && ipos.y == py && ilvl.0 == level_id {
+                                floor_items.push(*ie);
+                            }
+                        }
+                    }
+
+                    if floor_items.is_empty() {
+                        if let Some(mut log) =
+                            self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                        {
+                            let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
+                            log.add("There is nothing here to pick up.", turn);
+                        }
+                    } else {
+                        let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
+
+                        // 첫 번째 아이템만 줍기 (NetHack은 여러개면 선택 메뉴)
+                        let item_ent = floor_items[0];
+
+                        // 아이템 이름 조회
+                        let item_name = self
+                            .game
+                            .world
+                            .entry_ref(item_ent)
+                            .ok()
+                            .and_then(|e| {
+                                e.get_component::<Item>()
+                                    .ok()
+                                    .map(|i| format!("{}", i.kind))
+                            })
+                            .unwrap_or_else(|| "something".to_string());
+
+                        // 인벤토리에 추가
+                        let mut picked = false;
+                        if let Some(mut entry) = self.game.world.entry(player_entity) {
+                            if let Ok(inv) = entry.get_component_mut::<Inventory>() {
+                                inv.items.push(item_ent);
+                                inv.assign_letter(item_ent);
+                                picked = true;
+                            }
+                        }
+
+                        if picked {
+                            // 바닥에서 제거: Position과 Level 컴포넌트 삭제
+                            if let Some(mut entry) = self.game.world.entry(item_ent) {
+                                entry.remove_component::<Position>();
+                                entry.remove_component::<Level>();
+                            }
+
+                            if let Some(mut log) =
+                                self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                            {
+                                log.add(format!("You pick up {}.", item_name), turn);
+                            }
+                        }
+
+                        _action_executed = true;
+                    }
+                }
             }
             Command::Open => {
                 self.input
