@@ -996,129 +996,73 @@ impl super::NetHackApp {
     }
 
     fn execute_turn_systems(&mut self) {
-        // [v2.42.1] 각 시스템을 개별 catch_unwind로 실행하여 패닉 격리 및 진단 강화
-        // 하나의 시스템 패닉이 전체 턴을 중단시키지 않도록 합니다.
-        macro_rules! run_sys {
-            ($name:expr, $sys:expr) => {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    let mut sched = Schedule::builder().add_system($sys).build();
-                    sched.execute(&mut self.game.world, &mut self.game.resources);
-                }));
-                if let Err(e) = result {
-                    let msg = if let Some(s) = e.downcast_ref::<String>() {
-                        s.clone()
-                    } else if let Some(s) = e.downcast_ref::<&str>() {
-                        s.to_string()
-                    } else {
-                        "unknown".to_string()
-                    };
-                    eprintln!("[WARN] 시스템 '{}' 패닉 (스킵됨): {}", $name, msg);
-                }
-            };
-        }
+        // [v2.42.2] 단일 Schedule + flush 방식 복원
+        // 중요: catch_unwind를 사용하면 Legion의 내부 borrow guard가
+        // 해제되지 않아 World 전체가 AccessDenied 상태에 빠집니다.
+        // 패닉 방지는 시스템 내부에서 처리해야 합니다.
+        let mut schedule = Schedule::builder()
+            .add_system(crate::core::systems::movement::movement_system())
+            .flush()
+            .add_system(crate::core::systems::ai::pet_hunger_system())
+            .flush()
+            .add_system(crate::core::systems::ai::monster_ai_system())
+            .flush()
+            .add_system(crate::core::systems::luck::luck_maintenance_system())
+            .flush()
+            .add_system(crate::core::systems::engrave::engrave_tick_system())
+            .flush()
+            .add_system(crate::core::systems::trap::trap_trigger_system())
+            .flush()
+            .add_system(crate::core::systems::death::death_system())
+            .flush()
+            .add_system(crate::core::systems::vision_system::vision_update_system())
+            .flush()
+            .add_system(crate::core::systems::vision_system::magic_map_effect_system())
+            .flush()
+            .add_system(crate::core::systems::inventory::autopickup_tick_system())
+            .flush()
+            .add_system(crate::core::systems::inventory::inventory_action_system())
+            .flush()
+            .add_system(crate::core::systems::item_use::item_input_system())
+            .flush()
+            .add_system(crate::core::systems::item_use::item_use_system())
+            .flush()
+            .add_system(crate::core::systems::equipment::equipment_system())
+            .flush()
+            .add_system(crate::core::systems::equipment::update_player_stats_system())
+            .flush()
+            .add_system(crate::core::systems::throw::throw_system())
+            .flush()
+            .add_system(crate::core::systems::zap::zap_system())
+            .flush()
+            .add_system(crate::core::systems::teleport::teleport_system())
+            .flush()
+            .add_system(crate::core::systems::spell::spell_cast_system())
+            .flush()
+            .add_system(crate::core::systems::stairs::stairs_system())
+            .flush()
+            .add_system(crate::core::systems::status::status_tick_system())
+            .flush()
+            .add_system(crate::core::systems::attrib::attrib_maintenance_system())
+            .flush()
+            .add_system(crate::core::systems::timeout::timeout_dialogue_system())
+            .flush()
+            .add_system(crate::core::systems::item_tick::item_tick_system())
+            .flush()
+            .add_system(crate::core::systems::regeneration::regeneration_system())
+            .flush()
+            .add_system(crate::core::systems::regeneration::monster_regeneration_system())
+            .flush()
+            .add_system(crate::core::systems::evolution::evolution_tick_system())
+            .flush()
+            .add_system(crate::core::systems::evolution::lycanthropy_tick_system())
+            .flush()
+            .add_system(crate::core::systems::shop::shopkeeper_update_system())
+            .flush()
+            .add_system(crate::core::systems::weight::update_encumbrance_system())
+            .build();
 
-        run_sys!(
-            "movement",
-            crate::core::systems::movement::movement_system()
-        );
-        run_sys!("pet_hunger", crate::core::systems::ai::pet_hunger_system());
-        run_sys!("monster_ai", crate::core::systems::ai::monster_ai_system());
-        run_sys!(
-            "luck",
-            crate::core::systems::luck::luck_maintenance_system()
-        );
-        run_sys!(
-            "engrave_tick",
-            crate::core::systems::engrave::engrave_tick_system()
-        );
-        run_sys!(
-            "trap_trigger",
-            crate::core::systems::trap::trap_trigger_system()
-        );
-        run_sys!("death", crate::core::systems::death::death_system());
-        run_sys!(
-            "vision_update",
-            crate::core::systems::vision_system::vision_update_system()
-        );
-        run_sys!(
-            "magic_map",
-            crate::core::systems::vision_system::magic_map_effect_system()
-        );
-        run_sys!(
-            "autopickup",
-            crate::core::systems::inventory::autopickup_tick_system()
-        );
-        run_sys!(
-            "inventory_action",
-            crate::core::systems::inventory::inventory_action_system()
-        );
-        run_sys!(
-            "item_input",
-            crate::core::systems::item_use::item_input_system()
-        );
-        run_sys!(
-            "item_use",
-            crate::core::systems::item_use::item_use_system()
-        );
-        run_sys!(
-            "equipment",
-            crate::core::systems::equipment::equipment_system()
-        );
-        run_sys!(
-            "player_stats",
-            crate::core::systems::equipment::update_player_stats_system()
-        );
-        run_sys!("throw", crate::core::systems::throw::throw_system());
-        run_sys!("zap", crate::core::systems::zap::zap_system());
-        run_sys!(
-            "teleport",
-            crate::core::systems::teleport::teleport_system()
-        );
-        run_sys!(
-            "spell_cast",
-            crate::core::systems::spell::spell_cast_system()
-        );
-        run_sys!("stairs", crate::core::systems::stairs::stairs_system());
-        run_sys!(
-            "status_tick",
-            crate::core::systems::status::status_tick_system()
-        );
-        run_sys!(
-            "attrib",
-            crate::core::systems::attrib::attrib_maintenance_system()
-        );
-        run_sys!(
-            "timeout_dialogue",
-            crate::core::systems::timeout::timeout_dialogue_system()
-        );
-        run_sys!(
-            "item_tick",
-            crate::core::systems::item_tick::item_tick_system()
-        );
-        run_sys!(
-            "regen",
-            crate::core::systems::regeneration::regeneration_system()
-        );
-        run_sys!(
-            "monster_regen",
-            crate::core::systems::regeneration::monster_regeneration_system()
-        );
-        run_sys!(
-            "evolution",
-            crate::core::systems::evolution::evolution_tick_system()
-        );
-        run_sys!(
-            "lycanthropy",
-            crate::core::systems::evolution::lycanthropy_tick_system()
-        );
-        run_sys!(
-            "shopkeeper",
-            crate::core::systems::shop::shopkeeper_update_system()
-        );
-        run_sys!(
-            "encumbrance",
-            crate::core::systems::weight::update_encumbrance_system()
-        );
+        schedule.execute(&mut self.game.world, &mut self.game.resources);
     }
 
     fn handle_level_change(&mut self) {

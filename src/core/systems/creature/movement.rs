@@ -41,6 +41,11 @@ use legion::*;
 #[read_component(crate::core::entity::TrapTag)]
 #[read_component(crate::core::entity::StructureTag)]
 #[write_component(crate::core::entity::Structure)]
+// [v2.42.2] CommandBuffer.push()에서 사용하는 컴포넌트 선언 추가
+// 이 누락이 Legion AccessDenied 패닉의 근본 원인이었습니다.
+#[write_component(Renderable)]
+#[write_component(Species)]
+#[write_component(Talkative)]
 pub fn movement(
     world: &mut SubWorld,
     #[resource] grid: &mut Grid,
