@@ -88,6 +88,38 @@ impl eframe::App for NetHackApp {
 }
 
 fn main() -> eframe::Result<()> {
+    // [v2.42.3] 외부 감사 반영: Fail-Fast 패닉 훅
+    // Legion ECS 환경에서 catch_unwind는 borrow guard를 오염시키므로,
+    // 패닉 시 진단 정보를 덤프하고 깨끗하게 종료하는 것이 유일한 안전 대안.
+    std::panic::set_hook(Box::new(|info| {
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        let msg = if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else if let Some(s) = info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else {
+            "Unknown panic".to_string()
+        };
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "unknown".to_string());
+
+        // 크래시 덤프 파일 생성
+        let dump = format!(
+            "=== AIHack Crash Dump ===\nTime: {:?}\nLocation: {}\nMessage: {}\n\nBacktrace:\n{}",
+            std::time::SystemTime::now(),
+            location,
+            msg,
+            backtrace
+        );
+        eprintln!("\n{}", dump);
+
+        // 파일로도 저장 시도
+        let _ = std::fs::write("crash_dump.txt", &dump);
+        eprintln!("\n[CRASH] 덤프가 crash_dump.txt에 저장되었습니다.");
+    }));
+
     println!(
         "[v{}] {} 인프라 및 에셋 로더가 준비되었습니다.",
         APP_VERSION, APP_TITLE

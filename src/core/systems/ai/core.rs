@@ -58,6 +58,11 @@ use crate::core::entity::monster::MonsterFaction;
 #[read_component(crate::core::entity::Structure)]
 #[read_component(crate::core::entity::StructureTag)]
 #[read_component(Level)]
+// [v2.42.3] 외부 감사 반영: entry_mut()이 archetype 전체 접근 권한을 요구하므로,
+// 몬스터 엔티티가 가진 모든 컴포넌트에 대한 선언이 필요합니다.
+#[read_component(crate::core::entity::Renderable)]
+#[read_component(crate::core::entity::Species)]
+#[read_component(crate::core::entity::Talkative)]
 pub fn monster_ai(
     world: &mut SubWorld,
     #[resource] grid: &mut Grid,

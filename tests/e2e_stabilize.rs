@@ -365,3 +365,88 @@ fn s5_wait_action() {
         println!("✅ S5: 5턴 대기 후 위치: ({}, {})", pos.x, pos.y);
     }
 }
+
+// ============================================================================
+// [v2.42.3] 외부 감사 반영: Full Schedule Integration Tests
+// 기존 격리 테스트(create_controlled_world + 단일 시스템)는 SubWorld 접근 충돌을
+// 잡지 못함. 30개 시스템 전체 Schedule 동시 실행으로 AccessDenied 사전 포착.
+// ============================================================================
+
+/// 감사T1: 30개 시스템 전체 실행 50턴 무패닉 — MoveN 이동 반복
+/// 실제 게임과 동일한 Schedule을 구성하여 SubWorld borrow 충돌 검증
+#[test]
+fn audit_full_schedule_50_turns_move() {
+    let (mut world, mut resources, _grid) = create_test_world();
+
+    // MoveN 명령으로 50턴 실행 — 이동 + 몬스터 AI + 전투 + 시야 갱신 전체
+    for turn in 1..=50 {
+        resources.insert(turn as u64);
+        resources.insert(aihack::ui::input::Command::MoveN);
+        run_schedule_safe(&mut world, &mut resources, 30);
+    }
+
+    // 패닉 없이 여기 도달하면 성공
+    let mut query = <&Health>::query().filter(component::<PlayerTag>());
+    let alive = query
+        .iter(&world)
+        .next()
+        .map(|h| h.current > 0)
+        .unwrap_or(false);
+    println!("✅ 감사T1: 50턴 Full Schedule 완료 (생존: {})", alive);
+}
+
+/// 감사T2: 무작위 Command 시퀀스 100턴 퍼징
+/// 모든 Command variant를 포함하여 미구현 명령에 의한 패닉도 검증
+#[test]
+fn audit_command_fuzzing_100_turns() {
+    let (mut world, mut resources, _grid) = create_test_world();
+
+    // 모든 Command variant를 순차 반복 주입
+    let commands = [
+        aihack::ui::input::Command::MoveN,
+        aihack::ui::input::Command::MoveS,
+        aihack::ui::input::Command::MoveE,
+        aihack::ui::input::Command::MoveW,
+        aihack::ui::input::Command::MoveNE,
+        aihack::ui::input::Command::MoveNW,
+        aihack::ui::input::Command::MoveSE,
+        aihack::ui::input::Command::MoveSW,
+        aihack::ui::input::Command::Wait,
+        aihack::ui::input::Command::Pickup,
+        aihack::ui::input::Command::Open,
+        aihack::ui::input::Command::Close,
+        aihack::ui::input::Command::Kick,
+        aihack::ui::input::Command::Search,
+        aihack::ui::input::Command::Descend,
+        aihack::ui::input::Command::Ascend,
+        aihack::ui::input::Command::Eat,
+        aihack::ui::input::Command::Quaff,
+        aihack::ui::input::Command::Read,
+        aihack::ui::input::Command::Wear,
+        aihack::ui::input::Command::Wield,
+        aihack::ui::input::Command::TakeOff,
+        aihack::ui::input::Command::Drop,
+        aihack::ui::input::Command::Throw,
+        aihack::ui::input::Command::Invoke,
+        aihack::ui::input::Command::Zap,
+        aihack::ui::input::Command::Cast,
+        aihack::ui::input::Command::Fire,
+        aihack::ui::input::Command::LookHere,
+        aihack::ui::input::Command::Pray,
+        aihack::ui::input::Command::Pay,
+    ];
+
+    for turn in 1..=100 {
+        let cmd = commands[turn as usize % commands.len()];
+        eprintln!("[FUZZ] Turn {} → {:?}", turn, cmd);
+        resources.insert(turn as u64);
+        resources.insert(cmd);
+        run_schedule_safe(&mut world, &mut resources, 30);
+    }
+
+    // 패닉 없이 여기 도달하면 성공
+    println!(
+        "✅ 감사T2: 100턴 Command 퍼징 완료 ({}개 variant 순환)",
+        commands.len()
+    );
+}

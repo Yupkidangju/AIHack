@@ -50,10 +50,10 @@ pub struct DeathResults {
 #[read_component(CombatStats)]
 #[read_component(MonsterTag)]
 #[read_component(PlayerTag)]
-#[read_component(crate::core::entity::Position)]
+#[write_component(crate::core::entity::Position)]
 #[read_component(crate::core::entity::Monster)]
 #[read_component(crate::core::entity::Inventory)]
-#[read_component(crate::core::entity::Level)]
+#[write_component(crate::core::entity::Level)]
 // [v2.42.2] CommandBuffer.push()에서 사용하는 컴포넌트 선언 추가
 #[write_component(crate::core::entity::Renderable)]
 #[write_component(crate::core::entity::Item)]

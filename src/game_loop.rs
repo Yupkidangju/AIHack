@@ -77,13 +77,19 @@ impl super::NetHackApp {
             _ => (/* Normal 등 */),
         }
 
-        // 명령이 있을 경우 시스템 실행
+        // [v2.42.3] 유효한 액션이 있을 때만 시스템 및 후처리 실행
+        // 외부 감사: 미구현 명령(Pay 등)이 빈 턴을 강제 연산하여
+        // 몬스터 이동/상태이상 틱이 의도치 않게 발생하는 문제 방지
         if self.input.last_cmd != crate::ui::input::Command::Unknown {
             //
             self.game.resources.insert(self.input.last_cmd);
             self.game.resources.insert(self.game.grid.clone());
 
-            //
+            // 액션 큐 배수 (큐에 직접 넣은 액션 포함)
+            let drained = self.drain_action_queue();
+            _action_executed = _action_executed || drained;
+
+            // 유효한 액션이 실행되었을 때만 턴 진행 + 시스템 실행
             if _action_executed {
                 if let Some(mut turn) = self.game.resources.get_mut::<u64>() {
                     *turn += 1;
@@ -92,15 +98,11 @@ impl super::NetHackApp {
                         log.current_turn = *turn;
                     }
                 }
+
+                self.execute_turn_systems();
+                self.post_turn_processing();
+                self.handle_level_change();
             }
-
-            // [v1.9.0
-            let drained = self.drain_action_queue();
-            _action_executed = _action_executed || drained;
-            self.execute_turn_systems();
-
-            self.post_turn_processing();
-            self.handle_level_change();
         }
     }
 
