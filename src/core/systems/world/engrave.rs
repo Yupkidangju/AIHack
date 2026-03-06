@@ -108,15 +108,12 @@ pub fn is_protected_by_elbereth(pos: (i32, i32), grid: &Grid) -> bool {
 }
 
 ///
-#[system]
-pub fn engrave_tick(
-    #[resource] grid: &mut Grid,
-    #[resource] turn: &u64,
-    #[resource] rng: &mut NetHackRng,
-) {
+pub fn engrave_tick_system(ctx: &mut crate::core::context::GameContext) {
+    let grid = &mut *ctx.grid;
+    let rng = &mut *ctx.rng;
     //
     // 성능을 위해 매 턴 전체 타일을 뒤지는 것보다 특정 주기(예: 10턴)마다 수행
-    if turn % 10 != 0 {
+    if ctx.turn % 10 != 0 {
         return;
     }
 
@@ -128,13 +125,13 @@ pub fn engrave_tick(
                     match engr.typ {
                         EngraveType::Dust => {
                             //
-                            if *turn - engr.age > 30 && rng.rn2(2) == 0 {
+                            if ctx.turn - engr.age > 30 && rng.rn2(2) == 0 {
                                 erase = true;
                             }
                         }
                         EngraveType::Blood => {
                             //
-                            if *turn - engr.age > 100 && rng.rn2(5) == 0 {
+                            if ctx.turn - engr.age > 100 && rng.rn2(5) == 0 {
                                 erase = true;
                             }
                         }

@@ -1,326 +1,336 @@
-# 🛡️ AIHack 안정화 로드맵 (STABILIZATION_ROADMAP)
+# 🛡️ AIHack 안정화 로드맵 v2.0 (STABILIZATION_ROADMAP)
 
-**버전**: v1.0
-**작성일**: 2026-02-28
-**대상 브랜치**: `stabilize/e2e-playable` (main에서 분기)
-**전제**: v2.41.0 main 브랜치 = 100% 순수 번역본 (177,229줄, 4,177 테스트)
-**목표**: cargo run → Title → CharCreation → Playing (N턴 생존) → GameOver 전체 E2E 동작
-
----
-
-## 0. 외부감사 제안 내부 검토
-
-### ✅ 수용하는 항목
-| 제안 | 판단 | 이유 |
-|------|------|------|
-| LLM 연동 보류 | **완전 수용** | 로직 데드락 vs LLM 오류 구분 불가. 결정론적 동작 우선 |
-| AppState 상태머신 E2E 검증 | **수용** | 현재 Title→Playing 흐름의 패닉 여부 미검증 |
-| ActionQueue→EventQueue 동기화 검증 | **수용** | post_turn_processing의 borrow 패턴이 런타임에서 안전한지 미확인 |
-| NetHack 특화 Edge Case 테스트 | **부분 수용** | 중요하나 E2E가 먼저. Phase 2로 배치 |
-| 점진적 LLM 주입 전략 | **수용** | death.rs 묘비명부터 시작하는 전략이 합리적 |
-| 커스텀 패닉 훅(Panic Hook) 설정 | **수용** | eframe/ratatui 혼용 환경에서 패닉 시 터미널 꼬임 방지 및 트레이스 확보 필수 |
-| 큐 연쇄 액션(Cascade) 무한 루프 방지 | **수용** | 이벤트 큐 아키텍처 다발성 데드락 방지를 위한 Safe Limit(상한선) 도입 필수 |
-| 세이브/로드(Save/Load) 엣지 케이스 | **수용** | ECS 직렬화/역직렬화 패닉은 가장 치명적이므로 최우선 엣지 케이스로 포함 |
-
-### ❌ 수정/보완하는 항목
-| 제안 | 수정 | 이유 |
-|------|------|------|
-| "스트레스 테스트 방안" | **E2E 동작이 먼저** | 폴리모프+장비해제 같은 엣지케이스는 기본 동작 후에 의미 있음 |
-| "즉시 로드맵 문서 작성 후 코드 수정" | **동의하되 단계 세분화** | 외부감사의 4단계는 너무 거칠다. 내부적으로 8단계로 세분화 |
-
-### 🔍 외부감사가 놓친 핵심 사항
-
-1. **`cargo run` 자체가 안 될 가능성이 높다**
-   - 177,229줄 중 상당수는 순수 결과 패턴(Pure Result)으로 이식되어 ECS와 **연결되지 않은 섬 코드**
-   - `execute_turn_systems()`에 등록된 시스템은 약 25개뿐. 나머지 수백개 모듈은 테스트만 통과
-   - **우선순위**: 게임이 "돌아가는" 것 = 이 25개 시스템이 패닉 없이 실행되는 것
-
-2. **에셋 로딩 실패 가능성**
-   - `assets/data/*.toml` 파일의 스키마와 현재 코드의 `serde` 역직렬화 구조체 사이 불일치 가능
-   - `AssetManager::load_defaults()`가 성공해야 게임이 시작됨
-
-3. **Legion ECS 런타임 Borrow Conflict**
-   - 테스트에서는 단일 시스템만 실행. schedule.execute()에서 25개 시스템이 동시에 World/Resources에 접근할 때 Legion의 런타임 borrow checker가 패닉 발생 가능
-   - 이것은 **컴파일 타임에 잡히지 않는** 런타임 이슈
-
-4. **Grid/DungeonManager 초기화 누락**
-   - `initialize_game_with_choices()`에서 Grid, DungeonLevel 등이 올바르게 생성되는지 미검증
-   - Grid가 비어있으면 movement_system, vision_system 등이 즉시 패닉
+**버전**: v2.1
+**갱신일**: 2026-03-06
+**이전 버전**: v2.0 (2026-03-04) — Phase E1~E5 계획 수립
+**이전 버전**: v1.0 (2026-02-28) — Phase S0~S6 완료, S7 대기 상태
+**대상 브랜치**: `stabilize/e2e-playable`
+**전제**: v2.42.1 = Phase S0~S6 완료. E2E 핵심 동사 및 Edge Case 전량 통과.
+**목표**: Legion `#[system]` 매크로 제거 → `&mut World` 직접 접근 엔진으로 전환 + LLM 통합 아키텍처 확립
 
 ---
 
-## 1. 안정화 Phase 구조 (8단계)
+## 0. v2.0 로드맵 전면 개편 사유
+
+### 0.1 발견된 구조적 문제
+
+v1.0 로드맵의 Phase S3(첫 턴 생존)에서 바이너리 서치 방식으로 시스템을 하나씩 활성화하며 `AccessDenied` 패닉을 수정하는 접근이 **구조적으로 한계에 도달**했다.
+
+**근본 원인**: Legion ECS의 `entry_ref(entity)` / `entry_mut(entity)` 호출 시, 해당 엔티티의 **아키타입 전체**에 대한 읽기/쓰기 권한이 `#[read_component]` / `#[write_component]`로 선언되어 있어야 함. 엔티티에 부착된 컴포넌트가 10~15개인 상황에서 하나라도 누락하면 런타임 패닉이 발생.
+
+**한계**:
+1. **비결정적**: RNG 시드에 따라 다른 코드 경로가 실행되어 같은 시스템 수에서도 패닉 발생 여부가 다름
+2. **조합 폭발**: 시스템 A+B 개별 통과해도 동시 실행 시 아키타입 잠금 충돌 가능
+3. **수정해도 재발**: 같은 패턴(entry_ref/entry_mut 사용 + 컴포넌트 선언 누락)이 25개+ 파일에 반복
+4. **턴 기반 게임에 불필요한 병렬화 오버헤드**: 순차 실행이면 충분한 게임에 병렬 스케줄링 적용 중
+
+### 0.2 핵심 통찰
+
+NetHack은 **턴 기반 게임**이다. 병렬 실행이 불필요하다.
+Legion의 Schedule + SubWorld + 컴포넌트 권한 선언은 **병렬 실행을 위한 안전 장치**이다.
+우리에게는 이 장치가 필요 없으며, 오히려 **AccessDenied 패닉의 원인**이 되고 있다.
+
+### 0.3 전략 전환
+
+**기존 (v1.0)**: 각 시스템의 컴포넌트 선언을 일일이 수정하여 AccessDenied 제거
+**신규 (v2.0)**: `#[system]` 매크로 자체를 제거하고 `&mut World` 직접 접근으로 전환
+
+`&mut World`에서는 `entry_ref`/`entry_mut`에 **권한 검사가 없다**.
+따라서 **AccessDenied가 구조적으로 영원히 불가능**해진다.
+
+### 0.4 이미 존재하는 성공 사례
+
+`src/core/systems/social/interaction.rs`는 **이미 `&mut World` 직접 접근 + InteractionProvider(LLM 교체 포인트) 패턴**을 사용 중:
+
+```rust
+pub fn try_open_door(
+    world: &mut World,                        // ← SubWorld가 아닌 World 직접
+    grid: &mut Grid,
+    log: &mut GameLog,
+    turn: u64,
+    direction: Direction,
+    provider: &dyn super::InteractionProvider, // ← LLM 교체 포인트
+) -> bool { ... }
+```
+
+이 패턴을 **31개 전체 시스템에 확산**하는 것이 본 로드맵의 핵심.
+
+---
+
+## 1. 신규 Phase 구조 (5단계)
 
 ```
-Phase S0: 브랜치 생성 + 빌드 검증
-Phase S1: 앱 기동 (cargo run → 창 뜨기)
-Phase S2: 상태머신 관통 (Title → CharCreation → Playing 진입)
-Phase S3: 첫 턴 생존 (Playing 상태에서 1턴 실행)
-Phase S4: N턴 루프 (10턴 연속 패닉 없음)
-Phase S5: 핵심 상호작용 (이동/공격/아이템 줍기/계단)
-Phase S6: Edge Case 방어 (사망/레벨변경/상점 진입)
-Phase S7: LLM 최소 주입 (묘비명 → NPC 대사 → 상점)
+Phase E1: GameContext 구조체 정의 + 턴 엔진 골격 (기반 구축)
+Phase E2: 시스템 전환 — #[system] → 일반 함수 (31개, 점진적)
+Phase E3: 전체 통합 테스트 + 안정성 검증
+Phase E4: LLM 통합 아키텍처 확립 (AIProvider trait)
+Phase E5: LLM 실제 주입 + 대화/내러티브/적응형 AI
 ```
+
+> **E = Engine Redesign**
 
 ---
 
 ## 2. Phase 상세
 
-### Phase S0: 브랜치 생성 + 빌드 검증
+### Phase E1: GameContext 구조체 + 턴 엔진 골격 ✅ **완료 (2026-03-05)**
 
-**목표**: 안정화 전용 브랜치에서 깨끗한 빌드 확인
+**목표**: 모든 시스템이 공유할 통합 컨텍스트 구조체를 정의하고, 수동 시스템 호출 루프를 구축
 
-- [ ] `git checkout -b stabilize/e2e-playable` 생성
-- [ ] `cargo build` 에러 0개 확인
+**완료 사항**:
+- [x] `GameContext` 구조체 정의 (`src/core/context.rs`)
+  ```rust
+  pub struct GameContext<'a> {
+      pub world: &'a mut World,
+      pub grid: &'a mut Grid,
+      pub log: &'a mut GameLog,
+      pub rng: &'a mut NetHackRng,
+      pub turn: u64,
+      pub cmd: Command,
+      pub assets: &'a AssetManager,
+      pub event_queue: &'a mut EventQueue,
+      pub action_queue: &'a mut ActionQueue,
+  }
+  ```
+- [x] `TurnRunner` 구조체 정의 (Schedule 대체)
+- [x] `game_loop.rs`에서 Schedule 실행 후 GameContext 순차 호출부 구축
+- [ ] `AIProvider` trait 정의 (→ Phase E4로 이동)
+- [ ] `DefaultAIProvider` 구현 (→ Phase E4로 이동)
+
+**판정 결과**: ✅ GameContext + TurnRunner 정의 완료 + 컴파일/테스트 성공
+
+---
+
+### Phase E2: 시스템 전환 (30개 → 일반 함수) — **13/30 완료 (43.3%)**
+
+**목표**: 모든 `#[system]` / `#[legion::system]` 매크로 시스템을 `fn system_name(ctx: &mut GameContext)` 시그니처로 전환
+
+**전환 상태 (2026-03-06 기준)**:
+
+| # | 파일 | 시스템 | 상태 | 비고 |
+|---|------|--------|------|------|
+| 1 | timeout.rs | timeout_dialogue | ✅ | E2a |
+| 2 | luck.rs | luck_maintenance | ✅ | E2a |
+| 3 | status.rs | status_tick | ✅ | E2a |
+| 4 | attrib.rs | attrib_maintenance | ✅ | E2a |
+| 5 | item_tick.rs | item_tick | ✅ | E2a, Gather-Apply |
+| 6 | regeneration.rs | regeneration | ✅ | E2a |
+| 7 | regeneration.rs | monster_regeneration | ✅ | E2a |
+| 8 | engrave.rs | engrave_tick | ✅ | E2b |
+| 9 | inventory.rs | autopickup_tick | ✅ | E2b |
+| 10 | inventory.rs | inventory_action | ✅ | E2b |
+| 11 | evolution.rs | evolution_tick | ✅ | E2b, Gather-Apply |
+| 12 | evolution.rs | lycanthropy_tick | ✅ | E2b, Gather-Apply |
+| 13 | weight.rs | update_encumbrance | ✅ | E2b, EntityStore 제네릭 |
+| 14 | movement.rs | movement | ⏳ | E2c, 1310줄 대형 |
+| 15 | ai/core.rs | pet_hunger | ⏳ | E2c |
+| 16 | ai/core.rs | monster_ai | ⏳ | E2c, 680줄 대형 |
+| 17 | death.rs | death | ⏳ | E2c |
+| 18 | trap.rs | trap_trigger | ⏳ | E2c |
+| 19 | vision_system.rs | vision_update | ⏳ | VisionSystem 리소스 필요 |
+| 20 | vision_system.rs | magic_map_effect | ⏳ | CommandBuffer 필요 |
+| 21 | item_use.rs | item_input | ⏳ | E2c |
+| 22 | item_use.rs | item_use | ⏳ | E2c |
+| 23 | equipment.rs | equipment | ⏳ | ActionQueue 사용 |
+| 24 | equipment.rs | update_player_stats | ⏳ | E2c |
+| 25 | throw.rs | throw | ⏳ | CommandBuffer 필요 |
+| 26 | zap.rs | zap | ⏳ | E2c |
+| 27 | teleport.rs | teleport | ⏳ | LevelChange 리소스 필요 |
+| 28 | spell.rs | spell_cast | ⏳ | E2c |
+| 29 | stairs.rs | stairs | ⏳ | SystemBuilder 패턴, LevelChange |
+| 30 | shop.rs | shopkeeper_update | ⏳ | Provider 리소스 필요 |
+
+**전환 절차 (각 시스템)**:
+1. `#[system]` / `#[legion::system]` 매크로 제거
+2. `#[read_component]` / `#[write_component]` 전체 제거
+3. `world: &mut SubWorld` → `ctx.world` (GameContext 경유)
+4. `#[resource] xxx: &Type` → `ctx.xxx` 직접 접근
+5. `command_buffer` → Gather-Apply 패턴 또는 `ctx.world` 직접 조작
+6. Schedule에서 제거 → GameContext 순차 호출부에 등록
+
+**교훈 (2026-03-06)**:
+- ⚠️ regex 대량 치환은 헬퍼 함수까지 오염시탘 → **한 시스템씩 수동 전환이 안전**
+- `let world = &mut *ctx.world;` 패턴은 ctx 전체 borrow를 잡으므로, `ctx.필드` 직접 참조가 바람직
+- Rust struct 다른 필드 동시 mutable borrow는 허용되므로 활용 가능
+
+**판정 기준**: 30개 전체 전환 + `cargo build` 성공 + 기존 E2E 테스트 통과
+
+**예상 소요**: 12~20시간 (시스템당 20~40분)
+
+---
+
+### Phase E3: 전체 통합 테스트 + 안정성 검증
+
+**목표**: 전환 완료 후 모든 기존 테스트 + 퍼징 테스트 통과
+
+**작업**:
+- [ ] `e2e_stabilize.rs` 수정: `run_schedule_safe` → `TurnRunner::execute()` 호출
 - [ ] `cargo test` 4,177개 전량 통과 확인
-- [ ] 경고(warning) 목록 캡처 → 정리 우선순위 결정
+- [ ] `audit_command_fuzzing_100_turns` **전체 31개 시스템 활성화**로 통과
+- [ ] `s3_incremental_system_activation` 테스트 업데이트
+- [ ] 새 퍼징: 500턴, 1000턴 테스트 추가
+- [ ] Panic Hook 설치: seed, turn, last_command, backtrace 기록
+- [ ] 불변식 검사 추가: 턴 종료 시 HP >= 0, Entity 유효성, Position 범위 확인
 
-**판정 기준**: `cargo build` 성공, 테스트 전량 통과
+**판정 기준**: 모든 테스트 통과 + 1000턴 퍼징 패닉 0건
+
+**예상 소요**: 4~8시간
 
 ---
 
-### Phase S1: 앱 기동 (창 띄우기)
+### Phase E4: LLM 통합 아키텍처 확립
 
-**목표**: `cargo run` → eframe 윈도우가 뜨고 Title 화면 렌더링
-
-**예상 장애물**:
-1. eframe/egui 의존성 버전 충돌
-2. `NetHackApp::new()`에서 `AssetManager::load_defaults()` 실패 (TOML 파싱 에러)
-3. ECS Resources 초기화 순서 문제
+**목표**: `GameContext`에 LLM 교체 포인트를 확장하여, 모든 시스템에서 LLM을 선택적으로 사용 가능한 구조 확립
 
 **작업**:
-- [ ] `main.rs` 기동 시 가장 먼저 `std::panic::set_hook` 설정 (터미널 복구 및 에러 로그 파일/콘솔 명확히 출력)
-- [ ] `cargo run` 실행 → 패닉 메시지 수집
-- [ ] AssetManager TOML 로딩 경로 확인/수정
-- [ ] NetHackApp::new() 내 Resources 등록 순서 검증
-- [ ] Title 화면 렌더링 확인
+- [ ] `AIProvider` trait 확장 (7개 교체 포인트):
+  1. **대화/내러티브**: 몬스터 대사, NPC 대화 → `generate_monster_dialogue()`
+  2. **몰입형 설명**: 전투 묘사, 던전 분위기 → `narrate_combat()`, `describe_atmosphere()`
+  3. **적응형 AI**: 몬스터 전술 결정 → `decide_monster_action()` (선택적 오버라이드)
+  4. **동적 이벤트**: 퀘스트/이벤트 자동 생성 → `generate_random_event()`
+  5. **분위기 설명**: 새 층 진입, 특별한 방 → `describe_dungeon_level()`
+  6. **아이템 설명**: 미확인 아이템 힌트 → `describe_unidentified_item()`
+  7. **함정 대화**: 상점 흥정, 기도 응답 → 기존 `InteractionProvider` 확장
+- [ ] `Snapshot` 구조체 정의: `PlayerSnapshot`, `MonsterSnapshot`, `GameStateSnapshot`
+  - LLM에 전달할 읽기 전용 스냅샷 (World에서 추출, 비동기 안전)
+- [ ] `ResponseCache` 구현: 비동기 LLM 호출 대비 캐시 패턴
+- [ ] 기존 `InteractionProvider` 7곳을 `GameContext.provider` 경유로 통합
 
-**판정 기준**: 윈도우가 뜨고 Title 화면의 "New Game" 버튼이 보임
+**핵심 설계 원칙**:
+1. LLM은 항상 **선택적** (None이면 기본 NetHack 텍스트)
+2. LLM 실패 시 **Fallback 보장** (게임 멈춤 절대 없음)
+3. LLM 호출은 **게임 로직과 완전 분리** (순수 텍스트 생성만)
+4. 모든 LLM 호출에 **타임아웃(2초)** 설정
 
----
+**판정 기준**: `AIProvider` trait 완성 + 기존 테스트 무영향 + 컴파일 성공
 
-### Phase S2: 상태머신 관통
-
-**목표**: Title → CharCreation → Playing 전체 흐름 무패닉
-
-**예상 장애물**:
-1. CharCreation → `initialize_game_with_choices()` 에서 패닉
-   - 몬스터/아이템 템플릿 로딩 실패
-   - Grid 생성 실패 (dungeon 초기화)
-   - Player 엔티티 생성 시 컴포넌트 누락
-2. AppState::Playing 전환 후 첫 `process_game_turn()` 호출 시 패닉
-
-**작업**:
-- [ ] CharCreation 화면에서 역할/종족/이름 선택 → Done 클릭
-- [ ] `initialize_game_with_choices()` 디버깅
-  - Grid 생성 (DungeonManager)
-  - Player 엔티티 + 초기 장비/인벤토리
-  - 몬스터 스포닝
-  - Resources 등록 (GameState, EventQueue, ActionQueue 등)
-- [ ] Playing 상태 진입 확인 (맵이 렌더링되는가?)
-
-**판정 기준**: 맵+플레이어 '@'가 화면에 보임
+**예상 소요**: 6~10시간
 
 ---
 
-### Phase S3: 첫 턴 생존
+### Phase E5: LLM 실제 주입
 
-**목표**: 키 입력 1회 → `process_game_turn()` → `execute_turn_systems()` → 패닉 없음
+> ⚠️ Phase E1~E4 전체 완료 후에만 진입 가능
 
-**이 Phase가 가장 위험하다.**
-
-**예상 장애물**:
-1. `execute_turn_systems()`의 25개 시스템 중 하나가 패닉
-   - *특히*: `movement_system` (Grid 타일 접근), `monster_ai_system` (몬스터 쿼리), `vision_update_system` (시야 계산)
-2. Legion SubWorld borrow conflict (서로 다른 시스템이 같은 컴포넌트에 동시 접근)
-3. `post_turn_processing()`에서 EventQueue/GameLog borrow 충돌
-
-**전략**: 
-```
-execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
-0개 → 1개(movement) → 2개(+ai) → ... → 25개(전체)
-```
-
-**작업**:
-- [ ] `execute_turn_systems()` 내 모든 시스템을 주석 처리
-- [ ] movement_system만 활성화 → 방향키 이동 테스트
-- [ ] +monster_ai_system → 몬스터가 움직이는지 확인
-- [ ] +death_system → 전투 사망 처리 확인
-- [ ] ... (점진적 활성화)
-- [ ] 25개 전체 활성화 → 1턴 무패닉
-
-**판정 기준**: 방향키 입력 → '@' 이동 → 화면 갱신 → 패닉 없음
-
----
-
-### Phase S4: N턴 루프
-
-**목표**: 10턴 연속 + 몬스터와 조우 1회 이상 + 패닉 없음
-
-**예상 장애물**:
-1. 턴 카운터 오버플로우 또는 미증가
-2. 몬스터 스폰 후 AI가 이동할 때 경계 체크 실패
-3. EventQueue 누적 (clear 시점 오류)
-
-**작업**:
-- [ ] `drain_action_queue()` 내 처리 횟수 카운터 도입 (예: 한 턴에 100회 초과 시 데드락으로 간주하고 강제 종료 및 에러 출력)
-- [ ] 10턴 자동 실행 (또는 방향키 10회 연타)
-- [ ] 턴 카운터 증가 확인
-- [ ] 몬스터 AI 이동 확인
-- [ ] GameLog 메시지 출력 확인
-- [ ] EventQueue→EventHistory 기록/클리어 확인
-
-**판정 기준**: 10턴 연속 패닉 없음, GameLog에 메시지 출력됨
-
----
-
-### Phase S5: 핵심 상호작용
-
-**목표**: NetHack의 기본 동사(verb)가 동작
-
-- [x] **이동**: 8방향 + 대기(.) — ✅ e2e_verbs T1-1~T1-6 통과 (넘패드/화살표/vi-key)
-- [x] **공격**: 몬스터에 인접 이동 → 전투 메시지 — ✅ T2-1 통과 + 폴백 공격 버그 수정
-- [x] **아이템 줍기**: 바닥 아이템 위에서 `,` 키 — ✅ T1-7 통과 + Pickup 실제 연결 완료
-- [x] **인벤토리**: `i` 키 → 인벤토리 팝업 — ✅ T1-8~T1-10 통과 (상태전환/아이템조회/줍기→인벤토리)
-- [x] **계단**: `>` 키 → 레벨 이동 — ✅ T3-2 통과 (LevelChange 설정 확인)
-- [x] **문 열기**: 이동 시 자동 열기 — ✅ T2-2 통과 (Door→OpenDoor 변환)
-- [x] **사망**: HP 0 이하 → DeathResults 처리 — ✅ T3-1 통과
-
-**판정 기준**: 위 7개 동사가 패닉 없이 실행 — ✅ **7/7 완료! Phase S5 PASS**
-
----
-
-### Phase S6: Edge Case 방어
-
-**목표**: 복합 상호작용에서 패닉/데드락 없음
-
-- [x] **사망 → GameOver**: death_system이 HP≤0 감지 → GameState::GameOver 전환 + PlayerDied 이벤트 — ✅ s6_death_triggers_gameover
-- [x] **사망 → 재시작**: GameOver → Normal 리셋 + 새 플레이어 생성 + 이동 가능 — ✅ s6_death_then_restart
-- [x] **레벨 변경**: 계단 → LevelChange 설정, 패닉 없음 — ✅ s6_level_change_next
-- [x] **연속 계단**: depth 1→2→3 계산 + Dungeon 저장/조회 — ✅ s6_consecutive_level_descend
-- [x] **포션 사용**: HP 회복 + 인벤토리 제거 — ✅ s6_use_potion_healing
-- [x] **다중 상태이상**: 독+혼란+실명 중첩/부분해제 + 이동 패닉 없음 — ✅ s6_multiple_status_effects
-- [x] **상점 진입**: shop_type 타일 식별 + shop_entry_reaction 6개 시나리오 + shop_exit_reaction 3개 시나리오 — ✅ s6_shop_entry_reaction
-- [x] **마법(Zap)**: 인벤토리 Wand 클래스 검색 + 미발견 시 패닉 없음 — ✅ s6_zap_no_wand
-
-**판정 기준**: 패닉 0건 — ✅ **8/8 완료! Phase S6 PASS**
-
----
-
-### Phase S7: LLM 최소 주입 (최종)
-
-> ⚠️ **Phase S0~S6 전체 완료 후에만 진입 가능**
-
-**목표**: 결정론적 게임 루프 위에 LLM 텍스트 생성을 최소 범위로 주입
+**목표**: 실제 LLM 모델을 연결하여 게임 경험 향상
 
 **주입 순서** (의존성 낮은 것부터):
 
 | 순서 | 대상 | LLM 역할 | 실패 시 폴백 |
 |------|------|----------|-------------|
-| 1 | `death.rs` 묘비명 | 사망 메시지 꾸밈 | 기존 하드코딩 텍스트 |
-| 2 | `GameLog` 메시지 | 전투/이벤트 서술 | `to_narrative()` 기본값 |
-| 3 | NPC 대화 | 오라클/상점주인 대사 | `ScriptedDialogue` 기본값 |
-| 4 | 상점 가격 흥정 | 자연어 가격 제안 | 고정 공식 |
-| 5 | 던전 서술 | 레벨 진입 시 분위기 | 고정 텍스트 |
+| 1 | `death.rs` 묘비명 | 극적 사망 에필로그 | 기존 하드코딩 텍스트 |
+| 2 | 전투 메시지 | 몰입형 전투 묘사 | `"You hit the {monster}."` |
+| 3 | NPC 대화 | 오라클/상점주인 대사 | `ScriptedDialogue` |
+| 4 | 던전 서술 | 레벨 진입 시 분위기 | 고정 텍스트 |
+| 5 | 몬스터 AI | 전술적 AI 결정 | 기존 RuleBasedAi |
+| 6 | 동적 이벤트 | 퀘스트/이벤트 자동 생성 | 생성 안함 |
 
-**원칙**:
-- 모든 LLM 호출에 **타임아웃(2초)** 설정
-- 타임아웃 시 **폴백 텍스트** 반환 (게임 멈춤 절대 없음)
-- LLM 호출은 **게임 로직과 완전 분리** (순수 텍스트 생성만)
-- `InteractionProvider` 트레이트의 `DefaultInteractionProvider` → `LlmInteractionProvider` 전환
+**모델 전략**:
+- **로컬 우선**: GGUF/ONNX 형태의 경량 LLM (1~7B)
+- **오프라인 동작**: 클라우드 의존 없이 완전 로컬 추론
+- **API 호환**: OpenAI-compatible API 지원 (llama.cpp, ollama 등)
 
----
-
-## 3. 디버깅 전략
-
-### 3.1 결정론적 재현 보장
-
-```rust
-// RNG 시드 고정 → 항상 같은 던전/몬스터 배치
-let rng = NetHackRng::new(42);
-```
-
-- 모든 디버깅은 **시드 42로 고정**하여 동일 상황 재현 보장
-- Phase S3~S4에서 발견된 버그는 시드+턴 수로 재현 가능
-
-### 3.2 시스템 격리 디버깅
-
-```
-[전략: 점진적 시스템 활성화]
-
-Step 1: 빈 스케줄 (시스템 0개) → 입력만 확인
-Step 2: movement_system만 → 이동 확인
-Step 3: +vision_system → 시야 확인
-Step 4: +monster_ai → AI 확인
-Step 5: +death_system → 전투/사망 확인
-...
-Step 25: 전체 활성화
-```
-
-각 Step에서 패닉 발생 시 **해당 시스템만 디버깅** → 원인 격리 용이
-
-### 3.3 ActionQueue/EventQueue 추적 방어
-
-```rust
-// 무한 연쇄 방지 (Cascade Limit)
-const MAX_QUEUE_DEPTH: usize = 100;
-let mut processed_count = 0;
-while let Some(action) = queue.pop() {
-    processed_count += 1;
-    if processed_count > MAX_QUEUE_DEPTH {
-        panic!("Cascade Limit Exceeded! Possible infinite loop detected in ActionQueue.");
-    }
-    // ...
-}
-
-// 디버그 모드에서 큐 상태 로깅
-println!("[T{}] ActionQueue: {} / EventQueue: {}", 
-    turn, action_queue.len(), event_queue.len());
-```
-
-- 한 턴 안의 연쇄 상호작용(예: 피격 -> 산성 반응 -> 장비파괴 -> 피격 로그)의 무한루프 방지벽 설치
-- 매 턴 큐 크기 출력 → 누적/누수 감지
-- EventQueue가 clear되지 않으면 메모리 누수 경고
+**예상 소요**: 별도 계획 (E4 완료 후 수립)
 
 ---
 
-## 4. 성공 기준 요약
+## 3. 아키텍처 변경 요약
+
+### 3.1 변경 전 (Legion Schedule 기반)
+
+```
+Schedule::builder()
+  .add_system(movement_system())      ← #[system] 매크로
+  .flush()                            ← 병렬화 경계
+  .add_system(death_system())         ← SubWorld 사용
+  .flush()
+  ...
+  .build()
+  .execute(&mut world, &mut resources) ← Legion 스케줄러 실행
+```
+
+**약점**: 각 시스템이 SubWorld를 통해 제한된 뷰로 접근 → AccessDenied 위험
+
+### 3.2 변경 후 (GameContext 기반)
+
+```
+let mut ctx = GameContext::new(&mut world, &mut resources, ...);
+TurnRunner::execute(&mut ctx)
+  → movement_system(&mut ctx)         ← 일반 함수
+  → death_system(&mut ctx)            ← &mut World 직접 접근
+  → vision_system(&mut ctx)           ← AccessDenied 불가능
+  → ...
+```
+
+**장점**: 전체 World 접근 → 권한 검사 없음 → 패닉 원천 차단
+
+### 3.3 ECS 유지 범위
+
+| 유지 | 제거 |
+|------|------|
+| Entity / Component 데이터 모델 | `#[system]` 매크로 |
+| `World::push()` 엔티티 생성 | `#[read/write_component]` 선언 |
+| `<A, B>::query()` 컴포넌트 쿼리 | `SubWorld` 제한된 뷰 |
+| `entry_ref()` / `entry_mut()` 직접 접근 | `Schedule` 병렬 스케줄러 |
+| `CommandBuffer` (필요 시) | Legion Resources (`#[resource]`) |
+| `serde` 직렬화 | |
+
+**핵심**: "ECS 데이터 모델은 유지, 실행 모델만 교체"
+
+---
+
+## 4. v1.0 로드맵 진행 상태 (보존)
+
+> 이하는 v1.0 로드맵에서 완료된 Phase의 기록. 신규 Phase E1~E5의 전제 조건.
+
+| Phase | 상태 | 비고 |
+|-------|------|------|
+| S0: 빌드 검증 | ✅ 완료 | cargo build 성공, 4,177 테스트 통과 |
+| S1: 앱 기동 | ✅ 완료 | eframe 윈도우 + Title 렌더링 |
+| S2: 상태머신 관통 | ✅ 완료 | Title → CharCreation → Playing |
+| S3: 첫 턴 생존 | ⚠️ 부분 | 29/31 시스템 통과, 30~31번째에서 AccessDenied → **v2.0에서 근본 해결** |
+| S4: N턴 루프 | ✅ 완료 | 10턴 연속 패닉 없음 (29개 시스템 기준) |
+| S5: 핵심 상호작용 | ✅ 완료 | 7/7 동사 통과 |
+| S6: Edge Case | ✅ 완료 | 8/8 Edge Case 통과 |
+| S7: LLM 주입 | → E4/E5 | 엔진 전환 후 Phase E4~E5로 재편 |
+
+---
+
+## 5. 성공 기준 요약
 
 | Phase | 기준 | 예상 소요 |
-|-------|------|-----------|
-| S0 | 빌드 + 테스트 통과 | 30분 |
-| S1 | 윈도우 뜨기 | 2~4시간 |
-| S2 | Playing 진입 (맵 보기) | 4~8시간 |
-| S3 | 첫 턴 (이동 1회) | 8~16시간 ⚠️ **최대 난관** |
-| S4 | 10턴 연속 | 4~8시간 |
-| S5 | 7개 동사 동작 | 8~16시간 |
-| S6 | Edge Case 방어 | 8~16시간 |
-| S7 | LLM 최소 주입 | 별도 계획 |
+|-------|------|-----------| 
+| E1 | GameContext + TurnRunner 정의 + 컴파일 | 4~6시간 |
+| E2a | 저난이도 12개 전환 + 빌드 | 4~6시간 |
+| E2b | 중난이도 10개 전환 + 빌드 | 4~8시간 |
+| E2c | 고난이도 9개 전환 + 기존 테스트 통과 | 4~8시간 |
+| E3 | 전체 테스트 + 1000턴 퍼징 | 4~8시간 |
+| E4 | LLM 아키텍처 확립 + 컴파일 | 6~10시간 |
+| E5 | LLM 실제 주입 | 별도 계획 |
 
-**총 예상**: S0~S6까지 약 **35~68시간** (집중 작업 기준)
+**E1~E3 총 예상**: **16~36시간** (집중 작업 기준)
+**E1~E4 총 예상**: **22~46시간**
 
 ---
 
-## 5. 브랜치 전략
+## 6. 브랜치 전략
 
 ```
 main (v2.41.0 = 100% 순수 번역본, 불변)
- └─ stabilize/e2e-playable
-      ├─ S0: build-verified
-      ├─ S1: window-launch
-      ├─ S2: state-machine-flow
-      ├─ S3: first-turn
-      ├─ S4: ten-turn-loop
-      ├─ S5: core-interactions
-      ├─ S6: edge-cases
-      └─ S7: llm-minimal (별도 브랜치 가능)
+ └─ stabilize/e2e-playable (v2.42.x = S0~S6 완료)
+      └─ engine/gamecontext (v3.0.0 = 엔진 전환)
+           ├─ E1: gamecontext-foundation
+           ├─ E2: system-migration
+           ├─ E3: integration-verified
+           ├─ E4: llm-architecture
+           └─ E5: llm-integration
 ```
 
-- main은 **절대 오염시키지 않는다** (순수 번역본 보존)
+- **v3.0.0**: 엔진 전환은 MAJOR 버전 변경 (Breaking Change: Schedule 제거)
 - 각 Phase 완료 시 **태그 + 커밋 메시지**로 마일스톤 기록
-- S6 완료 시 main으로 PR/머지 검토
+- E3 완료 시 `stabilize/e2e-playable`로 머지 검토
 
 ---
 
-**문서 버전**: v1.0
-**최종 업데이트**: 2026-02-28
+**문서 버전**: v2.0
+**최종 업데이트**: 2026-03-04

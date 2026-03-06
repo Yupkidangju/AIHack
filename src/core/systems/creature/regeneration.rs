@@ -6,17 +6,13 @@ use legion::world::SubWorld;
 use legion::*;
 
 ///
-#[legion::system]
-#[write_component(Player)]
-#[write_component(Health)]
-#[read_component(PlayerTag)]
-pub fn regeneration(world: &mut SubWorld, #[resource] turn: &u64) {
+pub fn regeneration_system(ctx: &mut crate::core::context::GameContext) {
     let mut query = <(&mut Player, &mut Health)>::query().filter(component::<PlayerTag>());
 
-    for (p_stats, p_health) in query.iter_mut(world) {
+    for (p_stats, p_health) in query.iter_mut(ctx.world) {
         // 1. 에너지(PW) 회복: 지혜(WIS) 및 레벨 기반
         let pw_regen_turns = if p_stats.wis.base > 12 { 3 } else { 5 };
-        if *turn % pw_regen_turns == 0 {
+        if ctx.turn % pw_regen_turns == 0 {
             if p_stats.energy < p_stats.energy_max {
                 let gain = if p_stats.exp_level > 10 { 2 } else { 1 };
                 p_stats.energy = (p_stats.energy + gain).min(p_stats.energy_max);
@@ -30,7 +26,7 @@ pub fn regeneration(world: &mut SubWorld, #[resource] turn: &u64) {
             hp_regen_turns = (20 - (p_stats.con.base - 12)).max(5) as u64;
         }
 
-        if *turn % hp_regen_turns == 0 {
+        if ctx.turn % hp_regen_turns == 0 {
             if p_health.current < p_health.max {
                 p_health.current += 1;
                 // Player 구조체 내부 HP도 동기화 (UI 표시용)
@@ -41,24 +37,13 @@ pub fn regeneration(world: &mut SubWorld, #[resource] turn: &u64) {
 }
 
 /// 몬스터 자동 회복 시스템 (원본 monmove.c:mon_regen 이식)
-#[legion::system]
-#[write_component(Health)]
-#[read_component(crate::core::entity::MonsterTag)]
-#[read_component(crate::core::entity::Monster)]
-#[write_component(crate::core::entity::monster::MonsterState)]
-#[read_component(crate::core::entity::Level)]
-#[read_component(crate::core::entity::PlayerTag)]
-pub fn monster_regeneration(
-    world: &mut SubWorld,
-    #[resource] turn: &u64,
-    #[resource] assets: &crate::assets::AssetManager,
-) {
+pub fn monster_regeneration_system(ctx: &mut crate::core::context::GameContext) {
     //
     let mut p_query = <&crate::core::entity::Level>::query()
         .filter(component::<crate::core::entity::PlayerTag>());
     let p_level =
         p_query
-            .iter(world)
+            .iter(ctx.world)
             .next()
             .map(|l| l.0)
             .unwrap_or(crate::core::dungeon::LevelID::new(
@@ -75,16 +60,16 @@ pub fn monster_regeneration(
     )>::query()
     .filter(component::<crate::core::entity::MonsterTag>());
 
-    for (m_health, monster, _m_state, m_level) in query.iter_mut(world) {
+    for (m_health, monster, _m_state, m_level) in query.iter_mut(ctx.world) {
         //
         if m_level.0 != p_level {
             continue;
         }
 
-        if let Some(template) = assets.monsters.get_by_kind(monster.kind) {
+        if let Some(template) = ctx.assets.monsters.get_by_kind(monster.kind) {
             // NetHack 3.6.7: Moves % 20 == 0 || REGEN 플래그
             if m_health.current < m_health.max
-                && (*turn % 20 == 0 || template.has_capability(MonsterCapability::Regen))
+                && (ctx.turn % 20 == 0 || template.has_capability(MonsterCapability::Regen))
             {
                 m_health.current += 1;
             }

@@ -18,7 +18,7 @@ pub enum Encumbrance {
 
 ///
 /// 원본: invent.c: weight_cap 이식 기초
-pub fn calculate_total_weight(world: &SubWorld, inv: &Inventory) -> u32 {
+pub fn calculate_total_weight(world: &impl legion::EntityStore, inv: &Inventory) -> u32 {
     let mut total_weight = 0;
 
     for &item_ent in &inv.items {
@@ -89,16 +89,8 @@ pub fn get_encumbrance(total_weight: u32, capacity: u32) -> Encumbrance {
 }
 
 ///
-#[legion::system]
-#[read_component(crate::core::entity::PlayerTag)]
-#[read_component(crate::core::entity::player::Player)]
-#[read_component(Inventory)]
-#[write_component(crate::core::entity::status::StatusBundle)]
-pub fn update_encumbrance(
-    world: &mut SubWorld,
-    #[resource] log: &mut crate::ui::log::GameLog,
-    #[resource] turn: &u64,
-) {
+pub fn update_encumbrance_system(ctx: &mut crate::core::context::GameContext) {
+    let world = &mut *ctx.world;
     use crate::core::entity::status::StatusFlags;
 
     //

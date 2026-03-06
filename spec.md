@@ -1,8 +1,8 @@
 # AIHack 기술 명세서 (spec.md)
 
-**버전**: v2.41.0
-**최종 업데이트**: 2026-02-28
-**상태**: 이식률 💯 **100.0%** (177,229 / 177,232 라인) | 4,177개 테스트 통과 | Phase FINAL 완료 🏆
+**버전**: v3.0.0-alpha.1
+**최종 업데이트**: 2026-03-06
+**상태**: 이식률 💯 **100.0%** (177,229 / 177,232 라인) | 4,178개 테스트 통과 | 엔진 전환 13/30 시스템 완료 (43.3%)
 
 ---
 
@@ -19,10 +19,25 @@ NetHack 3.6.7 (C 소스 177,232줄 + 헤더 20,097줄 = 197,329줄)을 Rust로 *
 
 ### 1.3 대상 환경
 - **언어**: Rust (1.84+ Stable)
-- **ECS**: Legion (Entity Component System)
+- **ECS**: Legion (데이터 모델만 사용, Schedule/SubWorld 제거 예정 → v3.0.0)
 - **TUI**: Ratatui (터미널 기반 렌더링)
 - **GUI**: egui/eframe (하이브리드 윈도우 UI)
 - **빌드**: Cargo (MSVC Build Tools on Windows)
+- **LLM**: 로컬 경량 LLM (1~7B, GGUF/ONNX) — AIProvider trait 경유 선택적 통합
+
+### 1.4 엔진 전환 방향 (v3.0.0 — 진행 중)
+
+> **결정 #41 (DESIGN_DECISIONS.md)**: Legion의 `#[system]` 매크로 + SubWorld를 제거하고,
+> 모든 시스템을 `fn system_name(ctx: &mut GameContext)` 시그니처의 일반 함수로 전환한다.
+> ECS 데이터 모델(Entity/Component/Query)은 100% 유지하며, 실행 모델만 순차 호출로 교체한다.
+> 이를 통해 AccessDenied 패닉을 구조적으로 영구 제거하고, LLM 통합 포인트(AIProvider)를 확보한다.
+>
+> **현황 (v3.0.0-alpha.1, 2026-03-06)**:
+> - Phase E1 ✅ 완료: `GameContext` + `TurnRunner` 구현
+> - Phase E2 진행 중: 13/30 시스템 전환 완료 (43.3%)
+> - 빌드 ✅ + 테스트 4,178개 전량 통과
+>
+> 상세: `STABILIZATION_ROADMAP.md` Phase E1~E5 참조.
 
 ---
 

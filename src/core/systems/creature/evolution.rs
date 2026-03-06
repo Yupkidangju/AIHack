@@ -18,43 +18,39 @@ use legion::world::SubWorld;
 use legion::*;
 
 ///
-#[legion::system]
-#[write_component(Species)]
-#[write_component(Health)]
-#[write_component(CombatStats)]
-#[write_component(Renderable)]
-#[write_component(Player)]
-#[read_component(PlayerTag)]
-pub fn evolution_tick(
-    world: &mut SubWorld,
-    #[resource] assets: &AssetManager,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] _rng: &mut NetHackRng,
-) {
-    let mut query = <(Entity, &mut Species)>::query();
+pub fn evolution_tick_system(ctx: &mut crate::core::context::GameContext) {
     let mut reversions = Vec::new();
 
-    for (ent, species) in query.iter_mut(world) {
-        if let Some(timer) = species.timer {
-            if timer > 0 {
-                species.timer = Some(timer - 1);
-            } else {
-                reversions.push((*ent, species.original.clone()));
+    {
+        let mut query = <(Entity, &mut Species)>::query();
+        for (ent, species) in query.iter_mut(ctx.world) {
+            if let Some(timer) = species.timer {
+                if timer > 0 {
+                    species.timer = Some(timer - 1);
+                } else {
+                    reversions.push((*ent, species.original.clone()));
+                }
             }
         }
     }
 
-    //
+    // 쿼리 borrow 해제 후 revert_polymorph 호출
     for (ent, original_name) in reversions {
-        revert_polymorph(ent, &original_name, world, assets, log, *turn);
+        revert_polymorph(
+            ent,
+            &original_name,
+            ctx.world,
+            ctx.assets,
+            ctx.log,
+            ctx.turn,
+        );
     }
 }
 
 pub fn revert_polymorph(
     ent: Entity,
     original_name: &str,
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     assets: &AssetManager,
     log: &mut GameLog,
     turn: u64,
@@ -93,7 +89,7 @@ pub fn revert_polymorph(
 ///
 pub fn drain_level(
     ent: Entity,
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     log: &mut GameLog,
     turn: u64,
     rng: &mut NetHackRng,
@@ -129,60 +125,50 @@ pub fn drain_level(
 }
 
 ///
-#[legion::system]
-#[read_component(crate::core::entity::status::StatusBundle)]
-#[write_component(Species)]
-#[write_component(Renderable)]
-#[read_component(PlayerTag)]
-pub fn lycanthropy_tick(
-    world: &mut SubWorld,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] rng: &mut NetHackRng,
-) {
+pub fn lycanthropy_tick_system(ctx: &mut crate::core::context::GameContext) {
     use crate::core::entity::status::StatusFlags;
 
-    let mut query = <(
-        Entity,
-        &crate::core::entity::status::StatusBundle,
-        &mut Species,
-    )>::query();
     let mut transformations = Vec::new();
 
-    for (ent, status, species) in query.iter_mut(world) {
-        if status.has(StatusFlags::LYCANTHROPY) {
-            //
-            if rng.rn2(80) == 0 {
-                if species.current == species.original {
-                    //
-                    transformations.push((*ent, "werewolf".to_string()));
-                } else {
-                    //
-                    transformations.push((*ent, species.original.clone()));
+    {
+        let mut query = <(
+            Entity,
+            &crate::core::entity::status::StatusBundle,
+            &mut Species,
+        )>::query();
+
+        for (ent, status, species) in query.iter_mut(ctx.world) {
+            if status.has(StatusFlags::LYCANTHROPY) {
+                if ctx.rng.rn2(80) == 0 {
+                    if species.current == species.original {
+                        transformations.push((*ent, "werewolf".to_string()));
+                    } else {
+                        transformations.push((*ent, species.original.clone()));
+                    }
                 }
             }
         }
     }
 
+    let turn = ctx.turn;
     for (ent, target_form) in transformations {
-        if let Ok(mut entry) = world.entry_mut(ent) {
+        if let Ok(mut entry) = ctx.world.entry_mut(ent) {
             let is_player = entry.get_component::<PlayerTag>().is_ok();
 
             if target_form == "werewolf" {
                 if is_player {
-                    log.add("You turn into a creature of the night!", *turn);
+                    ctx.log.add("You turn into a creature of the night!", turn);
                     if let Ok(render) = entry.get_component_mut::<Renderable>() {
                         render.glyph = 'd';
-                        render.color = 8; // Dark Gray
+                        render.color = 8;
                     }
                 }
                 if let Ok(sp) = entry.get_component_mut::<Species>() {
                     sp.current = "werewolf".to_string();
                 }
             } else {
-                //
                 if is_player {
-                    log.add("You feel purer.", *turn);
+                    ctx.log.add("You feel purer.", turn);
                     if let Ok(render) = entry.get_component_mut::<Renderable>() {
                         render.glyph = '@';
                         render.color = 15;

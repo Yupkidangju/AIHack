@@ -8,18 +8,7 @@ use crate::util::rng::NetHackRng;
 use legion::world::SubWorld;
 use legion::*;
 
-#[legion::system]
-#[write_component(StatusBundle)]
-#[write_component(crate::core::entity::player::Player)]
-#[write_component(Health)]
-#[read_component(PlayerTag)]
-pub fn status_tick(
-    world: &mut SubWorld,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] rng: &mut NetHackRng,
-    #[resource] event_queue: &mut EventQueue,
-) {
+pub fn status_tick_system(ctx: &mut crate::core::context::GameContext) {
     let mut query = <(
         Entity,
         &mut StatusBundle,
@@ -28,7 +17,7 @@ pub fn status_tick(
         Option<&PlayerTag>,
     )>::query();
 
-    for (_ent, status, health, player, is_player) in query.iter_mut(world) {
+    for (_ent, status, health, player, is_player) in query.iter_mut(ctx.world) {
         let expired = status.tick();
 
         if let Some(p) = player {
@@ -78,7 +67,7 @@ pub fn status_tick(
                 }
 
                 if recovered {
-                    log.add("You feel your abilities returning.", *turn);
+                    ctx.log.add("You feel your abilities returning.", ctx.turn);
                 }
                 p.attribute_recovery_turns = 1500;
             }
@@ -123,16 +112,16 @@ pub fn status_tick(
             if p.hunger != old_hunger {
                 match p.hunger {
                     crate::core::entity::player::HungerState::Hungry => {
-                        log.add("You are beginning to feel hungry.", *turn)
+                        ctx.log.add("You are beginning to feel hungry.", ctx.turn)
                     }
                     crate::core::entity::player::HungerState::Weak => {
-                        log.add("You feel weak.", *turn)
+                        ctx.log.add("You feel weak.", ctx.turn)
                     }
                     crate::core::entity::player::HungerState::Fainting => {
-                        log.add("You feel faint from lack of food.", *turn)
+                        ctx.log.add("You feel faint from lack of food.", ctx.turn)
                     }
                     crate::core::entity::player::HungerState::Satiated => {
-                        log.add("You feel stuffed.", *turn)
+                        ctx.log.add("You feel stuffed.", ctx.turn)
                     }
                     _ => {}
                 }
@@ -144,15 +133,16 @@ pub fn status_tick(
             if p.nutrition <= 0 {
                 if p.nutrition < -200 {
                     //
-                    log.add_colored("You die from starvation...", [255, 0, 0], *turn);
+                    ctx.log
+                        .add_colored("You die from starvation...", [255, 0, 0], ctx.turn);
                     health.current = 0;
-                } else if rng.rn2(20) == 0 && !status.flags().contains(StatusFlags::SLEEPING) {
+                } else if ctx.rng.rn2(20) == 0 && !status.flags().contains(StatusFlags::SLEEPING) {
                     //
-                    log.add("You faint from lack of food.", *turn);
-                    status.add(StatusFlags::SLEEPING, 10 + rng.rn2(10) as u32);
+                    ctx.log.add("You faint from lack of food.", ctx.turn);
+                    status.add(StatusFlags::SLEEPING, 10 + ctx.rng.rn2(10) as u32);
 
                     // [v2.0.0
-                    event_queue.push(GameEvent::StatusApplied {
+                    ctx.event_queue.push(GameEvent::StatusApplied {
                         target: "player".to_string(),
                         status: StatusFlags::SLEEPING,
                         turns: 10,
@@ -163,19 +153,20 @@ pub fn status_tick(
             // 5. Periodic Status Damage
             let flags = status.flags();
             if flags.contains(StatusFlags::POISONED) && !flags.contains(StatusFlags::POISON_RES) {
-                if *turn % 15 == 0 {
+                if ctx.turn % 15 == 0 {
                     health.current -= 1;
-                    log.add("You feel the poison coursing through your veins.", *turn);
-                    if rng.rn2(10) == 0 && p.str.base > 3 {
+                    ctx.log
+                        .add("You feel the poison coursing through your veins.", ctx.turn);
+                    if ctx.rng.rn2(10) == 0 && p.str.base > 3 {
                         p.str.base -= 1;
-                        log.add("You feel much weaker!", *turn);
+                        ctx.log.add("You feel much weaker!", ctx.turn);
                     }
                 }
             }
             if flags.contains(StatusFlags::SICK) {
-                if *turn % 10 == 0 {
+                if ctx.turn % 10 == 0 {
                     health.current -= 2;
-                    log.add("You feel very ill.", *turn);
+                    ctx.log.add("You feel very ill.", ctx.turn);
                 }
             }
         }
@@ -183,29 +174,33 @@ pub fn status_tick(
         if is_player.is_some() {
             for flag in expired {
                 // [v2.0.0
-                event_queue.push(GameEvent::StatusExpired {
+                ctx.event_queue.push(GameEvent::StatusExpired {
                     target: "player".to_string(),
                     status: flag,
                 });
 
                 match flag {
-                    StatusFlags::BLIND => log.add("You can see again.", *turn),
-                    StatusFlags::CONFUSED => log.add("You feel less confused.", *turn),
-                    StatusFlags::STUNNED => log.add("You feel less staggered.", *turn),
-                    StatusFlags::HALLUCINATING => log.add("Everything looks normal now.", *turn),
-                    StatusFlags::LEVITATING => log.add("You float gently to the ground.", *turn),
-                    StatusFlags::SLOW => log.add("You feel yourself speeding up.", *turn),
-                    StatusFlags::FAST => log.add("You feel yourself slowing down.", *turn),
-                    StatusFlags::SLEEPING => log.add("You wake up.", *turn),
-                    StatusFlags::PARALYZED => log.add("You can move again.", *turn),
-                    StatusFlags::PHASING => log.add("You feel solid again.", *turn),
-                    StatusFlags::POISONED | StatusFlags::SICK => {
-                        log.add("You feel much better now.", *turn)
+                    StatusFlags::BLIND => ctx.log.add("You can see again.", ctx.turn),
+                    StatusFlags::CONFUSED => ctx.log.add("You feel less confused.", ctx.turn),
+                    StatusFlags::STUNNED => ctx.log.add("You feel less staggered.", ctx.turn),
+                    StatusFlags::HALLUCINATING => {
+                        ctx.log.add("Everything looks normal now.", ctx.turn)
                     }
-                    StatusFlags::STONING => log.add("You feel limber again.", *turn),
-                    StatusFlags::SLIMED => log.add("The slime disappears.", *turn),
+                    StatusFlags::LEVITATING => {
+                        ctx.log.add("You float gently to the ground.", ctx.turn)
+                    }
+                    StatusFlags::SLOW => ctx.log.add("You feel yourself speeding up.", ctx.turn),
+                    StatusFlags::FAST => ctx.log.add("You feel yourself slowing down.", ctx.turn),
+                    StatusFlags::SLEEPING => ctx.log.add("You wake up.", ctx.turn),
+                    StatusFlags::PARALYZED => ctx.log.add("You can move again.", ctx.turn),
+                    StatusFlags::PHASING => ctx.log.add("You feel solid again.", ctx.turn),
+                    StatusFlags::POISONED | StatusFlags::SICK => {
+                        ctx.log.add("You feel much better now.", ctx.turn)
+                    }
+                    StatusFlags::STONING => ctx.log.add("You feel limber again.", ctx.turn),
+                    StatusFlags::SLIMED => ctx.log.add("The slime disappears.", ctx.turn),
                     StatusFlags::STRANGLED | StatusFlags::CHOKING => {
-                        log.add("You can breathe again.", *turn)
+                        ctx.log.add("You can breathe again.", ctx.turn)
                     }
                     _ => {}
                 }

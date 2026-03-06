@@ -94,16 +94,12 @@ impl InventorySystem {
 }
 
 ///
-#[legion::system]
-#[read_component(Inventory)]
-pub fn autopickup_tick(_world: &mut legion::world::SubWorld) {
+pub fn autopickup_tick_system(_ctx: &mut crate::core::context::GameContext) {
     //
 }
 
 ///
-#[legion::system]
-#[read_component(Inventory)]
-pub fn inventory_action(_world: &mut legion::world::SubWorld) {
+pub fn inventory_action_system(_ctx: &mut crate::core::context::GameContext) {
     //
 }
 

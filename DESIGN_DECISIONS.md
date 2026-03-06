@@ -5,6 +5,60 @@
 
 ---
 
+## [2026-03-04] - 결정 #41: 엔진 전환 — Legion Schedule/SubWorld → GameContext/&mut World 직접 접근
+
+> ⚠️ **최상위 아키텍처 결정**: 이 결정은 프로젝트의 실행 모델을 근본적으로 변경한다.
+
+### ENGINE-1. `#[system]` 매크로 전면 제거 + `&mut World` 직접 접근 전환
+
+- **결정**: Legion의 `#[system]` / `#[legion::system]` 매크로, `SubWorld`, `#[read_component]` / `#[write_component]` 선언, `Schedule` 스케줄러를 **전면 제거**하고, 모든 시스템을 `fn system_name(ctx: &mut GameContext)` 시그니처의 일반 함수로 전환한다.
+- **배경**:
+  - v2.42.x 안정화 과정에서 **AccessDenied 패닉이 구조적으로 해결 불가능**함을 확인
+  - Legion의 `entry_ref(entity)` / `entry_mut(entity)` 호출 시, 해당 엔티티의 **아키타입 전체**에 대한 접근 권한이 시스템 매크로에 선언되어 있어야 함
+  - 엔티티에 10~15개 컴포넌트가 부착된 상황에서 하나라도 누락하면 런타임 패닉 발생
+  - 25개+ 파일에서 이 패턴이 반복되며, 바이너리 서치 디버깅은 비결정적이고 조합 폭발로 수렴 불가
+  - 외부 감사(GPT 5.2)의 "Command dispatch mismatch" 진단은 오진이었으나, "현행 방식의 한계" 지적은 유효
+- **근거**:
+  1. NetHack은 **턴 기반 게임**이므로 병렬 실행이 불필요 → Legion의 병렬 스케줄러는 과잉 설계
+  2. `&mut World`에서 `entry_ref`/`entry_mut` 호출 시 **권한 검사가 없음** → AccessDenied 구조적 불가능
+  3. ECS의 장점(엔티티-컴포넌트 데이터 모델, 쿼리, 직렬화)은 **100% 유지**
+  4. `interaction.rs`가 이미 `&mut World` + `InteractionProvider` 패턴으로 **성공적으로 동작 중**
+  5. 로직 변경 없이 **시그니처만 바꾸는 기계적 전환** (시스템 31개, 작업당 20~40분)
+- **대안 고려**:
+  - (A) 전면 재작성 → ❌ 17만 줄 재작성 비현실적
+  - (B) ECS 프레임워크 교체 (Bevy/hecs) → ❌ API 차이 방대, 근본 문제 동일
+  - (C) 전수 조사로 모든 entry_ref/entry_mut에 컴포넌트 선언 추가 → ❌ 끝이 없는 반복, 비결정적
+  - (D) **본 결정 채택** → ✅ 기계적 전환, AccessDenied 영구 소멸
+- **유지 범위**: Entity/Component 데이터 모델, World::push(), query(), entry_ref/entry_mut, CommandBuffer, serde 직렬화
+- **제거 범위**: `#[system]` 매크로, `#[read/write_component]` 선언, SubWorld, Schedule 스케줄러, `#[resource]` 매크로
+- **버전 영향**: 실행 모델 변경 = **MAJOR 버전 변경 (v3.0.0)**
+
+### ENGINE-2. GameContext 통합 컨텍스트 도입
+
+- **결정**: `World` + 리소스(Grid, RNG, GameLog 등) + LLM Provider를 하나의 `GameContext` 구조체로 통합하여, 모든 시스템 함수가 동일한 시그니처로 접근한다.
+- **배경**: 기존 Legion 시스템은 각각 `#[resource]`로 필요한 리소스를 개별 선언했으나, 이는 시스템 간 시그니처 불일치 + 리소스 누락 패닉의 원인이 됨.
+- **근거**:
+  1. `interaction.rs`의 패턴(`world + grid + log + ... + provider`)을 정형화
+  2. LLM Provider가 모든 시스템에서 접근 가능해지므로 LLM 통합 포인트가 자연스럽게 확보됨
+  3. 다른 내용은 결정 #37(프로젝트 최종 비전 — AI Roguelike)의 "LLM이 붙을 수 있는 구조"를 직접 구현
+- **대안 고려**: 개별 인자 전달 → 시스템마다 8~12개 인자 → 가독성/유지보수성 저하
+
+### ENGINE-3. AIProvider trait + 선택적 LLM 교체 포인트
+
+- **결정**: 기존 `InteractionProvider`(텍스트 생성 4개 메서드)를 확장하여, 7개 LLM 교체 포인트를 가진 `AIProvider` trait을 정의한다. 모든 메서드에 `DefaultAIProvider` (기존 NetHack 로직) 폴백을 보장한다.
+- **배경**: 결정 #37에서 "Phase 2: 로컬 LLM 이식"을 선언했으나, 구체적인 교체 지점과 인터페이스가 미정의 상태.
+- **근거**:
+  1. **대화/내러티브** — 이미 InteractionProvider로 7곳에서 사용 중
+  2. **전투 묘사** — `narrate_combat()`: "You hit the goblin" → 극적 묘사
+  3. **적응형 AI** — `decide_monster_action()`: 기존 AI를 선택적으로 LLM으로 오버라이드
+  4. **동적 이벤트** — `generate_random_event()`: 라이브 퀘스트/이벤트 자동 생성
+  5. **분위기 설명** — `describe_atmosphere()`: 던전 층 진입 시 몰입감
+  6. **아이템 설명** — `describe_unidentified_item()`: 지혜 기반 힌트
+  7. **함정 대화** — 상점 흥정, 기도 응답 등
+- **핵심 원칙**: LLM 없어도 게임은 완벽히 동작 (DefaultAIProvider = 기존 하드코딩 텍스트)
+
+---
+
 ## [2026-02-26] - R32~R34: Bridge 통합 단계 아키텍처 리스크 대응
 
 ### BRIDGE-1. TurnContext 도메인 분리 (God Object 방지)

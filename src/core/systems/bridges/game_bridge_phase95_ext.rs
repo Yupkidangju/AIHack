@@ -37,7 +37,7 @@ pub struct TurnResult {
 
 /// [v2.31.0 95-3] 1턴 처리
 pub fn process_turn(
-    current_turn: i32,
+    _current_turn: i32,
     player_hp: i32,
     player_hunger: i32,
     monster_count: i32,

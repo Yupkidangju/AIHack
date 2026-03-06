@@ -1,12 +1,13 @@
 # AIHack 구현 현황 (Implementation Summary)
 
-- **프로젝트명**: AIHack (NetHack 3.6.7 → Rust 100% Port)
-- **현재 버전**: v2.42.0 (Phase FINAL 달성 및 E2E 안정화)
-- **최근 업데이트**: 2026-02-27
+- **프로젝트명**: AIHack (NetHack 3.6.7 → Rust 100% Port → AI Roguelike)
+- **현재 버전**: v3.0.0-alpha.1 (엔진 전환 Phase E2b 진행 중)
+- **최근 업데이트**: 2026-03-06
 - **원본 소스**: 177,232 라인 (C 소스)
 - **현재 Rust**: **177,229 라인** (438개 파일) [2026-02-27 실측치]
 - **이식률**: **100%** (C 소스 기준 100% 달성)
-- **테스트**: **4,177개** 전체 통과 및 E2E 테스트 안정화 완료 [2026-02-27 기준]
+- **테스트**: **4,178개** 전체 통과 [2026-03-06 기준]
+- **엔진 전환**: **13/30 시스템** GameContext 전환 완료 (43.3%)
 - **Bridge Layer**: **12개** (7개 기존 + 5개 Phase 2 신규)
 - **목표**: **100% (달성 완료!)**
 
@@ -207,22 +208,30 @@
 ## 핵심 기술적 특징
 
 - **ECS 기반**: `legion` 라이브러리를 사용한 Entity-Component-System 아키텍처
+  - ⚠️ **v3.0.0에서 변경 예정**: `#[system]` 매크로/SubWorld/Schedule 제거 → `GameContext` + `&mut World` 직접 접근으로 전환 (결정 #41)
+  - ECS 데이터 모델(Entity/Component/Query)은 100% 유지, 실행 모델만 순차 호출로 교체
 - **하이브리드 UI**: `egui` (프론트 윈도우) + `ratatui` (TUI 렌더링)
 - **원본 공식 1:1 이식**: NetHack 3.6.7 C 소스의 계치/공식/분기를 Rust로 완전하게 재구현
 - **다국어 지원**: 모든 코드 주석은 한국어, 게임 내 메시지는 다국어 대응
-- **Gather-Apply 패턴**: ECS Borrow Checker 충돌을 방지하는 수집-적용 분리 아키텍처
+- **LLM 통합 아키텍처**: `InteractionProvider`(기존 7곳) + `AIProvider`(7개 교체 포인트) — 선택적 LLM 주입, DefaultImpl 폴백 보장
 - **AppState 상태 머신**: Title → CharCreation → Playing → GameOver → Title 전환
 - **Enum 기반 타입 안전**: MonsterKind/ItemKind enum + get_by_kind() API로 문자열 비교 최소화
 - **이벤트 큐**: GameEvent 20+ variant + EventQueue + EventHistory 링 버퍼 (200건)
 
 ---
 
-## 현재 다음 작업
+## 현재 다음 작업 (v3.0.0 엔진 전환)
 
-- muse.rs 확장 이식: `m_dowear`, `meatmetal` 연동 (원본 37.8%)
-- zap.rs 확장 이식: `buzz`, `bhitpile`, `effect`, `weffects` (원본 39.5%)
-- 핵심 시스템 파일의 지속 확장 (이식률 💯 100%, Phase FINAL 신/함정/스킬/영양/전투통계/세이브/i18n 완료)
-- 테스트 커버리지 증가 (현재 4,177개 🏆)
+> **최우선**: STABILIZATION_ROADMAP.md Phase E1~E5 실행
+
+1. **Phase E1**: `GameContext` 구조체 + `TurnRunner` 정의 (4~6시간)
+2. **Phase E2**: 31개 `#[system]` 매크로 시스템 → `fn system_name(ctx: &mut GameContext)` 일반 함수 전환 (12~20시간)
+3. **Phase E3**: 전체 통합 테스트 + 1000턴 퍼징 (4~8시간)
+4. **Phase E4**: `AIProvider` trait 확장 + LLM 통합 아키텍처 (6~10시간)
+5. **Phase E5**: LLM 실제 주입 (별도 계획)
+
+- 이식률 💯 100% 유지 (177,229줄, 4,177 테스트)
+- 콘텐츠 추가 이식은 엔진 전환 완료 후 진행
 
 ### v2.20.0 아키텍처 리팩토링 완료 모듈 (R7, R8 통합)
 - **social/mod.rs**: `InteractionProvider` 및 `DefaultInteractionProvider` 추상화 도입
@@ -283,9 +292,9 @@
 
 ### 아키텍처 패턴
 
-1. **ECS 시스템 계층 (core.rs)**: `#[system]` 매크로 기반 legion ECS 함수. SubWorld를 직접 조작. 게임 루프에서 호출.
-2. **결과 구조체 패턴 (dog.rs/monmove.rs/muse.rs 등)**: `XxxResult` 구조체 + `xxx_result()` 순수 함수. ECS 없이 독립 테스트 가능. 원본 C 로직의 1:1 변환.
-3. **Behavior 트레이트 (mod.rs)**: `decide(&self, obs: &Observation) -> AiAction` — 향후 교체 가능한 AI 전략 패턴.
+1. **ECS 시스템 계층 (core.rs)**: ~~`#[system]` 매크로 기반 legion ECS 함수~~ → ⚠️ **v3.0.0에서 `fn system_name(ctx: &mut GameContext)` 일반 함수로 전환 예정** (결정 #41). `&mut World` 직접 접근으로 AccessDenied 원천 차단.
+2. **결과 구조체 패턴 (dog.rs/monmove.rs/muse.rs 등)**: `XxxResult` 구조체 + `xxx_result()` 순수 함수. ECS 없이 독립 테스트 가능. 원본 C 로직의 1:1 변환. (변경 없음)
+3. **Behavior 트레이트 (mod.rs)**: `decide(&self, obs: &Observation) -> AiAction` — **v3.0.0에서 AIProvider trait으로 확장**, LLM 선택적 오버라이드 가능.
 
 ### dog.rs 내부 구조 (Phase1 + Phase2)
 
@@ -308,5 +317,5 @@
 
 ---
 
-**문서 버전**: v2.41.0 🏆 100% 달성!
-**최종 업데이트**: 2026-02-28
+**문서 버전**: v2.43.0 (엔진 전환 결정 #41 반영)
+**최종 업데이트**: 2026-03-04

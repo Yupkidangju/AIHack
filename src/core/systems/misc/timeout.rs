@@ -55,16 +55,12 @@ const STRANGLE_TEXTS: [&str; 5] = [
     "You die from strangulation.",
 ];
 
-#[legion::system]
-#[write_component(StatusBundle)]
-#[write_component(Health)]
-pub fn timeout_dialogue(
-    world: &mut SubWorld,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-) {
+
+
+
+pub fn timeout_dialogue_system(ctx: &mut crate::core::context::GameContext) {
     let mut query = <(&mut StatusBundle, Option<&mut Health>)>::query();
-    for (status, mut health) in query.iter_mut(world) {
+    for (status, mut health) in query.iter_mut(ctx.world) {
         // Stoning dialogue
         if let Some(s) = status
             .active
@@ -73,9 +69,9 @@ pub fn timeout_dialogue(
         {
             let idx = (s.remaining_turns as usize).min(STONED_TEXTS.len()) - 1;
             if s.remaining_turns > 0 && s.remaining_turns <= 5 {
-                log.add(
+                ctx.log.add(
                     STONED_TEXTS[STONED_TEXTS.len() - 1 - idx].to_string(),
-                    *turn,
+                    ctx.turn,
                 );
             }
             if s.remaining_turns == 1 {
@@ -89,7 +85,7 @@ pub fn timeout_dialogue(
         if let Some(s) = status.active.iter().find(|s| s.flag == StatusFlags::SLIMED) {
             let idx = (s.remaining_turns as usize).min(SLIME_TEXTS.len()) - 1;
             if s.remaining_turns > 0 && s.remaining_turns <= 5 {
-                log.add(SLIME_TEXTS[SLIME_TEXTS.len() - 1 - idx].to_string(), *turn);
+                ctx.log.add(SLIME_TEXTS[SLIME_TEXTS.len() - 1 - idx].to_string(), ctx.turn);
             }
             if s.remaining_turns == 1 {
                 if let Some(h) = health.as_mut() {
@@ -106,7 +102,7 @@ pub fn timeout_dialogue(
         {
             let idx = (s.remaining_turns as usize).min(CHOKE_TEXTS.len()) - 1;
             if s.remaining_turns > 0 && s.remaining_turns <= 5 {
-                log.add(CHOKE_TEXTS[CHOKE_TEXTS.len() - 1 - idx].to_string(), *turn);
+                ctx.log.add(CHOKE_TEXTS[CHOKE_TEXTS.len() - 1 - idx].to_string(), ctx.turn);
             }
             if s.remaining_turns == 1 {
                 if let Some(h) = health.as_mut() {
@@ -123,7 +119,7 @@ pub fn timeout_dialogue(
         {
             let idx = (s.remaining_turns as usize).min(VOMIT_TEXTS.len()) - 1;
             if s.remaining_turns > 0 && s.remaining_turns <= 5 {
-                log.add(VOMIT_TEXTS[VOMIT_TEXTS.len() - 1 - idx].to_string(), *turn);
+                ctx.log.add(VOMIT_TEXTS[VOMIT_TEXTS.len() - 1 - idx].to_string(), ctx.turn);
             }
             if s.remaining_turns == 1 {
                 if let Some(h) = health.as_mut() {
@@ -139,9 +135,9 @@ pub fn timeout_dialogue(
         {
             let idx = (s.remaining_turns as usize).min(STRANGLE_TEXTS.len()) - 1;
             if s.remaining_turns > 0 && s.remaining_turns <= 5 {
-                log.add(
+                ctx.log.add(
                     STRANGLE_TEXTS[STRANGLE_TEXTS.len() - 1 - idx].to_string(),
-                    *turn,
+                    ctx.turn,
                 );
             }
             if s.remaining_turns == 1 {

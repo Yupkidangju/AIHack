@@ -143,8 +143,6 @@ fn run_full_turn_safe(world: &mut World, resources: &mut Resources) {
         .flush()
         .add_system(aihack::core::systems::inventory::autopickup_tick_system())
         .flush()
-        .add_system(aihack::core::systems::regeneration::regeneration_system())
-        .flush()
         .build();
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

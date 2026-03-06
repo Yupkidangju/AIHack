@@ -2,6 +2,51 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+
+## [3.0.0-alpha.1] - 2026-03-06
+### Changed
+- **[Phase E1 완료] GameContext 구조체 정의 및 TurnRunner 구현** (`src/core/context.rs`)
+  - `GameContext<'a>` 구조체: World, Grid, GameLog, NetHackRng, EventQueue, ActionQueue, AssetManager, Command, turn 필드 통합
+  - `TurnRunner` 구조체: Schedule 대체 순차 실행기
+  - `action_queue` 필드 추가 (장비/던지기 등 사용자 액션 큐)
+- **[Phase E2a 완료] 저난이도 시스템 7개 GameContext 전환**
+  - `timeout_dialogue` (`misc/timeout.rs`)
+  - `luck_maintenance` (`misc/luck.rs`)
+  - `status_tick` (`creature/status.rs`)
+  - `attrib_maintenance` (`creature/attrib.rs`)
+  - `item_tick` (`item/item_tick.rs`) — Gather-Apply 패턴 적용
+  - `regeneration` (`creature/regeneration.rs`)
+  - `monster_regeneration` (`creature/regeneration.rs`)
+- **[Phase E2b 진행] 중난이도 시스템 6개 추가 GameContext 전환** (총 13개 완료)
+  - `engrave_tick` (`world/engrave.rs`)
+  - `autopickup_tick` (`misc/inventory.rs`)
+  - `inventory_action` (`misc/inventory.rs`)
+  - `evolution_tick` (`creature/evolution.rs`) — Gather-Apply 패턴 + ctx 블록 분리
+  - `lycanthropy_tick` (`creature/evolution.rs`) — Gather-Apply 패턴 + ctx 블록 분리
+  - `update_encumbrance` (`item/weight.rs`) — `calculate_total_weight` 시그니처 `impl EntityStore` 제네릭화
+- **game_loop.rs 리팩토링**: Schedule에서 13개 시스템 제거 → GameContext 순차 호출부로 이동
+- **e2e_stabilize.rs / e2e_verbs.rs**: 전환 완료 시스템의 Schedule 등록 제거
+
+### Technical Notes
+- Gather-Apply 패턴: World의 query borrow와 entry_mut borrow가 겹치는 경우, 먼저 데이터를 Vec에 수집(Gather)한 뒤 borrow를 해제하고, 이후 Vec을 순회하며 적용(Apply)
+- `calculate_total_weight`를 `&impl EntityStore`로 제네릭화하여 World/SubWorld 모두에서 호출 가능
+- 중난이도 대량 변환 시 regex 헬퍼 함수 오염 교훈 → 한 시스템씩 수동 전환이 안전함
+
+## [2.43.0] - 2026-03-04
+### Changed
+- **[아키텍처 결정 #41] 엔진 전환 계획 수립**: Legion `#[system]` 매크로 + SubWorld + Schedule 제거 → `GameContext` + `&mut World` 직접 접근 + 순차 실행으로 전환 결정
+  - 근본 원인: `entry_ref`/`entry_mut`의 아키타입 전체 잠금으로 인한 AccessDenied 패닉이 구조적으로 해결 불가
+  - ECS 데이터 모델(Entity/Component/Query)은 100% 유지, 실행 모델만 교체
+  - MAJOR 버전 변경(v3.0.0) 예정
+- **STABILIZATION_ROADMAP.md v2.0 전면 개편**: 기존 Phase S0~S7 → 신규 Phase E1~E5로 재편
+  - E1: GameContext + TurnRunner 기반 구축
+  - E2: 31개 시스템 일반 함수 전환 (저→중→고 난이도 순)
+  - E3: 전체 통합 테스트 + 1000턴 퍼징
+  - E4: AIProvider trait + LLM 통합 아키텍처
+  - E5: LLM 실제 주입
+- **DESIGN_DECISIONS.md 결정 #41 추가**: ENGINE-1(시스템 매크로 제거), ENGINE-2(GameContext), ENGINE-3(AIProvider trait) 3개 하위 결정 기록
+- **spec.md 섹션 1.3~1.4 갱신**: 대상 환경에 LLM 추가, 엔진 전환 방향(v3.0.0) 명세
+
 ## [2.42.1] - 2026-03-01
 ### Added
 - **E2E 핵심 동사 테스트 (e2e_verbs.rs)**: Tier 1-3 자동 검증 15개 테스트 작성 및 전량 통과

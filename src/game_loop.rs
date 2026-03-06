@@ -1009,10 +1009,6 @@ impl super::NetHackApp {
             .flush()
             .add_system(crate::core::systems::ai::monster_ai_system())
             .flush()
-            .add_system(crate::core::systems::luck::luck_maintenance_system())
-            .flush()
-            .add_system(crate::core::systems::engrave::engrave_tick_system())
-            .flush()
             .add_system(crate::core::systems::trap::trap_trigger_system())
             .flush()
             .add_system(crate::core::systems::death::death_system())
@@ -1020,10 +1016,6 @@ impl super::NetHackApp {
             .add_system(crate::core::systems::vision_system::vision_update_system())
             .flush()
             .add_system(crate::core::systems::vision_system::magic_map_effect_system())
-            .flush()
-            .add_system(crate::core::systems::inventory::autopickup_tick_system())
-            .flush()
-            .add_system(crate::core::systems::inventory::inventory_action_system())
             .flush()
             .add_system(crate::core::systems::item_use::item_input_system())
             .flush()
@@ -1043,28 +1035,73 @@ impl super::NetHackApp {
             .flush()
             .add_system(crate::core::systems::stairs::stairs_system())
             .flush()
-            .add_system(crate::core::systems::status::status_tick_system())
-            .flush()
-            .add_system(crate::core::systems::attrib::attrib_maintenance_system())
-            .flush()
-            .add_system(crate::core::systems::timeout::timeout_dialogue_system())
-            .flush()
-            .add_system(crate::core::systems::item_tick::item_tick_system())
-            .flush()
-            .add_system(crate::core::systems::regeneration::regeneration_system())
-            .flush()
-            .add_system(crate::core::systems::regeneration::monster_regeneration_system())
-            .flush()
-            .add_system(crate::core::systems::evolution::evolution_tick_system())
-            .flush()
-            .add_system(crate::core::systems::evolution::lycanthropy_tick_system())
-            .flush()
             .add_system(crate::core::systems::shop::shopkeeper_update_system())
-            .flush()
-            .add_system(crate::core::systems::weight::update_encumbrance_system())
             .build();
 
         schedule.execute(&mut self.game.world, &mut self.game.resources);
+
+        // ====================================================================
+        // [v3.0.0 Phase E2] GameContext 기반 전환 시스템 실행부 (13개)
+        // Schedule에서 제거된 시스템들을 여기서 순차 실행한다.
+        // &mut World 직접 접근 → AccessDenied 영구 불가능
+        // ====================================================================
+        {
+            let mut log = self
+                .game
+                .resources
+                .get_mut::<crate::ui::log::GameLog>()
+                .unwrap();
+            let mut rng = self
+                .game
+                .resources
+                .get_mut::<crate::util::rng::NetHackRng>()
+                .unwrap();
+            let turn = *self.game.resources.get::<u64>().unwrap();
+            let cmd = *self
+                .game
+                .resources
+                .get::<crate::ui::input::Command>()
+                .unwrap();
+            let mut event_queue = self
+                .game
+                .resources
+                .get_mut::<crate::core::events::EventQueue>()
+                .unwrap();
+            let mut grid = self
+                .game
+                .resources
+                .get_mut::<crate::core::dungeon::Grid>()
+                .unwrap();
+
+            let mut action_queue = self.game.resources.get_mut::<crate::core::action_queue::ActionQueue>().unwrap();
+
+            let mut ctx = crate::core::context::GameContext::new(
+                &mut self.game.world,
+                &mut grid,
+                &mut log,
+                &mut rng,
+                turn,
+                cmd,
+                &self.game.assets,
+                &mut event_queue,
+                &mut action_queue,
+            );
+
+            // [v3.0.0] 전환 완료 시스템 (13개)
+            crate::core::systems::world::engrave::engrave_tick_system(&mut ctx);
+            crate::core::systems::misc::inventory::autopickup_tick_system(&mut ctx);
+            crate::core::systems::misc::inventory::inventory_action_system(&mut ctx);
+            crate::core::systems::misc::luck::luck_maintenance_system(&mut ctx);
+            crate::core::systems::creature::status::status_tick_system(&mut ctx);
+            crate::core::systems::creature::attrib::attrib_maintenance_system(&mut ctx);
+            crate::core::systems::misc::timeout::timeout_dialogue_system(&mut ctx);
+            crate::core::systems::item::item_tick::item_tick_system(&mut ctx);
+            crate::core::systems::creature::regeneration::regeneration_system(&mut ctx);
+            crate::core::systems::creature::regeneration::monster_regeneration_system(&mut ctx);
+            crate::core::systems::creature::evolution::evolution_tick_system(&mut ctx);
+            crate::core::systems::creature::evolution::lycanthropy_tick_system(&mut ctx);
+            crate::core::systems::item::weight::update_encumbrance_system(&mut ctx);
+        }
     }
 
     fn handle_level_change(&mut self) {

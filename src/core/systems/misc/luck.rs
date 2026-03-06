@@ -18,15 +18,9 @@ use legion::IntoQuery;
 ///
 
 ///
-#[legion::system]
-#[write_component(Player)]
-pub fn luck_maintenance(
-    world: &mut SubWorld,
-    #[resource] _log: &mut GameLog,
-    #[resource] _turn: &u64,
-) {
+pub fn luck_maintenance_system(ctx: &mut crate::core::context::GameContext) {
     let mut query = <&mut Player>::query();
-    for player in query.iter_mut(world) {
+    for player in query.iter_mut(ctx.world) {
         // 1. Luck Timeout 泥섎━ (u.uluckcnt)
         //
         if player.luck != 0 {

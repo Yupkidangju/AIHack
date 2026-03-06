@@ -151,10 +151,7 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.add_system(aihack::core::systems::ai::monster_ai_system());
         builder.flush();
     }
-    if system_count >= 4 {
-        builder.add_system(aihack::core::systems::luck::luck_maintenance_system());
-        builder.flush();
-    }
+    // [v3.0.0] luck_maintenance  GameContext로 전환됨 (system_count 4  건너뜀)
     if system_count >= 5 {
         builder.add_system(aihack::core::systems::engrave::engrave_tick_system());
         builder.flush();
@@ -219,30 +216,12 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.add_system(aihack::core::systems::stairs::stairs_system());
         builder.flush();
     }
-    if system_count >= 21 {
-        builder.add_system(aihack::core::systems::status::status_tick_system());
-        builder.flush();
-    }
-    if system_count >= 22 {
-        builder.add_system(aihack::core::systems::attrib::attrib_maintenance_system());
-        builder.flush();
-    }
-    if system_count >= 23 {
-        builder.add_system(aihack::core::systems::timeout::timeout_dialogue_system());
-        builder.flush();
-    }
-    if system_count >= 24 {
-        builder.add_system(aihack::core::systems::item_tick::item_tick_system());
-        builder.flush();
-    }
-    if system_count >= 25 {
-        builder.add_system(aihack::core::systems::regeneration::regeneration_system());
-        builder.flush();
-    }
-    if system_count >= 26 {
-        builder.add_system(aihack::core::systems::regeneration::monster_regeneration_system());
-        builder.flush();
-    }
+    // [v3.0.0] status_tick  GameContext로 전환됨 (system_count 21  건너뜀)
+    // [v3.0.0] attrib_maintenance  GameContext로 전환됨 (system_count 22  건너뜀)
+    // [v3.0.0] timeout_dialogue  GameContext로 전환됨 (system_count 23  건너뜀)
+    // [v3.0.0] item_tick  GameContext로 전환됨 (system_count 24  건너뜀)
+    // [v3.0.0] regeneration  GameContext로 전환됨 (system_count 25  건너뜀)
+    // [v3.0.0] monster_regeneration  GameContext로 전환됨 (system_count 26  건너뜀)
     if system_count >= 27 {
         builder.add_system(aihack::core::systems::evolution::evolution_tick_system());
         builder.flush();
@@ -441,7 +420,7 @@ fn audit_command_fuzzing_100_turns() {
         eprintln!("[FUZZ] Turn {} → {:?}", turn, cmd);
         resources.insert(turn as u64);
         resources.insert(cmd);
-        run_schedule_safe(&mut world, &mut resources, 30);
+        run_schedule_safe(&mut world, &mut resources, 29);
     }
 
     // 패닉 없이 여기 도달하면 성공

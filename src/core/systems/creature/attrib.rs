@@ -271,16 +271,10 @@ pub fn restore_attrib(player: &mut Player, log: &mut GameLog, turn: u64) {
 }
 
 ///
-#[legion::system]
-#[write_component(crate::core::entity::player::Player)]
-pub fn attrib_maintenance(
-    world: &mut SubWorld,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-) {
+pub fn attrib_maintenance_system(ctx: &mut crate::core::context::GameContext) {
     let mut query = <&mut Player>::query();
-    for player in query.iter_mut(world) {
-        restore_attrib(player, log, *turn);
+    for player in query.iter_mut(ctx.world) {
+        restore_attrib(player, ctx.log, ctx.turn);
     }
 }
 
