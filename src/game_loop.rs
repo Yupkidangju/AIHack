@@ -1005,33 +1005,19 @@ impl super::NetHackApp {
         let mut schedule = Schedule::builder()
             .add_system(crate::core::systems::movement::movement_system())
             .flush()
-            .add_system(crate::core::systems::ai::pet_hunger_system())
-            .flush()
             .add_system(crate::core::systems::ai::monster_ai_system())
             .flush()
             .add_system(crate::core::systems::trap::trap_trigger_system())
             .flush()
             .add_system(crate::core::systems::death::death_system())
             .flush()
-            .add_system(crate::core::systems::vision_system::vision_update_system())
-            .flush()
-            .add_system(crate::core::systems::vision_system::magic_map_effect_system())
-            .flush()
-            .add_system(crate::core::systems::item_use::item_input_system())
-            .flush()
             .add_system(crate::core::systems::item_use::item_use_system())
-            .flush()
-            .add_system(crate::core::systems::equipment::equipment_system())
-            .flush()
-            .add_system(crate::core::systems::equipment::update_player_stats_system())
             .flush()
             .add_system(crate::core::systems::throw::throw_system())
             .flush()
             .add_system(crate::core::systems::zap::zap_system())
             .flush()
             .add_system(crate::core::systems::teleport::teleport_system())
-            .flush()
-            .add_system(crate::core::systems::spell::spell_cast_system())
             .flush()
             .add_system(crate::core::systems::stairs::stairs_system())
             .flush()
@@ -1073,7 +1059,17 @@ impl super::NetHackApp {
                 .get_mut::<crate::core::dungeon::Grid>()
                 .unwrap();
 
-            let mut action_queue = self.game.resources.get_mut::<crate::core::action_queue::ActionQueue>().unwrap();
+            let mut action_queue = self
+                .game
+                .resources
+                .get_mut::<crate::core::action_queue::ActionQueue>()
+                .unwrap();
+
+            let mut vision = self
+                .game
+                .resources
+                .get_mut::<crate::core::systems::vision::VisionSystem>()
+                .unwrap();
 
             let mut ctx = crate::core::context::GameContext::new(
                 &mut self.game.world,
@@ -1085,9 +1081,17 @@ impl super::NetHackApp {
                 &self.game.assets,
                 &mut event_queue,
                 &mut action_queue,
+                &mut vision,
             );
 
-            // [v3.0.0] 전환 완료 시스템 (13개)
+            // [v3.0.0] 전환 완료 시스템 (20개)
+            crate::core::systems::ai::core::pet_hunger_system(&mut ctx);
+            crate::core::systems::creature::equipment::update_player_stats_system(&mut ctx);
+            crate::core::systems::creature::equipment::equipment_system(&mut ctx);
+            crate::core::systems::misc::spell::spell_cast_system(&mut ctx);
+            crate::core::systems::world::vision_system::vision_update_system(&mut ctx);
+            crate::core::systems::world::vision_system::magic_map_effect_system(&mut ctx);
+            crate::core::systems::item::item_use::item_input_system(&mut ctx);
             crate::core::systems::world::engrave::engrave_tick_system(&mut ctx);
             crate::core::systems::misc::inventory::autopickup_tick_system(&mut ctx);
             crate::core::systems::misc::inventory::inventory_action_system(&mut ctx);

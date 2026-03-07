@@ -11,6 +11,7 @@ use crate::assets::AssetManager;
 use crate::core::action_queue::ActionQueue;
 use crate::core::dungeon::Grid;
 use crate::core::events::EventQueue;
+use crate::core::systems::vision::VisionSystem;
 use crate::ui::input::Command;
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
@@ -54,6 +55,8 @@ pub struct GameContext<'a> {
     pub event_queue: &'a mut EventQueue,
     /// 액션 큐 (장비/던지기/이동 등 사용자 액션)
     pub action_queue: &'a mut ActionQueue,
+    /// 시야 시스템 (FOV/가시 영역 계산)
+    pub vision: &'a mut VisionSystem,
 }
 
 impl<'a> GameContext<'a> {
@@ -68,6 +71,7 @@ impl<'a> GameContext<'a> {
         assets: &'a AssetManager,
         event_queue: &'a mut EventQueue,
         action_queue: &'a mut ActionQueue,
+        vision: &'a mut VisionSystem,
     ) -> Self {
         Self {
             world,
@@ -79,6 +83,7 @@ impl<'a> GameContext<'a> {
             assets,
             event_queue,
             action_queue,
+            vision,
         }
     }
 }
@@ -139,6 +144,7 @@ mod tests {
         let assets = AssetManager::new();
 
         let mut action_queue = crate::core::action_queue::ActionQueue::new();
+        let mut vision = crate::core::systems::vision::VisionSystem::new();
 
         let mut ctx = GameContext::new(
             &mut world,
@@ -150,6 +156,7 @@ mod tests {
             &assets,
             &mut event_queue,
             &mut action_queue,
+            &mut vision,
         );
 
         // GameContext가 정상 생성되면 turn/cmd 접근 가능

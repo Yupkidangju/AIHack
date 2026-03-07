@@ -9,22 +9,20 @@ use crate::ui::log::GameLog;
 use legion::world::SubWorld;
 use legion::{component, Entity, EntityStore, IntoQuery};
 
-#[legion::system]
-#[read_component(PlayerTag)]
-#[read_component(Item)]
-#[write_component(Inventory)]
-#[write_component(Equipment)]
-#[write_component(crate::core::entity::Health)]
-#[write_component(crate::core::entity::player::Player)]
-#[read_component(crate::core::entity::ItemTag)]
-pub fn equipment(
-    world: &mut SubWorld,
-    #[resource] assets: &AssetManager,
-    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] event_queue: &mut EventQueue, // [v2.0.0 R5] 장비 이벤트
-) {
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn equipment_system(ctx: &mut crate::core::context::GameContext) {
+    // ctx 필드 분해: world, log, event_queue 등을 동시에 mutable borrow
+    let crate::core::context::GameContext {
+        world,
+        assets,
+        action_queue,
+        log,
+        turn,
+        event_queue,
+        ..
+    } = ctx;
+    let turn_val = *turn;
+
     let mut to_keep = Vec::new();
     let mut action_to_process = None;
     while let Some(game_action) = action_queue.pop() {
@@ -81,7 +79,7 @@ pub fn equipment(
     )>::query()
     .filter(component::<PlayerTag>());
 
-    if let Some((inventory, equipment, player, health)) = query.iter_mut(world).next() {
+    if let Some((inventory, equipment, player, health)) = query.iter_mut(*world).next() {
         // ... (artifact check) ...
         if let Some(art_id) = artifact_id {
             if let Some(art_tmpl) = assets.artifacts.get_artifact(&art_id) {
@@ -89,13 +87,12 @@ pub fn equipment(
                     log.add_colored(
                         format!("The {} blasts you!", art_tmpl.name),
                         [255, 100, 100],
-                        *turn,
+                        turn_val,
                     );
                     health.current -= 10;
                     if health.current <= 0 {
-                        log.add("You died from the blast...", *turn);
+                        log.add("You died from the blast...", turn_val);
                     }
-                    // *action = None;
                     return;
                 }
             }
@@ -103,7 +100,6 @@ pub fn equipment(
 
         match current_action {
             ItemAction::Wield(_) => {
-                // ...
                 if let Some(t) = template {
                     if t.class == ItemClass::Weapon {
                         equip_item(
@@ -113,23 +109,19 @@ pub fn equipment(
                             inventory,
                             equipment,
                             log,
-                            *turn,
+                            turn_val,
                             event_queue,
                         );
-                        // *action = None;
                     } else {
-                        log.add("You can only wield weapons.", *turn);
-                        // *action = None;
+                        log.add("You can only wield weapons.", turn_val);
                     }
                 }
             }
             ItemAction::EquipOffhand(_) => {
                 if let Some(t) = template {
                     if t.class == ItemClass::Weapon {
-                        // Check Shield slot
                         if equipment.slots.contains_key(&EquipmentSlot::Shield) {
-                            log.add("You cannot dual-wield while wearing a shield.", *turn);
-                            // *action = None;
+                            log.add("You cannot dual-wield while wearing a shield.", turn_val);
                             return;
                         }
 
@@ -140,19 +132,16 @@ pub fn equipment(
                             inventory,
                             equipment,
                             log,
-                            *turn,
+                            turn_val,
                             event_queue,
                         );
                         player.two_weapon = true;
-                        // *action = None;
                     } else {
-                        log.add("You can only wield weapons in your off-hand.", *turn);
-                        // *action = None;
+                        log.add("You can only wield weapons in your off-hand.", turn_val);
                     }
                 }
             }
             ItemAction::Wear(_) => {
-                // ... (wear logic) ...
                 if let Some(t) = template {
                     if t.class == ItemClass::Armor {
                         let slot = match t.subtype {
@@ -165,12 +154,10 @@ pub fn equipment(
                             _ => None,
                         };
                         if let Some(s) = slot {
-                            // Check Offhand if trying to wear Shield
                             if s == EquipmentSlot::Shield
                                 && equipment.slots.contains_key(&EquipmentSlot::Offhand)
                             {
-                                log.add("You cannot wear a shield while dual-wielding.", *turn);
-                                // *action = None;
+                                log.add("You cannot wear a shield while dual-wielding.", turn_val);
                                 return;
                             }
 
@@ -181,24 +168,19 @@ pub fn equipment(
                                 inventory,
                                 equipment,
                                 log,
-                                *turn,
+                                turn_val,
                                 event_queue,
                             );
-                            // *action = None;
                         } else {
-                            log.add("You cannot wear that.", *turn);
-                            // *action = None;
+                            log.add("You cannot wear that.", turn_val);
                         }
                     } else {
-                        log.add("You can only wear armor.", *turn);
-                        // *action = None;
+                        log.add("You can only wear armor.", turn_val);
                     }
                 }
             }
             ItemAction::QuiverSelect(_) => {
                 if let Some(t) = template {
-                    // NetHack allows Quivering weapons, tools (wands), or food (sometimes)
-                    // But primarily Weapons, Tools, Gem, or Food
                     if t.class == ItemClass::Weapon
                         || t.class == ItemClass::Tool
                         || t.class == ItemClass::Gem
@@ -211,19 +193,16 @@ pub fn equipment(
                             inventory,
                             equipment,
                             log,
-                            *turn,
+                            turn_val,
                             event_queue,
                         );
-                        // *action = None;
                     } else {
-                        log.add("You cannot quiver that.", *turn);
-                        // *action = None;
+                        log.add("You cannot quiver that.", turn_val);
                     }
                 }
             }
             ItemAction::TakeOff(_) => {
-                unequip_item(item_ent, inventory, equipment, log, *turn, event_queue);
-                // *action = None;
+                unequip_item(item_ent, inventory, equipment, log, turn_val, event_queue);
             }
             _ => {}
         }
@@ -299,19 +278,12 @@ fn unequip_item(
     }
 }
 
-///
-#[legion::system]
-#[read_component(PlayerTag)]
-#[read_component(Equipment)]
-#[read_component(Item)]
-#[write_component(crate::core::entity::CombatStats)]
-#[write_component(crate::core::entity::status::StatusBundle)]
-#[write_component(crate::core::entity::player::Player)]
-pub fn update_player_stats(world: &mut SubWorld, #[resource] assets: &AssetManager) {
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn update_player_stats_system(ctx: &mut crate::core::context::GameContext) {
     // 1. 장착된 아이템 ID들 수집 (Borrow 충돌 방지)
     let mut equipped_items = Vec::new();
     let mut p_query = <&Equipment>::query().filter(component::<PlayerTag>());
-    for equipment in p_query.iter(world) {
+    for equipment in p_query.iter(ctx.world) {
         for item_ent in equipment.slots.values() {
             equipped_items.push(*item_ent);
         }
@@ -324,10 +296,10 @@ pub fn update_player_stats(world: &mut SubWorld, #[resource] assets: &AssetManag
     let mut total_effects = crate::core::systems::worn::EquipmentEffects::new();
 
     for item_ent in equipped_items {
-        if let Ok(entry) = world.entry_ref(item_ent) {
+        if let Ok(entry) = ctx.world.entry_ref(item_ent) {
             if let Ok(item) = entry.get_component::<Item>() {
                 // 일반 아이템 속성 (AC)
-                if let Some(template) = assets.items.get_by_kind(item.kind) {
+                if let Some(template) = ctx.assets.items.get_by_kind(item.kind) {
                     if template.class == ItemClass::Armor {
                         let base_bonus = template.oc1 as i32;
                         let erosion = (item.oeroded as i32) + (item.oeroded2 as i32);
@@ -364,7 +336,7 @@ pub fn update_player_stats(world: &mut SubWorld, #[resource] assets: &AssetManag
 
                 //
                 if let Some(art_id) = &item.artifact {
-                    if let Some(art) = assets.artifacts.get_artifact(art_id) {
+                    if let Some(art) = ctx.assets.artifacts.get_artifact(art_id) {
                         for &res in &art.resists {
                             artifact_resists.insert(res);
                         }
@@ -381,7 +353,7 @@ pub fn update_player_stats(world: &mut SubWorld, #[resource] assets: &AssetManag
         &mut crate::core::entity::player::Player,
     )>::query()
     .filter(component::<PlayerTag>());
-    for (stats, status, player) in query.iter_mut(world) {
+    for (stats, status, player) in query.iter_mut(ctx.world) {
         stats.ac = 10 - total_ac_bonus;
 
         //

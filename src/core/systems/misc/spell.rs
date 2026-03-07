@@ -26,24 +26,11 @@ pub struct CastAction {
     pub direction: Option<crate::core::game_state::Direction>,
 }
 
-///
-#[legion::system]
-#[read_component(PlayerTag)]
-#[write_component(Player)]
-#[read_component(SpellKnowledge)]
-#[read_component(Position)]
-#[write_component(Health)]
-#[read_component(MonsterTag)]
-pub fn spell_cast(
-    world: &mut SubWorld,
-    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] grid: &Grid,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn spell_cast_system(ctx: &mut crate::core::context::GameContext) {
     let mut to_keep = Vec::new();
     let mut action_to_process = None;
-    while let Some(game_action) = action_queue.pop() {
+    while let Some(game_action) = ctx.action_queue.pop() {
         if let crate::core::action_queue::GameAction::Cast(a) = game_action {
             action_to_process = Some(a);
         } else {
@@ -51,7 +38,7 @@ pub fn spell_cast(
         }
     }
     for a in to_keep {
-        action_queue.push(a);
+        ctx.action_queue.push(a);
     }
 
     let action = match action_to_process {
@@ -67,20 +54,21 @@ pub fn spell_cast(
 
     let mut p_query =
         <(&Player, &SpellKnowledge, &Position)>::query().filter(component::<PlayerTag>());
-    for (p_stats, p_knowledge, p_pos) in p_query.iter(world) {
+    for (p_stats, p_knowledge, p_pos) in p_query.iter(ctx.world) {
         if let Some(spell) = p_knowledge.spells.get(&spell_key) {
             let cost = spell.level * 5;
             if p_stats.energy >= cost {
                 spell_to_cast = Some((spell.name.clone(), cost));
                 p_pos_copy = Some(*p_pos);
             } else {
-                log.add("You don't have enough energy to cast that spell.", *turn);
+                ctx.log
+                    .add("You don't have enough energy to cast that spell.", ctx.turn);
                 return;
             }
         } else {
-            log.add(
+            ctx.log.add(
                 format!("You don't know any spell assigned to '{}'.", spell_key),
-                *turn,
+                ctx.turn,
             );
             return;
         }
@@ -90,22 +78,22 @@ pub fn spell_cast(
     if let Some((spell_name, cost)) = spell_to_cast {
         //
         let mut p_stats_query = <&mut Player>::query().filter(component::<PlayerTag>());
-        for p_stats in p_stats_query.iter_mut(world) {
+        for p_stats in p_stats_query.iter_mut(ctx.world) {
             p_stats.energy -= cost;
         }
 
-        log.add(format!("You cast {}.", spell_name), *turn);
+        ctx.log.add(format!("You cast {}.", spell_name), ctx.turn);
 
         //
         if let Some(p_pos) = p_pos_copy {
             execute_spell_effect(
                 &spell_name,
                 &p_pos,
-                world,
-                log,
-                *turn,
+                ctx.world,
+                ctx.log,
+                ctx.turn,
                 action.direction,
-                grid,
+                ctx.grid,
             );
         }
     }
@@ -114,7 +102,7 @@ pub fn spell_cast(
 fn execute_spell_effect(
     name: &str,
     p_pos: &Position,
-    world: &mut SubWorld,
+    world: &mut World,
     log: &mut GameLog,
     turn: u64,
     direction: Option<crate::core::game_state::Direction>,
@@ -188,7 +176,7 @@ pub fn cast_monster_spell(
     m_ent: Entity,
     m_name: &str,
     p_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut World,
     assets: &crate::assets::AssetManager,
     rng: &mut crate::util::rng::NetHackRng,
     log: &mut GameLog,

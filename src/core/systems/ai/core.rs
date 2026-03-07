@@ -18,22 +18,14 @@ use legion::world::{EntityStore, SubWorld};
 use legion::*;
 use std::collections::{HashMap, HashSet};
 
-///
-#[system]
-#[read_component(MonsterTag)]
-#[write_component(crate::core::entity::monster::Pet)]
-pub fn pet_hunger(
-    world: &mut SubWorld,
-    #[resource] rng: &mut NetHackRng,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn pet_hunger_system(ctx: &mut crate::core::context::GameContext) {
     let mut query = <(&mut crate::core::entity::monster::Pet, &MonsterTag)>::query();
-    for (pet, _) in query.iter_mut(world) {
-        if *turn % 10 == 0 {
+    for (pet, _) in query.iter_mut(ctx.world) {
+        if ctx.turn % 10 == 0 {
             pet.hunger += 1;
-            if pet.hunger > 1000 && rng.rn2(20) == 0 {
-                log.add("Your pet whines.", *turn);
+            if pet.hunger > 1000 && ctx.rng.rn2(20) == 0 {
+                ctx.log.add("Your pet whines.", ctx.turn);
             }
         }
     }

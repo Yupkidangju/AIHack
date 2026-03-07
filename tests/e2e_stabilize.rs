@@ -144,7 +144,8 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.flush();
     }
     if system_count >= 2 {
-        builder.add_system(aihack::core::systems::ai::pet_hunger_system());
+        builder
+;
         builder.flush();
     }
     if system_count >= 3 {
@@ -165,11 +166,13 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.flush();
     }
     if system_count >= 8 {
-        builder.add_system(aihack::core::systems::vision_system::vision_update_system());
+        builder
+;
         builder.flush();
     }
     if system_count >= 9 {
-        builder.add_system(aihack::core::systems::vision_system::magic_map_effect_system());
+        builder
+;
         builder.flush();
     }
     if system_count >= 10 {
@@ -193,7 +196,8 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.flush();
     }
     if system_count >= 15 {
-        builder.add_system(aihack::core::systems::equipment::update_player_stats_system());
+        builder
+;
         builder.flush();
     }
     if system_count >= 16 {
@@ -209,7 +213,8 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.flush();
     }
     if system_count >= 19 {
-        builder.add_system(aihack::core::systems::spell::spell_cast_system());
+        builder
+;
         builder.flush();
     }
     if system_count >= 20 {

@@ -4,28 +4,15 @@ use crate::core::systems::vision::VisionSystem;
 use legion::world::SubWorld;
 use legion::*;
 
-///
-#[legion::system]
-#[read_component(Position)]
-#[read_component(PlayerTag)]
-#[read_component(crate::core::entity::LightSource)]
-#[read_component(crate::core::entity::Inventory)]
-#[read_component(crate::core::entity::Level)]
-#[read_component(crate::core::entity::Item)]
-#[read_component(crate::core::entity::status::StatusBundle)]
-#[read_component(crate::core::entity::MonsterTag)]
-pub fn vision_update(
-    world: &mut SubWorld,
-    #[resource] grid: &Grid,
-    #[resource] vision: &mut VisionSystem,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn vision_update_system(ctx: &mut crate::core::context::GameContext) {
     use crate::core::entity::status::{StatusBundle, StatusFlags};
     use crate::core::entity::{Inventory, Level, LightSource, PlayerTag, Position};
 
     //
     let mut p_q = <(&Position, &Level, &StatusBundle, &PlayerTag)>::query();
     let p_info: Option<(Position, Level, StatusFlags)> = p_q
-        .iter(world)
+        .iter(ctx.world)
         .next()
         .map(|(p, l, s, _)| (*p, *l, s.flags()));
 
@@ -34,18 +21,19 @@ pub fn vision_update(
         None => return,
     };
 
-    vision.update_clear_zones(grid);
+    ctx.vision.update_clear_zones(ctx.grid);
 
     //
     if p_flags.contains(StatusFlags::BLIND) {
-        vision.reset_sight();
+        ctx.vision.reset_sight();
         //
-        vision.apply_vision(grid, p_pos.x as usize, p_pos.y as usize, 1);
+        ctx.vision
+            .apply_vision(ctx.grid, p_pos.x as usize, p_pos.y as usize, 1);
         return;
     }
 
     //
-    let is_dark = if let Some(tile) = grid.get_tile(p_pos.x as usize, p_pos.y as usize) {
+    let is_dark = if let Some(tile) = ctx.grid.get_tile(p_pos.x as usize, p_pos.y as usize) {
         !tile
             .flags
             .contains(crate::core::dungeon::tile::TileFlags::LIT)
@@ -63,70 +51,87 @@ pub fn vision_update(
         5
     };
 
-    vision.recalc(grid, p_pos.x as usize, p_pos.y as usize, base_radius);
+    ctx.vision
+        .recalc(ctx.grid, p_pos.x as usize, p_pos.y as usize, base_radius);
 
-    //
-    let mut f_q = <(&Position, &LightSource, &Level)>::query();
-    for (pos, light, lvl) in f_q.iter(world) {
-        if light.lit && lvl.0 == p_lvl.0 {
-            vision.apply_vision(grid, pos.x as usize, pos.y as usize, light.range);
+    // 조명원 수집 (Gather)
+    let mut light_positions = Vec::new();
+    {
+        let mut f_q = <(&Position, &LightSource, &Level)>::query();
+        for (pos, light, lvl) in f_q.iter(ctx.world) {
+            if light.lit && lvl.0 == p_lvl.0 {
+                light_positions.push((pos.x as usize, pos.y as usize, light.range));
+            }
         }
     }
+    // Apply
+    for (lx, ly, range) in &light_positions {
+        ctx.vision.apply_vision(ctx.grid, *lx, *ly, *range);
+    }
 
-    //
-    let mut c_q = <(&Position, &Inventory, &Level)>::query();
-    for (pos, inv, lvl) in c_q.iter(world) {
-        if lvl.0 == p_lvl.0 {
-            for &item_ent in &inv.items {
-                if let Ok(entry) = world.entry_ref(item_ent) {
-                    if let Ok(light) = entry.get_component::<LightSource>() {
-                        if light.lit {
-                            vision.apply_vision(grid, pos.x as usize, pos.y as usize, light.range);
-                        }
-                    }
+    // 인벤토리 내 조명원 수집 (Gather)
+    let mut inv_lights = Vec::new();
+    {
+        let mut c_q = <(&Position, &Inventory, &Level)>::query();
+        for (pos, inv, lvl) in c_q.iter(ctx.world) {
+            if lvl.0 == p_lvl.0 {
+                for &item_ent in &inv.items {
+                    inv_lights.push((pos.x as usize, pos.y as usize, item_ent));
+                }
+            }
+        }
+    }
+    // Apply
+    for (px, py, item_ent) in inv_lights {
+        if let Ok(entry) = ctx.world.entry_ref(item_ent) {
+            if let Ok(light) = entry.get_component::<LightSource>() {
+                if light.lit {
+                    ctx.vision.apply_vision(ctx.grid, px, py, light.range);
                 }
             }
         }
     }
 
-    //
+    // 적외선 시야
     if p_flags.contains(StatusFlags::INFRAVISION) {
-        let mut m_q = <(&Position, &Level, &crate::core::entity::MonsterTag)>::query();
-        for (m_pos, m_lvl, _) in m_q.iter(world) {
-            if m_lvl.0 == p_lvl.0 {
-                let dx = (m_pos.x - p_pos.x).abs();
-                let dy = (m_pos.y - p_pos.y).abs();
-                if dx <= 8 && dy <= 8 {
-                    //
-                    if VisionSystem::has_line_of_sight(
-                        grid,
-                        p_pos.x as usize,
-                        p_pos.y as usize,
-                        m_pos.x as usize,
-                        m_pos.y as usize,
-                    ) {
-                        vision.viz_array[m_pos.x as usize][m_pos.y as usize] |=
-                            crate::core::systems::vision::IN_SIGHT;
+        let mut infra_targets = Vec::new();
+        {
+            let mut m_q = <(&Position, &Level, &crate::core::entity::MonsterTag)>::query();
+            for (m_pos, m_lvl, _) in m_q.iter(ctx.world) {
+                if m_lvl.0 == p_lvl.0 {
+                    let dx = (m_pos.x - p_pos.x).abs();
+                    let dy = (m_pos.y - p_pos.y).abs();
+                    if dx <= 8 && dy <= 8 {
+                        infra_targets.push((m_pos.x as usize, m_pos.y as usize));
                     }
                 }
+            }
+        }
+        for (mx, my) in infra_targets {
+            if VisionSystem::has_line_of_sight(ctx.grid, p_pos.x as usize, p_pos.y as usize, mx, my)
+            {
+                ctx.vision.viz_array[mx][my] |= crate::core::systems::vision::IN_SIGHT;
             }
         }
     }
 }
 
-///
-#[legion::system]
-#[read_component(crate::core::entity::MagicMapRequest)]
-#[read_component(PlayerTag)]
-pub fn magic_map_effect(
-    world: &SubWorld,
-    #[resource] vision: &mut VisionSystem,
-    command_buffer: &mut legion::systems::CommandBuffer,
-) {
-    let mut query =
-        <(Entity, &crate::core::entity::MagicMapRequest)>::query().filter(component::<PlayerTag>());
-    for (ent, _) in query.iter(world) {
-        vision.magic_map();
-        command_buffer.remove_component::<crate::core::entity::MagicMapRequest>(*ent);
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn magic_map_effect_system(ctx: &mut crate::core::context::GameContext) {
+    // Gather: 매직맵 요청이 있는 엔티티 수집
+    let mut entities_with_request = Vec::new();
+    {
+        let mut query = <(Entity, &crate::core::entity::MagicMapRequest)>::query()
+            .filter(component::<PlayerTag>());
+        for (ent, _) in query.iter(ctx.world) {
+            entities_with_request.push(*ent);
+        }
+    }
+    // Apply: 매직맵 실행 + 컴포넌트 제거
+    for ent in entities_with_request {
+        ctx.vision.magic_map();
+        if let Some(mut entry) = ctx.world.entry(ent) {
+            entry.remove_component::<crate::core::entity::MagicMapRequest>();
+        }
     }
 }

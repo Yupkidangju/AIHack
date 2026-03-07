@@ -45,22 +45,10 @@ pub enum ItemAction {
     Dip(Entity),
 }
 
-///
-#[legion::system]
-#[read_component(Inventory)]
-#[read_component(Equipment)]
-#[read_component(Item)]
-#[read_component(Position)]
-#[read_component(PlayerTag)]
-pub fn item_input(
-    world: &mut SubWorld,
-    #[resource] cmd: &Command,
-    #[resource] assets: &AssetManager,
-    #[resource] grid: &crate::core::dungeon::Grid,
-    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
-    #[resource] log: &mut GameLog,
-) {
-    if action_queue
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn item_input_system(ctx: &mut crate::core::context::GameContext) {
+    if ctx
+        .action_queue
         .actions
         .iter()
         .any(|a| matches!(a, crate::core::action_queue::GameAction::Item(_)))
@@ -68,26 +56,34 @@ pub fn item_input(
         return;
     }
 
-    //
-    let mut player_query = <(&Inventory, &Equipment)>::query().filter(component::<PlayerTag>());
-    let (inventory, equipment) = match player_query.iter(world).next() {
-        Some((i, e)) => (i, e),
-        None => return,
-    };
+    // Gather: 플레이어 인벤토리/장비 정보 수집
+    let mut player_items = Vec::new();
+    let mut equipment_slots: Vec<(crate::core::entity::EquipmentSlot, Entity)> = Vec::new();
+    {
+        let mut player_query = <(&Inventory, &Equipment)>::query().filter(component::<PlayerTag>());
+        if let Some((inventory, equipment)) = player_query.iter(ctx.world).next() {
+            player_items = inventory.items.clone();
+            equipment_slots = equipment.slots.iter().map(|(k, v)| (*k, *v)).collect();
+        } else {
+            return;
+        }
+    }
 
     // 장비 해제 명령 처리
-    if *cmd == Command::TakeOff {
-        if let Some((_slot, entity)) = equipment.slots.iter().next() {
-            action_queue.push(crate::core::action_queue::GameAction::Item(
-                ItemAction::TakeOff(*entity),
-            ));
+    if ctx.cmd == Command::TakeOff {
+        if let Some((_slot, entity)) = equipment_slots.first() {
+            ctx.action_queue
+                .push(crate::core::action_queue::GameAction::Item(
+                    ItemAction::TakeOff(*entity),
+                ));
         } else {
-            log.add("You are not wearing anything.", log.current_turn);
+            ctx.log
+                .add("You are not wearing anything.", ctx.log.current_turn);
         }
         return;
     }
 
-    let target_classes = match cmd {
+    let target_classes = match ctx.cmd {
         Command::Quaff => vec![ItemClass::Potion],
         Command::Read => vec![ItemClass::Scroll, ItemClass::Spellbook],
         Command::Wear => vec![ItemClass::Armor],
@@ -113,7 +109,7 @@ pub fn item_input(
             ItemClass::Wand,
             ItemClass::Gem,
             ItemClass::Rock,
-            ItemClass::Coin, // Coin support?
+            ItemClass::Coin,
         ],
         Command::Name | Command::Call => vec![
             ItemClass::Weapon,
@@ -131,14 +127,14 @@ pub fn item_input(
         _ => return,
     };
 
-    //
-    for item_ent in &inventory.items {
-        if let Ok(entry) = world.entry_ref(*item_ent) {
+    // 인벤토리 아이템 매칭 (Gather된 items로 순회)
+    for item_ent in &player_items {
+        if let Ok(entry) = ctx.world.entry_ref(*item_ent) {
             if let Ok(item) = entry.get_component::<Item>() {
-                if let Some(template) = assets.items.get_by_kind(item.kind) {
+                if let Some(template) = ctx.assets.items.get_by_kind(item.kind) {
                     if target_classes.contains(&template.class) {
                         // 액션 생성
-                        let action = match cmd {
+                        let action = match ctx.cmd {
                             Command::Quaff => Some(ItemAction::Drink(*item_ent)),
                             Command::Read => Some(ItemAction::Read(*item_ent)),
                             Command::Wear => Some(ItemAction::Wear(*item_ent)),
@@ -152,7 +148,8 @@ pub fn item_input(
                         };
 
                         if let Some(a) = action {
-                            action_queue.push(crate::core::action_queue::GameAction::Item(a));
+                            ctx.action_queue
+                                .push(crate::core::action_queue::GameAction::Item(a));
                             return;
                         }
                     }
@@ -162,17 +159,21 @@ pub fn item_input(
     }
 
     //
-    if *cmd == Command::Quaff {
+    if ctx.cmd == Command::Quaff {
         let mut p_query = <&Position>::query().filter(component::<PlayerTag>());
-        if let Some(pos) = p_query.iter(world).next() {
-            if let Some(tile) = grid.get_tile(pos.x as usize, pos.y as usize) {
+        if let Some(pos) = p_query.iter(ctx.world).next() {
+            if let Some(tile) = ctx.grid.get_tile(pos.x as usize, pos.y as usize) {
                 if tile.typ == crate::core::dungeon::tile::TileType::Fountain {
-                    log.add("You drink from the fountain.", log.current_turn);
-                    log.add("It's cool and refreshing.", log.current_turn);
+                    ctx.log
+                        .add("You drink from the fountain.", ctx.log.current_turn);
+                    ctx.log
+                        .add("It's cool and refreshing.", ctx.log.current_turn);
                     return;
                 } else if tile.typ == crate::core::dungeon::tile::TileType::Sink {
-                    log.add("You drink from the sink.", log.current_turn);
-                    log.add("It tastes of metallic pipes.", log.current_turn);
+                    ctx.log
+                        .add("You drink from the sink.", ctx.log.current_turn);
+                    ctx.log
+                        .add("It tastes of metallic pipes.", ctx.log.current_turn);
                     return;
                 }
             }
@@ -180,12 +181,22 @@ pub fn item_input(
     }
 
     //
-    match cmd {
-        Command::Quaff => log.add("You have nothing to drink.", log.current_turn),
-        Command::Read => log.add("You have nothing to read.", log.current_turn),
-        Command::Wear => log.add("You have nothing to wear.", log.current_turn),
-        Command::Wield => log.add("You have no weapon to wield.", log.current_turn),
-        Command::Eat => log.add("You have nothing to eat.", log.current_turn),
+    match ctx.cmd {
+        Command::Quaff => ctx
+            .log
+            .add("You have nothing to drink.", ctx.log.current_turn),
+        Command::Read => ctx
+            .log
+            .add("You have nothing to read.", ctx.log.current_turn),
+        Command::Wear => ctx
+            .log
+            .add("You have nothing to wear.", ctx.log.current_turn),
+        Command::Wield => ctx
+            .log
+            .add("You have no weapon to wield.", ctx.log.current_turn),
+        Command::Eat => ctx
+            .log
+            .add("You have nothing to eat.", ctx.log.current_turn),
         _ => {}
     }
 }
