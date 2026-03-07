@@ -3,7 +3,7 @@
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
 
-## [3.0.0-alpha.1] - 2026-03-06
+## [3.0.0-alpha.1] - 2026-03-07
 ### Changed
 - **[Phase E1 완료] GameContext 구조체 정의 및 TurnRunner 구현** (`src/core/context.rs`)
   - `GameContext<'a>` 구조체: World, Grid, GameLog, NetHackRng, EventQueue, ActionQueue, AssetManager, Command, turn 필드 통합
@@ -17,20 +17,37 @@
   - `item_tick` (`item/item_tick.rs`) — Gather-Apply 패턴 적용
   - `regeneration` (`creature/regeneration.rs`)
   - `monster_regeneration` (`creature/regeneration.rs`)
-- **[Phase E2b 진행] 중난이도 시스템 6개 추가 GameContext 전환** (총 13개 완료)
+- **[Phase E2b 완료] 중난이도 시스템 6개 추가 GameContext 전환** (총 13개)
   - `engrave_tick` (`world/engrave.rs`)
   - `autopickup_tick` (`misc/inventory.rs`)
   - `inventory_action` (`misc/inventory.rs`)
   - `evolution_tick` (`creature/evolution.rs`) — Gather-Apply 패턴 + ctx 블록 분리
   - `lycanthropy_tick` (`creature/evolution.rs`) — Gather-Apply 패턴 + ctx 블록 분리
   - `update_encumbrance` (`item/weight.rs`) — `calculate_total_weight` 시그니처 `impl EntityStore` 제네릭화
-- **game_loop.rs 리팩토링**: Schedule에서 13개 시스템 제거 → GameContext 순차 호출부로 이동
+- **[Phase E2c 진행 중] 고난이도 시스템 10개 추가 GameContext 전환** (총 23개, 76.7%)
+  - `pet_hunger` (`ai/core.rs`) — 간단 전환
+  - `update_player_stats` (`creature/equipment.rs`) — Gather-Apply 유지
+  - `spell_cast` (`misc/spell.rs`) — 헬퍼 SubWorld→World 전환 포함
+  - `vision_update` (`world/vision_system.rs`) — VisionSystem을 GameContext에 추가, Gather-Apply 3단계
+  - `magic_map_effect` (`world/vision_system.rs`) — command_buffer→world.entry() 전환
+  - `item_input` (`item/item_use.rs`) — Gather 패턴으로 inventory items 복사
+  - `equipment` (`creature/equipment.rs`) — **ctx 필드 분해(destructure) 패턴**으로 동시 mutable borrow 해결
+  - `throw` (`combat/throw.rs`) — **command_buffer 완전 제거** → world.entry()/world.remove() 직접 조작
+  - `teleport` (`world/teleport.rs`) — command_buffer 제거 + LevelChange 전환
+  - `stairs` (`world/stairs.rs`) — SystemBuilder→일반 함수 전환
+- **GameContext 확장 (v3.0.0-alpha.1 → 현재)**
+  - `vision: &mut VisionSystem` — 시야 시스템 (FOV/가시 영역)
+  - `level_req: &mut Option<LevelChange>` — 레벨 전환 요청
+  - `dungeon: &Dungeon` — 현재 던전 정보 (읽기전용)
+- **game_loop.rs 리팩토링**: Schedule에서 23개 시스템 제거 → GameContext 순차 호출부로 이동
 - **e2e_stabilize.rs / e2e_verbs.rs**: 전환 완료 시스템의 Schedule 등록 제거
 
 ### Technical Notes
-- Gather-Apply 패턴: World의 query borrow와 entry_mut borrow가 겹치는 경우, 먼저 데이터를 Vec에 수집(Gather)한 뒤 borrow를 해제하고, 이후 Vec을 순회하며 적용(Apply)
+- **Gather-Apply 패턴**: World query borrow와 entry_mut borrow 충돌 해결 — 데이터를 Vec에 수집 후 적용
+- **필드 분해(destructure) 패턴**: `let GameContext { world, log, .. } = ctx;` — Rust가 각 필드를 독립 borrow로 인식
+- **command_buffer 대체**: `command_buffer.add_component()` → `world.entry(ent).add_component()`, `command_buffer.remove()` → `world.remove(ent)`
+- **Entry vs EntryMut**: `world.entry()` (Entry) → `remove_component` ✅ / `world.entry_mut()` (EntryMut) → `remove_component` ❌
 - `calculate_total_weight`를 `&impl EntityStore`로 제네릭화하여 World/SubWorld 모두에서 호출 가능
-- 중난이도 대량 변환 시 regex 헬퍼 함수 오염 교훈 → 한 시스템씩 수동 전환이 안전함
 
 ## [2.43.0] - 2026-03-04
 ### Changed

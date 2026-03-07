@@ -1,8 +1,8 @@
 # 🛡️ AIHack 안정화 로드맵 v2.0 (STABILIZATION_ROADMAP)
 
-**버전**: v2.1
-**갱신일**: 2026-03-06
-**이전 버전**: v2.0 (2026-03-04) — Phase E1~E5 계획 수립
+**버전**: v2.2
+**갱신일**: 2026-03-07
+**이전 버전**: v2.1 (2026-03-06) — Phase E2a/E2b 13/30 시스템 전환 완료
 **이전 버전**: v1.0 (2026-02-28) — Phase S0~S6 완료, S7 대기 상태
 **대상 브랜치**: `stabilize/e2e-playable`
 **전제**: v2.42.1 = Phase S0~S6 완료. E2E 핵심 동사 및 Edge Case 전량 통과.
@@ -90,6 +90,9 @@ Phase E5: LLM 실제 주입 + 대화/내러티브/적응형 AI
       pub assets: &'a AssetManager,
       pub event_queue: &'a mut EventQueue,
       pub action_queue: &'a mut ActionQueue,
+      pub vision: &'a mut VisionSystem,      // [E2c] 추가
+      pub level_req: &'a mut Option<LevelChange>, // [E2c] 추가
+      pub dungeon: &'a Dungeon,              // [E2c] 추가
   }
   ```
 - [x] `TurnRunner` 구조체 정의 (Schedule 대체)
@@ -101,11 +104,11 @@ Phase E5: LLM 실제 주입 + 대화/내러티브/적응형 AI
 
 ---
 
-### Phase E2: 시스템 전환 (30개 → 일반 함수) — **13/30 완료 (43.3%)**
+### Phase E2: 시스템 전환 (30개 → 일반 함수) — **23/30 완료 (76.7%)**
 
 **목표**: 모든 `#[system]` / `#[legion::system]` 매크로 시스템을 `fn system_name(ctx: &mut GameContext)` 시그니처로 전환
 
-**전환 상태 (2026-03-06 기준)**:
+**전환 상태 (2026-03-07 기준)**:
 
 | # | 파일 | 시스템 | 상태 | 비고 |
 |---|------|--------|------|------|
@@ -122,34 +125,40 @@ Phase E5: LLM 실제 주입 + 대화/내러티브/적응형 AI
 | 11 | evolution.rs | evolution_tick | ✅ | E2b, Gather-Apply |
 | 12 | evolution.rs | lycanthropy_tick | ✅ | E2b, Gather-Apply |
 | 13 | weight.rs | update_encumbrance | ✅ | E2b, EntityStore 제네릭 |
-| 14 | movement.rs | movement | ⏳ | E2c, 1310줄 대형 |
-| 15 | ai/core.rs | pet_hunger | ⏳ | E2c |
-| 16 | ai/core.rs | monster_ai | ⏳ | E2c, 680줄 대형 |
-| 17 | death.rs | death | ⏳ | E2c |
-| 18 | trap.rs | trap_trigger | ⏳ | E2c |
-| 19 | vision_system.rs | vision_update | ⏳ | VisionSystem 리소스 필요 |
-| 20 | vision_system.rs | magic_map_effect | ⏳ | CommandBuffer 필요 |
-| 21 | item_use.rs | item_input | ⏳ | E2c |
-| 22 | item_use.rs | item_use | ⏳ | E2c |
-| 23 | equipment.rs | equipment | ⏳ | ActionQueue 사용 |
-| 24 | equipment.rs | update_player_stats | ⏳ | E2c |
-| 25 | throw.rs | throw | ⏳ | CommandBuffer 필요 |
-| 26 | zap.rs | zap | ⏳ | E2c |
-| 27 | teleport.rs | teleport | ⏳ | LevelChange 리소스 필요 |
-| 28 | spell.rs | spell_cast | ⏳ | E2c |
-| 29 | stairs.rs | stairs | ⏳ | SystemBuilder 패턴, LevelChange |
-| 30 | shop.rs | shopkeeper_update | ⏳ | Provider 리소스 필요 |
+| 14 | ai/core.rs | pet_hunger | ✅ | E2c, 간단 전환 |
+| 15 | equipment.rs | update_player_stats | ✅ | E2c, Gather-Apply |
+| 16 | spell.rs | spell_cast | ✅ | E2c, 헬퍼 SubWorld→World |
+| 17 | vision_system.rs | vision_update | ✅ | E2c, VisionSystem 추가 |
+| 18 | vision_system.rs | magic_map_effect | ✅ | E2c, world.entry() |
+| 19 | item_use.rs | item_input | ✅ | E2c, Gather 패턴 |
+| 20 | equipment.rs | equipment | ✅ | E2c, **필드 분해 패턴** |
+| 21 | throw.rs | throw | ✅ | E2c, **command_buffer 제거** |
+| 22 | teleport.rs | teleport | ✅ | E2c, LevelChange |
+| 23 | stairs.rs | stairs | ✅ | E2c, SystemBuilder 제거 |
+| 24 | movement.rs | movement | ⏳ | E2c, 1310줄 대형 |
+| 25 | ai/core.rs | monster_ai | ⏳ | E2c, 680줄 대형 |
+| 26 | trap.rs | trap_trigger | ⏳ | E2c |
+| 27 | death.rs | death | ⏳ | E2c, GameState 필요 |
+| 28 | item_use.rs | item_use | ⏳ | E2c, GameState/IdentityTable/CommandBuffer |
+| 29 | zap.rs | zap | ⏳ | E2c, CommandBuffer |
+| 30 | shop.rs | shopkeeper_update | ⏳ | E2c, InteractionProvider/CommandBuffer |
 
 **전환 절차 (각 시스템)**:
 1. `#[system]` / `#[legion::system]` 매크로 제거
 2. `#[read_component]` / `#[write_component]` 전체 제거
 3. `world: &mut SubWorld` → `ctx.world` (GameContext 경유)
 4. `#[resource] xxx: &Type` → `ctx.xxx` 직접 접근
-5. `command_buffer` → Gather-Apply 패턴 또는 `ctx.world` 직접 조작
+5. `command_buffer` → `world.entry(ent).add_component()` 또는 `world.remove(ent)` 직접 조작
 6. Schedule에서 제거 → GameContext 순차 호출부에 등록
 
-**교훈 (2026-03-06)**:
-- ⚠️ regex 대량 치환은 헬퍼 함수까지 오염시탘 → **한 시스템씩 수동 전환이 안전**
+**핵심 패턴 (2026-03-07)**:
+- **Gather-Apply**: query borrow와 entry_mut borrow 충돌 → 데이터를 Vec에 수집 후 적용
+- **필드 분해(destructure)**: `let GameContext { world, log, .. } = ctx;` → 각 필드를 독립 borrow
+- **command_buffer 제거**: `add_component` → `world.entry(ent).add_component()`, `remove` → `world.remove(ent)`
+- **Entry vs EntryMut**: `world.entry()` → `remove_component` ✅ / `world.entry_mut()` → `remove_component` ❌
+
+**교훈 (2026-03-06~07)**:
+- ⚠️ regex 대량 치환은 헬퍼 함수까지 오염시킴 → **한 시스템씩 수동 전환이 안전**
 - `let world = &mut *ctx.world;` 패턴은 ctx 전체 borrow를 잡으므로, `ctx.필드` 직접 참조가 바람직
 - Rust struct 다른 필드 동시 mutable borrow는 허용되므로 활용 가능
 

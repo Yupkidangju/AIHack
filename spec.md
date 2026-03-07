@@ -1,8 +1,8 @@
 # AIHack 기술 명세서 (spec.md)
 
 **버전**: v3.0.0-alpha.1
-**최종 업데이트**: 2026-03-06
-**상태**: 이식률 💯 **100.0%** (177,229 / 177,232 라인) | 4,178개 테스트 통과 | 엔진 전환 13/30 시스템 완료 (43.3%)
+**최종 업데이트**: 2026-03-07
+**상태**: 이식률 💯 **100.0%** (177,229 / 177,232 라인) | 4,178개 테스트 통과 | 엔진 전환 23/30 시스템 완료 (76.7%)
 
 ---
 
@@ -32,9 +32,14 @@ NetHack 3.6.7 (C 소스 177,232줄 + 헤더 20,097줄 = 197,329줄)을 Rust로 *
 > ECS 데이터 모델(Entity/Component/Query)은 100% 유지하며, 실행 모델만 순차 호출로 교체한다.
 > 이를 통해 AccessDenied 패닉을 구조적으로 영구 제거하고, LLM 통합 포인트(AIProvider)를 확보한다.
 >
-> **현황 (v3.0.0-alpha.1, 2026-03-06)**:
+> **현황 (v3.0.0-alpha.1, 2026-03-07)**:
 > - Phase E1 ✅ 완료: `GameContext` + `TurnRunner` 구현
-> - Phase E2 진행 중: 13/30 시스템 전환 완료 (43.3%)
+> - Phase E2 진행 중: **23/30 시스템 전환 완료 (76.7%)**
+>   - E2a ✅ 저난이도 7개
+>   - E2b ✅ 중난이도 6개
+>   - E2c 진행 중: 고난이도 10개 완료, 7개 남음 (movement, monster_ai, trap, death, item_use, zap, shop)
+> - GameContext 확장: VisionSystem, LevelChange, Dungeon 필드 추가
+> - 핵심 패턴: Gather-Apply, 필드 분해(destructure), command_buffer 제거
 > - 빌드 ✅ + 테스트 4,178개 전량 통과
 >
 > 상세: `STABILIZATION_ROADMAP.md` Phase E1~E5 참조.
