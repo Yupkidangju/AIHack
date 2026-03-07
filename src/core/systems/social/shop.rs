@@ -171,75 +171,75 @@ pub fn try_identify_service(
     }
 }
 
-/// 상점 주인 AI 및 도둑질 감시
-#[legion::system]
-#[read_component(Position)]
-#[read_component(PlayerTag)]
-#[read_component(ShopkeeperTag)]
-#[read_component(Item)]
-#[read_component(Inventory)]
-#[read_component(crate::core::entity::Monster)]
-#[write_component(Position)]
-pub fn shopkeeper_update(
-    world: &mut SubWorld,
-    #[resource] grid: &Grid,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] rng: &mut NetHackRng,
-    #[resource] provider: &super::DefaultInteractionProvider,
-    command_buffer: &mut legion::systems::CommandBuffer,
-) {
-    //
-    let mut p_query = <(&Position, &Inventory)>::query().filter(component::<PlayerTag>());
-    let (p_pos, p_inv) = match p_query.iter(world).next() {
-        Some(d) => (*d.0, d.1.clone()),
-        None => return,
+/// [v3.0.0] GameContext 기반 전환 완료 (상점 주인 AI)
+pub fn shopkeeper_update_system(ctx: &mut crate::core::context::GameContext) {
+    let crate::core::context::GameContext {
+        world,
+        grid,
+        log,
+        turn,
+        rng,
+        ..
+    } = ctx;
+    let turn_val = *turn;
+    let provider = super::DefaultInteractionProvider;
+
+    // Gather: 플레이어 위치/인벤토리
+    let (p_pos, p_inv) = {
+        let mut p_query = <(&Position, &Inventory)>::query().filter(component::<PlayerTag>());
+        match p_query.iter(*world).next() {
+            Some(d) => (*d.0, d.1.clone()),
+            None => return,
+        }
     };
 
     let p_tile = grid.get_tile(p_pos.x as usize, p_pos.y as usize);
     let u_in_shop = p_tile.map(|t| t.shop_type > 0).unwrap_or(false);
     let u_room_id = p_tile.map(|t| t.roomno as i32).unwrap_or(-1);
 
-    //
-    let has_unpaid_player = has_unpaid_recursive(world, &p_inv);
+    let has_unpaid_player = has_unpaid_recursive_world(*world, &p_inv);
 
-    // 2. 상점 주인 루프
-    let mut sk_query = <(Entity, &mut Position, &crate::core::entity::Monster)>::query()
-        .filter(component::<ShopkeeperTag>());
-    for (sk_ent, sk_pos, sk_mon) in sk_query.iter_mut(world) {
-        let sk_tile = grid.get_tile(sk_pos.x as usize, sk_pos.y as usize);
+    // Gather: 상점 주인 데이터
+    let mut sk_data = Vec::new();
+    {
+        let mut sk_query = <(Entity, &Position, &crate::core::entity::Monster)>::query()
+            .filter(component::<ShopkeeperTag>());
+        for (sk_ent, sk_pos, sk_mon) in sk_query.iter(*world) {
+            sk_data.push((*sk_ent, *sk_pos, sk_mon.clone()));
+        }
+    }
+
+    // Apply: 상점 주인 로직
+    for (sk_ent, mut sk_pos_val, sk_mon) in sk_data {
+        let sk_tile = grid.get_tile(sk_pos_val.x as usize, sk_pos_val.y as usize);
         let sk_room_id = sk_tile.map(|t| t.roomno as i32).unwrap_or(-1);
 
-        //
         if u_room_id == sk_room_id && sk_room_id != -1 {
-            // 입구 근처 대사 (Entry/Exit Dialogue)
-            let dist_sq = (p_pos.x - sk_pos.x).pow(2) + (p_pos.y - sk_pos.y).pow(2);
+            let dist_sq = (p_pos.x - sk_pos_val.x).pow(2) + (p_pos.y - sk_pos_val.y).pow(2);
             if dist_sq < 9 && rng.rn2(10) == 0 {
                 if has_unpaid_player {
                     log.add(
                         provider.generate_shop_reaction("pay_reminder", sk_mon.kind.as_str(), 0),
-                        *turn,
+                        turn_val,
                     );
                 } else {
                     log.add(
                         provider.generate_shop_reaction("welcome", sk_mon.kind.as_str(), 0),
-                        *turn,
+                        turn_val,
                     );
                 }
             }
 
             if has_unpaid_player {
-                //
                 let mut exit_pos = None;
                 for dx in -5..=5 {
                     for dy in -5..=5 {
-                        let tx = sk_pos.x + dx;
-                        let ty = sk_pos.y + dy;
+                        let tx = sk_pos_val.x + dx;
+                        let ty = sk_pos_val.y + dy;
                         if tx < 0 || tx >= 80 || ty < 0 || ty >= 21 {
                             continue;
                         }
                         if let Some(t) = grid.get_tile(tx as usize, ty as usize) {
-                            //
                             if (t.typ == crate::core::dungeon::tile::TileType::OpenDoor
                                 || t.typ == crate::core::dungeon::tile::TileType::Door)
                                 && t.roomno as i32 == sk_room_id
@@ -255,43 +255,46 @@ pub fn shopkeeper_update(
                 }
 
                 if let Some((ex, ey)) = exit_pos {
-                    // 상점 주인이 문 앞에 서서 길을 막음 (shk.c:shk_move)
-                    if sk_pos.x != ex || sk_pos.y != ey {
-                        //
-                        let nx = if sk_pos.x < ex {
-                            sk_pos.x + 1
-                        } else if sk_pos.x > ex {
-                            sk_pos.x - 1
+                    if sk_pos_val.x != ex || sk_pos_val.y != ey {
+                        let nx = if sk_pos_val.x < ex {
+                            sk_pos_val.x + 1
+                        } else if sk_pos_val.x > ex {
+                            sk_pos_val.x - 1
                         } else {
-                            sk_pos.x
+                            sk_pos_val.x
                         };
-                        let ny = if sk_pos.y < ey {
-                            sk_pos.y + 1
-                        } else if sk_pos.y > ey {
-                            sk_pos.y - 1
+                        let ny = if sk_pos_val.y < ey {
+                            sk_pos_val.y + 1
+                        } else if sk_pos_val.y > ey {
+                            sk_pos_val.y - 1
                         } else {
-                            sk_pos.y
+                            sk_pos_val.y
                         };
-
-                        // 문으로 이동 시도
-                        sk_pos.x = nx;
-                        sk_pos.y = ny;
+                        sk_pos_val.x = nx;
+                        sk_pos_val.y = ny;
+                        // [v3.0.0] world.entry() 로 Position 직접 업데이트
+                        if let Some(mut entry) = world.entry(sk_ent) {
+                            if let Ok(pos) = entry.get_component_mut::<Position>() {
+                                pos.x = sk_pos_val.x;
+                                pos.y = sk_pos_val.y;
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // 3. 도둑질 즉각 판정 (상점을 이미 벗어난 경우)
+        // 3. 도둑질 즉각 판정
         if !u_in_shop && !sk_mon.hostile {
             if has_unpaid_player {
-                stop_thief(*sk_ent, sk_mon, log, *turn, command_buffer, provider);
+                stop_thief(sk_ent, &sk_mon, *log, turn_val, *world, &provider);
             }
         }
     }
 }
 
 ///
-fn has_unpaid_recursive(world: &SubWorld, inv: &Inventory) -> bool {
+fn has_unpaid_recursive_sub(world: &SubWorld, inv: &Inventory) -> bool {
     for &item_ent in &inv.items {
         if let Ok(entry) = world.entry_ref(item_ent) {
             //
@@ -302,7 +305,27 @@ fn has_unpaid_recursive(world: &SubWorld, inv: &Inventory) -> bool {
             }
             //
             if let Ok(sub_inv) = entry.get_component::<Inventory>() {
-                if has_unpaid_recursive(world, sub_inv) {
+                if has_unpaid_recursive_sub(world, sub_inv) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// [v3.0.0] World 기반 has_unpaid 체크 (shopkeeper_update_system 전용)
+fn has_unpaid_recursive_world(world: &World, inv: &Inventory) -> bool {
+    use crate::core::entity::Item;
+    for &item_ent in &inv.items {
+        if let Ok(entry) = world.entry_ref(item_ent) {
+            if let Ok(item) = entry.get_component::<Item>() {
+                if item.unpaid {
+                    return true;
+                }
+            }
+            if let Ok(sub_inv) = entry.get_component::<Inventory>() {
+                if has_unpaid_recursive_world(world, sub_inv) {
                     return true;
                 }
             }
@@ -317,7 +340,7 @@ fn stop_thief(
     sk_mon: &crate::core::entity::Monster,
     log: &mut GameLog,
     turn: u64,
-    command_buffer: &mut CommandBuffer,
+    world: &mut World,
     provider: &dyn super::InteractionProvider,
 ) {
     // [R8-3] provider 경유 대사
@@ -326,11 +349,12 @@ fn stop_thief(
         [255, 50, 50],
         turn,
     );
+    // [v3.0.0] command_buffer -> world.entry() 직접 조작
     let mut new_mon = sk_mon.clone();
     new_mon.hostile = true;
-    command_buffer.add_component(sk_ent, new_mon);
-
-    //
+    if let Some(mut entry) = world.entry(sk_ent) {
+        entry.add_component(new_mon);
+    }
 }
 
 ///

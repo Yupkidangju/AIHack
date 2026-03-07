@@ -12,74 +12,49 @@
 use crate::core::entity::{Health, MonsterTag, PlayerTag, Position, Trap, TrapType};
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::systems::CommandBuffer;
-use legion::world::SubWorld;
 use legion::*;
 
-///
-#[legion::system]
-#[read_component(Position)]
-#[read_component(PlayerTag)]
-#[read_component(MonsterTag)]
-#[read_component(crate::core::entity::Level)]
-#[read_component(crate::core::entity::Inventory)]
-#[read_component(crate::core::entity::Equipment)]
-#[write_component(Trap)]
-#[write_component(Health)]
-#[write_component(crate::core::entity::Item)]
-pub fn trap_trigger(
-    world: &mut SubWorld,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] rng: &mut NetHackRng,
-    #[resource] item_mgr: &crate::core::entity::object::ItemManager,
-    #[resource] tele_action: &mut Option<crate::core::systems::teleport::TeleportAction>,
-    #[resource] level_change: &mut Option<crate::core::dungeon::LevelChange>,
-    command_buffer: &mut CommandBuffer,
-) {
-    //
+/// [v3.0.0] GameContext 기반 전환 완료 (트랩 감지 시스템)
+pub fn trap_trigger_system(ctx: &mut crate::core::context::GameContext) {
+    let crate::core::context::GameContext {
+        world, log, turn, rng, assets, level_req, action_queue, ..
+    } = ctx;
+    let turn_val = *turn;
+    let item_mgr = &assets.items;
+
+    // Gather: 모든 대상(플레이어/몬스터) 수집
     let mut targets = Vec::new();
-
-    //
-    let mut p_query = <(Entity, &Position, &crate::core::entity::Level)>::query()
-        .filter(component::<PlayerTag>());
-    for (ent, pos, level) in p_query.iter(world) {
-        targets.push((*ent, *pos, true, *level)); // (entity, position, is_player, level)
+    {
+        let mut p_query = <(Entity, &Position, &crate::core::entity::Level)>::query()
+            .filter(component::<PlayerTag>());
+        for (ent, pos, level) in p_query.iter(*world) {
+            targets.push((*ent, *pos, true, *level));
+        }
+    }
+    {
+        let mut m_query = <(Entity, &Position, &crate::core::entity::Level)>::query()
+            .filter(component::<MonsterTag>());
+        for (ent, pos, level) in m_query.iter(*world) {
+            targets.push((*ent, *pos, false, *level));
+        }
     }
 
-    //
-    let mut m_query = <(Entity, &Position, &crate::core::entity::Level)>::query()
-        .filter(component::<MonsterTag>());
-    for (ent, pos, level) in m_query.iter(world) {
-        targets.push((*ent, *pos, false, *level));
-    }
-
-    //
+    // Gather: 모든 트랩 수집
     let mut traps = Vec::new();
-    let mut t_query = <(Entity, &Position, &Trap, &crate::core::entity::Level)>::query();
-    for (ent, pos, trap, lvl) in t_query.iter(world) {
-        traps.push((*ent, *pos, *trap, *lvl));
+    {
+        let mut t_query = <(Entity, &Position, &Trap, &crate::core::entity::Level)>::query();
+        for (ent, pos, trap, lvl) in t_query.iter(*world) {
+            traps.push((*ent, *pos, *trap, *lvl));
+        }
     }
 
-    //
+    // Apply: 트랩-대상 매칭 후 트리거
     for (t_ent, t_pos, t_data, t_lvl) in traps {
         for (target_ent, target_pos, is_player, level) in &targets {
-            //
             if t_pos.x == target_pos.x && t_pos.y == target_pos.y && t_lvl.0 == level.0 {
                 trigger_trap(
-                    t_ent,
-                    t_data,
-                    *target_ent,
-                    *is_player,
-                    level.0, // current level id
-                    world,
-                    log,
-                    *turn,
-                    rng,
-                    item_mgr,
-                    tele_action,
-                    level_change,
-                    command_buffer,
+                    t_ent, t_data, *target_ent, *is_player, level.0,
+                    *world, *log, turn_val, *rng, item_mgr, *action_queue, *level_req,
                 );
             }
         }
@@ -87,21 +62,13 @@ pub fn trap_trigger(
 }
 
 fn trigger_trap(
-    t_ent: Entity,
-    trap: Trap,
-    target: Entity,
-    is_player: bool,
+    t_ent: Entity, trap: Trap, target: Entity, is_player: bool,
     current_level: crate::core::dungeon::LevelID,
-    world: &mut SubWorld,
-    log: &mut GameLog,
-    turn: u64,
-    rng: &mut NetHackRng,
+    world: &mut World, log: &mut GameLog, turn: u64, rng: &mut NetHackRng,
     item_mgr: &crate::core::entity::object::ItemManager,
-    tele_action: &mut Option<crate::core::systems::teleport::TeleportAction>,
+    action_queue: &mut crate::core::action_queue::ActionQueue,
     level_change: &mut Option<crate::core::dungeon::LevelChange>,
-    command_buffer: &mut CommandBuffer,
 ) {
-    //
     if !trap.discovered {
         seetrap(t_ent, world);
     }
@@ -109,97 +76,58 @@ fn trigger_trap(
     match trap.typ {
         TrapType::NoTrap => {}
         TrapType::Arrow => {
-            if is_player {
-                log.add("An arrow shoots out at you!", turn);
-            } else {
-                log.add("An arrow shoots out at the monster!", turn);
-            }
-
-            //
+            if is_player { log.add("An arrow shoots out at you!", turn); }
+            else { log.add("An arrow shoots out at the monster!", turn); }
             if rng.rn2(2) == 0 {
-                let dmg = rng.rn1(6, 1); // 1d6
+                let dmg = rng.rn1(6, 1);
                 apply_damage(target, dmg, world, log, turn, is_player);
-            } else {
-                if is_player {
-                    log.add("The arrow misses you.", turn);
-                }
-            }
+            } else if is_player { log.add("The arrow misses you.", turn); }
         }
         TrapType::Dart => {
-            if is_player {
-                log.add("A little dart shoots out at you!", turn);
-            }
-            //
+            if is_player { log.add("A little dart shoots out at you!", turn); }
             if rng.rn2(2) == 0 {
-                let dmg = rng.rn1(3, 1); // 1d3
+                let dmg = rng.rn1(3, 1);
                 apply_damage(target, dmg, world, log, turn, is_player);
-                //
-                if rng.rn2(6) == 0 {
-                    if is_player {
-                        log.add_colored("The dart was poisoned!", [255, 100, 100], turn);
-                    }
+                if rng.rn2(6) == 0 && is_player {
+                    log.add_colored("The dart was poisoned!", [255, 100, 100], turn);
                 }
-            } else {
-                if is_player {
-                    log.add("The dart misses you.", turn);
-                }
-            }
+            } else if is_player { log.add("The dart misses you.", turn); }
         }
         TrapType::Rock => {
             let dmg = rng.d(2, 6);
-            if is_player {
-                log.add("A rock falls from the ceiling and hits you!", turn);
-            }
+            if is_player { log.add("A rock falls from the ceiling and hits you!", turn); }
             apply_damage(target, dmg, world, log, turn, is_player);
         }
         TrapType::SqueakyBoard => {
             seetrap(t_ent, world);
-            if is_player {
-                log.add("A board beneath you squeaks loudly.", turn);
-            } else {
-                log.add("You hear a squeak.", turn);
-            }
-            //
+            if is_player { log.add("A board beneath you squeaks loudly.", turn); }
+            else { log.add("You hear a squeak.", turn); }
         }
         TrapType::BearTrap => {
-            if is_player {
-                log.add("A bear trap snaps shut on your leg!", turn);
-            }
+            if is_player { log.add("A bear trap snaps shut on your leg!", turn); }
             let dmg = rng.rn1(4, 1);
             apply_damage(target, dmg, world, log, turn, is_player);
-            //
         }
         TrapType::Landmine => {
             if is_player {
-                log.add_colored(
-                    "KAABLAMM!!! You stepped on a land mine!",
-                    [255, 100, 0],
-                    turn,
-                );
+                log.add_colored("KAABLAMM!!! You stepped on a land mine!", [255, 100, 0], turn);
             }
             let dmg = rng.d(4, 8);
             apply_damage(target, dmg, world, log, turn, is_player);
-            //
-            command_buffer.remove(t_ent);
+            // [v3.0.0] command_buffer.remove -> world.remove
+            world.remove(t_ent);
         }
         TrapType::RollingBoulder => {
-            if is_player {
-                log.add_colored("A large boulder rolls towards you!", [200, 200, 200], turn);
-            }
+            if is_player { log.add_colored("A large boulder rolls towards you!", [200, 200, 200], turn); }
             let dmg = rng.d(3, 10);
             apply_damage(target, dmg, world, log, turn, is_player);
         }
         TrapType::SleepGas => {
             if is_player {
                 log.add("A cloud of gas puts you to sleep!", turn);
-                if let Ok(mut entry) = world.entry_mut(target) {
-                    if let Ok(status) =
-                        entry.get_component_mut::<crate::core::entity::status::StatusBundle>()
-                    {
-                        status.add(
-                            crate::core::entity::status::StatusFlags::SLEEPING,
-                            rng.rn1(50, 10) as u32,
-                        );
+                if let Some(mut entry) = world.entry(target) {
+                    if let Ok(status) = entry.get_component_mut::<crate::core::entity::status::StatusBundle>() {
+                        status.add(crate::core::entity::status::StatusFlags::SLEEPING, rng.rn1(50, 10) as u32);
                     }
                 }
             }
@@ -211,107 +139,58 @@ fn trigger_trap(
             }
         }
         TrapType::Fire => {
-            if is_player {
-                log.add("A burst of flame hits you!", turn);
-            }
+            if is_player { log.add("A burst of flame hits you!", turn); }
             let dmg = rng.rn1(10, 5);
             apply_damage(target, dmg, world, log, turn, is_player);
-            if is_player {
-                damage_random_equipment(target, world, item_mgr, log, turn, false, true, rng);
-            }
+            if is_player { damage_random_equipment(target, world, item_mgr, log, turn, false, true, rng); }
         }
         TrapType::Pit | TrapType::SpikedPit => {
             if is_player {
-                log.add(
-                    format!(
-                        "You fall into a {}pit!",
-                        if trap.typ == TrapType::SpikedPit {
-                            "spiked "
-                        } else {
-                            ""
-                        }
-                    ),
-                    turn,
-                );
-            } else {
-                log.add("The monster falls into a pit!", turn);
-            }
-            let dice = if trap.typ == TrapType::SpikedPit {
-                (2, 10)
-            } else {
-                (2, 6)
-            };
+                log.add(format!("You fall into a {}pit!",
+                    if trap.typ == TrapType::SpikedPit { "spiked " } else { "" }), turn);
+            } else { log.add("The monster falls into a pit!", turn); }
+            let dice = if trap.typ == TrapType::SpikedPit { (2, 10) } else { (2, 6) };
             let dmg = rng.d(dice.0, dice.1);
             apply_damage(target, dmg, world, log, turn, is_player);
-
-            if trap.typ == TrapType::SpikedPit && rng.rn2(6) == 0 {
-                if is_player {
-                    log.add_colored("The spikes were poisoned!", [255, 100, 100], turn);
-                }
+            if trap.typ == TrapType::SpikedPit && rng.rn2(6) == 0 && is_player {
+                log.add_colored("The spikes were poisoned!", [255, 100, 100], turn);
             }
         }
         TrapType::Hole | TrapType::TrapDoor => {
-            let msg = if trap.typ == TrapType::TrapDoor {
-                "A trap door opens under your feet!"
-            } else {
-                "You fall through a hole in the floor!"
-            };
-
+            let msg = if trap.typ == TrapType::TrapDoor { "A trap door opens under your feet!" }
+                      else { "You fall through a hole in the floor!" };
             if is_player {
                 log.add_colored(msg, [255, 0, 0], turn);
                 let next_depth = current_level.depth + 1;
                 if next_depth <= 50 {
                     *level_change = Some(crate::core::dungeon::LevelChange::Teleport {
-                        target: crate::core::dungeon::LevelID {
-                            branch: current_level.branch,
-                            depth: next_depth,
-                        },
+                        target: crate::core::dungeon::LevelID { branch: current_level.branch, depth: next_depth },
                         landing: crate::core::dungeon::LandingType::Random,
                     });
                 }
             } else {
-                if trap.typ == TrapType::TrapDoor {
-                    log.add("A trap door opens under the monster!", turn);
-                } else {
-                    log.add("The monster falls through a hole!", turn);
-                }
+                if trap.typ == TrapType::TrapDoor { log.add("A trap door opens under the monster!", turn); }
+                else { log.add("The monster falls through a hole!", turn); }
             }
         }
         TrapType::Teleport => {
-            if is_player {
-                log.add("A strange energy envelops you!", turn);
-            }
-            *tele_action = Some(crate::core::systems::teleport::TeleportAction {
-                target,
-                is_level_tele: false,
-            });
+            if is_player { log.add("A strange energy envelops you!", turn); }
+            // [v3.0.0] tele_action -> action_queue.push(Teleport)
+            action_queue.push(crate::core::action_queue::GameAction::Teleport(
+                crate::core::systems::world::teleport::TeleportAction { target, is_level_tele: false },
+            ));
         }
         TrapType::LevelTeleport => {
-            if is_player {
-                log.add("You feel a wrenching sensation!", turn);
-            }
-            *tele_action = Some(crate::core::systems::teleport::TeleportAction {
-                target,
-                is_level_tele: true,
-            });
+            if is_player { log.add("You feel a wrenching sensation!", turn); }
+            action_queue.push(crate::core::action_queue::GameAction::Teleport(
+                crate::core::systems::world::teleport::TeleportAction { target, is_level_tele: true },
+            ));
         }
         TrapType::MagicPortal | TrapType::VibratingSquare => {
-            if is_player {
-                log.add("Nothing happens.", turn);
-            }
+            if is_player { log.add("Nothing happens.", turn); }
         }
-        TrapType::Web => {
-            if is_player {
-                log.add("You are caught in a spider web!", turn);
-            }
-            //
-        }
-        TrapType::Statue => {
-            // Statue trap activation logic (animate_statue in C)
-            if is_player {
-                log.add("The statue comes to life!", turn);
-            }
-        }
+        TrapType::Web => { if is_player { log.add("You are caught in a spider web!", turn); } }
+        TrapType::Statue => { if is_player { log.add("The statue comes to life!", turn); } }
         TrapType::Magic => {
             if is_player {
                 log.add("You are caught in a magical explosion!", turn);
@@ -319,84 +198,49 @@ fn trigger_trap(
                 apply_damage(target, dmg, world, log, turn, is_player);
             }
         }
-        TrapType::AntiMagic => {
-            if is_player {
-                log.add("You feel a sudden loss of energy!", turn);
-                //
-            }
-        }
-        TrapType::Polymorph => {
-            if is_player {
-                log.add("You feel a change coming over you!", turn);
-                // TODO: Polymorph ?ㅽ뻾
-            }
-        }
+        TrapType::AntiMagic => { if is_player { log.add("You feel a sudden loss of energy!", turn); } }
+        TrapType::Polymorph => { if is_player { log.add("You feel a change coming over you!", turn); } }
     }
 }
 
 fn damage_random_equipment(
-    target: Entity,
-    world: &mut SubWorld,
+    target: Entity, world: &mut World,
     item_mgr: &crate::core::entity::object::ItemManager,
-    log: &mut GameLog,
-    turn: u64,
-    do_rust: bool,
-    do_fire: bool,
-    rng: &mut NetHackRng,
+    log: &mut GameLog, turn: u64, do_rust: bool, do_fire: bool, rng: &mut NetHackRng,
 ) {
     use crate::core::entity::{Equipment, Item};
     use crate::core::systems::item_damage::ItemDamageSystem;
-
-    //
-    //
-    if let Ok(entry) = world.entry_ref(target) {
+    // Gather: 장비 슬롯 엔티티 수집
+    let slots: Vec<Entity> = if let Ok(entry) = world.entry_ref(target) {
         if let Ok(equip) = entry.get_component::<Equipment>() {
-            let slots: Vec<_> = equip.slots.values().cloned().collect();
-            if slots.is_empty() {
-                return;
-            }
-
-            let item_ent = slots[rng.rn2(slots.len() as i32) as usize];
-            drop(entry);
-
-            if let Ok(mut item_entry) = world.entry_mut(item_ent) {
-                if let Ok(item) = item_entry.get_component_mut::<Item>() {
-                    if let Some(template) = item_mgr.get_by_kind(item.kind) {
-                        if do_rust {
-                            ItemDamageSystem::rust_item(item, template, log, turn, true);
-                        }
-                        if do_fire {
-                            ItemDamageSystem::burn_item(item, template, log, turn, true);
-                        }
-                    }
-                }
+            equip.slots.values().cloned().collect()
+        } else { return; }
+    } else { return; };
+    if slots.is_empty() { return; }
+    let item_ent = slots[rng.rn2(slots.len() as i32) as usize];
+    // Apply: 아이템 데미지
+    if let Some(mut item_entry) = world.entry(item_ent) {
+        if let Ok(item) = item_entry.get_component_mut::<Item>() {
+            if let Some(template) = item_mgr.get_by_kind(item.kind) {
+                if do_rust { ItemDamageSystem::rust_item(item, template, log, turn, true); }
+                if do_fire { ItemDamageSystem::burn_item(item, template, log, turn, true); }
             }
         }
     }
 }
 
-fn apply_damage(
-    target: Entity,
-    dmg: i32,
-    world: &mut SubWorld,
-    log: &mut GameLog,
-    turn: u64,
-    is_player: bool,
-) {
-    if let Ok(mut entry) = world.entry_mut(target) {
+fn apply_damage(target: Entity, dmg: i32, world: &mut World, log: &mut GameLog, turn: u64, is_player: bool) {
+    if let Some(mut entry) = world.entry(target) {
         if let Ok(health) = entry.get_component_mut::<Health>() {
             health.current -= dmg;
-            if is_player {
-                log.add(format!("You take {} damage!", dmg), turn);
-            } else {
-                log.add(format!("The monster takes {} damage!", dmg), turn);
-            }
+            if is_player { log.add(format!("You take {} damage!", dmg), turn); }
+            else { log.add(format!("The monster takes {} damage!", dmg), turn); }
         }
     }
 }
 
-fn seetrap(t_ent: Entity, world: &mut SubWorld) {
-    if let Ok(mut entry) = world.entry_mut(t_ent) {
+fn seetrap(t_ent: Entity, world: &mut World) {
+    if let Some(mut entry) = world.entry(t_ent) {
         if let Ok(t_comp) = entry.get_component_mut::<Trap>() {
             t_comp.discovered = true;
         }
