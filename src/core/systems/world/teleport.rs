@@ -23,19 +23,18 @@ pub struct TeleportAction {
     pub is_level_tele: bool,
 }
 
-#[legion::system]
-#[read_component(PlayerTag)]
-#[read_component(TeleportAction)]
-#[write_component(Position)]
-pub fn teleport(
-    world: &mut SubWorld,
-    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
-    #[resource] log: &mut GameLog,
-    #[resource] grid: &Grid,
-    #[resource] rng: &mut NetHackRng,
-    #[resource] level_req: &mut Option<LevelChange>,
-    command_buffer: &mut legion::systems::CommandBuffer,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료
+pub fn teleport_system(ctx: &mut crate::core::context::GameContext) {
+    let crate::core::context::GameContext {
+        world,
+        action_queue,
+        log,
+        grid,
+        rng,
+        level_req,
+        ..
+    } = ctx;
+
     // ActionQueue에서 Teleport 액션 추출
     let mut to_keep = Vec::new();
     let mut action_opt = None;
@@ -55,9 +54,12 @@ pub fn teleport(
         Some(a)
     } else {
         let mut query = <(Entity, &TeleportAction)>::query();
-        let found = query.iter(world).next().map(|(&e, &a)| (e, a));
+        let found = query.iter(*world).next().map(|(&e, &a)| (e, a));
         if let Some((e, a)) = found {
-            command_buffer.remove_component::<TeleportAction>(e);
+            // [v3.0.0] command_buffer → world.entry() 직접 조작
+            if let Some(mut entry) = world.entry(e) {
+                entry.remove_component::<TeleportAction>();
+            }
             Some(a)
         } else {
             None
@@ -76,7 +78,6 @@ pub fn teleport(
     };
 
     if action.is_level_tele && is_player {
-        //
         let current_id = if let Ok(entry) = world.entry_ref(action.target) {
             entry
                 .get_component::<crate::core::entity::Level>()
@@ -98,12 +99,11 @@ pub fn teleport(
         let target_id = crate::core::dungeon::LevelID::new(current_id.branch, next_depth);
 
         log.add("You are swept away to another level!", log.current_turn);
-        *level_req = Some(LevelChange::Teleport {
+        **level_req = Some(LevelChange::Teleport {
             target: target_id,
             landing: crate::core::dungeon::LandingType::Random,
         });
     } else {
-        //
         let mut success = false;
         let mut target_pos = (0, 0);
 
@@ -112,7 +112,6 @@ pub fn teleport(
             let ty = rng.rn2(crate::core::dungeon::ROWNO as i32) as usize;
 
             if let Some(tile) = grid.get_tile(tx, ty) {
-                //
                 if !tile.typ.is_wall() {
                     target_pos = (tx as i32, ty as i32);
                     success = true;
@@ -122,7 +121,7 @@ pub fn teleport(
         }
 
         if success {
-            if let Ok(mut entry) = world.entry_mut(action.target) {
+            if let Some(mut entry) = world.entry(action.target) {
                 if let Ok(pos) = entry.get_component_mut::<Position>() {
                     pos.x = target_pos.0;
                     pos.y = target_pos.1;

@@ -1013,11 +1013,7 @@ impl super::NetHackApp {
             .flush()
             .add_system(crate::core::systems::item_use::item_use_system())
             .flush()
-            .add_system(crate::core::systems::throw::throw_system())
-            .flush()
             .add_system(crate::core::systems::zap::zap_system())
-            .flush()
-            .add_system(crate::core::systems::teleport::teleport_system())
             .flush()
             .add_system(crate::core::systems::stairs::stairs_system())
             .flush()
@@ -1071,6 +1067,12 @@ impl super::NetHackApp {
                 .get_mut::<crate::core::systems::vision::VisionSystem>()
                 .unwrap();
 
+            let mut level_req = self
+                .game
+                .resources
+                .get_mut::<Option<crate::core::dungeon::LevelChange>>()
+                .unwrap();
+
             let mut ctx = crate::core::context::GameContext::new(
                 &mut self.game.world,
                 &mut grid,
@@ -1082,13 +1084,16 @@ impl super::NetHackApp {
                 &mut event_queue,
                 &mut action_queue,
                 &mut vision,
+                &mut level_req,
             );
 
-            // [v3.0.0] 전환 완료 시스템 (20개)
+            // [v3.0.0] 전환 완료 시스템 (22개)
             crate::core::systems::ai::core::pet_hunger_system(&mut ctx);
             crate::core::systems::creature::equipment::update_player_stats_system(&mut ctx);
             crate::core::systems::creature::equipment::equipment_system(&mut ctx);
             crate::core::systems::misc::spell::spell_cast_system(&mut ctx);
+            crate::core::systems::combat::throw::throw_system(&mut ctx);
+            crate::core::systems::world::teleport::teleport_system(&mut ctx);
             crate::core::systems::world::vision_system::vision_update_system(&mut ctx);
             crate::core::systems::world::vision_system::magic_map_effect_system(&mut ctx);
             crate::core::systems::item::item_use::item_input_system(&mut ctx);

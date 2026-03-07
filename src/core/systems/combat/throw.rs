@@ -17,21 +17,21 @@ pub struct ThrowAction {
     pub dir: Direction,
 }
 
-/// 원거리 공격 시스템 (Throw, Fire)
-#[system]
-#[read_component(crate::core::entity::player::Player)]
-#[read_component(crate::core::entity::Equipment)]
-#[read_component(CombatStats)]
-#[write_component(Health)]
-pub fn throw(
-    world: &mut SubWorld,
-    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
-    #[resource] grid: &Grid,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] _assets: &AssetManager,
-    command_buffer: &mut CommandBuffer,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료 (원거리 공격 시스템)
+pub fn throw_system(ctx: &mut crate::core::context::GameContext) {
+    // ctx 필드 분해: world, log, grid 등을 동시에 mutable borrow
+    let crate::core::context::GameContext {
+        world,
+        action_queue,
+        grid,
+        log,
+        turn,
+        assets,
+        rng: _ctx_rng,
+        ..
+    } = ctx;
+    let turn_val = *turn;
+
     let mut to_keep = Vec::new();
     let mut action_to_process = None;
     while let Some(game_action) = action_queue.pop() {
@@ -76,14 +76,14 @@ pub fn throw(
             &crate::core::entity::player::Player,
         )>::query()
         .filter(component::<PlayerTag>());
-        let (p_ent, p_pos, p_inv, p_equip, player) = match player_query.iter_mut(world).next() {
+        let (p_ent, p_pos, p_inv, p_equip, player) = match player_query.iter_mut(*world).next() {
             Some(res) => res,
             None => return,
         };
 
         let p_ent_val = *p_ent;
         let (px, py) = (p_pos.x, p_pos.y);
-        log.add(format!("You throw the {}.", item_name), *turn);
+        log.add(format!("You throw the {}.", item_name), turn_val);
 
         //
         if p_inv.items.contains(&item_ent) {
@@ -134,25 +134,27 @@ pub fn throw(
         // 범위 및 벽 체크
         if let Some(tile) = grid.get_tile(nx as usize, ny as usize) {
             if crate::core::systems::vision::VisionSystem::does_block(tile) {
-                log.add(format!("The {} hits the wall.", item_name), *turn);
+                log.add(format!("The {} hits the wall.", item_name), turn_val);
                 break;
             }
         } else {
             break;
         }
 
-        //
+        // Gather: 몬스터 충돌 데이터 수집
         let mut monster_hit_data: Option<(Entity, i32)> = None;
-        let mut monster_query =
-            <(Entity, &Position, &mut Health)>::query().filter(!component::<PlayerTag>());
+        {
+            let mut monster_query =
+                <(Entity, &Position, &mut Health)>::query().filter(!component::<PlayerTag>());
 
-        for (ent, pos, health) in monster_query.iter_mut(world) {
-            if pos.x == nx && pos.y == ny {
-                let mut rng = NetHackRng::new(*turn);
-                let damage = rng.d(1, 6);
-                health.current -= damage;
-                monster_hit_data = Some((*ent, damage));
-                break;
+            for (ent, pos, health) in monster_query.iter_mut(*world) {
+                if pos.x == nx && pos.y == ny {
+                    let mut rng = NetHackRng::new(turn_val);
+                    let damage = rng.d(1, 6);
+                    health.current -= damage;
+                    monster_hit_data = Some((*ent, damage));
+                    break;
+                }
             }
         }
 
@@ -161,12 +163,11 @@ pub fn throw(
             let mut eaten = false;
             if let Ok(m_entry) = world.entry_ref(m_ent) {
                 if let Ok(monster) = m_entry.get_component::<crate::core::entity::Monster>() {
-                    //
                     if item_name.contains("lichen")
                         || item_name.contains("tripe")
                         || item_name.contains("meat")
                     {
-                        if let Some(mt) = _assets.monsters.get_by_kind(monster.kind) {
+                        if let Some(mt) = assets.monsters.get_by_kind(monster.kind) {
                             if mt.has_capability(
                                 crate::core::entity::capability::MonsterCapability::Animal,
                             ) {
@@ -175,26 +176,25 @@ pub fn throw(
                                         "The {} eats the {} and is tamed!",
                                         monster.kind, item_name
                                     ),
-                                    *turn,
+                                    turn_val,
                                 );
-                                //
-                                command_buffer.add_component(
-                                    m_ent,
-                                    crate::core::entity::monster::Pet {
+                                // [v3.0.0] command_buffer → world.entry() 직접 조작
+                                let mon_kind = monster.kind;
+                                let mon_name = monster.mon_name.clone();
+                                drop(m_entry);
+                                if let Some(mut entry) = world.entry(m_ent) {
+                                    entry.add_component(crate::core::entity::monster::Pet {
                                         owner: player_ent,
                                         name: None,
                                         hunger: 0,
                                         loyalty: 10,
-                                    },
-                                );
-                                command_buffer.add_component(
-                                    m_ent,
-                                    crate::core::entity::Monster {
-                                        kind: monster.kind,
+                                    });
+                                    entry.add_component(crate::core::entity::Monster {
+                                        kind: mon_kind,
                                         hostile: false,
-                                        mon_name: monster.mon_name.clone(),
-                                    },
-                                );
+                                        mon_name,
+                                    });
+                                }
                                 eaten = true;
                             }
                         }
@@ -203,12 +203,13 @@ pub fn throw(
             }
 
             if eaten {
-                command_buffer.remove(item_ent);
-                returned = true; // 더 이상 땅에 떨어뜨리지 않음
+                // [v3.0.0] command_buffer.remove → world.remove 직접 삭제
+                world.remove(item_ent);
+                returned = true;
             } else {
                 log.add(
                     format!("The {} hits the monster for {} damage!", item_name, dmg),
-                    *turn,
+                    turn_val,
                 );
             }
             current_x = nx;
@@ -232,32 +233,31 @@ pub fn throw(
     };
 
     if is_mjollnir {
-        // Valkyrie 체크
         let mut p_query =
             <&crate::core::entity::player::Player>::query().filter(component::<PlayerTag>());
-        if let Some(player) = p_query.iter(world).next() {
-            if player.role == crate::core::entity::player::PlayerClass::Valkyrie {
-                log.add("The Mjollnir returns to your hand!", *turn);
-                let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
-                if let Some(inv) = query.iter_mut(world).next() {
-                    inv.items.push(item_ent);
-                    returned = true;
-                }
+        let is_valkyrie = p_query.iter(*world).next().map_or(false, |p| {
+            p.role == crate::core::entity::player::PlayerClass::Valkyrie
+        });
+
+        if is_valkyrie {
+            log.add("The Mjollnir returns to your hand!", turn_val);
+            let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
+            if let Some(inv) = query.iter_mut(*world).next() {
+                inv.items.push(item_ent);
+                returned = true;
             }
         }
     }
 
     if !returned {
-        command_buffer.add_component(
-            item_ent,
-            Position {
+        // [v3.0.0] command_buffer → world.entry() 직접 Position 추가
+        if let Some(mut entry) = world.entry(item_ent) {
+            entry.add_component(Position {
                 x: current_x,
                 y: current_y,
-            },
-        );
+            });
+        }
     }
-
-    // 액션 소비 완료
 }
 
 // =============================================================================

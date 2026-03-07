@@ -9,7 +9,7 @@
 
 use crate::assets::AssetManager;
 use crate::core::action_queue::ActionQueue;
-use crate::core::dungeon::Grid;
+use crate::core::dungeon::{Grid, LevelChange};
 use crate::core::events::EventQueue;
 use crate::core::systems::vision::VisionSystem;
 use crate::ui::input::Command;
@@ -57,6 +57,8 @@ pub struct GameContext<'a> {
     pub action_queue: &'a mut ActionQueue,
     /// 시야 시스템 (FOV/가시 영역 계산)
     pub vision: &'a mut VisionSystem,
+    /// 레벨 변경 요청 (계단/텔레포트 등)
+    pub level_req: &'a mut Option<LevelChange>,
 }
 
 impl<'a> GameContext<'a> {
@@ -72,6 +74,7 @@ impl<'a> GameContext<'a> {
         event_queue: &'a mut EventQueue,
         action_queue: &'a mut ActionQueue,
         vision: &'a mut VisionSystem,
+        level_req: &'a mut Option<LevelChange>,
     ) -> Self {
         Self {
             world,
@@ -84,6 +87,7 @@ impl<'a> GameContext<'a> {
             event_queue,
             action_queue,
             vision,
+            level_req,
         }
     }
 }
@@ -145,6 +149,7 @@ mod tests {
 
         let mut action_queue = crate::core::action_queue::ActionQueue::new();
         let mut vision = crate::core::systems::vision::VisionSystem::new();
+        let mut level_req: Option<LevelChange> = None;
 
         let mut ctx = GameContext::new(
             &mut world,
@@ -157,6 +162,7 @@ mod tests {
             &mut event_queue,
             &mut action_queue,
             &mut vision,
+            &mut level_req,
         );
 
         // GameContext가 정상 생성되면 turn/cmd 접근 가능
