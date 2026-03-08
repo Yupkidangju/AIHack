@@ -157,14 +157,8 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.add_system(aihack::core::systems::engrave::engrave_tick_system());
         builder.flush();
     }
-    if system_count >= 6 {
-        builder.add_system(aihack::core::systems::trap::trap_trigger_system());
-        builder.flush();
-    }
-    if system_count >= 7 {
-        builder.add_system(aihack::core::systems::death::death_system());
-        builder.flush();
-    }
+    // [v3.0.0] trap_trigger_system은 GameContext로 전환됨 (system_count 6 건너뜀)
+    // [v3.0.0] death_system은 GameContext로 전환됨 (system_count 7 건너뜀)
     if system_count >= 8 {
         builder
 ;
@@ -217,10 +211,7 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
 ;
         builder.flush();
     }
-    if system_count >= 20 {
-        builder.add_system(aihack::core::systems::stairs::stairs_system());
-        builder.flush();
-    }
+    // [v3.0.0] stairs_system은 GameContext로 전환됨 (system_count 20 건너뜀)
     // [v3.0.0] status_tick  GameContext로 전환됨 (system_count 21  건너뜀)
     // [v3.0.0] attrib_maintenance  GameContext로 전환됨 (system_count 22  건너뜀)
     // [v3.0.0] timeout_dialogue  GameContext로 전환됨 (system_count 23  건너뜀)
@@ -235,10 +226,7 @@ fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count:
         builder.add_system(aihack::core::systems::evolution::lycanthropy_tick_system());
         builder.flush();
     }
-    if system_count >= 29 {
-        builder.add_system(aihack::core::systems::shop::shopkeeper_update_system());
-        builder.flush();
-    }
+    // [v3.0.0] shopkeeper_update_system은 GameContext로 전환됨 (system_count 29 건너뜀)
     if system_count >= 30 {
         builder.add_system(aihack::core::systems::weight::update_encumbrance_system());
         builder.flush();

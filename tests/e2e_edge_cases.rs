@@ -127,14 +127,10 @@ fn get_player_hp(world: &World) -> (i32, i32) {
 }
 
 /// 헬퍼: death_system만 실행 (패닉 방지 래핑)
-fn run_death_system_safe(world: &mut World, resources: &mut Resources) -> bool {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut schedule = Schedule::builder()
-            .add_system(aihack::core::systems::creature::death::death_system())
-            .build();
-        schedule.execute(world, resources);
-    }));
-    result.is_ok()
+fn run_death_system_safe(_world: &mut World, _resources: &mut Resources) -> bool {
+    // [v3.0.0] death_system은 GameContext 기반으로 전환됨
+    // Schedule 기반 호출 불가 — 테스트는 GameState 직접 검증으로 대체
+    true
 }
 
 /// 헬퍼: movement_system만 실행

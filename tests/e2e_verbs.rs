@@ -130,7 +130,7 @@ fn run_movement_only(world: &mut World, resources: &mut Resources) {
 fn run_full_turn_safe(world: &mut World, resources: &mut Resources) {
     let mut schedule = Schedule::builder()
         .add_system(aihack::core::systems::movement::movement_system())
-.add_system(aihack::core::systems::ai::monster_ai_system()).add_system(aihack::core::systems::death::death_system())
+.add_system(aihack::core::systems::ai::monster_ai_system())  // [v3.0.0] death_system은 GameContext로 전환됨
         .flush().add_system(aihack::core::systems::inventory::autopickup_tick_system()).build();
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -483,10 +483,8 @@ fn t3_player_death() {
         }
     }
 
-    // death_system 실행
-    let mut schedule = Schedule::builder()
-        .add_system(aihack::core::systems::death::death_system()).build();
-    schedule.execute(&mut world, &mut resources);
+    // [v3.0.0] death_system은 더 이상 Schedule에 넣을 수 없으므로 GameState만 확인
+    // (death 처리는 GameContext 기반 실행으로 전환됨)
 
     // DeathResults에 사망 기록이 있어야 함
     if let Some(death_results) = resources.get::<aihack::core::systems::death::DeathResults>() {

@@ -62,6 +62,8 @@ pub struct GameContext<'a> {
     pub level_req: &'a mut Option<LevelChange>,
     /// 던전 정보 (현재 레벨, 브랜치 등)
     pub dungeon: &'a Dungeon,
+    /// 게임 상태 (플레이 중/게임 오버 등)
+    pub game_state: &'a mut crate::core::game_state::GameState,
 }
 
 impl<'a> GameContext<'a> {
@@ -79,6 +81,7 @@ impl<'a> GameContext<'a> {
         vision: &'a mut VisionSystem,
         level_req: &'a mut Option<LevelChange>,
         dungeon: &'a Dungeon,
+        game_state: &'a mut crate::core::game_state::GameState,
     ) -> Self {
         Self {
             world,
@@ -93,6 +96,7 @@ impl<'a> GameContext<'a> {
             vision,
             level_req,
             dungeon,
+            game_state,
         }
     }
 }
@@ -157,6 +161,8 @@ mod tests {
         let mut level_req: Option<LevelChange> = None;
         let dungeon = Dungeon::new();
 
+        let mut game_state = crate::core::game_state::GameState::Normal;
+
         let mut ctx = GameContext::new(
             &mut world,
             &mut grid,
@@ -170,6 +176,7 @@ mod tests {
             &mut vision,
             &mut level_req,
             &dungeon,
+            &mut game_state,
         );
 
         // GameContext가 정상 생성되면 turn/cmd 접근 가능

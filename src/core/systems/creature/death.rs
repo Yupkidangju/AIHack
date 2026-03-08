@@ -3,19 +3,14 @@
 // =============================================================================
 //
 // [v2.0.0] 몬스터 사망 시 시체/전리품 드롭, 경험치, 레벨업, 게임 오버 전환
-// [v2.0.0 R5] Phase R5: GameEvent 발행 ? MonsterDied, ExperienceGained, PlayerDied
-// =============================================================================
-// SubWorld 제약 사항:
-//   - push() 불가 → 시체/금화 생성은 SpawnRequest 또는 외부 처리
-//
-//   - entry_mut() 가능 (individual Entity에 대해)
+// [v2.0.0 R5] Phase R5: GameEvent 발행 — MonsterDied, ExperienceGained, PlayerDied
+// [v3.0.0] GameContext 기반 전환 완료
 // =============================================================================
 
 use crate::core::entity::player::Player;
 use crate::core::entity::{CombatStats, Health, MonsterTag, PlayerTag};
-use crate::core::events::{EventQueue, GameEvent}; // [v2.0.0 R5] 이벤트 발행
+use crate::core::events::{EventQueue, GameEvent};
 use crate::ui::log::GameLog;
-use legion::world::SubWorld;
 use legion::*;
 
 ///
@@ -44,33 +39,16 @@ pub struct DeathResults {
     pub item_drop_requests: Vec<ItemDropRequest>,
 }
 
-#[system]
-#[write_component(Player)]
-#[read_component(Health)]
-#[read_component(CombatStats)]
-#[read_component(MonsterTag)]
-#[read_component(PlayerTag)]
-#[write_component(crate::core::entity::Position)]
-#[read_component(crate::core::entity::Monster)]
-#[read_component(crate::core::entity::Inventory)]
-#[write_component(crate::core::entity::Level)]
-// [v2.42.2] CommandBuffer.push()에서 사용하는 컴포넌트 선언 추가
-#[write_component(crate::core::entity::Renderable)]
-#[write_component(crate::core::entity::Item)]
-#[write_component(crate::core::entity::ItemTag)]
-pub fn death(
-    world: &mut SubWorld,
-    #[resource] log: &mut GameLog,
-    #[resource] assets: &crate::assets::AssetManager,
-    #[resource] rng: &mut crate::util::rng::NetHackRng,
-    #[resource] turn: &u64,
-    #[resource] game_state: &mut crate::core::game_state::GameState,
-    #[resource] event_queue: &mut EventQueue, // [v2.0.0 R5] 이벤트 큐
-    #[resource] provider: &crate::core::systems::social::DefaultInteractionProvider, // [R8-3] LLM 교체 포인트
-    command_buffer: &mut legion::systems::CommandBuffer,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료 (사망 처리 시스템)
+pub fn death_system(ctx: &mut crate::core::context::GameContext) {
+    let crate::core::context::GameContext {
+        world, log, assets, rng, turn, event_queue, game_state, ..
+    } = ctx;
+    let turn_val = *turn;
+    let provider = crate::core::systems::social::DefaultInteractionProvider;
+
     // =========================================================================
-    //
+    // 1. 플레이어 정보 수집
     // =========================================================================
     let mut player_ent: Option<Entity> = None;
     let mut player_luck = 0i32;
@@ -81,8 +59,7 @@ pub fn death(
     {
         let mut p_query = <(Entity, &Player, &crate::core::entity::Level)>::query()
             .filter(component::<PlayerTag>());
-
-        for (e, p, lvl) in p_query.iter(world) {
+        for (e, p, lvl) in p_query.iter(*world) {
             player_ent = Some(*e);
             player_luck = p.luck;
             player_exp_level = p.exp_level;
@@ -117,7 +94,7 @@ pub fn death(
         )>::query()
         .filter(component::<MonsterTag>());
 
-        for (entity, health, stats, monster, pos) in m_query.iter(world) {
+        for (entity, health, stats, monster, pos) in m_query.iter(*world) {
             if health.current <= 0 {
                 let mut should_explode = false;
                 let mut explode_adtype = crate::core::entity::monster::DamageType::Phys;
@@ -136,16 +113,13 @@ pub fn death(
                     }
                 }
 
-                //
-                let items = Vec::new(); // SubWorld에서 Inventory 접근은 별도 Query 필요
-
                 dead_list.push(DeadInfo {
                     entity: *entity,
                     template_name: monster.kind.to_string(),
                     pos_x: pos.x,
                     pos_y: pos.y,
                     level: stats.level,
-                    items,
+                    items: Vec::new(),
                     should_explode,
                     explode_adtype,
                     explode_dice,
@@ -154,12 +128,11 @@ pub fn death(
         }
     }
 
-    //
+    // 인벤토리 수집 (별도 쿼리)
     {
         let mut inv_query =
             <(Entity, &crate::core::entity::Inventory)>::query().filter(component::<MonsterTag>());
-
-        for (entity, inv) in inv_query.iter(world) {
+        for (entity, inv) in inv_query.iter(*world) {
             if let Some(dead) = dead_list.iter_mut().find(|d| d.entity == *entity) {
                 dead.items = inv.items.clone();
             }
@@ -176,9 +149,9 @@ pub fn death(
         let mon_name = &dead.template_name;
 
         // --- 3-1. 사망 메시지 ---
-        log.add(format!("The {} dies!", mon_name), *turn);
+        log.add(format!("The {} dies!", mon_name), turn_val);
 
-        // [v2.0.0 R5] MonsterDied 이벤트 발행 ? 기존 DeathResults와 병행
+        // [v2.0.0 R5] MonsterDied 이벤트 발행
         event_queue.push(GameEvent::MonsterDied {
             name: mon_name.clone(),
             killer: "player".to_string(),
@@ -187,7 +160,7 @@ pub fn death(
                 .unwrap_or(false),
             x: dead.pos_x,
             y: dead.pos_y,
-            xp_gained: 0, // 사망 시점에는 아직 미확정, ExperienceGained에서 기록
+            xp_gained: 0,
         });
 
         // --- 3-2. 경험치 계산 (원본: exper.c:experience) ---
@@ -204,23 +177,20 @@ pub fn death(
             total_xp_gain += (dead.level * 10) as u64;
         }
 
-        // --- 3-3. 아이템 드롭 — CommandBuffer로 위치 변경 (R8-1: DeathResults 대체) ---
-        // [v2.20.0 R8] SubWorld 제약 우회: CommandBuffer로 아이템 드롭 위치 컴포넌트 추가
+        // --- 3-3. 아이템 드롭 — world.entry() 직접 Position 추가 (v3.0.0) ---
         for &item_ent in &dead.items {
-            command_buffer.add_component(
-                item_ent,
-                crate::core::entity::Position {
+            if let Some(mut entry) = world.entry(item_ent) {
+                entry.add_component(crate::core::entity::Position {
                     x: dead.pos_x,
                     y: dead.pos_y,
-                },
-            );
+                });
+            }
         }
 
-        // --- 3-4. 시체 생성 — CommandBuffer.push()로 직접 Entity 생성 (R8-1) ---
-        // [v2.20.0 R8] DeathResults 브릿지 제거: SubWorld 제약을 CommandBuffer로 완전 해소
+        // --- 3-4. 시체 생성 — world.push() 직접 Entity 생성 (v3.0.0) ---
         if let Some(template) = template_opt {
             if crate::core::entity::mon::corpse_chance(template) {
-                command_buffer.push((
+                world.push((
                     crate::core::entity::ItemTag,
                     crate::core::entity::Position {
                         x: dead.pos_x,
@@ -235,7 +205,7 @@ pub fn death(
                         weight: (template.weight / 10).max(1) as u32,
                         quantity: 1,
                         corpsenm: Some(mon_name.clone()),
-                        age: *turn,
+                        age: turn_val,
                         ..Default::default()
                     },
                     crate::core::entity::Level(player_level),
@@ -250,22 +220,68 @@ pub fn death(
             }
         }
 
-        // --- 3-6. 폭발 처리 ---
+        // --- 3-6. 폭발 처리 --- (인라인 폭발 — SubWorld→World 호환 문제 해결)
         if dead.should_explode {
-            crate::core::systems::combat::CombatEngine::execute_explosion(
-                world,
-                (dead.pos_x, dead.pos_y),
-                dead.explode_adtype,
-                dead.explode_dice,
-                log,
-                *turn,
-                rng,
-                assets,
-            );
+            let bx = dead.pos_x;
+            let by = dead.pos_y;
+            let dtype = dead.explode_adtype;
+            let dice = dead.explode_dice;
+
+            // 3x3 영역 폭발 대상 수집
+            let mut affected = Vec::new();
+            {
+                let mut query = <(Entity, &crate::core::entity::Position, Option<&crate::core::entity::status::StatusBundle>)>::query();
+                for (ent, p, status) in query.iter(*world) {
+                    let dx = (p.x - bx).abs();
+                    let dy = (p.y - by).abs();
+                    if dx <= 1 && dy <= 1 {
+                        let is_player = {
+                            let mut pq = <&PlayerTag>::query();
+                            pq.iter(*world).any(|_| true) && world.entry_ref(*ent).ok()
+                                .map(|e| e.get_component::<PlayerTag>().is_ok()).unwrap_or(false)
+                        };
+                        let mut dmg = rng.d(dice.0, dice.1);
+                        use crate::core::entity::status::StatusFlags;
+                        use crate::core::entity::monster::DamageType;
+                        let mut resists = false;
+                        if let Some(s) = status {
+                            let f = s.flags();
+                            resists = match dtype {
+                                DamageType::Fire => f.contains(StatusFlags::FIRE_RES),
+                                DamageType::Cold => f.contains(StatusFlags::COLD_RES),
+                                DamageType::Elec => f.contains(StatusFlags::SHOCK_RES),
+                                DamageType::Acid => f.contains(StatusFlags::ACID_RES),
+                                _ => false,
+                            };
+                        }
+                        if resists { dmg /= 2; }
+                        affected.push((*ent, dmg, is_player));
+                    }
+                }
+            }
+            for (ent, dmg, is_player) in affected {
+                if let Some(mut entry) = world.entry(ent) {
+                    if let Ok(h) = entry.get_component_mut::<Health>() {
+                        if dmg > 0 {
+                            h.current -= dmg;
+                            if is_player {
+                                log.add(format!("You are hit by the explosion for {} damage!", dmg), turn_val);
+                            }
+                        }
+                    }
+                }
+            }
+            use crate::core::entity::monster::DamageType;
+            let msg = match dtype {
+                DamageType::Fire => "You hear an explosion! Booom!",
+                DamageType::Cold => "You hear a crackling freeze!",
+                _ => "You hear a loud blast!",
+            };
+            log.add(msg, turn_val);
         }
 
-        // --- 3-7. 엔티티 제거 ---
-        command_buffer.remove(dead.entity);
+        // --- 3-7. 엔티티 제거 — world.remove 직접 (v3.0.0) ---
+        world.remove(dead.entity);
     }
 
     // =========================================================================
@@ -273,9 +289,9 @@ pub fn death(
     // =========================================================================
     if total_xp_gain > 0 {
         if let Some(p_ent) = player_ent {
-            if let Ok(mut p_entry) = world.entry_mut(p_ent) {
+            if let Some(mut p_entry) = world.entry(p_ent) {
                 if let Ok(player) = p_entry.get_component_mut::<Player>() {
-                    log.add(format!("You gain {} experience.", total_xp_gain), *turn);
+                    log.add(format!("You gain {} experience.", total_xp_gain), turn_val);
 
                     // [v2.0.0 R5] ExperienceGained 이벤트 발행
                     event_queue.push(GameEvent::ExperienceGained {
@@ -285,9 +301,9 @@ pub fn death(
                     crate::core::systems::exper::gain_experience(
                         player,
                         total_xp_gain,
-                        rng,
-                        log,
-                        *turn,
+                        *rng,
+                        *log,
+                        turn_val,
                     );
                 }
             }
@@ -295,36 +311,40 @@ pub fn death(
     }
 
     // =========================================================================
-    //
+    // 5. 플레이어 사망 판정
     // =========================================================================
     {
         let mut pq = <(Entity, &Health)>::query().filter(component::<PlayerTag>());
-        for (_e, health) in pq.iter(world) {
+        let mut player_dead = false;
+        for (_e, health) in pq.iter(*world) {
             if health.current <= 0 {
-                // [R8-3] provider 경유 사망 에필로그
-                use crate::core::systems::social::InteractionProvider;
-                let cause_str = format!("killed on level {} of the Dungeon", player_level.depth);
-                let epitaph = provider.generate_death_epitaph(&cause_str, "You");
-                log.add_colored(&epitaph, [255, 0, 0], *turn);
-
-                let tombstone = provider.generate_tombstone_text("Adventurer", &cause_str, 0);
-                log.add_colored(format!("Tombstone: {}", tombstone), [200, 200, 200], *turn);
-
-                // [v2.0.0 R5] PlayerDied 이벤트 발행
-                event_queue.push(GameEvent::PlayerDied {
-                    cause: cause_str.clone(),
-                });
-
-                *game_state = crate::core::game_state::GameState::GameOver {
-                    message: format!(
-                        "You were killed on level {} of the Dungeon.",
-                        player_level.depth
-                    ),
-                };
+                player_dead = true;
             }
+        }
+
+        if player_dead {
+            use crate::core::systems::social::InteractionProvider;
+            let cause_str = format!("killed on level {} of the Dungeon", player_level.depth);
+            let epitaph = provider.generate_death_epitaph(&cause_str, "You");
+            log.add_colored(&epitaph, [255, 0, 0], turn_val);
+
+            let tombstone = provider.generate_tombstone_text("Adventurer", &cause_str, 0);
+            log.add_colored(format!("Tombstone: {}", tombstone), [200, 200, 200], turn_val);
+
+            event_queue.push(GameEvent::PlayerDied {
+                cause: cause_str.clone(),
+            });
+
+            **game_state = crate::core::game_state::GameState::GameOver {
+                message: format!(
+                    "You were killed on level {} of the Dungeon.",
+                    player_level.depth
+                ),
+            };
         }
     }
 }
+
 
 // =============================================================================
 // [v2.3.1] end.c 핵심 로직 이식
