@@ -7,7 +7,7 @@ use crate::core::entity::{Health, Monster, MonsterTag, PlayerTag, Position};
 use crate::core::game_state::Direction;
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::world::SubWorld;
+use legion::world::World;
 use legion::*;
 
 /// 지팡이 사용 또는 주문 시전 액션
@@ -18,23 +18,23 @@ pub struct ZapAction {
     pub direction: Direction,
 }
 
-#[legion::system]
-#[read_component(PlayerTag)]
-#[write_component(Player)]
-#[read_component(Position)]
-#[write_component(Health)]
-#[read_component(MonsterTag)]
-#[read_component(Monster)]
-#[write_component(crate::core::entity::Item)]
-#[read_component(crate::core::entity::status::StatusBundle)]
-pub fn zap(
-    world: &mut SubWorld,
-    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] grid: &mut Grid,
-    #[resource] rng: &mut NetHackRng,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료 (지팡이/주문 시스템)
+pub fn zap_system(ctx: &mut crate::core::context::GameContext) {
+    let crate::core::context::GameContext {
+        world,
+        action_queue,
+        log,
+        turn,
+        grid,
+        rng,
+        ..
+    } = ctx;
+    let turn_val = *turn;
+    let world = &mut **world;
+    let log = &mut **log;
+    let grid = &mut **grid;
+    let rng = &mut **rng;
+    // --- 이하 기존 로직 (world/log/grid/rng 직접 사용) ---
     let mut to_keep = Vec::new();
     let mut action_to_process = None;
     while let Some(game_action) = action_queue.pop() {
@@ -62,41 +62,41 @@ pub fn zap(
     if let Some(item_ent) = action.item_ent {
         // 지팡이 사용 (Wand Zap)
         let mut wand_info = None;
-        if let Ok(mut entry) = world.entry_mut(item_ent) {
+        if let Some(mut entry) = world.entry(item_ent) {
             if let Ok(item) = entry.get_component_mut::<crate::core::entity::Item>() {
                 if item.spe > 0 {
                     item.spe -= 1;
                     wand_info = Some((item.kind.to_string(), item.spe));
                 } else {
-                    log.add("The wand is empty.", *turn);
+                    log.add("The wand is empty.", turn_val);
                     return;
                 }
             }
         }
 
         if let Some((template, _charges)) = wand_info {
-            log.add_colored(format!("You zap a {}.", template), [255, 255, 0], *turn);
+            log.add_colored(format!("You zap a {}.", template), [255, 255, 0], turn_val);
             execute_wand_effect(
                 &template,
                 start_pos,
                 action.direction,
                 world,
                 log,
-                *turn,
+                turn_val,
                 grid,
                 rng,
             );
         }
     } else if let Some(spell_name) = action.spell_name {
         // 주문 시전 (Spell Cast)
-        log.add(format!("You cast {}.", spell_name), *turn);
+        log.add(format!("You cast {}.", spell_name), turn_val);
         execute_spell_effect_internal(
             &spell_name,
             start_pos,
             action.direction,
             world,
             log,
-            *turn,
+            turn_val,
             grid,
             rng,
         );
@@ -107,7 +107,7 @@ fn execute_wand_effect(
     name: &str,
     origin: (i32, i32),
     dir: Direction,
-    world: &mut SubWorld,
+    world: &mut World,
     log: &mut GameLog,
     turn: u64,
     grid: &mut Grid,
@@ -260,7 +260,7 @@ fn execute_wand_effect(
 
 /// 빛 지팡이 효과 (Wand of Light)
 fn execute_light_beam(
-    _world: &mut SubWorld,
+    _world: &mut World,
     origin: (i32, i32),
     dir: Direction,
     grid: &mut Grid,
@@ -302,7 +302,7 @@ fn execute_spell_effect_internal(
     name: &str,
     origin: (i32, i32),
     dir: Direction,
-    world: &mut SubWorld,
+    world: &mut World,
     log: &mut GameLog,
     turn: u64,
     grid: &mut Grid,
@@ -331,7 +331,7 @@ fn execute_spell_effect_internal(
 
 /// 공용 볼트/레이 실행 엔진 (zap.c:bhit 이식)
 pub fn execute_bolt(
-    world: &mut SubWorld,
+    world: &mut World,
     origin: (i32, i32),
     dir: Direction,
     dtype: DamageType,
@@ -549,7 +549,7 @@ pub fn execute_bolt(
 
         if let Some(m_ent) = m_hit_ent {
             let dmg = if dice.0 > 0 { rng.d(dice.0, dice.1) } else { 0 };
-            if let Ok(mut entry) = world.entry_mut(m_ent) {
+            if let Some(mut entry) = world.entry(m_ent) {
                 if let Ok(health) = entry.get_component_mut::<Health>() {
                     match dtype {
                         DamageType::Deth => {
@@ -590,7 +590,7 @@ pub fn execute_bolt(
 
 /// 굴착(Digging) 지팡이 로직 (zap.c:dig_actual 이식)
 pub fn execute_dig(
-    _world: &mut SubWorld,
+    _world: &mut World,
     origin: (i32, i32),
     dir: crate::core::game_state::Direction,
     grid: &mut Grid,
