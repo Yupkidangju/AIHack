@@ -16,13 +16,12 @@ use legion::{component, Entity, EntityStore, IntoQuery};
 ///
 pub fn item_apply(
     item_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     _assets: &AssetManager,
     _grid: &crate::core::dungeon::Grid,
     log: &mut GameLog,
     turn: u64,
     state: &mut GameState,
-    _command_buffer: &mut CommandBuffer,
 ) {
     let item = match world.entry_ref(item_ent) {
         Ok(entry) => match entry.get_component::<Item>() {
@@ -63,7 +62,7 @@ pub fn item_apply(
         }
         "bag of tricks" => {
             // 마법의 자루 (몬스터 소환)
-            use_bag_of_tricks(item_ent, world, _assets, log, turn, _command_buffer);
+            use_bag_of_tricks(item_ent, world, _assets, log, turn);
         }
         "lamp" | "oil lamp" | "brass lantern" | "magic lamp" => {
             use_lamp(item_ent, world, _assets, log, turn);
@@ -82,7 +81,7 @@ pub fn item_apply(
 
 /// 유니콘 뿔 사용 로직
 /// 원본: apply.c:3720 use_unicorn_horn()
-fn use_unicorn_horn(world: &mut SubWorld, log: &mut GameLog, turn: u64) {
+fn use_unicorn_horn(world: &mut legion::world::World, log: &mut GameLog, turn: u64) {
     let mut query =
         <&mut crate::core::entity::status::StatusBundle>::query().filter(component::<PlayerTag>());
     for status in query.iter_mut(world) {
@@ -115,12 +114,12 @@ fn use_unicorn_horn(world: &mut SubWorld, log: &mut GameLog, turn: u64) {
 /// 등불 사용 로직 (Phase 43)
 fn use_lamp(
     item_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     _assets: &AssetManager,
     log: &mut GameLog,
     turn: u64,
 ) {
-    if let Ok(mut entry) = world.entry_mut(item_ent) {
+    if let Some(mut entry) = world.entry(item_ent) {
         let (template, age, blessed, cursed) = if let Ok(item) = entry.get_component::<Item>() {
             (item.kind.to_string(), item.age, item.blessed, item.cursed)
         } else {
@@ -356,7 +355,7 @@ fn use_camera(
 /// 기름 사용 로직 (Phase 43)
 fn use_oil(
     oil_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     log: &mut GameLog,
     turn: u64,
     state: &mut GameState,
@@ -391,11 +390,10 @@ fn use_oil(
 /// 마법의 자루 사용 로직 (Phase 48)
 fn use_bag_of_tricks(
     item_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     _assets: &AssetManager,
     log: &mut GameLog,
     turn: u64,
-    command_buffer: &mut CommandBuffer,
 ) {
     //
     let mut player_pos = Position { x: 0, y: 0 };
@@ -406,7 +404,7 @@ fn use_bag_of_tricks(
         return;
     }
 
-    if let Ok(mut entry) = world.entry_mut(item_ent) {
+    if let Some(mut entry) = world.entry(item_ent) {
         if let Ok(item) = entry.get_component_mut::<Item>() {
             // 충전 확인 (spe)
             if item.spe > 0 {
@@ -422,7 +420,7 @@ fn use_bag_of_tricks(
                 let dx = rng.rn2(3) as i32 - 1;
                 let dy = rng.rn2(3) as i32 - 1;
 
-                command_buffer.push((crate::core::entity::spawn::SpawnRequest {
+                let _ = world.push((crate::core::entity::spawn::SpawnRequest {
                     x: player_pos.x + dx,
                     y: player_pos.y + dy,
                     template: tmpl.to_string(),

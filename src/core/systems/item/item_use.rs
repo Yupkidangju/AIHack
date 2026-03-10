@@ -201,27 +201,36 @@ pub fn item_input_system(ctx: &mut crate::core::context::GameContext) {
     }
 }
 
-///
-#[legion::system]
-#[read_component(Item)]
-#[write_component(Inventory)]
-#[write_component(StatusBundle)]
-#[write_component(Health)]
-#[write_component(Position)]
-#[write_component(SpellKnowledge)]
-#[read_component(PlayerTag)]
-pub fn item_use(
-    world: &mut SubWorld,
-    #[resource] _assets: &AssetManager,
-    #[resource] grid: &mut crate::core::dungeon::Grid,
-    #[resource] log: &mut GameLog,
-    #[resource] ident_table: &crate::core::entity::identity::IdentityTable,
-    #[resource] action_queue: &mut crate::core::action_queue::ActionQueue,
-    #[resource] state: &mut crate::core::game_state::GameState,
-    #[resource] altar_update: &mut Option<crate::core::systems::pray::PendingAltarUpdate>,
-    #[resource] event_queue: &mut EventQueue, // [v2.0.0 R5] 상태 이벤트
-    command_buffer: &mut CommandBuffer,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료 (아이템 사용 시스템)
+pub fn item_use_system(ctx: &mut crate::core::context::GameContext) {
+    let crate::core::context::GameContext {
+        world,
+        grid,
+        log,
+        action_queue,
+        event_queue,
+        game_state,
+        assets,
+        ..
+    } = ctx;
+    let world = &mut **world;
+    let grid = &mut **grid;
+    let log = &mut **log;
+    let _assets = &**assets;
+    let state = &mut **game_state;
+    // [v3.0.0] CommandBuffer 제거 — world 직접 접근
+    // [v3.0.0] deferred ops 변수 (쿼리 빌림 중 world.entry 호출 불가하므로)
+    let mut deferred_add_item: Option<(Entity, Item)> = None;
+    let mut deferred_consume: Option<Entity> = None;
+    let mut deferred_teleport: Option<(Entity, bool)> = None;
+    let mut deferred_magic_map: Option<Entity> = None;
+
+    // [v3.0.0] ident_table — 빈 테이블 (이름 표시에만 사용, 기능 영향 없음)
+    let ident_table = &crate::core::entity::identity::IdentityTable::new();
+    // [v3.0.0] altar_update — 제단 제물 업데이트용
+    let mut altar_update_local: Option<crate::core::systems::pray::PendingAltarUpdate> = None;
+    let altar_update = &mut altar_update_local;
+
     let mut to_keep = Vec::new();
     let mut action_to_process = None;
     while let Some(game_action) = action_queue.pop() {
@@ -287,8 +296,12 @@ pub fn item_use(
             if let Some(mut inv) = container_inv {
                 if inv.items.contains(&item) {
                     inv.remove_item(item);
-                    command_buffer.add_component(container, inv);
-                    command_buffer.remove_component::<crate::core::entity::InContainerTag>(item);
+                    if let Some(mut e) = world.entry(container) {
+                        e.add_component(inv);
+                    }
+                    if let Some(mut e) = world.entry(item) {
+                        e.remove_component::<crate::core::entity::InContainerTag>();
+                    }
 
                     // [v2.21.0 R9-3] 플레이어 인벤토리 편입 시 Stacking 처리
                     let mut merge_target = None;
@@ -309,8 +322,10 @@ pub fn item_use(
                             if let Ok(exist_comp) = target_entry.get_component::<Item>() {
                                 let mut merged = exist_comp.clone();
                                 merged.quantity += qty_to_add;
-                                command_buffer.add_component(target, merged);
-                                command_buffer.remove(item);
+                                if let Some(mut e) = world.entry(target) {
+                                    e.add_component(merged);
+                                }
+                                world.remove(item);
                             }
                         }
                         log.add(
@@ -341,17 +356,22 @@ pub fn item_use(
                     log.current_turn,
                 );
 
-                // 재귀적 파괴: 가방 내부의 모든 아이템 소멸 (NetHack 100% 이식)
-                if let Ok(c_entry) = world.entry_ref(container) {
+                // [v3.0.0] 먼저 아이템 목록 수집 후 entry_ref drop 후 제거
+                let items_to_remove: Vec<Entity> = if let Ok(c_entry) = world.entry_ref(container) {
                     if let Ok(c_inv) = c_entry.get_component::<Inventory>() {
-                        for &inner_item in &c_inv.items {
-                            command_buffer.remove(inner_item);
-                        }
+                        c_inv.items.clone()
+                    } else {
+                        vec![]
                     }
+                } else {
+                    vec![]
+                };
+                for inner_item in items_to_remove {
+                    world.remove(inner_item);
                 }
 
-                command_buffer.remove(container);
-                command_buffer.remove(item);
+                world.remove(container);
+                world.remove(item);
 
                 let mut query = <&mut Inventory>::query().filter(component::<PlayerTag>());
                 if let Some(inv) = query.iter_mut(world).next() {
@@ -392,8 +412,10 @@ pub fn item_use(
                     if let Ok(exist_comp) = target_entry.get_component::<Item>() {
                         let mut merged = exist_comp.clone();
                         merged.quantity += qty_to_add;
-                        command_buffer.add_component(target, merged);
-                        command_buffer.remove(item);
+                        if let Some(mut e) = world.entry(target) {
+                            e.add_component(merged);
+                        }
+                        world.remove(item);
                         log.add(
                             "You put the item in and it merges with other items.",
                             log.current_turn,
@@ -401,11 +423,14 @@ pub fn item_use(
                     }
                 }
             } else {
-                if let Ok(mut entry) = world.entry_mut(container) {
+                if let Some(mut entry) = world.entry(container) {
                     if let Ok(c_inv) = entry.get_component_mut::<Inventory>() {
                         c_inv.items.push(item);
-                        command_buffer
-                            .add_component(item, crate::core::entity::InContainerTag { container });
+                        // [v3.0.0] 직접 접근 불가 (entry 대출 중) — drop 후 접근
+                        drop(entry);
+                        if let Some(mut e2) = world.entry(item) {
+                            e2.add_component(crate::core::entity::InContainerTag { container });
+                        }
                         log.add("You put the item into the container.", log.current_turn);
                     }
                 }
@@ -421,7 +446,6 @@ pub fn item_use(
                 log,
                 log.current_turn,
                 state,
-                command_buffer,
             );
             return;
         }
@@ -568,9 +592,10 @@ pub fn item_use(
 
                 item_inst.known = true;
                 item_inst.bknown = true;
-                command_buffer.add_component(item_ent, item_inst.clone());
-
-                consume_item(p_inv, item_ent, command_buffer);
+                // [v3.0.0] deferred — 쿼리 빌림 종료 후 적용
+                deferred_add_item = Some((item_ent, item_inst.clone()));
+                deferred_consume = Some(item_ent);
+                p_inv.remove_item(item_ent);
             }
             ItemAction::Eat(_) => {
                 log.add(format!("You eat a {}.", display_name), log.current_turn);
@@ -680,8 +705,10 @@ pub fn item_use(
                 p_health.current = (p_health.current + 2).min(p_health.max);
                 item_inst.known = true;
                 item_inst.bknown = true;
-                command_buffer.add_component(item_ent, item_inst.clone());
-                consume_item(p_inv, item_ent, command_buffer);
+                // [v3.0.0] deferred — 쿼리 빌림 종료 후 적용
+                deferred_add_item = Some((item_ent, item_inst.clone()));
+                deferred_consume = Some(item_ent);
+                p_inv.remove_item(item_ent);
             }
             ItemAction::Read(_) => {
                 log.add(format!("You read a {}.", display_name), log.current_turn);
@@ -689,32 +716,20 @@ pub fn item_use(
                     "Scroll of teleportation" => {
                         let mut rng = NetHackRng::new(log.current_turn);
                         if let Some(target) = player_ent {
-                            command_buffer.add_component(
-                                target,
-                                crate::core::systems::teleport::TeleportAction {
-                                    target,
-                                    is_level_tele: p_status.has(StatusFlags::CONFUSED)
-                                        || rng.rn2(10) == 0,
-                                },
-                            );
+                            // [v3.0.0] deferred — 쿼리 빌림 중 world.entry 불가
+                            deferred_teleport = Some((target, p_status.has(StatusFlags::CONFUSED)
+                                || rng.rn2(10) == 0));
                         }
                     }
                     "Scroll of level teleportation" => {
                         if let Some(target) = player_ent {
-                            command_buffer.add_component(
-                                target,
-                                crate::core::systems::teleport::TeleportAction {
-                                    target,
-                                    is_level_tele: true,
-                                },
-                            );
+                            deferred_teleport = Some((target, true));
                         }
                     }
                     "Scroll of magic mapping" => {
                         log.add("A map coalesces in your mind!", log.current_turn);
                         if let Some(p_ent) = player_ent {
-                            command_buffer
-                                .add_component(p_ent, crate::core::entity::MagicMapRequest);
+                            deferred_magic_map = Some(p_ent);
                         }
                     }
                     "Scroll of light" => {
@@ -834,8 +849,10 @@ pub fn item_use(
                 }
                 item_inst.known = true;
                 item_inst.bknown = true;
-                command_buffer.add_component(item_ent, item_inst.clone());
-                consume_item(p_inv, item_ent, command_buffer);
+                // [v3.0.0] deferred — 쿼리 빌림 종료 후 적용
+                deferred_add_item = Some((item_ent, item_inst.clone()));
+                deferred_consume = Some(item_ent);
+                p_inv.remove_item(item_ent);
             }
             ItemAction::Offer(item_ent) => {
                 let mut rng = NetHackRng::new(log.current_turn);
@@ -847,7 +864,6 @@ pub fn item_use(
                     &mut rng,
                     log,
                     log.current_turn,
-                    command_buffer,
                 ) {
                     //
                     let mut p_query = <&Position>::query().filter(component::<PlayerTag>());
@@ -900,14 +916,16 @@ pub fn item_use(
                     if !handled_by_sink {
                         log.add("You drop the item.", log.current_turn);
                         if let Some((px, py)) = p_pos {
-                            command_buffer.add_component(item_ent, Position { x: px, y: py });
+                            if let Some(mut e) = world.entry(item_ent) {
+                                e.add_component(Position { x: px, y: py });
+                            }
                         }
                     } else {
                         //
                         // SubWorld에서는 remove가 안 될 수 있음.
                         //
                         //
-                        command_buffer.remove(item_ent);
+                        world.remove(item_ent);
                     }
                 }
             }
@@ -945,16 +963,41 @@ pub fn item_use(
                 let mut identified = item.clone();
                 identified.known = true;
                 identified.bknown = true;
-                command_buffer.add_component(target_ent, identified);
+                if let Some(mut e) = world.entry(target_ent) {
+                    e.add_component(identified);
+                }
                 log.add("You identify an item.", log.current_turn);
             }
         }
     }
+
+    // [v3.0.0] deferred ops 적용 (쿼리 빌림 해제 후)
+    if let Some((ent, comp)) = deferred_add_item {
+        if let Some(mut e) = world.entry(ent) {
+            e.add_component(comp);
+        }
+    }
+    if let Some(ent) = deferred_consume {
+        world.remove(ent);
+    }
+    if let Some((target, is_level_tele)) = deferred_teleport {
+        if let Some(mut e) = world.entry(target) {
+            e.add_component(crate::core::systems::teleport::TeleportAction {
+                target,
+                is_level_tele,
+            });
+        }
+    }
+    if let Some(p_ent) = deferred_magic_map {
+        if let Some(mut e) = world.entry(p_ent) {
+            e.add_component(crate::core::entity::MagicMapRequest);
+        }
+    }
 }
 
-fn consume_item(inv: &mut Inventory, item_ent: Entity, command_buffer: &mut CommandBuffer) {
+fn consume_item(inv: &mut Inventory, item_ent: Entity, world: &mut legion::world::World) {
     if inv.items.contains(&item_ent) {
         inv.remove_item(item_ent);
     }
-    command_buffer.remove(item_ent);
+    world.remove(item_ent);
 }

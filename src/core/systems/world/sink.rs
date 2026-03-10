@@ -73,7 +73,7 @@ pub fn try_kick_sink(
 ///
 pub fn try_drop_into_sink(
     item_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut World,
     log: &mut GameLog,
     turn: u64,
 ) -> bool {

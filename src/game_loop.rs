@@ -367,7 +367,7 @@ impl super::NetHackApp {
                                 .get::<crate::core::systems::social::DefaultInteractionProvider>()
                         {
                             crate::core::systems::pray::try_pray(
-                                &mut subworld,
+                                &mut self.game.world,
                                 &self.game.grid,
                                 &mut log,
                                 turn,
@@ -1007,8 +1007,6 @@ impl super::NetHackApp {
             .flush()
             .add_system(crate::core::systems::ai::monster_ai_system())
             .flush()
-            .add_system(crate::core::systems::item_use::item_use_system())
-            .flush()
             .build();
 
         schedule.execute(&mut self.game.world, &mut self.game.resources);
@@ -1092,7 +1090,7 @@ impl super::NetHackApp {
                 &mut game_state,
             );
 
-            // [v3.0.0] 전환 완료 시스템 (27개)
+            // [v3.0.0] 전환 완료 시스템 (28개)
             crate::core::systems::ai::core::pet_hunger_system(&mut ctx);
             crate::core::systems::creature::equipment::update_player_stats_system(&mut ctx);
             crate::core::systems::creature::equipment::equipment_system(&mut ctx);
@@ -1104,6 +1102,7 @@ impl super::NetHackApp {
             crate::core::systems::social::shop::shopkeeper_update_system(&mut ctx);
             crate::core::systems::creature::death::death_system(&mut ctx);
             crate::core::systems::item::zap::zap_system(&mut ctx);
+            crate::core::systems::item::item_use::item_use_system(&mut ctx);
             crate::core::systems::world::vision_system::vision_update_system(&mut ctx);
             crate::core::systems::world::vision_system::magic_map_effect_system(&mut ctx);
             crate::core::systems::item::item_use::item_input_system(&mut ctx);

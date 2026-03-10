@@ -95,7 +95,7 @@ pub fn get_god_name(role: PlayerClass, align: Alignment) -> &'static str {
 /// 기도(Pray) 시스템
 /// 원본 NetHack의 pray.c 로직 이식
 pub fn try_pray(
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     grid: &Grid,
     log: &mut GameLog,
     turn: u64,
@@ -304,13 +304,12 @@ pub fn try_pray(
 /// 제물 바치기 (#offer)
 pub fn try_offer(
     item_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut legion::world::World,
     grid: &crate::core::dungeon::Grid,
     assets: &crate::assets::AssetManager,
     rng: &mut crate::util::rng::NetHackRng,
     log: &mut GameLog,
     turn: u64,
-    command_buffer: &mut CommandBuffer,
 ) -> Option<Alignment> {
     let mut player_pos = None;
     let mut p_level =
@@ -385,17 +384,8 @@ pub fn try_offer(
                     //
                     if p.luck >= 0 && p.piety >= 20 && rng.rn2(10) == 0 {
                         log.add_colored("신의 은총이 솟구치는 것을 느낍니다!", [255, 215, 0], turn);
-                        crate::core::systems::artifact::ArtifactSystem::gift_artifact(
-                            p.alignment,
-                            &mut World::default(),
-                            assets,
-                            player_entity,
-                            (px, py),
-                            p_level,
-                            log,
-                            turn,
-                            command_buffer,
-                        );
+                        // [v3.0.0] 아티팩트 선물은 GameContext 기반으로 이후 연동
+                        log.add("A divine gift materializes!", turn);
                         p.piety -= 15;
                     } else if p.piety > 25 {
                         p.luck = (p.luck + 1).min(10);
@@ -435,7 +425,7 @@ pub fn try_offer(
             }
 
             // 아이템 제거
-            command_buffer.remove(item_ent);
+            world.remove(item_ent);
 
             //
             let mut inv_query =
