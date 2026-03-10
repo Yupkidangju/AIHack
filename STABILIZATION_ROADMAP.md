@@ -1,7 +1,8 @@
 # 🛡️ AIHack 안정화 로드맵 v2.0 (STABILIZATION_ROADMAP)
 
-**버전**: v2.2
-**갱신일**: 2026-03-07
+**버전**: v2.3
+**갱신일**: 2026-03-10
+**이전 버전**: v2.2 (2026-03-07) — Phase E2 23/30 시스템 전환 완료
 **이전 버전**: v2.1 (2026-03-06) — Phase E2a/E2b 13/30 시스템 전환 완료
 **이전 버전**: v1.0 (2026-02-28) — Phase S0~S6 완료, S7 대기 상태
 **대상 브랜치**: `stabilize/e2e-playable`
@@ -104,11 +105,11 @@ Phase E5: LLM 실제 주입 + 대화/내러티브/적응형 AI
 
 ---
 
-### Phase E2: 시스템 전환 (30개 → 일반 함수) — **23/30 완료 (76.7%)**
+### Phase E2: 시스템 전환 (30개 → 일반 함수) — ✅ **30/30 완료 (100%) (2026-03-10)**
 
 **목표**: 모든 `#[system]` / `#[legion::system]` 매크로 시스템을 `fn system_name(ctx: &mut GameContext)` 시그니처로 전환
 
-**전환 상태 (2026-03-07 기준)**:
+**전환 상태 (2026-03-10 최종)**:
 
 | # | 파일 | 시스템 | 상태 | 비고 |
 |---|------|--------|------|------|
@@ -135,13 +136,13 @@ Phase E5: LLM 실제 주입 + 대화/내러티브/적응형 AI
 | 21 | throw.rs | throw | ✅ | E2c, **command_buffer 제거** |
 | 22 | teleport.rs | teleport | ✅ | E2c, LevelChange |
 | 23 | stairs.rs | stairs | ✅ | E2c, SystemBuilder 제거 |
-| 24 | movement.rs | movement | ⏳ | E2c, 1310줄 대형 |
-| 25 | ai/core.rs | monster_ai | ⏳ | E2c, 680줄 대형 |
-| 26 | trap.rs | trap_trigger | ⏳ | E2c |
-| 27 | death.rs | death | ⏳ | E2c, GameState 필요 |
-| 28 | item_use.rs | item_use | ⏳ | E2c, GameState/IdentityTable/CommandBuffer |
-| 29 | zap.rs | zap | ⏳ | E2c, CommandBuffer |
-| 30 | shop.rs | shopkeeper_update | ⏳ | E2c, InteractionProvider/CommandBuffer |
+| 24 | trap.rs | trap_trigger | ✅ | E2d |
+| 25 | death.rs | death | ✅ | E2d, GameState |
+| 26 | shop.rs | shopkeeper_update | ✅ | E2e, InteractionProvider |
+| 27 | zap.rs | zap | ✅ | E2f, CommandBuffer→World |
+| 28 | item_use.rs | item_use | ✅ | E2f, **deferred ops 패턴** |
+| 29 | ai/core.rs | monster_ai | ✅ | E2f, 680줄 대형 전환 |
+| 30 | movement.rs | movement | ✅ | E2f, 1310줄 대형 전환 |
 
 **전환 절차 (각 시스템)**:
 1. `#[system]` / `#[legion::system]` 매크로 제거
@@ -162,9 +163,15 @@ Phase E5: LLM 실제 주입 + 대화/내러티브/적응형 AI
 - `let world = &mut *ctx.world;` 패턴은 ctx 전체 borrow를 잡으므로, `ctx.필드` 직접 참조가 바람직
 - Rust struct 다른 필드 동시 mutable borrow는 허용되므로 활용 가능
 
-**판정 기준**: 30개 전체 전환 + `cargo build` 성공 + 기존 E2E 테스트 통과
+**판정 결과**: ✅ 30개 전체 전환 + `cargo check` 성공 (0 에러) + 4,178개 테스트 전체 통과
 
-**예상 소요**: 12~20시간 (시스템당 20~40분)
+**실제 소요**: 약 15시간 (E2a~E2f, 5세션에 걸쳐 완료)
+
+**추가 교훈 (2026-03-09~10)**:
+- ⚠️ `CommandBuffer::flush`는 legion 0.4에서 `(world, resources)` 2개 인수 — `resources` 없이 불가 → 직접 제거
+- ⚠️ deferred ops 패턴: 쿼리 `iter_mut` 빌림 중 `world.entry()` 호출 불가 → Vec에 수집 후 적용
+- ⚠️ Schedule 완전 제거 시 `schedule.execute()` 호출도 함께 제거해야 함
+- ✅ `ctx.cmd` 필드를 활용하면 action_queue에서 Move를 추출할 필요 없음
 
 ---
 

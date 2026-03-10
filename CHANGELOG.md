@@ -3,6 +3,15 @@
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
 
+## [3.0.0-alpha.2] - 2026-03-10
+### Changed
+- **[Phase E2 완료!] 30/30 시스템 전환 (100%) — Legion Schedule 완전 제거**
+  - `trap_trigger`, `death`, `shopkeeper_update`, `zap`, `item_use`, `monster_ai`, `movement` (E2d~E2f 7개)
+- **Legion Schedule 완전 제거**: `Schedule::builder()...execute()` 전체 삭제
+- **연쇄 전환**: apply.rs, pray.rs, sink.rs, item_damage.rs, engine.rs — SubWorld→World
+- **game_loop.rs**: `schedule.execute()` 삭제, 30개 시스템 모두 GameContext 순차 호출
+- **빌드**: 0 에러 / **테스트**: 4,178개 전체 통과
+
 ## [3.0.0-alpha.1] - 2026-03-07
 ### Changed
 - **[Phase E1 완료] GameContext 구조체 정의 및 TurnRunner 구현** (`src/core/context.rs`)
