@@ -1002,15 +1002,10 @@ impl super::NetHackApp {
         // 중요: catch_unwind를 사용하면 Legion의 내부 borrow guard가
         // 해제되지 않아 World 전체가 AccessDenied 상태에 빠집니다.
         // 패닉 방지는 시스템 내부에서 처리해야 합니다.
-        let mut schedule = Schedule::builder()
-            .add_system(crate::core::systems::movement::movement_system())
-            .flush()
-            .add_system(crate::core::systems::ai::monster_ai_system())
-            .flush()
-            .build();
+        // [v3.0.0] Schedule 완전 제거 — 모든 시스템이 GameContext 기반
+        // movement 및 monster_ai는 아래 GameContext 호출 체인에서 실행
 
-        schedule.execute(&mut self.game.world, &mut self.game.resources);
-
+        // [v3.0.0] Schedule 완전 제거 완료 — 모든 시스템이 GameContext 기반
         // ====================================================================
         // [v3.0.0 Phase E2] GameContext 기반 전환 시스템 실행부 (13개)
         // Schedule에서 제거된 시스템들을 여기서 순차 실행한다.
@@ -1090,7 +1085,9 @@ impl super::NetHackApp {
                 &mut game_state,
             );
 
-            // [v3.0.0] 전환 완료 시스템 (28개)
+            // [v3.0.0] 전환 완료 시스템 (30/30)
+            crate::core::systems::creature::movement::movement(&mut ctx);
+            crate::core::systems::ai::core::monster_ai(&mut ctx);
             crate::core::systems::ai::core::pet_hunger_system(&mut ctx);
             crate::core::systems::creature::equipment::update_player_stats_system(&mut ctx);
             crate::core::systems::creature::equipment::equipment_system(&mut ctx);

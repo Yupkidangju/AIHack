@@ -20,46 +20,33 @@ use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use legion::*;
 
-/// 엔티티 이동 및 충돌 판정 시스템
-#[legion::system]
-#[read_component(PlayerTag)]
-#[read_component(MonsterTag)]
-#[write_component(Position)]
-#[read_component(CombatStats)]
-#[write_component(Health)]
-#[write_component(Player)]
-#[read_component(StatusBundle)]
-#[read_component(Equipment)]
-#[read_component(Monster)]
-#[read_component(MonsterState)]
-#[read_component(Level)]
-#[write_component(Item)]
-#[write_component(Inventory)]
-#[read_component(crate::core::entity::BoulderTag)]
-#[read_component(crate::core::entity::StatueTag)]
-#[read_component(crate::core::entity::Trap)]
-#[read_component(crate::core::entity::TrapTag)]
-#[read_component(crate::core::entity::StructureTag)]
-#[write_component(crate::core::entity::Structure)]
-// [v2.42.2] CommandBuffer.push()에서 사용하는 컴포넌트 선언 추가
-// 이 누락이 Legion AccessDenied 패닉의 근본 원인이었습니다.
-#[write_component(Renderable)]
-#[write_component(Species)]
-#[write_component(Talkative)]
-pub fn movement(
-    world: &mut SubWorld,
-    #[resource] grid: &mut Grid,
-    #[resource] cmd: &crate::ui::input::Command,
-    #[resource] rng: &mut NetHackRng,
-    #[resource] log: &mut GameLog,
-    #[resource] turn: &u64,
-    #[resource] assets: &AssetManager,
-    #[resource] event_queue: &mut EventQueue, // [v2.0.0 R5] 전투 이벤트 발행
-    command_buffer: &mut CommandBuffer,
-) {
+/// [v3.0.0] GameContext 기반 전환 완료 (이동 시스템)
+pub fn movement(ctx: &mut crate::core::context::GameContext) {
+    let crate::core::context::GameContext {
+        world,
+        grid,
+        log,
+        event_queue,
+        assets,
+        turn,
+        cmd,
+        ..
+    } = ctx;
+    let world = &mut **world;
+    let grid = &mut **grid;
+    let log = &mut **log;
+    let assets = &**assets;
+    let event_queue = &mut **event_queue;
+    let turn = *turn;
+    let mut rng = NetHackRng::new(turn);
+    let rng = &mut rng;
+
+    // [v3.0.0] ctx.cmd에서 직접 읽기
+    let cmd = cmd;
+
     if *cmd == Command::Unknown || *cmd == Command::Wait {
         if *cmd == Command::Wait {
-            log.add("Time passes...", *turn);
+            log.add("Time passes...", turn);
         }
         return;
     }
@@ -125,7 +112,7 @@ pub fn movement(
 
         // 수면 또는 마비 상태 체크
         if flags.intersects(StatusFlags::SLEEPING | StatusFlags::PARALYZED) {
-            log.add("You are unable to move!", *turn);
+            log.add("You are unable to move!", turn);
             continue;
         }
 
@@ -140,19 +127,19 @@ pub fn movement(
                         TrapType::BearTrap => {
                             if rng.rn2(100) < 70 {
                                 // 70% 확률로 탈출 불가
-                                log.add("You are stuck in a bear trap!", *turn);
+                                log.add("You are stuck in a bear trap!", turn);
                                 restrained = true;
                             } else {
-                                log.add("You break free from the bear trap!", *turn);
+                                log.add("You break free from the bear trap!", turn);
                             }
                         }
                         TrapType::Web => {
                             if rng.rn2(100) < 50 {
                                 // 50% 확률로 탈출 불가
-                                log.add("You are entangled in a web!", *turn);
+                                log.add("You are entangled in a web!", turn);
                                 restrained = true;
                             } else {
-                                log.add("You tear through the web!", *turn);
+                                log.add("You tear through the web!", turn);
                             }
                         }
                         _ => {}
@@ -173,7 +160,7 @@ pub fn movement(
                 move_dx = rng.rn2(3) - 1;
                 move_dy = rng.rn2(3) - 1;
                 if move_dx == 0 && move_dy == 0 {
-                    log.add("You stagger around...", *turn);
+                    log.add("You stagger around...", turn);
                     continue;
                 }
             }
@@ -200,7 +187,7 @@ pub fn movement(
         }
 
         if let Some(s_ent) = target_structure {
-            if let Ok(mut entry) = world.entry_mut(s_ent) {
+            if let Some(mut entry) = world.entry(s_ent) {
                 if let Ok(mut s_comp) = entry.get_component_mut::<crate::core::entity::Structure>()
                 {
                     let (dmg, destroyed) = CombatEngine::attack_structure(rng, &mut s_comp);
@@ -208,9 +195,9 @@ pub fn movement(
                         crate::core::entity::StructureType::CommBase => "communication antenna",
                         crate::core::entity::StructureType::SupplyDepot => "supply depot",
                     };
-                    log.add(format!("You hit the {} for {} damage.", s_name, dmg), *turn);
+                    log.add(format!("You hit the {} for {} damage.", s_name, dmg), turn);
                     if destroyed {
-                        log.add(format!("The {} collapses!", s_name), *turn);
+                        log.add(format!("The {} collapses!", s_name), turn);
                         // 파괴 처리는 ai.rs의 Structure Destruction Pass에서 처리됨 (integrity <= 0)
                     }
                 }
@@ -347,14 +334,14 @@ pub fn movement(
 
                     if hit {
                         // 스킬 연습
-                        if let Ok(mut p_entry) = world.entry_mut(p_ent) {
+                        if let Some(mut p_entry) = world.entry(p_ent) {
                             if let Ok(player_mut) = p_entry.get_component_mut::<Player>() {
                                 let skill = CombatEngine::get_weapon_skill(
                                     player_mut,
                                     weapon_info.as_ref().map(|(_, t)| t),
                                 );
                                 CombatEngine::practice_weapon_skill(
-                                    player_mut, skill, 1, log, *turn,
+                                    player_mut, skill, 1, log, turn,
                                 );
                                 // 쌍수 스킬 연습
                                 if is_offhand || p_player.two_weapon {
@@ -363,13 +350,13 @@ pub fn movement(
                                         WeaponSkill::TwoWeapon,
                                         1,
                                         log,
-                                        *turn,
+                                        turn,
                                     );
                                 }
                             }
                         }
 
-                        if let Ok(mut m_entry) = world.entry_mut(m_ent) {
+                        if let Some(mut m_entry) = world.entry(m_ent) {
                             if let Ok(m_health) = m_entry.get_component_mut::<Health>() {
                                 m_health.current -= dmg;
                                 if m_health.current <= 0 {
@@ -377,7 +364,7 @@ pub fn movement(
                                 }
                                 log.add(
                                     format!("You hit the {} for {} damage!", m_display_name, dmg),
-                                    *turn,
+                                    turn,
                                 );
                             }
                         }
@@ -396,21 +383,11 @@ pub fn movement(
 
                         // 수동형 반격 처리
                         CombatEngine::passive(
-                            rng,
-                            world,
-                            p_ent,
-                            &p_player,
-                            m_tmpl_ptr,
-                            true,
-                            m_dead,
-                            log,
-                            turn,
-                            assets,
-                            command_buffer,
-                            p_level.0,
+                            rng, world, p_ent, &p_player, m_tmpl_ptr, true, m_dead, log, turn,
+                            assets, p_level.0,
                         );
                     } else {
-                        log.add(format!("You miss the {}.", m_display_name), *turn);
+                        log.add(format!("You miss the {}.", m_display_name), turn);
 
                         // [v2.0.0 R5] AttackMissed 이벤트 발행
                         event_queue.push(GameEvent::AttackMissed {
@@ -452,9 +429,9 @@ pub fn movement(
                     }
 
                     if let Some((sx, sy)) = split_pos {
-                        log.add(format!("The {} splits!", m_display_name), *turn);
+                        log.add(format!("The {} splits!", m_display_name), turn);
                         let hp = (m_tmpl_ptr.level as i32).max(1) * 4;
-                        command_buffer.push((
+                        let _ = world.push((
                             MonsterTag,
                             Species {
                                 current: m_tmpl_ptr.name.clone(),
@@ -487,12 +464,12 @@ pub fn movement(
                 // [v2.42.0] 템플릿을 찾지 못한 몬스터에 대한 폴백 공격
                 // 기본 맨손 데미지(1d4)를 적용하여 플레이어가 몬스터를 관통하는 버그 방지
                 let base_dmg = rng.rn2(4) + 1;
-                if let Ok(mut m_entry) = world.entry_mut(m_ent) {
+                if let Some(mut m_entry) = world.entry(m_ent) {
                     if let Ok(m_health) = m_entry.get_component_mut::<Health>() {
                         m_health.current -= base_dmg;
                         log.add(
                             format!("You hit the {} for {} damage!", m_display_name, base_dmg),
-                            *turn,
+                            turn,
                         );
                     }
                 }
@@ -527,7 +504,7 @@ pub fn movement(
 
         if let Some((o_ent, kind, pushable, o_name)) = obstacle_found {
             if kind == "statue" {
-                log.add(format!("There is a statue ({}) in the way.", o_name), *turn);
+                log.add(format!("There is a statue ({}) in the way.", o_name), turn);
                 continue;
             }
             if kind == "boulder" && pushable {
@@ -562,11 +539,11 @@ pub fn movement(
 
                 if can_push {
                     if p_player.str.base < 6 {
-                        log.add("바위를 밀기에는 힘이 부족합니다.", *turn);
+                        log.add("바위를 밀기에는 힘이 부족합니다.", turn);
                         continue;
                     }
 
-                    log.add("바위를 밀어냅니다.", *turn);
+                    log.add("바위를 밀어냅니다.", turn);
 
                     // 함정 메우기 체크
                     let mut trap_to_fill = None;
@@ -582,24 +559,28 @@ pub fn movement(
                     }
 
                     if let Some(t_ent) = trap_to_fill {
-                        log.add("The boulder fills the hole.", *turn);
-                        command_buffer.remove(t_ent);
-                        command_buffer.remove(o_ent);
+                        log.add("The boulder fills the hole.", turn);
+                        world.remove(t_ent);
+                        world.remove(o_ent);
                     } else if let Some(target_tile) = grid.get_tile_mut(tnx as usize, tny as usize)
                     {
                         if target_tile.typ == TileType::Pool || target_tile.typ == TileType::Moat {
-                            log.add("The boulder fills the water.", *turn);
+                            log.add("The boulder fills the water.", turn);
                             target_tile.typ = TileType::Room;
-                            command_buffer.remove(o_ent);
+                            world.remove(o_ent);
                         } else {
-                            command_buffer.add_component(o_ent, Position { x: tnx, y: tny });
+                            if let Some(mut oe) = world.entry(o_ent) {
+                                oe.add_component(Position { x: tnx, y: tny });
+                            }
                         }
                     } else {
-                        command_buffer.add_component(o_ent, Position { x: tnx, y: tny });
+                        if let Some(mut oe) = world.entry(o_ent) {
+                            oe.add_component(Position { x: tnx, y: tny });
+                        }
                     }
 
                     //
-                    if let Ok(mut p_entry) = world.entry_mut(p_ent) {
+                    if let Some(mut p_entry) = world.entry(p_ent) {
                         if let Ok(pos) = p_entry.get_component_mut::<Position>() {
                             pos.x = nx;
                             pos.y = ny;
@@ -607,7 +588,7 @@ pub fn movement(
                     }
                     continue;
                 } else {
-                    log.add("The boulder is stuck.", *turn);
+                    log.add("The boulder is stuck.", turn);
                     continue;
                 }
             }
@@ -627,7 +608,7 @@ pub fn movement(
         }
 
         if door_opened {
-            log.add("You open the door.", *turn);
+            log.add("You open the door.", turn);
             continue;
         }
 
@@ -698,7 +679,7 @@ pub fn movement(
                     &items_to_process,
                     item_protection,
                     log,
-                    *turn,
+                    turn,
                     true,
                     &assets.items,
                     rng,
@@ -706,11 +687,11 @@ pub fn movement(
             }
 
             if let Some(msg) = message {
-                log.add(msg, *turn);
+                log.add(msg, turn);
             }
 
             if die {
-                if let Ok(mut p_entry) = world.entry_mut(p_ent) {
+                if let Some(mut p_entry) = world.entry(p_ent) {
                     if let Ok(health) = p_entry.get_component_mut::<Health>() {
                         health.current = 0;
                     }
@@ -730,7 +711,7 @@ pub fn movement(
                     if snx >= 0 && snx < 80 && sny >= 0 && sny < 21 {
                         if let Some(stile) = grid.get_tile(snx as usize, sny as usize) {
                             if !stile.typ.is_wall() && stile.typ != TileType::Stone {
-                                log.add("You slip on the ice!", *turn);
+                                log.add("You slip on the ice!", turn);
                                 final_nx = snx;
                                 final_ny = sny;
                             }
@@ -738,7 +719,7 @@ pub fn movement(
                     }
                 }
 
-                if let Ok(mut p_entry) = world.entry_mut(p_ent) {
+                if let Some(mut p_entry) = world.entry(p_ent) {
                     if let Ok(pos) = p_entry.get_component_mut::<Position>() {
                         pos.x = final_nx;
                         pos.y = final_ny;
@@ -747,13 +728,13 @@ pub fn movement(
                         if let Some(tile) = grid.get_tile(final_nx as usize, final_ny as usize) {
                             match tile.typ {
                                 TileType::StairsUp => {
-                                    log.add("You see some stairs leading up here.", *turn);
+                                    log.add("You see some stairs leading up here.", turn);
                                 }
                                 TileType::StairsDown => {
-                                    log.add("You see some stairs leading down here.", *turn);
+                                    log.add("You see some stairs leading down here.", turn);
                                 }
                                 TileType::Ladder => {
-                                    log.add("You see a ladder leading down.", *turn);
+                                    log.add("You see a ladder leading down.", turn);
                                 }
                                 _ => {}
                             }
@@ -762,7 +743,7 @@ pub fn movement(
                 }
             }
         } else {
-            log.add("You bump into a wall.", *turn);
+            log.add("You bump into a wall.", turn);
         }
     }
 
@@ -793,7 +774,7 @@ pub fn movement(
 
         //
         if !nearby_monster_templates.is_empty() {
-            if let Ok(mut entry) = world.entry_mut(p_ent) {
+            if let Some(mut entry) = world.entry(p_ent) {
                 //
                 for template in nearby_monster_templates {
                     let p_status_flags = entry
@@ -807,7 +788,7 @@ pub fn movement(
                             &p_status_flags,
                             template,
                             log,
-                            *turn,
+                            turn,
                         );
                     }
                 }

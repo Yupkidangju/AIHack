@@ -123,7 +123,7 @@ impl ItemDamageSystem {
     /// 물 노출에 의한 아이템 손상 (재귀적 처리)
     ///
     pub fn water_exposure_recursive(
-        world: &mut legion::world::SubWorld,
+        world: &mut legion::world::World,
         inventory_items: &[legion::Entity],
         protection_chance: i32,
         log: &mut GameLog,
@@ -163,7 +163,7 @@ impl ItemDamageSystem {
             }
 
             // 개별 아이템 데미지 처리
-            if let Ok(mut entry) = world.entry_mut(item_ent) {
+            if let Some(mut entry) = world.entry(item_ent) {
                 if let Ok(item) = entry.get_component_mut::<Item>() {
                     if let Some(it) = item_manager.get_by_kind(item.kind) {
                         if it.class == ItemClass::Potion && item.kind != ItemKind::Water {

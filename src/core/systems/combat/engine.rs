@@ -460,16 +460,15 @@ impl CombatEngine {
     ///
     pub fn passive(
         rng: &mut NetHackRng,
-        world: &mut SubWorld,
+        world: &mut legion::world::World,
         p_ent: Entity,
         _player_clone: &Player,
         monster_tmpl: &MonsterTemplate,
         hit: bool,
         dead: bool,
         log: &mut crate::ui::log::GameLog,
-        turn: &u64,
+        turn: u64,
         _assets: &crate::assets::AssetManager,
-        _command_buffer: &mut CommandBuffer,
         _p_level: crate::core::dungeon::LevelID,
     ) {
         if dead {
@@ -502,15 +501,15 @@ impl CombatEngine {
                     DamageType::Acid => {
                         if hit && rng.rn2(2) == 0 {
                             if has_gloves {
-                                log.add("Your gloves protect you from the acid.", *turn);
+                                log.add("Your gloves protect you from the acid.", turn);
                             } else {
                                 log.add_colored(
                                     format!("The {}'s acid splashes you!", monster_tmpl.name),
                                     [100, 255, 100],
-                                    *turn,
+                                    turn,
                                 );
                                 let dmg = rng.d(attack.dice as i32, attack.sides as i32);
-                                if let Ok(mut entry) = world.entry_mut(p_ent) {
+                                if let Some(mut entry) = world.entry(p_ent) {
                                     if let Ok(health) = entry.get_component_mut::<Health>() {
                                         health.current -= dmg;
                                     }
@@ -523,10 +522,10 @@ impl CombatEngine {
                             log.add_colored(
                                 format!("The {} is burning hot!", monster_tmpl.name),
                                 [255, 100, 0],
-                                *turn,
+                                turn,
                             );
                             let dmg = rng.d(attack.dice as i32, attack.sides as i32);
-                            if let Ok(mut entry) = world.entry_mut(p_ent) {
+                            if let Some(mut entry) = world.entry(p_ent) {
                                 if let Ok(health) = entry.get_component_mut::<Health>() {
                                     health.current -= dmg;
                                 }
@@ -538,10 +537,10 @@ impl CombatEngine {
                             log.add_colored(
                                 format!("The {} is freezing cold!", monster_tmpl.name),
                                 [100, 100, 255],
-                                *turn,
+                                turn,
                             );
                             let dmg = rng.d(attack.dice as i32, attack.sides as i32);
-                            if let Ok(mut entry) = world.entry_mut(p_ent) {
+                            if let Some(mut entry) = world.entry(p_ent) {
                                 if let Ok(health) = entry.get_component_mut::<Health>() {
                                     health.current -= dmg;
                                 }
@@ -553,10 +552,10 @@ impl CombatEngine {
                             log.add_colored(
                                 format!("The {} shocks you!", monster_tmpl.name),
                                 [255, 255, 0],
-                                *turn,
+                                turn,
                             );
                             let dmg = rng.d(attack.dice as i32, attack.sides as i32);
-                            if let Ok(mut entry) = world.entry_mut(p_ent) {
+                            if let Some(mut entry) = world.entry(p_ent) {
                                 if let Ok(health) = entry.get_component_mut::<Health>() {
                                     health.current -= dmg;
                                 }
@@ -569,9 +568,9 @@ impl CombatEngine {
                             log.add_colored(
                                 format!("You are frozen by the {}'s gaze!", monster_tmpl.name),
                                 [200, 200, 255],
-                                *turn,
+                                turn,
                             );
-                            if let Ok(mut entry) = world.entry_mut(p_ent) {
+                            if let Some(mut entry) = world.entry(p_ent) {
                                 if let Ok(status) = entry
                                     .get_component_mut::<crate::core::entity::status::StatusBundle>(
                                     )
@@ -589,9 +588,9 @@ impl CombatEngine {
                             log.add_colored(
                                 format!("Touching the {} stones you!", monster_tmpl.name),
                                 [200, 200, 200],
-                                *turn,
+                                turn,
                             );
-                            if let Ok(mut entry) = world.entry_mut(p_ent) {
+                            if let Some(mut entry) = world.entry(p_ent) {
                                 if let Ok(health) = entry.get_component_mut::<Health>() {
                                     health.current = 0; // 즉사
                                 }
@@ -607,7 +606,7 @@ impl CombatEngine {
                                 _assets,
                                 DamageType::Rust,
                                 log,
-                                *turn,
+                                turn,
                             );
                         }
                     }
@@ -620,15 +619,15 @@ impl CombatEngine {
                                 _assets,
                                 DamageType::Corr,
                                 log,
-                                *turn,
+                                turn,
                             );
                         }
                     }
                     DamageType::Drli => {
                         // 레벨 드레인 (AD_DRLI)
                         if hit && rng.rn2(3) == 0 {
-                            log.add_colored(format!("You feel weaker!"), [150, 0, 150], *turn);
-                            if let Ok(mut entry) = world.entry_mut(p_ent) {
+                            log.add_colored(format!("You feel weaker!"), [150, 0, 150], turn);
+                            if let Some(mut entry) = world.entry(p_ent) {
                                 if let Ok(p) = entry.get_component_mut::<Player>() {
                                     if p.exp_level > 1 {
                                         p.exp_level -= 1;
@@ -651,7 +650,7 @@ impl CombatEngine {
     /// 장비 손상 처리 (rust, corrosion 등)
     pub fn damage_equipment(
         rng: &mut NetHackRng,
-        world: &mut SubWorld,
+        world: &mut legion::world::World,
         p_ent: Entity,
         assets: &crate::assets::AssetManager,
         damage_type: DamageType,
@@ -670,7 +669,7 @@ impl CombatEngine {
         }
 
         if let Some(item_ent) = equipment_ent {
-            if let Ok(mut entry) = world.entry_mut(item_ent) {
+            if let Some(mut entry) = world.entry(item_ent) {
                 if let Ok(item) = entry.get_component_mut::<crate::core::entity::Item>() {
                     if let Some(tmpl) = assets.items.get_by_kind(item.kind) {
                         use crate::core::systems::item_damage::ItemDamageSystem;
@@ -861,7 +860,7 @@ impl CombatEngine {
 
     /// 광역 폭발 처리 (AttackType::Explode, Boom 및 화염 마법 대응)
     pub fn execute_explosion(
-        world: &mut SubWorld,
+        world: &mut legion::world::World,
         pos: (i32, i32),
         dtype: DamageType,
         dice: (i32, i32),
@@ -914,7 +913,7 @@ impl CombatEngine {
         }
 
         for (ent, dmg, is_player) in affected {
-            if let Ok(mut entry) = world.entry_mut(ent) {
+            if let Some(mut entry) = world.entry(ent) {
                 if let Ok(h) = entry.get_component_mut::<Health>() {
                     if dmg > 0 {
                         h.current -= dmg;
