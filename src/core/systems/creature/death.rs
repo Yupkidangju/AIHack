@@ -325,6 +325,27 @@ pub fn death_system(ctx: &mut crate::core::context::GameContext) {
         if player_dead {
             use crate::core::systems::social::InteractionProvider;
             let cause_str = format!("killed on level {} of the Dungeon", player_level.depth);
+
+            // [v3.0.0 E4] LLM 비동기 묘비 생성 (턴 블로킹 없음)
+            if let Some(llm) = &ctx.llm {
+                let prompt = format!(
+                    "Write a creative, darkly humorous tombstone epitaph for a roguelike game.\n\
+                     Player: Adventurer\nCause of death: {}\nDungeon level: {}\n\
+                     Rules: 1-2 sentences, darkly funny, in the style of NetHack.\n\
+                     Reply with ONLY the epitaph text, no quotes.",
+                    cause_str, player_level.depth
+                );
+                let _request = llm.generate_async(prompt, 60);
+                // TODO: 향후 GameOver 화면에서 request.try_get()으로 결과 폴링
+                // 현재는 폴백 텍스트를 즉시 표시하고, LLM 응답은 로그에 추가 예정
+                log.add_colored(
+                    "[AI] 묘비를 새기는 중...",
+                    [180, 180, 255],
+                    turn_val,
+                );
+            }
+
+            // 폴백: 기존 하드코딩 묘비 (LLM 없거나 응답 대기 중에도 표시)
             let epitaph = provider.generate_death_epitaph(&cause_str, "You");
             log.add_colored(&epitaph, [255, 0, 0], turn_val);
 
