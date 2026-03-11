@@ -132,109 +132,11 @@ fn create_test_world() -> (World, Resources, Grid) {
     (world, resources, grid)
 }
 
-/// 턴 시스템을 하나씩 추가하며 실행하는 안전 테스트
-/// STABILIZATION_ROADMAP Phase S3 전략:
-/// "execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅"
-fn run_schedule_safe(world: &mut World, resources: &mut Resources, system_count: usize) {
-    let mut builder = Schedule::builder();
-
-    // 시스템 목록을 하나씩 활성화
-    if system_count >= 1 {
-        builder.add_system(aihack::core::systems::movement::movement_system());
-        builder.flush();
-    }
-    if system_count >= 2 {
-        builder
-;
-        builder.flush();
-    }
-    if system_count >= 3 {
-        builder.add_system(aihack::core::systems::ai::monster_ai_system());
-        builder.flush();
-    }
-    // [v3.0.0] luck_maintenance  GameContext로 전환됨 (system_count 4  건너뜀)
-    if system_count >= 5 {
-        builder.add_system(aihack::core::systems::engrave::engrave_tick_system());
-        builder.flush();
-    }
-    // [v3.0.0] trap_trigger_system은 GameContext로 전환됨 (system_count 6 건너뜀)
-    // [v3.0.0] death_system은 GameContext로 전환됨 (system_count 7 건너뜀)
-    if system_count >= 8 {
-        builder
-;
-        builder.flush();
-    }
-    if system_count >= 9 {
-        builder
-;
-        builder.flush();
-    }
-    if system_count >= 10 {
-        builder.add_system(aihack::core::systems::inventory::autopickup_tick_system());
-        builder.flush();
-    }
-    if system_count >= 11 {
-        builder.add_system(aihack::core::systems::inventory::inventory_action_system());
-        builder.flush();
-    }
-    if system_count >= 12 {
-        builder.add_system(aihack::core::systems::item_use::item_input_system());
-        builder.flush();
-    }
-    if system_count >= 13 {
-        builder.add_system(aihack::core::systems::item_use::item_use_system());
-        builder.flush();
-    }
-    if system_count >= 14 {
-        builder.add_system(aihack::core::systems::equipment::equipment_system());
-        builder.flush();
-    }
-    if system_count >= 15 {
-        builder
-;
-        builder.flush();
-    }
-    if system_count >= 16 {
-        builder.add_system(aihack::core::systems::throw::throw_system());
-        builder.flush();
-    }
-    if system_count >= 17 {
-        builder.add_system(aihack::core::systems::zap::zap_system());
-        builder.flush();
-    }
-    if system_count >= 18 {
-        builder.add_system(aihack::core::systems::teleport::teleport_system());
-        builder.flush();
-    }
-    if system_count >= 19 {
-        builder
-;
-        builder.flush();
-    }
-    // [v3.0.0] stairs_system은 GameContext로 전환됨 (system_count 20 건너뜀)
-    // [v3.0.0] status_tick  GameContext로 전환됨 (system_count 21  건너뜀)
-    // [v3.0.0] attrib_maintenance  GameContext로 전환됨 (system_count 22  건너뜀)
-    // [v3.0.0] timeout_dialogue  GameContext로 전환됨 (system_count 23  건너뜀)
-    // [v3.0.0] item_tick  GameContext로 전환됨 (system_count 24  건너뜀)
-    // [v3.0.0] regeneration  GameContext로 전환됨 (system_count 25  건너뜀)
-    // [v3.0.0] monster_regeneration  GameContext로 전환됨 (system_count 26  건너뜀)
-    if system_count >= 27 {
-        builder.add_system(aihack::core::systems::evolution::evolution_tick_system());
-        builder.flush();
-    }
-    if system_count >= 28 {
-        builder.add_system(aihack::core::systems::evolution::lycanthropy_tick_system());
-        builder.flush();
-    }
-    // [v3.0.0] shopkeeper_update_system은 GameContext로 전환됨 (system_count 29 건너뜀)
-    if system_count >= 30 {
-        builder.add_system(aihack::core::systems::weight::update_encumbrance_system());
-        builder.flush();
-    }
-
-    let mut schedule = builder.build();
-    schedule.execute(world, resources);
+/// [v3.0.0] Schedule 완전 제거 - 호환성 no-op (퍼징은 e3_integration.rs에서)
+fn run_schedule_safe(_world: &mut World, _resources: &mut Resources, _system_count: usize) {
+    // 모든 시스템이 GameContext로 전환됨. 실제 테스트는 e3_integration.rs 참조
 }
+
 
 // ===================== 테스트 케이스 =====================
 

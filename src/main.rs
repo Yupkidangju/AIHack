@@ -34,8 +34,15 @@ use app::NetHackApp;
 use eframe::egui;
 
 /// [v2.3.0 M8] 공통 상수
-pub const APP_VERSION: &str = "2.3.0";
+pub const APP_VERSION: &str = "3.0.0-alpha.2";
 pub const APP_TITLE: &str = "AIHack";
+
+// [v3.0.0 E3] Panic Hook용 글로벌 진단 정보
+// 패닅 발생 시 seed, turn, last_command를 덤프하기 위해
+// AtomicU64로 추적 (성능 영향 무시 가능)
+pub static DIAG_SEED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub static DIAG_TURN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub static DIAG_CMD: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 // ======================================================================
 //
@@ -88,9 +95,7 @@ impl eframe::App for NetHackApp {
 }
 
 fn main() -> eframe::Result<()> {
-    // [v2.42.3] 외부 감사 반영: Fail-Fast 패닉 훅
-    // Legion ECS 환경에서 catch_unwind는 borrow guard를 오염시키므로,
-    // 패닉 시 진단 정보를 덤프하고 깨끗하게 종료하는 것이 유일한 안전 대안.
+    // [v3.0.0 E3] Panic Hook 강화: seed, turn, last_command 정보 추가
     std::panic::set_hook(Box::new(|info| {
         let backtrace = std::backtrace::Backtrace::force_capture();
         let msg = if let Some(s) = info.payload().downcast_ref::<String>() {
@@ -105,10 +110,26 @@ fn main() -> eframe::Result<()> {
             .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
             .unwrap_or_else(|| "unknown".to_string());
 
+        // [v3.0.0 E3] 글로벌 진단 정보 수집
+        let seed = DIAG_SEED.load(std::sync::atomic::Ordering::Relaxed);
+        let turn = DIAG_TURN.load(std::sync::atomic::Ordering::Relaxed);
+        let cmd_val = DIAG_CMD.load(std::sync::atomic::Ordering::Relaxed);
+
         // 크래시 덤프 파일 생성
         let dump = format!(
-            "=== AIHack Crash Dump ===\nTime: {:?}\nLocation: {}\nMessage: {}\n\nBacktrace:\n{}",
+            "=== AIHack Crash Dump (v{}) ===\n\
+             Time: {:?}\n\
+             Seed: {}\n\
+             Turn: {}\n\
+             Last Command ID: {}\n\
+             Location: {}\n\
+             Message: {}\n\
+             \nBacktrace:\n{}",
+            APP_VERSION,
             std::time::SystemTime::now(),
+            seed,
+            turn,
+            cmd_val,
             location,
             msg,
             backtrace
@@ -116,8 +137,9 @@ fn main() -> eframe::Result<()> {
         eprintln!("\n{}", dump);
 
         // 파일로도 저장 시도
-        let _ = std::fs::write("crash_dump.txt", &dump);
-        eprintln!("\n[CRASH] 덤프가 crash_dump.txt에 저장되었습니다.");
+        let filename = format!("crash_dump_t{}_s{}.txt", turn, seed);
+        let _ = std::fs::write(&filename, &dump);
+        eprintln!("\n[CRASH] 덤프가 {}에 저장되었습니다.", filename);
     }));
 
     println!(

@@ -184,8 +184,10 @@ impl NetHackApp {
         resources.insert(options.clone());
         resources.insert(assets.clone()); // AssetManager 등록
 
-        // RNG 및 맵 생성
-        let mut rng = crate::util::rng::NetHackRng::new(rand::random());
+        // [v3.0.0 E3] seed 기록 (Panic Hook 진단용)
+        let seed: u64 = rand::random();
+        crate::DIAG_SEED.store(seed, std::sync::atomic::Ordering::Relaxed);
+        let mut rng = crate::util::rng::NetHackRng::new(seed);
 
         // 몬스터 템플릿 준비 (초기 스폰 및 생성에 필요)
         let monster_templates: Vec<_> = assets.monsters.templates.values().collect();
@@ -377,7 +379,10 @@ impl NetHackApp {
         let mut resources = Resources::default();
         let assets = self.game.assets.clone();
 
-        let mut rng = crate::util::rng::NetHackRng::new(rand::random());
+        // [v3.0.0 E3] seed 기록 (Panic Hook 진단용)
+        let seed: u64 = rand::random();
+        crate::DIAG_SEED.store(seed, std::sync::atomic::Ordering::Relaxed);
+        let mut rng = crate::util::rng::NetHackRng::new(seed);
         let (grid, _up_pos, _down_pos, _rooms) =
             crate::core::dungeon::gen::MapGenerator::generate_improved(
                 &mut rng,
@@ -464,7 +469,10 @@ impl NetHackApp {
         let mut resources = Resources::default();
         let assets = self.game.assets.clone();
 
-        let mut rng = crate::util::rng::NetHackRng::new(rand::random());
+        // [v3.0.0 E3] seed 기록 (Panic Hook 진단용)
+        let seed: u64 = rand::random();
+        crate::DIAG_SEED.store(seed, std::sync::atomic::Ordering::Relaxed);
+        let mut rng = crate::util::rng::NetHackRng::new(seed);
 
         let monster_templates: Vec<_> = assets.monsters.templates.values().collect();
         let (grid, start_pos, _down_pos, _rooms) =

@@ -15,8 +15,6 @@ use crate::core::entity::player::{Alignment, Player, PlayerClass};
 use crate::core::entity::{Health, PlayerTag, Position};
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::systems::CommandBuffer;
-use legion::world::SubWorld;
 use legion::*;
 
 /// 제단 성향 변경 대기 정보

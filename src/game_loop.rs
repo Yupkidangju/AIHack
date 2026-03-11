@@ -1085,6 +1085,10 @@ impl super::NetHackApp {
                 &mut game_state,
             );
 
+            // [v3.0.0 E3] Panic Hook 진단 정보 업데이트
+            crate::DIAG_TURN.store(turn, std::sync::atomic::Ordering::Relaxed);
+            crate::DIAG_CMD.store(cmd as u64, std::sync::atomic::Ordering::Relaxed);
+
             // [v3.0.0] 전환 완료 시스템 (30/30)
             crate::core::systems::creature::movement::movement(&mut ctx);
             crate::core::systems::ai::core::monster_ai(&mut ctx);

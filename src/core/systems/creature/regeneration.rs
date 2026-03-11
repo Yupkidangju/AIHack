@@ -2,7 +2,6 @@
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
 use crate::core::entity::player::Player;
 use crate::core::entity::{Health, PlayerTag};
-use legion::world::SubWorld;
 use legion::*;
 
 ///

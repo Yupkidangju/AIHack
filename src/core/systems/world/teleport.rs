@@ -11,9 +11,7 @@
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
 use crate::core::dungeon::{Grid, LevelChange};
 use crate::core::entity::{PlayerTag, Position};
-use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::world::SubWorld;
 use legion::*;
 
 ///

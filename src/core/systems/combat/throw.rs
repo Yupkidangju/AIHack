@@ -1,13 +1,9 @@
 // Copyright 2026 Yupkidangju. Licensed under Apache-2.0.
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
-use crate::assets::AssetManager;
 use crate::core::dungeon::Grid;
 use crate::core::entity::{CombatStats, Equipment, Health, Inventory, Item, PlayerTag, Position};
 use crate::core::game_state::Direction;
-use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::systems::CommandBuffer;
-use legion::world::SubWorld;
 use legion::*;
 
 /// 던지기 액션 리소스

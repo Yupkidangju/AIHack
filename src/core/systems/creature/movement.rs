@@ -1,6 +1,5 @@
 // Copyright 2026 Yupkidangju. Licensed under Apache-2.0.
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
-use crate::assets::AssetManager;
 use crate::core::dungeon::tile::TileType;
 use crate::core::dungeon::{Grid, COLNO, ROWNO};
 use crate::core::entity::monster::MonsterState;
@@ -14,10 +13,7 @@ use crate::core::entity::{
 use crate::core::events::{EventQueue, GameEvent}; // [v2.0.0 R5] 이벤트 발행
 use crate::core::systems::combat::CombatEngine;
 use crate::ui::input::Command;
-use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::systems::CommandBuffer;
-use legion::world::SubWorld;
 use legion::*;
 
 /// [v3.0.0] GameContext 기반 전환 완료 (이동 시스템)

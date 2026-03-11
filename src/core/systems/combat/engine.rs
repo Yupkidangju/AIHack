@@ -5,8 +5,7 @@ use crate::core::entity::skills::{SkillLevel, WeaponSkill};
 use crate::core::entity::status::StatusFlags;
 use crate::core::entity::{Health, Position};
 use crate::util::rng::NetHackRng;
-use legion::systems::CommandBuffer;
-use legion::world::{EntityStore, SubWorld};
+use legion::world::EntityStore;
 use legion::{Entity, IntoQuery};
 
 /// 전투 결과 정보
