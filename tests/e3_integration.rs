@@ -150,6 +150,7 @@ impl TestGameSetup {
             &mut self.level_req,
             &self.dungeon,
             &mut self.game_state,
+            None, // [v3.0.0 E4] LLM 없음 (테스트)
         );
         f(&mut ctx);
     }

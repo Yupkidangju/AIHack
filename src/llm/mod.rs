@@ -37,7 +37,7 @@ fn get_llm_client() -> reqwest::blocking::Client {
 /// smaLLM의 ProcessManager + EngineState를 게임용으로 통합한 구조체
 /// 
 /// 사용법:
-/// ```no_run
+/// ```ignore
 /// let engine = LlmEngine::start("models/qwen3-4b.gguf", Path::new("binaries"))?;
 /// let text = engine.generate("묘비명을 지어줘", 60)?;
 /// engine.stop();

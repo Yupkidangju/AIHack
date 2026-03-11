@@ -6,13 +6,13 @@
 // 현재 Phase E1에서는 World+Resources 직접 접근 래퍼로 구현.
 // Phase E2에서 각 시스템의 시그니처를 fn(ctx: &mut GameContext)로 전환.
 // Phase E4에서 AIProvider 필드를 추가.
-
 use crate::assets::AssetManager;
 use crate::core::action_queue::ActionQueue;
 use crate::core::dungeon::dungeon::Dungeon;
 use crate::core::dungeon::{Grid, LevelChange};
 use crate::core::events::EventQueue;
 use crate::core::systems::vision::VisionSystem;
+use crate::llm::LlmEngine; // [v3.0.0 E4] LLM 엔진
 use crate::ui::input::Command;
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
@@ -64,6 +64,9 @@ pub struct GameContext<'a> {
     pub dungeon: &'a Dungeon,
     /// 게임 상태 (플레이 중/게임 오버 등)
     pub game_state: &'a mut crate::core::game_state::GameState,
+    // === AI 엔진 (Phase E4) ===
+    /// [v3.0.0 E4] LLM 추론 엔진 (Option: 없으면 폴백 텍스트 사용)
+    pub llm: Option<&'a LlmEngine>,
 }
 
 impl<'a> GameContext<'a> {
@@ -82,6 +85,7 @@ impl<'a> GameContext<'a> {
         level_req: &'a mut Option<LevelChange>,
         dungeon: &'a Dungeon,
         game_state: &'a mut crate::core::game_state::GameState,
+        llm: Option<&'a LlmEngine>, // [v3.0.0 E4]
     ) -> Self {
         Self {
             world,
@@ -97,6 +101,7 @@ impl<'a> GameContext<'a> {
             level_req,
             dungeon,
             game_state,
+            llm,
         }
     }
 }
@@ -177,6 +182,7 @@ mod tests {
             &mut level_req,
             &dungeon,
             &mut game_state,
+            None, // [v3.0.0 E4] LLM 없음 (테스트)
         );
 
         // GameContext가 정상 생성되면 turn/cmd 접근 가능

@@ -1083,6 +1083,7 @@ impl super::NetHackApp {
                 &mut level_req,
                 &dungeon,
                 &mut game_state,
+                None, // [v3.0.0 E4] LLM 엔진 (None = 폴백 모드)
             );
 
             // [v3.0.0 E3] Panic Hook 진단 정보 업데이트
