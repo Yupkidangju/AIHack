@@ -27,3 +27,7 @@ Thumbs.db
 # 6. IDE / 에디터
 .vscode/
 .idea/
+
+# 7. [v3.0.0 E4] LLM 엔진 바이너리 및 모델 (대용량)
+/binaries/
+/models/

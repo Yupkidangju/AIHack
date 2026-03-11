@@ -28,5 +28,14 @@ serde_repr = "0.1"
 lazy_static = "1.4"
 thiserror = "2.0.18"
 
+# [v3.0.0 E4] LLM Engine (smaLLM 이식)
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+sysinfo = "0.30"
+regex = "1.12"
+
+# [v3.0.0 E4] Windows Process Management
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winbase", "winnt", "fileapi"] }
+
 [dev-dependencies]
 pretty_assertions = "1.4"

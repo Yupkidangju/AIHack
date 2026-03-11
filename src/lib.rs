@@ -7,5 +7,6 @@
 pub mod assets;
 pub mod core;
 pub mod generated;
+pub mod llm; // [v3.0.0 E4] LLM 엔진 (smaLLM 이식)
 pub mod ui;
 pub mod util;

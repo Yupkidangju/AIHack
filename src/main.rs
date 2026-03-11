@@ -20,6 +20,7 @@
 pub mod assets;
 pub mod core;
 pub mod generated; // [v2.0.0 R2] 자동 생성된 MonsterKind/ItemKind enum
+pub mod llm; // [v3.0.0 E4] LLM 엔진 (smaLLM 이식)
 pub mod ui;
 pub mod util;
 
