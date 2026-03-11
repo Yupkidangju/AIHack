@@ -1,8 +1,8 @@
 # AIHack 기술 명세서 (spec.md)
 
-**버전**: v3.0.0-alpha.1
-**최종 업데이트**: 2026-03-07
-**상태**: 이식률 💯 **100.0%** (177,229 / 177,232 라인) | 4,178개 테스트 통과 | 엔진 전환 23/30 시스템 완료 (76.7%)
+**버전**: v3.0.0-alpha.2
+**최종 업데이트**: 2026-03-11
+**상태**: 이식률 💯 **100.0%** (177,229 / 177,232 라인) | 4,179개 테스트 통과 | 엔진 전환 30/30 시스템 완료 (100%) | LLM 엔진 통합 (Phase E4)
 
 ---
 
@@ -23,7 +23,7 @@ NetHack 3.6.7 (C 소스 177,232줄 + 헤더 20,097줄 = 197,329줄)을 Rust로 *
 - **TUI**: Ratatui (터미널 기반 렌더링)
 - **GUI**: egui/eframe (하이브리드 윈도우 UI)
 - **빌드**: Cargo (MSVC Build Tools on Windows)
-- **LLM**: 로컬 경량 LLM (1~7B, GGUF/ONNX) — AIProvider trait 경유 선택적 통합
+- **LLM**: llama.cpp b8192 Sidecar (Qwen3-4B Q4_K_M) — Vulkan/CPU, 비동기 generate_async()
 
 ### 1.4 엔진 전환 방향 (v3.0.0 — 진행 중)
 
@@ -32,15 +32,18 @@ NetHack 3.6.7 (C 소스 177,232줄 + 헤더 20,097줄 = 197,329줄)을 Rust로 *
 > ECS 데이터 모델(Entity/Component/Query)은 100% 유지하며, 실행 모델만 순차 호출로 교체한다.
 > 이를 통해 AccessDenied 패닉을 구조적으로 영구 제거하고, LLM 통합 포인트(AIProvider)를 확보한다.
 >
-> **현황 (v3.0.0-alpha.1, 2026-03-07)**:
+> **현황 (v3.0.0-alpha.2, 2026-03-11)**:
 > - Phase E1 ✅ 완료: `GameContext` + `TurnRunner` 구현
-> - Phase E2 진행 중: **23/30 시스템 전환 완료 (76.7%)**
->   - E2a ✅ 저난이도 7개
->   - E2b ✅ 중난이도 6개
->   - E2c 진행 중: 고난이도 10개 완료, 7개 남음 (movement, monster_ai, trap, death, item_use, zap, shop)
-> - GameContext 확장: VisionSystem, LevelChange, Dungeon 필드 추가
-> - 핵심 패턴: Gather-Apply, 필드 분해(destructure), command_buffer 제거
-> - 빌드 ✅ + 테스트 4,178개 전량 통과
+> - Phase E2 ✅ 완료: **30/30 시스템 전환 완료 (100%)**
+> - Phase E3 ✅ 완료: Panic Hook 강화, dead code 정리, 레거시 테스트 마이그레이션, 1000턴 퍼징 통과
+> - Phase E4 ✅ 완료: **LLM 엔진 통합 (smaLLM v0.2.25 이식)**
+>   - `src/llm/` 모듈 (785줄): ProcessManager + LlmEngine + AcceleratorInfo
+>   - 비동기 API: `generate_async()` → `LlmRequest` 폴링 (턴 블로킹 방지)
+>   - 기능 연결: death.rs (AI 묘비명) + stairs.rs (던전 분위기 묘사)
+>   - 바이너리: llama.cpp b8192 Vulkan+CPU (84.8MB)
+>   - 모델: Qwen3-4B-Instruct-2507-Q4_K_M (2.33GB)
+> - GameContext 확장: VisionSystem, LevelChange, Dungeon, **LlmEngine** 필드
+> - 빌드 ✅ + 테스트 4,179개 전량 통과
 >
 > 상세: `STABILIZATION_ROADMAP.md` Phase E1~E5 참조.
 
@@ -72,6 +75,17 @@ NetHack 3.6.7 (C 소스 177,232줄 + 헤더 20,097줄 = 197,329줄)을 Rust로 *
 │  │weapon  │ │eat     │ │        │ │fountain│ │
 │  │kick    │ │status  │ │        │ │zap    │ │
 │  └────────┘ └────────┘ └────────┘ └───────┘ │
+├─────────────────────────────────────────────┤
+│          LLM Engine (Phase E4)                │
+│  ┌────────────┐ ┌──────────┐ ┌────────────┐ │
+│  │ProcessMgr  │ │LlmEngine │ │Accelerator │ │
+│  │(Sidecar)   │ │(async)   │ │(GPU detect)│ │
+│  └─────┬──────┘ └────┬─────┘ └────────────┘ │
+│        │ HTTP        │ generate_async()      │
+│  ┌─────▼──────────────▼──────┐               │
+│  │ llama-server (llama.cpp)  │               │
+│  │ Qwen3-4B Q4_K_M (2.3GB)  │               │
+│  └───────────────────────────┘               │
 ├─────────────────────────────────────────────┤
 │            Data Layer                         │
 │  ┌────────┐ ┌────────┐ ┌────────┐ ┌───────┐ │
@@ -246,6 +260,8 @@ NetHack 3.6.7 (C 소스 177,232줄 + 헤더 20,097줄 = 197,329줄)을 Rust로 *
 | **v2.39.0** | **2026-02-27** | **98.2%** | **Phase 102: 425파일, 4,074테스트** |
 | **v2.40.0** | **2026-02-27** | **98.8%** | **Phase 103: 430파일, 4,115테스트** |
 | **v2.41.0** | **2026-02-27** | **💯 100%** | **🏆 Phase FINAL: 438파일, 4,177테스트 — 이식 완료!** |
+| **v3.0.0-α1** | **2026-03-07** | **💯 100%** | **Phase E1~E2: GameContext + TurnRunner, 30/30 시스템 전환 완료** |
+| **v3.0.0-α2** | **2026-03-11** | **💯 100%** | **Phase E3~E4: Panic Hook 강화, LLM 엔진 통합 (smaLLM 이식), 비동기 API, death.rs+stairs.rs 연결, 4,179테스트** |
 
 ---
 

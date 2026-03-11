@@ -1,7 +1,48 @@
-﻿# 디자인 의사결정 (DESIGN_DECISIONS)
+# 디자인 의사결정 (DESIGN_DECISIONS)
 
 이 문서는 프로젝트 진행 중 선택한 주요 아키텍처 및 기술적 결정에 대한 근거를 기록합니다.
 모든 신규 아키텍처 결정은 반드시 이 문서에 추가되어야 하며, 결정의 배경/근거/대안을 포함해야 합니다.
+
+---
+
+## [2026-03-11] - 결정 #42: LLM 엔진 통합 — smaLLM Sidecar + 비동기 폴링 패턴
+
+> ⚠️ **중요 아키텍처 결정**: 결정 #37(AI Roguelike 비전)의 Phase 2 실현.
+
+### LLM-1. llama.cpp Sidecar 방식 선정 (FFI 직접 바인딩 기각)
+
+- **결정**: LLM 엔진을 FFI(Foreign Function Interface)로 직접 바인딩하지 않고, `llama-server`를 별도 프로세스(Sidecar)로 실행하고 HTTP API로 통신한다.
+- **배경**: smaLLM v0.2.25 엔진이 이미 이 패턴으로 검증됨 (23 Phase, 78건 결함 수정).
+- **근거**:
+  1. **프로세스 격리**: llama-server 크래시/메모리 누수가 게임 프로세스에 영향 없음
+  2. **인터페이스 단순성**: HTTP POST + JSON → reqwest blocking client로 구현 가능
+  3. **백엔드 교체 용이**: Vulkan/CUDA/CPU 백엔드를 바이너리 교체만으로 전환
+  4. **디버깅 독립성**: llama-server 로그를 별도로 확인 가능
+- **대안 고려**:
+  - (A) llama.cpp C++ FFI → ❌ 메모리 관리/스레드 안전성/패닉 전파 문제
+  - (B) ort (ONNX Runtime) → ❌ 모델 변환 필요, GGUF 미지원
+  - (C) candle (Rust 네이티브) → ❌ 모델 호환성 제한적
+  - (D) **본 결정 채택** → ✅ 검증된 Sidecar, 바이너리 84.8MB
+
+### LLM-2. 비동기 폴링 패턴 (`LlmRequest`)
+
+- **결정**: LLM 호출을 `std::thread::spawn`으로 백그라운드 실행하고, `LlmRequest` 핸들의 `try_get()` 메서드로 논블로킹 폴링한다.
+- **배경**: CPU 모드에서 30토큰 생성에 2~5초 소요 → 동기 호출 시 게임 턴 블로킹.
+- **근거**:
+  1. **턴 기반 게임**: 다음 키 입력까지 시간이 있으므로 폴링으로 충분
+  2. **tokio 불필요**: 동시 요청이 1~2건이므로 async runtime 과잉
+  3. **Arc<Mutex<Option<Result>>>**: 스레드 안전하면서도 최소 오버헤드
+- **대안 고려**:
+  - 채널(mpsc) → 복잡성 증가, 현재 규모에 불필요
+  - tokio async → 의존성 과잉, eframe 이벤트 루프와 충돌 위험
+
+### LLM-3. 폴백 전략 (DefaultProvider 보장)
+
+- **결정**: LLM이 없거나 응답 대기 중에도 게임은 완벽히 동작한다. `GameContext.llm: Option<&LlmEngine>` — None이면 기존 하드코딩 텍스트를 즉시 표시.
+- **근거**: 결정 #41의 ENGINE-3 원칙 "DefaultAIProvider = 기존 NetHack 로직" 직접 구현.
+- **적용**:
+  - `death.rs`: `if let Some(llm) = &ctx.llm { ... }` → LLM 요청 발사 + 폴백 즉시 표시
+  - `stairs.rs`: `if let (Some(depth), Some(llm_engine)) = ...` → LLM 요청 발사만
 
 ---
 

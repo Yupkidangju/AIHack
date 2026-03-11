@@ -1,15 +1,16 @@
 # AIHack 구현 현황 (Implementation Summary)
 
 - **프로젝트명**: AIHack (NetHack 3.6.7 → Rust 100% Port → AI Roguelike)
-- **현재 버전**: v3.0.0-alpha.1 (엔진 전환 Phase E2c 진행 중)
-- **최근 업데이트**: 2026-03-07
+- **현재 버전**: v3.0.0-alpha.2 (Phase E4: LLM 엔진 통합 완료)
+- **최근 업데이트**: 2026-03-11
 - **원본 소스**: 177,232 라인 (C 소스)
-- **현재 Rust**: **177,229 라인** (438개 파일) [2026-02-27 실측치]
+- **현재 Rust**: **177,229+ 라인** (438+ 파일 + LLM 모듈 785줄)
 - **이식률**: **100%** (C 소스 기준 100% 달성)
-- **테스트**: **4,178개** 전체 통과 [2026-03-07 기준]
-- **엔진 전환**: **23/30 시스템** GameContext 전환 완료 (76.7%)
+- **테스트**: **4,179개** 전체 통과 [2026-03-11 기준]
+- **엔진 전환**: **30/30 시스템** GameContext 전환 완료 (100%)
+- **LLM 엔진**: smaLLM v0.2.25 이식 — llama.cpp Sidecar + Qwen3-4B Q4_K_M
 - **Bridge Layer**: **12개** (7개 기존 + 5개 Phase 2 신규)
-- **목표**: **100% (달성 완료!)**
+- **목표**: **100% (달성 완료!) + LLM 통합 진행 중**
 
 ---
 
@@ -208,30 +209,43 @@
 ## 핵심 기술적 특징
 
 - **ECS 기반**: `legion` 라이브러리를 사용한 Entity-Component-System 아키텍처
-  - ⚠️ **v3.0.0에서 변경 예정**: `#[system]` 매크로/SubWorld/Schedule 제거 → `GameContext` + `&mut World` 직접 접근으로 전환 (결정 #41)
+  - ✅ **v3.0.0에서 완료**: `#[system]` 매크로/SubWorld/Schedule 제거 → `GameContext` + `&mut World` 직접 접근으로 전환 (30/30 시스템)
   - ECS 데이터 모델(Entity/Component/Query)은 100% 유지, 실행 모델만 순차 호출로 교체
 - **하이브리드 UI**: `egui` (프론트 윈도우) + `ratatui` (TUI 렌더링)
 - **원본 공식 1:1 이식**: NetHack 3.6.7 C 소스의 계치/공식/분기를 Rust로 완전하게 재구현
 - **다국어 지원**: 모든 코드 주석은 한국어, 게임 내 메시지는 다국어 대응
-- **LLM 통합 아키텍처**: `InteractionProvider`(기존 7곳) + `AIProvider`(7개 교체 포인트) — 선택적 LLM 주입, DefaultImpl 폴백 보장
+- **LLM 엔진 통합 (Phase E4)**:
+  - `src/llm/` 모듈: ProcessManager + LlmEngine + AcceleratorInfo (785줄)
+  - llama.cpp b8192 Sidecar 방식 (HTTP API 통신)
+  - 비동기 API: `generate_async()` → `LlmRequest` 핸들 (턴 블로킹 방지)
+  - 모델: Qwen3-4B-Instruct-2507-Q4_K_M (2.33GB)
+  - 기능 연결: death.rs (AI 묘비명) + stairs.rs (던전 분위기 묘사)
+  - `InteractionProvider`(기존 7곳) + `AIProvider` — 선택적 LLM 주입, DefaultImpl 폴백 보장
 - **AppState 상태 머신**: Title → CharCreation → Playing → GameOver → Title 전환
 - **Enum 기반 타입 안전**: MonsterKind/ItemKind enum + get_by_kind() API로 문자열 비교 최소화
 - **이벤트 큐**: GameEvent 20+ variant + EventQueue + EventHistory 링 버퍼 (200건)
 
 ---
 
-## 현재 다음 작업 (v3.0.0 엔진 전환)
+## 현재 다음 작업 (Phase E5: LLM 실제 주입)
 
-> **최우선**: STABILIZATION_ROADMAP.md Phase E1~E5 실행
+> **현황**: Phase E1~E4 완료, Phase E5 대기 중
 
-1. **Phase E1**: `GameContext` 구조체 + `TurnRunner` 정의 (4~6시간)
-2. **Phase E2**: 31개 `#[system]` 매크로 시스템 → `fn system_name(ctx: &mut GameContext)` 일반 함수 전환 (12~20시간)
-3. **Phase E3**: 전체 통합 테스트 + 1000턴 퍼징 (4~8시간)
-4. **Phase E4**: `AIProvider` trait 확장 + LLM 통합 아키텍처 (6~10시간)
-5. **Phase E5**: LLM 실제 주입 (별도 계획)
+| Phase | 상태 | 내용 |
+|-------|------|------|
+| E1 | ✅ 완료 | `GameContext` + `TurnRunner` 구현 |
+| E2 | ✅ 완료 | 30/30 시스템 GameContext 전환 (100%) |
+| E3 | ✅ 완료 | Panic Hook 강화 + 1000턴 퍼징 + 레거시 테스트 마이그레이션 |
+| E4 | ✅ 완료 | **LLM 엔진 통합** (smaLLM 이식, 비동기 API, death/stairs 연결) |
+| E5 | ⏳ 다음 | App에서 LLM 초기화 + GameContext 주입 + LlmRequest 폴링 |
 
-- 이식률 💯 100% 유지 (177,229줄, 4,177 테스트)
-- 콘텐츠 추가 이식은 엔진 전환 완료 후 진행
+### E5 세부 TODO
+1. `app.rs`에서 `LlmEngine::start()` 호출 → 게임 시작 시 엔진 초기화
+2. `game_loop.rs`의 `None` → `Some(&engine)` 전환 → GameContext에 LLM 주입
+3. `Vec<(String, LlmRequest)>` 폴링 루프 → 매 프레임 결과 회수
+4. 토큰/컨텍스트 최적화 — 실제 플레이 중 조정
+
+- 이식률 💯 100% 유지 (177,229줄, 4,179 테스트)
 
 ### v2.20.0 아키텍처 리팩토링 완료 모듈 (R7, R8 통합)
 - **social/mod.rs**: `InteractionProvider` 및 `DefaultInteractionProvider` 추상화 도입
@@ -317,5 +331,5 @@
 
 ---
 
-**문서 버전**: v2.43.0 (엔진 전환 결정 #41 반영)
-**최종 업데이트**: 2026-03-04
+**문서 버전**: v3.0.0-alpha.2 (Phase E4: LLM 엔진 통합 완료)
+**최종 업데이트**: 2026-03-11

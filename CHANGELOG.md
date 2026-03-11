@@ -3,14 +3,33 @@
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
 
-## [3.0.0-alpha.2] - 2026-03-10
+## [3.0.0-alpha.2] - 2026-03-11
+### Added
+- **[Phase E4] LLM 엔진 통합 — smaLLM v0.2.25 이식**
+  - `src/llm/mod.rs` (270줄): LlmEngine 공개 API (동기 + 비동기)
+  - `src/llm/process.rs` (330줄): ProcessManager — llama-server Sidecar 프로세스 관리
+  - `src/llm/accelerator.rs` (185줄): GPU 자동 감지 (CUDA/Vulkan/CPU)
+  - `LlmRequest`: 비동기 폴링 핸들 (`Arc<Mutex<Option<Result>>>`)
+  - `generate_async()` / `generate_with_system_async()`: 턴 블로킹 방지
+  - 파라미터: temp=0.5, top_p=0.85, top_k=25, rp=1.15
+  - 바이너리: llama.cpp b8192 Vulkan+CPU (21파일, 84.8MB)
+  - 모델: Qwen3-4B-Instruct-2507-Q4_K_M (2.33GB)
+- **death.rs**: AI 묘비명 비동기 생성 (LLM 연결점 #1)
+- **stairs.rs**: 던전 분위기 묘사 비동기 생성 (LLM 연결점 #2)
+- `GameContext`에 `llm: Option<&LlmEngine>` 필드 추가
+- Cargo.toml: `reqwest` (blocking), `sysinfo`, `regex`, `winapi` 의존성 추가
+- `.gitignore`: `/binaries/`, `/models/` 제외
+
 ### Changed
 - **[Phase E2 완료!] 30/30 시스템 전환 (100%) — Legion Schedule 완전 제거**
   - `trap_trigger`, `death`, `shopkeeper_update`, `zap`, `item_use`, `monster_ai`, `movement` (E2d~E2f 7개)
 - **Legion Schedule 완전 제거**: `Schedule::builder()...execute()` 전체 삭제
-- **연쇄 전환**: apply.rs, pray.rs, sink.rs, item_damage.rs, engine.rs — SubWorld→World
-- **game_loop.rs**: `schedule.execute()` 삭제, 30개 시스템 모두 GameContext 순차 호출
-- **빌드**: 0 에러 / **테스트**: 4,178개 전체 통과
+- **[Phase E3] 안정화**
+  - Panic Hook 강화 + dead code 정리
+  - 레거시 테스트 마이그레이션
+  - 1000턴 퍼징 통과 (E3-T3)
+- **빌드**: 0 에러 / **테스트**: 4,179개 전체 통과
+
 
 ## [3.0.0-alpha.1] - 2026-03-07
 ### Changed
