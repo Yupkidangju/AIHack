@@ -138,10 +138,10 @@ END OF TERMS AND CONDITIONS
 
 APPENDIX: How to apply the Apache License to your work.
 
-[Project Name: aihack]
-[Description: A Rust-based variant and modernization of NetHack.]
+[Project Name: AI Hack (aihack)]
+[Description: A Rust-based AI-enhanced variant and modernization of NetHack.]
 
-Copyright [2026] [Your Name or Organization]
+Copyright 2026 방은호 (Eunho Bang)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -156,7 +156,7 @@ limitations under the License.
 
 ADDITIONAL NOTICE FOR DERIVATIVE WORKS FROM NETHACK:
 
-This software, "aihack", is a derivative work based on NetHack,
+This software, "AI Hack" (aihack), is a derivative work based on NetHack,
 originally created by the NetHack DevTeam.
 
 NetHack Original Authors: Copyright (c) 1985-2026 The NetHack DevTeam.

@@ -1,6 +1,6 @@
 ﻿// ============================================================================
 // AIHack - A Modern Rust Roguelike
-// Copyright (c) 2026 Yupkidangju. Licensed under Apache License 2.0.
+// Copyright (c) 2026 방은호 (Eunho Bang). Licensed under Apache License 2.0.
 //
 // 원본: nethack-3.6.7/src/muse.c (2,608줄)
 // 몬스터 아이템 사용 AI — 방어/공격/기타 아이템 선택 및 사용

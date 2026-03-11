@@ -1,4 +1,4 @@
-// Copyright 2026 Yupkidangju. Licensed under Apache-2.0.
+// Copyright 2026 방은호 (Eunho Bang). Licensed under Apache-2.0.
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
 //! 용기 및 보관함 시스템 (Loot)
 //! 원본 NetHack의 invent.c, pickup.c 기반

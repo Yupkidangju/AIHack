@@ -1,6 +1,6 @@
 // ============================================================================
 // AIHack - A Modern Rust Roguelike
-// Copyright (c) 2026 Yupkidangju. Licensed under Apache License 2.0.
+// Copyright (c) 2026 방은호 (Eunho Bang). Licensed under Apache License 2.0.
 //
 // This file contains code derived from NetHack 3.6.7.
 // Original NetHack source: Copyright (c) Stichting Mathematisch Centrum,

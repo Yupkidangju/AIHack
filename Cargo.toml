@@ -1,8 +1,8 @@
 [package]
 name = "aihack"
-version = "2.23.0"
+version = "3.0.0-alpha.2"
 edition = "2021"
-authors = ["Yupkidangju"]
+authors = ["방은호 (Eunho Bang)"]
 license = "Apache-2.0"
 license-file = "LICENSE.NGPL"
 repository = "https://github.com/Yupkidangju/AIHack"

@@ -1,4 +1,4 @@
-// Copyright 2026 Yupkidangju. Licensed under Apache-2.0.
+// Copyright 2026 방은호 (Eunho Bang). Licensed under Apache-2.0.
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
 use crate::core::dungeon::tile::TileType;
 use crate::core::dungeon::{Grid, COLNO, ROWNO};

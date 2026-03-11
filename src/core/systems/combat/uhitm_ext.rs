@@ -1,6 +1,6 @@
 // =============================================================================
 // AIHack — uhitm_ext.rs
-// Copyright (c) 2026 Yupkidangju. Licensed under Apache-2.0.
+// Copyright (c) 2026 방은호 (Eunho Bang). Licensed under Apache-2.0.
 // Based on NetHack 3.6.7 (NGPL). See LICENSE and LICENSE.NGPL.
 // =============================================================================
 // [v2.19.0] uhitm.c 핵심 함수 이식 — Pure Result 패턴

@@ -1,6 +1,6 @@
 // ============================================================================
 // AIHack - exper_ext.rs
-// Copyright (c) 2026 Yupkidangju. Licensed under Apache-2.0.
+// Copyright (c) 2026 방은호 (Eunho Bang). Licensed under Apache-2.0.
 //
 // [v2.10.1] exper.c 미이식 함수 완전 이식 (순수 결과 패턴)
 // 원본: NetHack 3.6.7 exper.c (353줄)

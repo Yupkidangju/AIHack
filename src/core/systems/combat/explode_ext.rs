@@ -1,6 +1,6 @@
 // =============================================================================
 // AIHack - explode_ext.rs
-// Copyright (c) 2026 Yupkidangju. Licensed under Apache License 2.0.
+// Copyright (c) 2026 방은호 (Eunho Bang). Licensed under Apache License 2.0.
 //
 // [v2.11.0] explode.c 미이식 핵심 로직 완전 이식 (순수 결과 패턴)
 // 원본: nethack-3.6.7/src/explode.c (820줄)

@@ -1,6 +1,6 @@
 // =============================================================================
 // AIHack - dothrow_ext.rs
-// Copyright (c) 2026 Yupkidangju. Licensed under Apache License 2.0.
+// Copyright (c) 2026 방은호 (Eunho Bang). Licensed under Apache License 2.0.
 //
 // [v2.11.0] dothrow.c 핵심 로직 순수 결과 패턴 이식
 // 원본: nethack-3.6.7/src/dothrow.c (2,189줄)
