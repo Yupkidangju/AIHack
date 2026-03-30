@@ -42,7 +42,7 @@ use crate::core::entity::monster::MonsterFaction;
 
 #[system]
 #[read_component(PlayerTag)]
-#[read_component(Position)]
+#[write_component(Position)]
 #[read_component(CombatStats)]
 #[write_component(Health)]
 #[write_component(StatusBundle)]

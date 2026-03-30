@@ -16,7 +16,7 @@ use crate::core::entity::{Health, PlayerTag, Position};
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
 use legion::systems::CommandBuffer;
-use legion::world::SubWorld;
+// [v2.41.1] SubWorld → World로 변경 (AccessDenied 방지)
 use legion::*;
 
 /// 제단 성향 변경 대기 정보
@@ -95,7 +95,7 @@ pub fn get_god_name(role: PlayerClass, align: Alignment) -> &'static str {
 /// 기도(Pray) 시스템
 /// 원본 NetHack의 pray.c 로직 이식
 pub fn try_pray(
-    world: &mut SubWorld,
+    world: &mut World,
     grid: &Grid,
     log: &mut GameLog,
     turn: u64,
@@ -304,7 +304,7 @@ pub fn try_pray(
 /// 제물 바치기 (#offer)
 pub fn try_offer(
     item_ent: Entity,
-    world: &mut SubWorld,
+    world: &mut legion::world::SubWorld,
     grid: &crate::core::dungeon::Grid,
     assets: &crate::assets::AssetManager,
     rng: &mut crate::util::rng::NetHackRng,

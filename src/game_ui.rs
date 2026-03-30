@@ -13,31 +13,6 @@ impl super::NetHackApp {
     /// 게임 UI 렌더링  egui 패널 + ratatui 맵 + 팝업 윈도우
     /// main.rs의 update()에서 process_game_turn() 이후 호출됨
     pub(crate) fn render_game_ui(&mut self, ctx: &egui::Context) {
-        //
-        {
-            let player_info: Option<(Entity, i32, i32)> = {
-                let mut q = <(Entity, &Position)>::query().filter(component::<PlayerTag>());
-                q.iter(&self.game.world).next().map(|(e, p)| (*e, p.x, p.y))
-            };
-            if let Some((ent, px, py)) = player_info {
-                let has_inv = self
-                    .game
-                    .world
-                    .entry_ref(ent)
-                    .map(|e| e.get_component::<Inventory>().is_ok())
-                    .unwrap_or(false);
-                let has_health = self
-                    .game
-                    .world
-                    .entry_ref(ent)
-                    .map(|e| e.get_component::<Health>().is_ok())
-                    .unwrap_or(false);
-                println!(
-                    "[Debug] Player Entity: {:?}, Pos: {},{}, Inv: {}, Health: {}",
-                    ent, px, py, has_inv, has_health
-                );
-            }
-        }
 
         ctx.request_repaint();
 

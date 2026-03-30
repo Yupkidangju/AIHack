@@ -103,11 +103,15 @@ impl<'a> LevelGen<'a> {
                     continue;
                 }
 
-                let r_w = self.rng.rnz(4, width.min(15) as i32) as usize;
-                let r_h = self.rng.rnz(3, height.min(10) as i32) as usize;
+                // [v2.41.1] rnz는 입력값보다 큰 값을 반환할 수 있으므로 clamp 필수
+                let r_w = (self.rng.rnz(4, width.min(15) as i32) as usize).clamp(3, width);
+                let r_h = (self.rng.rnz(3, height.min(10) as i32) as usize).clamp(3, height);
 
-                let rx = rect.lx + self.rng.rn2((width - r_w + 1) as i32) as usize;
-                let ry = rect.ly + self.rng.rn2((height - r_h + 1) as i32) as usize;
+                // saturating_sub로 usize 오버플로우 방지
+                let rx_range = width.saturating_sub(r_w) + 1;
+                let ry_range = height.saturating_sub(r_h) + 1;
+                let rx = rect.lx + self.rng.rn2(rx_range.max(1) as i32) as usize;
+                let ry = rect.ly + self.rng.rn2(ry_range.max(1) as i32) as usize;
 
                 let hx = rx + r_w - 1;
                 let hy = ry + r_h - 1;
@@ -132,30 +136,29 @@ impl<'a> LevelGen<'a> {
                 let room_id = (self.rooms.rooms.len() as u8) + 1;
                 self.apply_room(&room, room_id);
 
-                //
-                if self.rng.rn2(10) == 0 {
-                    room.rtype = crate::core::dungeon::mkroom::RoomType::ShopBase;
-                } else if self.rng.rn2(20) == 0 {
-                    room.rtype = crate::core::dungeon::mkroom::RoomType::Zoo;
-                } else if self.rng.rn2(20) == 0 {
-                    room.rtype = crate::core::dungeon::mkroom::RoomType::Morgue;
-                }
-
-                //
-                if self.rng.rn2(10) == 0 && r_w > 6 && r_h > 5 {
-                    //
-                    let sw = self.rng.rnz(3, (r_w - 2) as i32) as usize;
-                    let sh = self.rng.rnz(2, (r_h - 2) as i32) as usize;
-                    let sx = rx + 1 + self.rng.rn2((r_w - sw - 1) as i32) as usize;
-                    let sy = ry + 1 + self.rng.rn2((r_h - sh - 1) as i32) as usize;
-
-                    let mut sub = MkRoom::new(sx, sy, sx + sw - 1, sy + sh - 1);
-                    sub.parent = Some(self.rooms.rooms.len());
-                    self.rooms.rooms.push(sub);
-                }
-
                 self.rooms.rooms.push(room);
                 n_rooms += 1;
+            }
+        }
+
+        // [v2.41.1] 원본 NetHack 방식: 레벨당 최대 1개 특수 방, 깊이 기반 확률
+        let depth = self.id.depth;
+        let nroom = self.rooms.rooms.len();
+        if nroom > 1 {
+            // 특수 방이 될 후보 인덱스 (첫 번째/마지막 방 제외)
+            let candidate_idx = if nroom > 2 {
+                (self.rng.rn2((nroom - 2) as i32) + 1) as usize
+            } else {
+                1
+            };
+
+            // 원본 NetHack 깊이 기반 특수 방 확률
+            if depth >= 10 && self.rng.rn2(10) == 0 {
+                self.rooms.rooms[candidate_idx].rtype = crate::core::dungeon::mkroom::RoomType::Morgue;
+            } else if depth >= 5 && self.rng.rn2(6) == 0 {
+                self.rooms.rooms[candidate_idx].rtype = crate::core::dungeon::mkroom::RoomType::Zoo;
+            } else if depth >= 3 && self.rng.rn2(4) == 0 {
+                self.rooms.rooms[candidate_idx].rtype = crate::core::dungeon::mkroom::RoomType::ShopBase;
             }
         }
     }
@@ -664,16 +667,20 @@ impl<'a> LevelGen<'a> {
     }
 
     ///
-    fn dodoor(&mut self, x: usize, y: usize, room_id: u8) {
+    // [v2.41.1] 원본 NetHack: 벽 또는 빈 타일에 문 배치 (roomno 조건 제거)
+    fn dodoor(&mut self, x: usize, y: usize, _room_id: u8) {
         if x >= COLNO || y >= ROWNO {
             return;
         }
 
         let tile = &mut self.grid.locations[x][y];
-        //
-        if tile.roomno == room_id {
-            tile.typ = TileType::Door;
-            tile.doormas = 0; // Closed
+        // 벽 계열이거나 돌(Stone)인 경우에만 문 배치 (이미 Room/Corr인 경우 건너뜀)
+        match tile.typ {
+            TileType::VWall | TileType::HWall | TileType::Stone => {
+                tile.typ = TileType::Door;
+                tile.doormas = 0; // 닫힌 문
+            }
+            _ => {} // Room, Corr 등은 그대로 유지
         }
     }
 
@@ -854,17 +861,25 @@ impl<'a> LevelGen<'a> {
         let nroom = self.rooms.rooms.len().max(1);
         let depth = id.depth;
 
-        //
-        //
-        let extra_monsters = nroom * (1 + self.rng.rn2(3) as usize);
+        // [v2.41.1] 원본 NetHack 방식: 방당 ~33% 확률로 몬스터 1마리 (기존: nroom*(1+rn2(3)))
+        let mut target_monsters = 0;
+        for _ in 0..nroom {
+            if self.rng.rn2(3) == 0 {
+                target_monsters += 1;
+            }
+        }
+        // 깊이에 따른 약간의 추가 (원본: 깊이가 깊을수록 소폭 증가)
+        target_monsters += (depth / 6) as usize;
+        target_monsters = target_monsters.max(1).min(nroom + 2); // 최소 1, 최대 방수+2
+
         let mut spawned = 0;
         let mut attempts = 0;
-        while spawned < extra_monsters && attempts < extra_monsters * 10 {
+        while spawned < target_monsters && attempts < target_monsters * 10 {
             attempts += 1;
             let x = self.rng.rn2(COLNO as i32) as usize;
             let y = self.rng.rn2(ROWNO as i32) as usize;
             let tile_typ = self.grid.locations[x][y].typ;
-            //
+            // 방이나 복도에만 스폰
             if tile_typ == TileType::Room || tile_typ == TileType::Corr {
                 if let Some(_ent) = Spawner::makemon(
                     None,
@@ -1128,7 +1143,9 @@ impl MapGenerator {
         gen.place_traps(world, id, level_type);
 
         //
-        crate::core::entity::spawn::Spawner::spawn_level_structures(world, &gen.grid, gen.rng, id);
+        // [v2.41.1] AIHack 전용 구조물(CommBase, SupplyDepot, beast_horde) 비활성화
+        // 게임 플레이 정상화 후 재활성화 예정
+        // crate::core::entity::spawn::Spawner::spawn_level_structures(world, &gen.grid, gen.rng, id);
 
         //
         let mut start_pos = (10, 10);

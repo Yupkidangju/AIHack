@@ -275,14 +275,11 @@ impl Spawner {
             m_lev += (level_id.depth - m_lev) / 2;
         }
         m_lev = m_lev.max(1);
+        // [v2.41.1] 원본 NetHack: d(m_lev, 8) — rnz 대신 rnd 사용으로 HP 안정화
         let hp = if m_lev <= 0 {
-            rng.rnz(1, 4)
+            rng.rnd(4)
         } else {
-            let mut h = 0;
-            for _ in 0..m_lev {
-                h += rng.rnz(1, 8);
-            }
-            h
+            rng.d(m_lev, 8)
         }
         .max(1);
 
@@ -398,17 +395,22 @@ impl Spawner {
             {
                 continue;
             }
-            if (t.level as i32) > depth + (depth / 10) + 2 {
+            // [v2.41.1] 원본 NetHack: 몬스터 레벨이 depth+5 이하만 허용 (기존: depth+depth/10+2)
+            if (t.level as i32) > depth + 5 {
                 continue;
             }
-            let weight = (t.geno & crate::core::entity::monster::G_FREQ) as i32 + 1;
+            // 난이도 차이에 따른 가중치: 깊이에 가까울수록 높은 가중치
+            let diff = (depth - t.level as i32).abs();
+            let weight = ((t.geno & crate::core::entity::monster::G_FREQ) as i32 + 1)
+                .saturating_sub(diff / 2)
+                .max(1);
             candidates.push((t, weight));
             total_weight += weight;
         }
         if candidates.is_empty() {
-            //
-            let idx = rng.rn2(templates.len() as i32) as usize;
-            return Some(templates[idx]);
+            // 후보가 없으면 가장 낮은 레벨 몬스터 반환
+            let lowest = templates.iter().min_by_key(|t| t.level);
+            return lowest.map(|t| *t);
         }
         let mut pick = rng.rn2(total_weight);
         for (t, weight) in candidates {
@@ -434,7 +436,8 @@ impl Spawner {
         rng: &mut NetHackRng,
         level_id: crate::core::dungeon::LevelID,
     ) {
-        let cnt = rng.rnz(1, n);
+        // [v2.41.1] 원본 NetHack: rnd(n) 사용 (rnz 대신) — 그룹 크기 안정화
+        let cnt = rng.rnd(n).min(8); // 최대 8마리로 제한
         for _ in 0..cnt {
             for dx in -1..=1 {
                 for dy in -1..=1 {

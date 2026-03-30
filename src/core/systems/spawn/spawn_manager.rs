@@ -102,8 +102,8 @@ pub fn turn_respawn(
         }
     }
 
-    //
-    if current_monsters >= 40 {
+    // [v2.41.1] 현재 레벨 몬스터 수 상한 (원본: 40, 안정화 기간 중 20으로 축소)
+    if current_monsters >= 20 {
         return;
     }
 

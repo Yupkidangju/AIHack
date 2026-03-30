@@ -270,9 +270,88 @@ impl NetHackApp {
 
             //
             if let Ok(inv) = entry.get_component_mut::<crate::core::entity::Inventory>() {
-                for item in inventory_items {
-                    inv.items.push(item);
-                    inv.assign_letter(item);
+                for item in inventory_items.iter() {
+                    inv.items.push(*item);
+                    inv.assign_letter(*item);
+                }
+            }
+
+            // [v2.41.1] 시작 장비 자동 장착 — 원본 NetHack과 동일하게 초기 무기/방패를 장착
+            if let Ok(equip) = entry.get_component_mut::<crate::core::entity::Equipment>() {
+                for &item_ent in inventory_items.iter() {
+                    // 아이템 타입 확인을 위해 world에서 직접 조회 불가 (entry 빌림 중)
+                    // 대신 순서 기반: 0번(long sword)=Melee, 1번(small shield)=Shield
+                    // 이 순서는 starting_items 배열 순서와 동일
+                    break; // 아래에서 별도 처리
+                }
+            }
+        }
+
+        // [v2.41.1] 인벤토리 아이템의 클래스를 확인하여 자동 장착
+        {
+            let item_classes: Vec<(legion::Entity, crate::core::entity::object::ItemClass, crate::core::entity::object::ArmorType)> = {
+                let mut result = Vec::new();
+                for &item_ent in &inventory_items {
+                    if let Ok(entry) = world.entry_ref(item_ent) {
+                        if let Ok(item) = entry.get_component::<crate::core::entity::Item>() {
+                            if let Some(tmpl) = assets.items.get_by_kind(item.kind) {
+                                let armor_type = if tmpl.class == crate::core::entity::object::ItemClass::Armor {
+                                    // subtype을 ArmorType으로 변환
+                                    match tmpl.subtype {
+                                        1 => crate::core::entity::object::ArmorType::Shield,
+                                        2 => crate::core::entity::object::ArmorType::Helm,
+                                        3 => crate::core::entity::object::ArmorType::Gloves,
+                                        4 => crate::core::entity::object::ArmorType::Boots,
+                                        5 => crate::core::entity::object::ArmorType::Cloak,
+                                        6 => crate::core::entity::object::ArmorType::Shirt,
+                                        _ => crate::core::entity::object::ArmorType::Suit,
+                                    }
+                                } else {
+                                    crate::core::entity::object::ArmorType::None
+                                };
+                                result.push((item_ent, tmpl.class, armor_type));
+                            }
+                        }
+                    }
+                }
+                result
+            };
+
+            let mut equip_query = <(&mut crate::core::entity::Equipment, &mut crate::core::entity::Inventory)>::query()
+                .filter(component::<PlayerTag>());
+            if let Some((equip, inv)) = equip_query.iter_mut(&mut world).next() {
+                for (item_ent, class, armor_type) in &item_classes {
+                    use crate::core::entity::object::ItemClass;
+                    use crate::core::entity::EquipmentSlot;
+                    let mut equipped = false;
+                    match class {
+                        ItemClass::Weapon => {
+                            if !equip.slots.contains_key(&EquipmentSlot::Melee) {
+                                equip.slots.insert(EquipmentSlot::Melee, *item_ent);
+                                equipped = true;
+                            }
+                        }
+                        ItemClass::Armor => {
+                            use crate::core::entity::object::ArmorType;
+                            let slot = match armor_type {
+                                ArmorType::Shield => EquipmentSlot::Shield,
+                                ArmorType::Helm => EquipmentSlot::Head,
+                                ArmorType::Gloves => EquipmentSlot::Hands,
+                                ArmorType::Boots => EquipmentSlot::Boots,
+                                ArmorType::Cloak => EquipmentSlot::Cloak,
+                                _ => EquipmentSlot::Body,
+                            };
+                            if !equip.slots.contains_key(&slot) {
+                                equip.slots.insert(slot, *item_ent);
+                                equipped = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                    // [v2.41.1] 장착된 아이템은 인벤토리에서 제거 (원본 NetHack 동일)
+                    if equipped {
+                        inv.remove_item(*item_ent);
+                    }
                 }
             }
         }
@@ -291,6 +370,8 @@ impl NetHackApp {
         resources.insert(crate::core::action_queue::ActionQueue::new()); // 신규 ActionQueue 병행
         resources.insert(None::<crate::core::dungeon::LevelChange>); // Level change request
         resources.insert(None::<crate::core::systems::pray::PendingAltarUpdate>); // Altar conversion
+        resources.insert(None::<crate::core::systems::teleport::TeleportAction>); // [v2.41.1] 트랩 시스템 텔레포트 액션
+        resources.insert(crate::core::systems::death::DeathResults::default()); // [v2.41.1] 사망 결과
                                                                                   // [v1.9.0
         resources.insert(crate::core::entity::status::StatusFlags::empty());
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5] 이벤트 큐
@@ -590,6 +671,7 @@ impl NetHackApp {
         resources.insert(crate::core::action_queue::ActionQueue::new()); // 신규 ActionQueue 병행
         resources.insert(None::<crate::core::dungeon::LevelChange>);
         resources.insert(None::<crate::core::systems::pray::PendingAltarUpdate>);
+        resources.insert(None::<crate::core::systems::teleport::TeleportAction>); // [v2.41.1] 트랩 시스템 텔레포트 액션
         resources.insert(crate::core::entity::status::StatusFlags::empty());
         resources.insert(crate::core::systems::death::DeathResults::default());
         resources.insert(crate::core::events::EventQueue::new()); // [v2.0.0 R5]

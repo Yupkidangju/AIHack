@@ -15,13 +15,13 @@ use crate::core::entity::player::Player;
 use crate::core::entity::{Health, PlayerTag, Position};
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::world::SubWorld;
+// [v2.41.1] SubWorld → World로 변경 (AccessDenied 방지)
 use legion::*;
 
 ///
 ///
 pub fn try_sit(
-    world: &mut SubWorld,
+    world: &mut World,
     grid: &crate::core::dungeon::Grid,
     log: &mut GameLog,
     turn: u64,

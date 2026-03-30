@@ -18,12 +18,11 @@ impl super::NetHackApp {
         let (polled_cmd, polled_spell) = self.poll_input(ctx);
         self.input.last_cmd = polled_cmd;
         self.input.spell_key_input = polled_spell;
-        //
 
-        //
         self.game.resources.insert(self.input.game_state.clone());
 
         let mut _action_executed = false;
+
         match &self.input.game_state {
             GameState::More => {
                 //
@@ -77,8 +76,9 @@ impl super::NetHackApp {
             _ => (/* Normal 등 */),
         }
 
-        // 명령이 있을 경우 시스템 실행
-        if self.input.last_cmd != crate::ui::input::Command::Unknown {
+        // [v2.41.1] 명령 처리 또는 액션 실행이 있을 경우 시스템 실행
+        // 방향 입력 처리 후 last_cmd가 Unknown으로 소비되어도 _action_executed가 true면 실행
+        if self.input.last_cmd != crate::ui::input::Command::Unknown || _action_executed {
             //
             self.game.resources.insert(self.input.last_cmd);
             self.game.resources.insert(self.game.grid.clone());
@@ -98,6 +98,14 @@ impl super::NetHackApp {
             let drained = self.drain_action_queue();
             _action_executed = _action_executed || drained;
             self.execute_turn_systems();
+
+            // [v2.41.1] 시스템 실행 후 resources의 Grid를 self.game.grid로 역동기화
+            // 시스템(movement, trap 등)이 resources의 Grid를 수정하지만
+            // 렌더러는 self.game.grid를 직접 읽으므로, 여기서 동기화하지 않으면
+            // 문 열기, 함정 발동 등 Grid 변경이 화면에 반영되지 않음
+            if let Some(updated_grid) = self.game.resources.get::<crate::core::dungeon::Grid>() {
+                self.game.grid = updated_grid.clone();
+            }
 
             self.post_turn_processing();
             self.handle_level_change();
@@ -119,6 +127,73 @@ impl super::NetHackApp {
                 _action_executed = true;
             }
             Command::Pickup => {
+                // [v2.41.1] S5b: 바닥 아이템 줍기 로직 연결
+                let mut player_pos = None;
+                {
+                    let mut q = <&Position>::query().filter(component::<PlayerTag>());
+                    if let Some(pos) = q.iter(&self.game.world).next() {
+                        player_pos = Some((pos.x, pos.y));
+                    }
+                }
+
+                if let Some((px, py)) = player_pos {
+                    // 바닥 아이템 수집 (플레이어 위치와 동일하고, PlayerTag가 없는 아이템)
+                    let mut floor_items: Vec<Entity> = Vec::new();
+                    {
+                        let mut item_query = <(Entity, &Position, &crate::core::entity::Item)>::query();
+                        for (ent, pos, _item) in item_query.iter(&self.game.world) {
+                            if pos.x == px && pos.y == py {
+                                // PlayerTag가 있는 엔티티(플레이어 자신)는 스킵
+                                if self.game.world.entry_ref(*ent)
+                                    .map(|e| e.get_component::<PlayerTag>().is_err())
+                                    .unwrap_or(false)
+                                {
+                                    floor_items.push(*ent);
+                                }
+                            }
+                        }
+                    }
+
+                    if floor_items.is_empty() {
+                        if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                            let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
+                            log.add("There is nothing here to pick up.", turn);
+                        }
+                    } else {
+                        // 각 아이템을 플레이어 인벤토리로 이동
+                        let mut picked_count = 0;
+                        for item_ent in &floor_items {
+                            // 아이템 이름 수집
+                            let item_name = self.game.world.entry_ref(*item_ent)
+                                .ok()
+                                .and_then(|e| e.get_component::<crate::core::entity::Item>().ok().map(|i| i.kind.to_string()))
+                                .unwrap_or_else(|| "something".to_string());
+
+                            // 인벤토리에 추가
+                            let mut inv_query = <&mut crate::core::entity::Inventory>::query()
+                                .filter(component::<PlayerTag>());
+                            if let Some(inv) = inv_query.iter_mut(&mut self.game.world).next() {
+                                inv.items.push(*item_ent);
+                                inv.assign_letter(*item_ent);
+                                picked_count += 1;
+                            }
+
+                            // Position 컴포넌트 제거 (바닥에서 시각적으로 사라짐)
+                            if let Some(mut entry) = self.game.world.entry(*item_ent) {
+                                entry.remove_component::<Position>();
+                            }
+
+                            if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                                let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
+                                log.add(format!("You pick up {}.", item_name), turn);
+                            }
+                        }
+                        if picked_count > 0 {
+                            // Grid 동기화
+                            self.game.resources.insert(self.game.grid.clone());
+                        }
+                    }
+                }
                 _action_executed = true;
             }
             Command::Open => {
@@ -209,33 +284,53 @@ impl super::NetHackApp {
                     .request_direction(DirectionAction::Loot);
             }
             Command::Search => {
-                let (mut subworld, _) =
-                    self.game
-                        .world
-                        .split_for_query(&<(&Position, &mut crate::core::entity::Trap)>::query());
-                if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
-                    let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
-                    if let Some(mut rng) = self
-                        .game
-                        .resources
-                        .get_mut::<crate::util::rng::NetHackRng>()
+                // [v2.41.1] split_for_query 대신 직접 World로 처리 (PlayerTag AccessDenied 수정)
+                let p_pos = {
+                    let mut q = <&Position>::query().filter(component::<PlayerTag>());
+                    q.iter(&self.game.world).next().copied()
+                };
+
+                if let Some(pos) = p_pos {
+                    let mut found_something = false;
+
+                    // 함정 발견 처리
                     {
-                        if let Some(rumors) = self
-                            .game
-                            .resources
-                            .get::<crate::core::systems::talk::Rumors>()
-                        {
-                            crate::core::systems::search::try_search(
-                                &mut subworld,
-                                &mut self.game.grid,
-                                &mut log,
-                                turn,
-                                &mut rng,
-                                &rumors,
-                            );
+                        let mut trap_query = <(&Position, &mut crate::core::entity::Trap)>::query();
+                        for (t_pos, trap) in trap_query.iter_mut(&mut self.game.world) {
+                            let dx = (t_pos.x - pos.x).abs();
+                            let dy = (t_pos.y - pos.y).abs();
+                            if dx <= 1 && dy <= 1 && !trap.discovered {
+                                trap.discovered = true;
+                                found_something = true;
+                            }
                         }
-                        _action_executed = true;
                     }
+
+                    // 비밀문 발견 처리
+                    for dy in -1..=1 {
+                        for dx in -1..=1 {
+                            let tx = pos.x + dx;
+                            let ty = pos.y + dy;
+                            if tx >= 0 && tx < 80 && ty >= 0 && ty < 21 {
+                                if let Some(tile) = self.game.grid.get_tile_mut(tx as usize, ty as usize) {
+                                    if tile.typ == crate::core::dungeon::tile::TileType::SDoor {
+                                        tile.typ = crate::core::dungeon::tile::TileType::Door;
+                                        found_something = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                        let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
+                        if found_something {
+                            log.add("You discover something!", turn);
+                        } else {
+                            log.add("You find nothing.", turn);
+                        }
+                    }
+                    _action_executed = true;
                 }
             }
             Command::Offer => {
@@ -269,18 +364,13 @@ impl super::NetHackApp {
                 }
             }
             Command::Pray => {
-                let (mut subworld, _) = self.game.world.split_for_query(&<(
-                    &mut crate::core::entity::player::Player,
-                    &mut crate::core::entity::Health,
-                    &Position,
-                )>::query(
-                ));
-                if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                // [v2.41.1] split_for_query 제거 → 직접 World 접근 (AccessDenied 방지)
+                if let Some(mut log) = self.game.resources.remove::<crate::ui::log::GameLog>() {
                     let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
                     if let Some(mut rng) = self
                         .game
                         .resources
-                        .get_mut::<crate::util::rng::NetHackRng>()
+                        .remove::<crate::util::rng::NetHackRng>()
                     {
                         if let Some(provider) =
                             self.game
@@ -288,7 +378,7 @@ impl super::NetHackApp {
                                 .get::<crate::core::systems::social::DefaultInteractionProvider>()
                         {
                             crate::core::systems::pray::try_pray(
-                                &mut subworld,
+                                &mut self.game.world,
                                 &self.game.grid,
                                 &mut log,
                                 turn,
@@ -297,32 +387,31 @@ impl super::NetHackApp {
                             );
                             _action_executed = true;
                         }
+                        self.game.resources.insert(rng);
                     }
+                    self.game.resources.insert(log);
                 }
             }
             Command::Sit => {
-                let (mut subworld, _) = self.game.world.split_for_query(&<(
-                    &mut crate::core::entity::player::Player,
-                    &mut crate::core::entity::Health,
-                    &Position,
-                )>::query(
-                ));
-                if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>() {
+                // [v2.41.1] split_for_query 제거 → 직접 World 접근 (AccessDenied 방지)
+                if let Some(mut log) = self.game.resources.remove::<crate::ui::log::GameLog>() {
                     let turn = self.game.resources.get::<u64>().map(|t| *t).unwrap_or(0);
                     if let Some(mut rng) = self
                         .game
                         .resources
-                        .get_mut::<crate::util::rng::NetHackRng>()
+                        .remove::<crate::util::rng::NetHackRng>()
                     {
                         crate::core::systems::sit::try_sit(
-                            &mut subworld,
+                            &mut self.game.world,
                             &self.game.grid,
                             &mut log,
                             turn,
                             &mut rng,
                         );
                         _action_executed = true;
+                        self.game.resources.insert(rng);
                     }
+                    self.game.resources.insert(log);
                 }
             }
             Command::Zap => {
@@ -622,14 +711,7 @@ impl super::NetHackApp {
                     _action_executed = true;
                 }
                 DirectionAction::Talk => {
-                    let (mut subworld, _) = self.game.world.split_for_query(&<(
-                        Entity,
-                        &Position,
-                        Option<&crate::core::entity::Dialogue>,
-                        Option<&crate::core::entity::Monster>,
-                    )>::query(
-                    ));
-                    // Resource borrow workaround: Extract using remove, perform action, then insert back.
+                    // [v2.41.1] split_for_query 제거 → 직접 World 접근 (AccessDenied 방지)
                     if let Some(mut log) = self.game.resources.remove::<crate::ui::log::GameLog>() {
                         if let Some(mut rng) =
                             self.game.resources.remove::<crate::util::rng::NetHackRng>()
@@ -646,7 +728,7 @@ impl super::NetHackApp {
                                 {
                                     let turn = log.current_turn;
                                     crate::core::systems::talk::try_talk(
-                                        &mut subworld,
+                                        &mut self.game.world,
                                         dir,
                                         &mut log,
                                         turn,
@@ -664,12 +746,13 @@ impl super::NetHackApp {
                     _action_executed = true;
                 }
                 _ => {
-                    if let Some(mut log) = self.game.resources.get_mut::<crate::ui::log::GameLog>()
+                    // [v2.41.1] Grid 동기화 추가 — Open/Close/Kick 등이 실제로 반영되도록
+                    if let Some(mut log) = self.game.resources.remove::<crate::ui::log::GameLog>()
                     {
                         if let Some(mut rng) = self
                             .game
                             .resources
-                            .get_mut::<crate::util::rng::NetHackRng>()
+                            .remove::<crate::util::rng::NetHackRng>()
                         {
                             if let Some(provider) = self
                                 .game
@@ -687,8 +770,14 @@ impl super::NetHackApp {
                                     &*provider,
                                 );
                             }
+                            self.game.resources.insert(rng);
                         }
+                        self.game.resources.insert(log);
                     }
+                    // Grid 변경을 resources에 반영 (렌더러가 참조)
+                    self.game.resources.insert(self.game.grid.clone());
+                    // [v2.41.1] 방향 입력 소비 — movement_system이 같은 키로 이동하는 것 방지
+                    self.input.last_cmd = Command::Unknown;
                     _action_executed = true;
                 }
             }

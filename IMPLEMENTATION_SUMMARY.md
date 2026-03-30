@@ -308,5 +308,27 @@
 
 ---
 
-**문서 버전**: v2.41.0 🏆 100% 달성!
-**최종 업데이트**: 2026-02-28
+## v2.41.1 안정화 작업 (2026-03-30)
+
+### Grid 이중화(Dual Grid) 근본 수정
+- **문제**: `self.game.grid`(렌더러 소스)와 `resources.Grid`(ECS 시스템 소스)가 분리되어 모든 시스템의 Grid 변경이 화면에 반영되지 않음
+- **수정**: `execute_turn_systems()` 직후 `resources.Grid → self.game.grid` 역동기화 추가
+- **영향**: movement, AI, engrave, item_use, zap 등 `&mut Grid` 사용 시스템 전체에 적용
+
+### 시작 장비 자동 장착
+- `app.rs`: `inventory_items`의 `ItemClass::Weapon` → `EquipmentSlot::Melee`, `ItemClass::Armor` → 해당 슬롯 자동 장착
+- 장착 후 인벤토리에서 제거하여 이중 참조 방지
+
+### 리소스 이중화 감사 결과
+| 리소스 | 이중화 여부 | 상태 |
+|--------|------------|------|
+| Grid | `self.game.grid` vs `resources.Grid` | ✅ 수정 완료 |
+| World | 동일 인스턴스 | ❌ 없음 |
+| VisionSystem | `resources`에서 직접 읽기 | ❌ 없음 |
+| GameLog | `resources`에서 직접 읽기 | ❌ 없음 |
+| Dungeon | 레벨전환 시에만 동기화 | ❌ 없음 |
+
+---
+
+**문서 버전**: v2.41.1
+**최종 업데이트**: 2026-03-30

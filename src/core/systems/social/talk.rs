@@ -4,7 +4,7 @@ use crate::core::entity::{Dialogue, Monster, PlayerTag, Position, Talkative};
 use crate::core::game_state::Direction;
 use crate::ui::log::GameLog;
 use crate::util::rng::NetHackRng;
-use legion::world::SubWorld;
+// [v2.41.1] SubWorld → World로 변경 (AccessDenied 방지)
 use legion::*;
 use serde::{Deserialize, Serialize};
 
@@ -120,7 +120,7 @@ impl Rumors {
 
 /// 대화(Talk) 시스템
 pub fn try_talk(
-    world: &mut SubWorld,
+    world: &mut World,
     dir: Direction,
     log: &mut GameLog,
     turn: u64,

@@ -171,8 +171,24 @@ pub fn death(
         let template_opt = assets.monsters.templates.get(&dead.template_name);
         let mon_name = &dead.template_name;
 
-        // --- 3-1. 사망 메시지 ---
-        log.add(format!("The {} dies!", mon_name), *turn);
+        // --- 3-1. 사망 메시지 --- (플레이어 인접인 경우만)
+        // [v2.41.1] 멀리 있는 몬스터 사망은 메시지 출력 안 함
+        let mut near_player = false;
+        if let Some(_p_ent) = player_ent {
+            let mut p_query = <&crate::core::entity::Position>::query()
+                .filter(component::<PlayerTag>());
+            for p_pos in p_query.iter(world) {
+                let dx = (p_pos.x - dead.pos_x).abs();
+                let dy = (p_pos.y - dead.pos_y).abs();
+                // 시야 범위 내 (약 10칸)
+                if dx <= 10 && dy <= 10 {
+                    near_player = true;
+                }
+            }
+        }
+        if near_player {
+            log.add(format!("The {} dies!", mon_name), *turn);
+        }
 
         // [v2.0.0 R5] MonsterDied 이벤트 발행 ? 기존 DeathResults와 병행
         event_queue.push(GameEvent::MonsterDied {
@@ -187,17 +203,34 @@ pub fn death(
         });
 
         // --- 3-2. 경험치 계산 (원본: exper.c:experience) ---
-        if let Some(template) = template_opt {
-            let base_xp = crate::core::systems::exper::experience(template, player_exp_level);
-            let adjusted_xp = crate::core::systems::exper::adjusted_experience(
-                base_xp,
-                player_luck,
-                player_exp_level,
-                dead.level,
-            );
-            total_xp_gain += adjusted_xp;
-        } else {
-            total_xp_gain += (dead.level * 10) as u64;
+        // [v2.41.1] 플레이어가 직접 관여한 경우만 경험치 부여 (인접 거리 2 이내)
+        // 원본 NetHack: killed_by 추적으로 판별하지만, 현재는 거리 기반 근사치 사용
+        let mut player_involved = false;
+        if let Some(_p_ent) = player_ent {
+            let mut p_query = <&crate::core::entity::Position>::query()
+                .filter(component::<PlayerTag>());
+            for p_pos in p_query.iter(world) {
+                let dx = (p_pos.x - dead.pos_x).abs();
+                let dy = (p_pos.y - dead.pos_y).abs();
+                if dx <= 2 && dy <= 2 {
+                    player_involved = true;
+                }
+            }
+        }
+
+        if player_involved {
+            if let Some(template) = template_opt {
+                let base_xp = crate::core::systems::exper::experience(template, player_exp_level);
+                let adjusted_xp = crate::core::systems::exper::adjusted_experience(
+                    base_xp,
+                    player_luck,
+                    player_exp_level,
+                    dead.level,
+                );
+                total_xp_gain += adjusted_xp;
+            } else {
+                total_xp_gain += (dead.level * 10) as u64;
+            }
         }
 
         // --- 3-3. 아이템 드롭 — CommandBuffer로 위치 변경 (R8-1: DeathResults 대체) ---

@@ -51,9 +51,7 @@ pub fn try_open_door(
     if let Some(tile) = grid.get_tile_mut(tx as usize, ty as usize) {
         match tile.typ {
             TileType::Door => {
-                //
-                //
-                //
+                // [v2.41.1] 닫힌 문을 열린 문으로 변경
                 tile.typ = TileType::OpenDoor;
                 tile.doormas = 1;
                 log.add(provider.generate_dialogue("door_opens"), turn);

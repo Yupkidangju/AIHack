@@ -2,6 +2,20 @@
 
 이 프로젝트의 모든 주요 변경 사항은 이 파일에 기록됩니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)를 따르며, 이 프로젝트는 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
+
+## [2.41.1] - 2026-03-30
+### Fixed
+- **[Phase S5a] Grid 이중화(Dual Grid) 근본 수정**: `self.game.grid`(렌더러)와 `resources.Grid`(ECS 시스템)가 분리되어 시스템의 모든 Grid 변경(문 열기, 전투, 함정, 이동 등)이 화면에 반영되지 않던 근본 결함 해결
+  - `execute_turn_systems()` 직후 `resources.Grid → self.game.grid` 역동기화 추가
+  - 시스템 실행 조건을 `last_cmd != Unknown || _action_executed`로 확장하여 방향 입력 처리 후에도 시스템 실행 보장
+  - 방향 입력 소비(`last_cmd = Unknown`)로 Open/Close/Kick 후 이동 중복 실행 방지
+- **몬스터 원거리 사망 필터링**: 플레이어와 무관한 몬스터 사망 시 경험치/사망 메시지 필터링 (거리 기반 판별)
+- **디버그 출력 정리**: 매 프레임 출력되던 `[Debug] Player Entity` 로그 제거
+
+### Changed
+- **Phase S5b**: 기본 상호작용 9개 동사(이동/공격/문열기/닫기/발차기/줍기/계단/사망/탐색) 전량 시각적 검증 완료
+- **메트릭**: 177,229줄 / 438파일 / 4,177테스트 / 이식률 100%
+
 ## [2.41.0] - 2026-02-27
 ### Added
 - **[🏆 Phase FINAL] 100% 달성!** religion_신(7t)/hazard_함정(7t)/skill_스킬(7t)/nutrition_영양(7t)/finale_마무리(7t)/final_misc_잔여(9t)/final_combat_전투(9t)/centennial_100%(9t) — 총 62테스트

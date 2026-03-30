@@ -1,7 +1,8 @@
 # 🛡️ AIHack 안정화 로드맵 (STABILIZATION_ROADMAP)
 
-**버전**: v1.0
+**버전**: v1.1
 **작성일**: 2026-02-28
+**최종 업데이트**: 2026-03-30 (Phase S5a 근본 수정 완료, S5b 검증 진행 중)
 **대상 브랜치**: `stabilize/e2e-playable` (main에서 분기)
 **전제**: v2.41.0 main 브랜치 = 100% 순수 번역본 (177,229줄, 4,177 테스트)
 **목표**: cargo run → Title → CharCreation → Playing (N턴 생존) → GameOver 전체 E2E 동작
@@ -52,14 +53,16 @@
 ## 1. 안정화 Phase 구조 (8단계)
 
 ```
-Phase S0: 브랜치 생성 + 빌드 검증
-Phase S1: 앱 기동 (cargo run → 창 뜨기)
-Phase S2: 상태머신 관통 (Title → CharCreation → Playing 진입)
-Phase S3: 첫 턴 생존 (Playing 상태에서 1턴 실행)
-Phase S4: N턴 루프 (10턴 연속 패닉 없음)
-Phase S5: 핵심 상호작용 (이동/공격/아이템 줍기/계단)
-Phase S6: Edge Case 방어 (사망/레벨변경/상점 진입)
-Phase S7: LLM 최소 주입 (묘비명 → NPC 대사 → 상점)
+Phase S0: 브랜치 생성 + 빌드 검증               ✅ 완료
+Phase S1: 앱 기동 (cargo run → 창 뜨기)          ✅ 완료
+Phase S2: 상태머신 관통 (Title → Playing 진입)    ✅ 완료
+Phase S3: 첫 턴 생존 (Playing에서 1턴 실행)       ✅ 완료
+Phase S4: N턴 루프 (1000턴 이상 패닉 없음)        ✅ 완료
+Phase S5a: 게임 루프-ECS 상태 동기화 파이프라인   ✅ 완료 (Grid 역동기화 포함)
+Phase S5b: 기본 상호작용 명령어 안정화            🔧 진행 중 ⬅️
+Phase S5c: 인벤토리/전투/마법 명령어 연결         ⬜ 대기
+Phase S6: Edge Case 방어                          ⬜ 대기
+Phase S7: LLM 최소 주입                           ⬜ 대기
 ```
 
 ---
@@ -70,12 +73,12 @@ Phase S7: LLM 최소 주입 (묘비명 → NPC 대사 → 상점)
 
 **목표**: 안정화 전용 브랜치에서 깨끗한 빌드 확인
 
-- [ ] `git checkout -b stabilize/e2e-playable` 생성
-- [ ] `cargo build` 에러 0개 확인
-- [ ] `cargo test` 4,177개 전량 통과 확인
-- [ ] 경고(warning) 목록 캡처 → 정리 우선순위 결정
+- [x] `git checkout -b stabilize/e2e-playable` 생성
+- [x] `cargo build` 에러 0개 확인
+- [x] `cargo test` 4,177개 전량 통과 확인
+- [x] 경고(warning) 목록 캡처 → 약 140개 (unused variables 등, 기능 영향 없음)
 
-**판정 기준**: `cargo build` 성공, 테스트 전량 통과
+**판정 기준**: `cargo build` 성공, 테스트 전량 통과 — ✅ **달성**
 
 ---
 
@@ -89,13 +92,13 @@ Phase S7: LLM 최소 주입 (묘비명 → NPC 대사 → 상점)
 3. ECS Resources 초기화 순서 문제
 
 **작업**:
-- [ ] `main.rs` 기동 시 가장 먼저 `std::panic::set_hook` 설정 (터미널 복구 및 에러 로그 파일/콘솔 명확히 출력)
-- [ ] `cargo run` 실행 → 패닉 메시지 수집
-- [ ] AssetManager TOML 로딩 경로 확인/수정
-- [ ] NetHackApp::new() 내 Resources 등록 순서 검증
-- [ ] Title 화면 렌더링 확인
+- [x] `main.rs` 기동 시 가장 먼저 `std::panic::set_hook` 설정
+- [x] `cargo run` 실행 → 패닉 메시지 수집
+- [x] AssetManager TOML 로딩 경로 확인/수정 (monsters.toml flags3 u16 초과 수정)
+- [x] NetHackApp::new() 내 Resources 등록 순서 검증
+- [x] Title 화면 렌더링 확인
 
-**판정 기준**: 윈도우가 뜨고 Title 화면의 "New Game" 버튼이 보임
+**판정 기준**: 윈도우가 뜨고 Title 화면의 "New Game" 버튼이 보임 — ✅ **달성**
 
 ---
 
@@ -111,15 +114,15 @@ Phase S7: LLM 최소 주입 (묘비명 → NPC 대사 → 상점)
 2. AppState::Playing 전환 후 첫 `process_game_turn()` 호출 시 패닉
 
 **작업**:
-- [ ] CharCreation 화면에서 역할/종족/이름 선택 → Done 클릭
-- [ ] `initialize_game_with_choices()` 디버깅
-  - Grid 생성 (DungeonManager)
+- [x] CharCreation 화면에서 역할/종족/이름 선택 → Done 클릭
+- [x] `initialize_game_with_choices()` 디버깅
+  - Grid 생성 (DungeonManager) — gen.rs 오버플로우 수정
   - Player 엔티티 + 초기 장비/인벤토리
-  - 몬스터 스포닝
-  - Resources 등록 (GameState, EventQueue, ActionQueue 등)
-- [ ] Playing 상태 진입 확인 (맵이 렌더링되는가?)
+  - 몬스터 스포닝 — 원본 NetHack 방식으로 조정 완료
+  - Resources 등록 (TeleportAction 등 누락분 추가)
+- [x] Playing 상태 진입 확인 (맵이 렌더링되는가?)
 
-**판정 기준**: 맵+플레이어 '@'가 화면에 보임
+**판정 기준**: 맵+플레이어 '@'가 화면에 보임 — ✅ **달성**
 
 ---
 
@@ -142,14 +145,14 @@ execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
 ```
 
 **작업**:
-- [ ] `execute_turn_systems()` 내 모든 시스템을 주석 처리
-- [ ] movement_system만 활성화 → 방향키 이동 테스트
-- [ ] +monster_ai_system → 몬스터가 움직이는지 확인
-- [ ] +death_system → 전투 사망 처리 확인
-- [ ] ... (점진적 활성화)
-- [ ] 25개 전체 활성화 → 1턴 무패닉
+- [x] `execute_turn_systems()` 내 시스템 점진적 활성화
+- [x] movement_system 활성화 → 방향키 이동 테스트 — ✅
+- [x] +monster_ai_system → AccessDenied 발생 → write_component(Position) 추가로 수정
+- [x] +death_system → 전투 사망 처리 확인
+- [x] +trap_trigger → Resource not exist → AssetManager 구조 변경으로 수정
+- [x] 25개 전체 활성화 → 1턴 무패닉
 
-**판정 기준**: 방향키 입력 → '@' 이동 → 화면 갱신 → 패닉 없음
+**판정 기준**: 방향키 입력 → '@' 이동 → 화면 갱신 → 패닉 없음 — ✅ **달성**
 
 ---
 
@@ -163,30 +166,114 @@ execute_turn_systems() 내 시스템을 1개씩 활성화하며 디버깅
 3. EventQueue 누적 (clear 시점 오류)
 
 **작업**:
-- [ ] `drain_action_queue()` 내 처리 횟수 카운터 도입 (예: 한 턴에 100회 초과 시 데드락으로 간주하고 강제 종료 및 에러 출력)
-- [ ] 10턴 자동 실행 (또는 방향키 10회 연타)
-- [ ] 턴 카운터 증가 확인
-- [ ] 몬스터 AI 이동 확인
-- [ ] GameLog 메시지 출력 확인
-- [ ] EventQueue→EventHistory 기록/클리어 확인
+- [x] `drain_action_queue()` 내 처리 횟수 카운터 도입
+- [x] 1000턴 자동 실행 (테스트 스크립트) — 패닉 없이 완주
+- [x] 턴 카운터 증가 확인
+- [x] 몬스터 AI 이동 확인
+- [x] GameLog 메시지 출력 확인
+- [x] EventQueue→EventHistory 기록/클리어 확인
 
-**판정 기준**: 10턴 연속 패닉 없음, GameLog에 메시지 출력됨
+**판정 기준**: 1000턴 연속 패닉 없음, GameLog에 메시지 출력됨 — ✅ **달성**
+
+**추가 수정 사항 (2026-03-29)**:
+- ✅ 맵 생성: 몬스터 수 원본 공식(방당 33%) 적용, 특수 방 깊이 기반 확률로 변경
+- ✅ 몬스터 스포닝: HP를 d(m_lev,8)로 안정화, 그룹 크기 rnd(n)으로 제한
+- ✅ 난이도 필터: depth+5 제한 + 거리 기반 가중치
+- ✅ AIHack 전용 스폰(beast_horde, CommBase, SupplyDepot) 비활성화
+- ✅ dodoor: 벽 타일 조건으로 수정
 
 ---
 
-### Phase S5: 핵심 상호작용
+### Phase S5: 핵심 상호작용 (3단계로 세분화)
 
-**목표**: NetHack의 기본 동사(verb)가 동작
+> ⚠️ **2026-03-29 진단 결과**: 이식된 로직 함수는 대부분 존재하지만, 게임 루프(`game_loop.rs`)와의 연결이 
+> 불완전하여 실제 게임에서 동작하지 않는 커맨드가 다수 존재함. 구조적으로 세 가지 문제가 확인됨:
+> 1. **Grid 상태 동기화 부재**: 커맨드가 `self.game.grid`를 수정하지만 `resources`에 반영되지 않음
+> 2. **분산된 로직**: 시스템(Schedule) vs 직접 Grid 조작이 혼재하여 버그 추적 어려움
+> 3. **Legion ECS AccessDenied**: `split_for_query`에서 컴포넌트 접근 선언 불일치로 런타임 패닉
 
-- [ ] **이동**: 8방향 + 대기(.) 
-- [ ] **공격**: 몬스터에 인접 이동 → 전투 메시지
-- [ ] **아이템 줍기**: 바닥 아이템 위에서 `,` 키
-- [ ] **인벤토리**: `i` 키 → 인벤토리 팝업
-- [ ] **계단**: `>` 키 → 레벨 이동
-- [ ] **문 열기**: `o` 키
-- [ ] **사망**: HP 0 이하 → GameOver 화면 전환
+---
 
-**판정 기준**: 위 7개 동사가 패닉 없이 실행
+#### Phase S5a: 게임 루프 - ECS 상태 동기화 파이프라인 확립 ⬅️ **최우선**
+
+**목표**: 어떤 커맨드가 Grid/엔티티를 수정하더라도, 그 변경이 즉각 렌더링에 반영되는 "단일화된 반영 통로" 구축
+
+**현재 문제**:
+- `Open/Close/Kick` 등 방향 액션의 `_ =>` 분기에서 Grid 수정 후 `resources.insert(grid.clone())` 누락
+- `split_for_query` 사용 시 선언되지 않은 컴포넌트 접근으로 AccessDenied 패닉 (Search, Pray, Sit, Talk에서 확인)
+
+**작업**:
+- [x] `execute_direction_action` 의 `_ =>` 분기에서 Grid 변경 후 resources 동기화 추가 (2026-03-30)
+- [x] `split_for_query` 사용 지점(Pray, Sit, Talk) 전부 직접 World 접근으로 교체 (2026-03-30)
+- [x] Grid 동기화: `_ =>` 분기에서 `resources.insert(grid.clone())` 추가, borrow conflict을 remove/insert 패턴으로 해결
+
+**판정 기준**: `o` (Open) + 방향키 → 실제로 문이 열림, `c` (Close) → 문이 닫힘, `K` (Kick) → 발차기 동작
+
+**이전 수정 이력** (본 세션에서 완료):
+- ✅ `Search (s)`: split_for_query → 직접 World 접근으로 수정 (AccessDenied 해결)
+- ✅ `monster_ai`: `#[write_component(Position)]` 추가 (AccessDenied 해결)
+- ✅ `Trap` 시스템: AssetManager를 통한 리소스 접근으로 구조 변경
+
+**근본 수정 (2026-03-30)**: Grid 이중화 (Dual Grid) 문제 해결
+- **문제**: `self.game.grid` (렌더러 소스)와 `resources.Grid` (시스템 소스)가 분리되어 있었음
+  - 89행에서 `resources.insert(self.game.grid.clone())` → 시스템은 복사본을 수정
+  - 시스템 실행 후 수정된 Grid를 `self.game.grid`로 역복원하지 않음
+  - **결과**: 모든 시스템의 Grid 변경(문 열기, 전투, 함정 등)이 화면에 반영되지 않음
+- **수정**: `execute_turn_systems()` 직후 `resources.Grid → self.game.grid` 역동기화 추가
+- **추가 수정**: 시스템 실행 조건을 `last_cmd != Unknown || _action_executed`로 확장
+- **추가 수정**: 방향 입력 소비(`last_cmd = Unknown`) 추가로 이동+액션 중복 실행 방지
+- **추가 수정**: 몬스터 원거리 사망 시 불필요한 경험치/메시지 필터링 (거리 기반)
+
+---
+
+#### Phase S5b: 기본 상호작용 명령어 안정화
+
+**목표**: NetHack의 기본 동사(verb) 중 '방향 입력 + 타일/아이템 상호작용' 그룹이 정상 동작
+
+**대상 커맨드**:
+- [x] **이동**: 8방향 + 대기(.) — ✅ 동작 확인됨
+- [x] **공격**: 몬스터 인접 이동 → 전투 메시지 — ✅ 시각적 검증 완료 (Grid 역동기화)
+- [x] **문 열기 (o)**: 방향 → Door → OpenDoor 변경 — ✅ 시각적 검증 완료 (Grid 역동기화)
+- [x] **문 닫기 (c)**: 방향 → OpenDoor → Door 변경 — ✅ 코드 연결 완료
+- [x] **발차기 (K)**: 방향 → 문 파괴/밀치기 — ✅ 코드 연결 완료
+- [x] **아이템 줍기 (,)**: 바닥 아이템 → 인벤토리 — ✅ 코드 연결 완료
+- [x] **계단 (> / <)**: 레벨 이동 — 기존 LevelChange 시스템으로 연결됨
+- [x] **사망**: HP 0 → GameOver 전환 — 기존 death_system으로 연결됨
+- [x] **탐색 (s)**: 숨겨진 문/함정 발견 — ✅ 동작 확인됨
+
+**판정 기준**: 위 9개 동사가 패닉 없이 실행되고 실제 게임 상태가 변경됨
+
+---
+
+#### Phase S5c: 인벤토리 및 전투/마법 명령어 연결
+
+**목표**: 인벤토리를 열어 타겟을 선택하는 복합 커맨드 그룹이 동작
+
+**대상 커맨드**:
+- [ ] **인벤토리 (i)**: 인벤토리 팝업 표시
+- [ ] **장비 착용 (W/P)**: Wear(갑옷) / Put on(악세서리) 선택 → 장비
+- [ ] **무기 장착 (w)**: Wield → 무기 교체
+- [ ] **포션 마시기 (q)**: Quaff → 포션 효과 적용
+- [ ] **스크롤 읽기 (r)**: Read → 스크롤 효과 적용
+- [ ] **마법 시전 (Z)**: Cast → 방향/타겟 → 마법 효과
+- [ ] **지팡이 (z)**: Zap → 방향 → 빔/볼트 효과
+- [ ] **던지기 (t)**: Throw → 아이템 선택 → 방향 → 투사체 이동
+- [ ] **식사 (e)**: Eat → 음식 선택 → 영양/효과 적용
+- [ ] **도구 사용 (a)**: Apply → 도구 선택 → 효과
+- [ ] **기도 (#pray)**: 신앙 시스템 → 보상/벌칙
+
+**구현 시 주의사항**:
+- UI(인벤토리 창, 프롬프트)와 게임 로직 간의 `GameState` 상태 머신이 꼬이지 않도록 주의
+- 각 커맨드에서 `_action_executed = true` 설정 확인 (턴 소비 여부)
+
+**판정 기준**: 위 커맨드가 패닉/크래시 없이 실행되고, 장비/스탯 변경이 즉각 UI에 반영됨
+
+---
+
+> **전체 진행 순서**: S5a (파이프라인) → S5b (기본) → S5c (복합)
+> S5a를 완료해야 S5b/S5c가 의미가 있음 (Grid 동기화 없이는 어떤 커맨드도 제대로 안됨)
+
+**판정 기준**: 위 전체 커맨드가 패닉 없이 실행
 
 ---
 

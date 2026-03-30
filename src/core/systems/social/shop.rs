@@ -77,7 +77,7 @@ pub fn try_pay(
 
 ///
 pub fn try_identify_service(
-    world: &mut SubWorld,
+    world: &mut World,
     log: &mut GameLog,
     turn: u64,
     provider: &dyn super::InteractionProvider,

@@ -1,4 +1,4 @@
-﻿# 디자인 의사결정 (DESIGN_DECISIONS)
+# 디자인 의사결정 (DESIGN_DECISIONS)
 
 이 문서는 프로젝트 진행 중 선택한 주요 아키텍처 및 기술적 결정에 대한 근거를 기록합니다.
 모든 신규 아키텍처 결정은 반드시 이 문서에 추가되어야 하며, 결정의 배경/근거/대안을 포함해야 합니다.
@@ -750,3 +750,26 @@ Rust Pure Result (spawn_ext.rs) - 순수 함수:
 2. 게임 엔진(NetHack 177,000줄)급 대형 레거시 C 코드에 실증 적용
 3. DARPA TRACTOR/C2SaferRust 등 기존 연구와 차별화된 접근법
 4. Pure Result + ECS 조합의 아키텍처 패턴 정립
+
+---
+
+## [2026-03-30] - v2.41.1: 안정화 Phase S5a/S5b 아키텍처 결정
+
+### STAB-1. Grid 역동기화(Reverse Sync) 패턴
+
+- **결정**: `execute_turn_systems()` 직후 `resources.Grid`를 `self.game.grid`로 역복원하는 단방향 동기화 패턴 채택
+- **배경**: 원본 C NetHack은 전역 `level` 변수 하나로 맵 상태를 관리하지만, Rust ECS에서는 `Resources`와 `self.game.grid`라는 두 개의 Grid 인스턴스가 존재. 시스템은 `resources`의 복사본을 수정하고, 렌더러는 `self.game.grid`를 직접 읽으므로 변경이 반영되지 않는 근본적 불일치 발생.
+- **근거**: Grid를 단일 소스로 통합하려면 전체 렌더러를 resources 기반으로 재작성해야 하므로 리스크가 높음. 대신 시스템 실행 후 역동기화하는 것이 최소 침습적 수정.
+- **대안 검토**: (1) 렌더러가 `resources.Grid`를 직접 읽는 방식 → VisionSystem은 이미 이 패턴이지만 Grid는 수천 곳에서 `self.game.grid`를 참조하므로 리팩토링 비용 과다. (2) `Arc<Mutex<Grid>>` 공유 → Legion의 Resource 시스템과 호환 불가.
+
+### STAB-2. 시작 장비 자동 장착
+
+- **결정**: `initialize_game_with_choices()`에서 초기 아이템의 `ItemClass`를 확인하여 `Weapon` → `Melee`, `Armor` → 해당 슬롯에 자동 장착
+- **배경**: 원본 NetHack도 시작 장비는 자동 장착됨 (`ini_inv()` 함수). 미장착 상태에서 AC 10 + 맨손 전투는 1층에서도 생존 불가.
+- **근거**: Wield/Wear UI가 아직 미구현(Phase S5c)이므로, 시작 시 자동 장착으로 플레이 테스트 가능성 확보.
+
+### STAB-3. 시스템 실행 조건 확장
+
+- **결정**: `execute_turn_systems()` 호출 조건을 `last_cmd != Unknown`에서 `last_cmd != Unknown || _action_executed`로 확장
+- **배경**: 방향 입력 처리(Open, Kick 등) 과정에서 `last_cmd`가 `Unknown`으로 소비되면 시스템 실행이 건너뛰어져 턴이 진행되지 않음.
+- **근거**: 액션이 실행되었다면(`_action_executed = true`) 시스템도 반드시 실행되어야 몬스터 AI, 함정 발동 등 후속 처리가 정상 작동.
