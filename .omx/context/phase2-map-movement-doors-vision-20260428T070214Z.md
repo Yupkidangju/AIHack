@@ -1,0 +1,25 @@
+# Ralplan Context Snapshot: Phase 2 Map, Movement, Doors, Vision
+
+- 작업 슬러그: `phase2-map-movement-doors-vision`
+- 작성시각(UTC): 2026-04-28T07:02:14Z
+- 요청: `$ralplan phase2 계획 문서화`. 구현 없이 Phase 2 전용 PRD/test-spec를 생성한다.
+- 원하는 산출물: Phase 2 실행 전 Ralph/Team이 그대로 사용할 수 있는 구현 참조급 계획 문서.
+- 현재 구현 근거:
+  - Phase 1 완료: `Cargo.toml`, `src/lib.rs`, `src/bin/aihack-headless.rs`, `src/core/{action,error,event,ids,mod,rng,session,snapshot,turn}.rs` 존재.
+  - `GameSession::new(seed)`, `CommandIntent::Wait`, `TurnOutcome`, FNV-1a stable snapshot hash, headless runner 검증 완료.
+  - 현재 `GameSession`에는 `world`가 없고 Phase 1 snapshot은 seed/turn/run_state/event summary만 포함한다.
+- 문서 근거:
+  - `audit_roadmap.md` Phase 2: `GameMap`, `TileKind`, `DoorState`, movement blocker, open/close, LOS radius 8, `Observation.visible_tiles`.
+  - `implementation_summary.md` Task 3/6/7: 40x20 map fixture, movement blocked by wall/closed door, open/close, visible tiles, closed door blocks LOS, legal actions.
+  - `spec.md` 9.3: 기본 시야 반경 8, 벽/닫힌 문 LOS 차단, 열린 문 LOS 통과.
+  - `spec.md` 10.4: 첫 레벨 fixture는 40x20, player_start=(5,5), stairs_down=(34,15), monsters/items는 후속 Phase용 데이터지만 Phase 2에서는 배치하지 않는다.
+- 제약:
+  - Phase 2만 계획한다. combat, item, monster AI, save/load, TUI 구현은 제외한다.
+  - 레거시 코드는 참조만 가능하고 직접 import 금지.
+  - `GameSession` 단일 상태 원천과 deterministic hash 계약을 유지한다.
+  - 문서에 나온 완료 기준은 테스트 가능한 형태로 닫는다.
+- 주요 설계 질문과 계획상 결정:
+  - `Pos`/`Direction`은 Phase 2 movement에 필수이므로 `src/core/position.rs` 또는 동등 모듈로 포함한다.
+  - 전체 entity store는 Phase 2 범위 밖이므로 player position은 `GameWorld.player_pos` 최소 필드로 둔다.
+  - `Observation.visible_tiles`는 AI adapter 전체가 아니라 Phase 2 최소 observation module로 구현한다.
+  - map hash 입력은 snapshot에 포함되어 movement/door 변경이 final hash에 반영되게 한다.

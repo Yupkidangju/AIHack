@@ -1,21 +1,14 @@
 # AIHack Git Policy (D3D Protocol Rule 7)
 
-# 1. 모든 .md 파일 제외 (All Markdown Files)
-*.md
-
-# 2. 예외 허용 (Allow Only 3 Types of Docs)
-!README.md
-!CHANGELOG.md
-!BUILD_GUIDE.md
-
-# 3. Rust 관련 제외 설정
+# 1. Rust 관련 제외 설정
 /target
+/runtime
 **/*.rs.bk
 
-# 4. NetHack 원본 소스 (참조용, Git 제외)
+# 2. NetHack 원본 소스 (참조용, Git 제외)
 /nethack_original/
 
-# 5. 기타 임시 파일
+# 3. 기타 임시 파일
 .antigravity/archive
 transplant_temp/
 *.log
@@ -24,6 +17,6 @@ transplant_temp/
 .DS_Store
 Thumbs.db
 
-# 6. IDE / 에디터
+# 4. IDE / 에디터
 .vscode/
 .idea/

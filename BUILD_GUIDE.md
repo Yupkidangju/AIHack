@@ -1,121 +1,198 @@
-# 빌드 가이드 (BUILD_GUIDE)
+# AIHack Build Guide
 
-이 문서는 AIHack 프로젝트를 빌드하고 실행하기 위한 절차를 설명합니다.
+문서 상태: active
+작성일: 2026-04-28
 
-## 1. 사전 요구 사항
+## 1. 현재 루트 상태
 
-| 도구 | 최소 버전 | 용도 |
-|-----|----------|-----|
-| **Rust** | 1.84+ (Stable) | 핵심 개발 언어 |
-| **Cargo** | Rust 번들 | 패키지 관리자 |
-| **MSVC Build Tools** | VS 2022+ | Windows C 링커 (egui 의존성) |
-| **Git** | 2.40+ | 버전 관리 |
+현재 루트에는 새 엔진 코드가 없다. 이전 Rust 포트는 `legacy_nethack_port_reference/` 아래에 보존되어 있다.
 
-### 1.1 Rust 설치 확인
-```powershell
-rustc --version   # 1.84.0 이상 확인
+새 코드 작성 전 기준 파일:
+
+- `AGENTS.md`
+- `AI_IMPLEMENTATION_DOC_STANDARD.md`
+- `README.md`
+- `spec.md`
+- `designs.md`
+- `implementation_summary.md`
+- `DESIGN_DECISIONS.md`
+- `audit_roadmap.md`
+- `CHANGELOG.md`
+
+## 2. 사전 준비
+
+필수:
+
+- Rust stable
+- Cargo
+
+확인:
+
+```bash
+rustc --version
 cargo --version
 ```
 
-### 1.2 Windows 빌드 도구
-`egui`(`eframe`)는 내부적으로 C 라이브러리를 사용합니다. Windows에서 빌드하려면 MSVC Build Tools가 필요합니다.
-- Visual Studio Installer에서 "C++ 빌드 도구" 워크로드 설치
+## 3. 새 Cargo 스캐폴딩 절차
 
----
+루트에서 새 Cargo 패키지를 만든다. 레거시 폴더는 workspace member로 넣지 않는다.
 
-## 2. 빌드 절차
+필수 `Cargo.toml` 초안:
 
-### 2.1 디버그 빌드 (개발용)
-```powershell
-# 프로젝트 루트에서
-cargo build
+```toml
+[package]
+name = "aihack"
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+rand = "0.8"
+clap = { version = "4", features = ["derive"] }
+
+[[bin]]
+name = "aihack"
+path = "src/main.rs"
+
+[[bin]]
+name = "aihack-headless"
+path = "src/bin/aihack-headless.rs"
 ```
 
-### 2.2 실행
-```powershell
-cargo run
+`license = "UNLICENSED"`는 초기 개발 중 임시값이다. NetHack 파생 여부가 결정되면 별도 라이선스 결정을 `DESIGN_DECISIONS.md`에 추가한다.
+
+## 4. 필수 엔트리와 현재 구현 상태
+
+`src/main.rs`:
+
+```rust
+fn main() {
+    println!("AIHack UI adapter is not implemented yet. Use aihack-headless.");
+}
 ```
 
-### 2.3 릴리즈 빌드 (배포용)
-```powershell
-cargo build --release
-```
-릴리즈 바이너리 경로: `target/release/nethack-rs.exe`
+`src/bin/aihack-headless.rs`:
 
-### 2.4 빌드 스크립트 (자동화)
-```powershell
-# PowerShell 빌드 스크립트
-./build.ps1
-```
+```rust
+use clap::Parser;
 
----
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(long, default_value_t = 42)]
+    seed: u64,
+    #[arg(long, default_value_t = 1000)]
+    turns: u64,
+}
 
-## 3. 의존성 목록
-
-| 크레이트 | 버전 | 용도 |
-|---------|-----|-----|
-| `ratatui` | 0.26 | TUI 맵 렌더링 |
-| `eframe` | 0.27 | egui 네이티브 윈도우 |
-| `crossterm` | 0.27 | 키보드/마우스 이벤트 |
-| `legion` | 0.4 | ECS 엔처 |
-| `serde` | 1.0 | 직렬화 |
-| `serde_json` | 1.0 | JSON 직렬화 |
-| `toml` | 0.8 | 설정 파일 파싱 |
-| `rand` | 0.8 | 난수 생성 |
-| `bitflags` | 2.4 | 비트플래그 |
-| `serde_repr` | 0.1 | 열거형 직렬화 |
-| `lazy_static` | 1.4 | 정적 초기화 |
-
----
-
-## 4. 프로젝트 구조
-
-```
-root/
-├── src/              # Rust 소스 (438개 파일, 177,229라인) 🏆 100% 이식 완료
-│   ├── main.rs       # 앱 엔트리포인트 + AppState 화면 분기
-│   ├── app.rs        # NetHackApp 구조체 + 초기화
-│   ├── game_loop.rs  # 게임 턴 처리
-│   ├── game_ui.rs    # UI 렌더링
-│   ├── input_handler.rs # 입력 처리
-│   ├── core/         # 게임 로직
-│   ├── ui/           # UI 레이어 (screens/, layout/, widgets/)
-│   ├── assets/       # 에셋 로더
-│   └── util/         # 유틸리티
-├── assets/           # 게임 데이터 (TOML)
-│   └── data/
-├── nethack_original/ # 원본 C 소스 (참조용)
-├── Cargo.toml        # 의존성 정의
-└── options.toml      # 게임 옵션
+fn main() {
+    let args = Args::parse();
+    println!("seed={} turns={}", args.seed, args.turns);
+}
 ```
 
----
+이 엔트리는 Phase 1에서 실제 `GameSession::new(seed)`와 `CommandIntent::Wait` 실행으로 교체되었다. 현재 runner는 `seed`, `turns`, `final_turn`, `final_hash`를 출력한다.
 
-## 5. 환경 변수 설정
+## 5. 런타임 출력 경로
 
-현재 별도의 환경 변수는 필요하지 않습니다. 게임 옵션은 `options.toml`에서 관리합니다.
+초기 구현은 다음 경로를 사용한다.
 
----
-
-## 6. 문제 해결 (Troubleshooting)
-
-### 6.1 eframe 빌드 실패
+```text
+runtime/
+  save/
+    dev_save.json
+  replays/
+    {seed}-{turns}.jsonl
+  snapshots/
+    {seed}-{turn}.json
+  logs/
+    headless.log
 ```
-error: linker `link.exe` not found
+
+`runtime/`은 git 추적 대상이 아니다. 필요 시 `.gitignore`에 추가한다.
+
+## 6. 검증 명령
+
+기본:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo test --test levels
+cargo test --test stairs
+cargo run --bin aihack-headless -- --seed 42 --turns 0
 ```
-→ MSVC Build Tools 설치 후 재시도
 
-### 6.2 에셋 로드 실패
+Phase 1 이후:
+
+```bash
+cargo run --bin aihack-headless -- --seed 42 --turns 100
 ```
-Failed to load assets/data/monsters.toml
+
+Phase 5 이후:
+
+```bash
+cargo run --bin aihack-headless -- --seed 42 --turns 1000
 ```
-→ 프로젝트 루트에서 `cargo run` 실행 확인 (작업 디렉토리가 프로젝트 루트여야 함)
 
-### 6.3 윈도우가 뜨지 않는 경우
-- GPU 드라이버 업데이트 확인 (egui는 GPU 가속 사용)
-- `RUST_LOG=debug cargo run`으로 디버그 로그 확인
+품질 게이트:
 
----
+```bash
+cargo clippy --all-targets -- -D warnings
+```
 
-**문서 버전**: v2.41.0 🏆 100% 달성
-**최종 업데이트**: 2026-02-28
+## 7. 첫 실행 산출물
+
+Phase 5 현재 기준 출력 예시:
+
+```text
+seed=42 turns=0 final_turn=0 final_hash=821520dc302c9ea2
+seed=42 turns=100 final_turn=100 final_hash=88886c28698a1730
+seed=43 turns=100 final_turn=100 final_hash=948c5ec460bebb99
+```
+
+
+`--turns 0`:
+
+- stdout에 seed/turns 표시
+- exit code 0
+
+`--turns 1000`:
+
+- `runtime/replays/42-1000.jsonl` 생성
+- 마지막 줄에 final snapshot hash 포함
+- 같은 명령을 두 번 실행하면 final hash 동일
+
+## 8. 레거시 빌드
+
+이전 포트를 빌드해야 할 경우:
+
+```bash
+cd legacy_nethack_port_reference
+cargo test
+```
+
+이 명령은 새 엔진 검증이 아니다. 레거시 상태 확인용이다.
+
+## 9. 금지 사항
+
+- `legacy_nethack_port_reference`를 workspace member로 추가하지 않는다.
+- 새 `src/`에서 `legacy_nethack_port_reference/src`를 path import하지 않는다.
+- UI 구현 전 core 없이 빈 화면만 만드는 작업을 완료로 보지 않는다.
+- `cargo test` 없이 Phase 완료를 주장하지 않는다.
+
+## 10. 배포 전 체크리스트
+
+v0.1 release candidate:
+
+- `cargo fmt --check`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo test`
+- headless 1000턴 seed 42/7/1234 통과
+- save/load hash 일치
+- replay 재생 hash 일치
+- `Observation` schema snapshot 통과
+- 루트 문서와 구현 타입 이름 일치

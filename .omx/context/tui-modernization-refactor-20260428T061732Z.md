@@ -1,0 +1,33 @@
+# Deep Interview Context Snapshot: TUI Modernization Refactor
+
+- 작업 슬러그: `tui-modernization-refactor`
+- 작성시각(UTC): 2026-04-28T06:17:32Z
+- 타입: brownfield documentation/planning task
+- 초기 요청: 기존 코드베이스와 기본 계획을 참고하여, 현대적인 TUI 기능(마우스 클릭, ASCII 애니메이션, 각종 효과)으로 UI/UX와 게임플레이 편의성을 개선하는 리팩토링 계획을 현재 프로젝트 메인 폴더 문서에 선반영한다.
+- 원하는 산출물: `AI_IMPLEMENTATION_DOC_STANDARD.md` 기준을 만족하는 구현 참조급 문서 계획. 개발 착수 전 문서에 반영.
+- 의도 가설: 새 AIHack 런타임의 핵심 안정성/AI 관찰 경계를 유지하면서, v0.1 이후 TUI 경험 수준을 Cogmind/Brogue류 현대 로그라이크에 가깝게 끌어올릴 수 있는 단계별 UI/UX 리팩토링 계획이 필요하다.
+- 확인된 문서 근거:
+  - `spec.md`: 현재 UI는 Phase 10에 배치되어 있으며 `ratatui` 우선, ASCII 우선, UI는 `GameSnapshot` 읽기/`CommandIntent` 쓰기만 가능하다는 경계를 둔다.
+  - `designs.md`: 현재 v0.1 TUI는 80x28, 40x20 고정 viewport, map/status/log/debug panel 중심이며 키보드 중심 입력만 상세화되어 있다.
+  - `implementation_summary.md`: TUI adapter는 Task 13으로 배치되어 있고 headless core 우선이다.
+  - `DESIGN_DECISIONS.md`: headless runner 우선, `GameSession` 단일 상태 원천, 레거시 직접 import 금지.
+  - 루트에는 아직 새 `Cargo.toml`/`src`가 없고, 실행 가능한 Rust 코드는 `legacy_nethack_port_reference/`에 격리되어 있다.
+- 외부 그라운딩 요약:
+  - Cogmind는 ASCII 기반 현대 roguelike UX의 대표 사례로, 모든 명령의 키보드/마우스 접근, drag/drop inventory, 자동 라벨, ASCII particle/GUI animation, 속도 조절된 효과를 강조한다.
+  - Brogue는 키보드/마우스 단독 또는 혼합 플레이가 가능하고 명령 도움말/간결한 인터페이스를 제공한다.
+  - Ratatui는 immediate rendering + event loop 모델이며 Crossterm backend, mouse/paste 지원 및 frame/tick rate 기반 앱 구조가 일반적이다.
+- 제약:
+  - UI는 core 상태 직접 수정 금지.
+  - headless deterministic 검증을 깨면 안 됨.
+  - 신규 의존성은 명시적 요청 없이는 추가 금지이나, 계획 문서에서는 후보/조건부 의존성으로 분리 가능.
+  - README 외 문서는 한국어.
+  - 코드 구현은 deep-interview 모드에서 직접 수행하지 않음.
+- 미확정 질문:
+  - 현대화 범위를 v0.1 필수로 끌어올릴지, v0.2+ 로드맵으로 둘지.
+  - 마우스 입력을 모든 명령 parity까지 목표로 할지, 이동/타겟팅/인벤토리 핵심만 1차 목표로 할지.
+  - 애니메이션/효과가 deterministic replay에 포함되어야 하는지, 순수 presentation layer로 둘지.
+  - 외부 사례 수준을 어느 기준(Cogmind급 full modern ASCII vs Brogue급 accessible simplicity)으로 삼을지.
+- 결정 경계 미확정:
+  - AI가 문서상 단계/수치/계약을 동결해도 되는 범위.
+  - 신규 TUI dependency 후보를 문서에 조건부로 기재할 수 있는지.
+- prompt-safe initial-context summary status: not_needed

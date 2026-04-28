@@ -1,0 +1,26 @@
+# Ralplan Context Snapshot: Phase 3 Combat and Death
+
+- 작업 슬러그: `phase3-combat-death`
+- 작성시각(UTC): 2026-04-28T11:26:28Z
+- 요청: `$ralplan phase 3 계획 문서 작성`. 구현 없이 Phase 3 전용 PRD/test-spec를 생성한다.
+- 원하는 산출물: Phase 3 실행 전 Ralph/Team이 그대로 사용할 수 있는 구현 참조급 계획 문서.
+- 현재 구현 근거:
+  - Phase 1 완료: seed 기반 `GameRng`, `GameSession`, `CommandIntent::Wait`, `TurnOutcome`, stable snapshot hash, headless runner.
+  - Phase 2 완료: 40x20 `GameMap`, `GameWorld { map, player_pos }`, movement/open/close/LOS radius 8, 최소 `Observation.visible_tiles`, map/player/door state snapshot hash.
+  - 현재 `GameWorld`는 full entity store가 없고 player position만 가진다.
+  - 현재 `GameEvent`에는 `EntityMoved`, `DoorChanged`, `CommandRejected`는 있으나 `AttackResolved`, `EntityDied`는 없다.
+- 문서 근거:
+  - `audit_roadmap.md` Phase 3: hit formula, damage formula, jackal/goblin combat, `EntityDied`, `RunState::GameOver`.
+  - `implementation_summary.md` Task 4/8: stable `EntityId`, player/monster/item spawn 중 Phase 3에는 player+monster만 필요, bump attack, deterministic hit/damage, death event/removal policy.
+  - `spec.md` 9.1/9.2: hit formula와 damage formula.
+  - `spec.md` 10.1/10.2: player, jackal, goblin, floating eye 데이터. Phase 3는 jackal/goblin combat 중심이며 floating eye passive는 후속 placeholder만 허용.
+- 제약:
+  - Phase 3만 계획한다. item/inventory, monster AI chase/wander, stairs/save/TUI/LLM은 제외한다.
+  - `GameSession` 단일 상태 원천과 deterministic replay/hash 계약을 유지한다.
+  - full ECS/Legion 금지. `EntityId` 기반 arena/vector store로 최소 구현한다.
+  - Phase 3에서 monster AI는 구현하지 않고, tests는 fixture 위치/직접 command sequence로 combat를 검증한다.
+- 주요 설계 결정:
+  - Phase 3에서 `GameWorld.player_pos`를 player entity position으로 이전하는 최소 `EntityStore`를 도입한다.
+  - bump attack은 `Move(dir)` 대상 tile에 hostile monster가 있을 때 이동 대신 공격한다.
+  - death 처리: monster death는 제거/tombstone 처리, player death는 `RunState::GameOver`와 `EntityDied` event를 만든다.
+  - deterministic combat는 `GameRng`만 사용하고 fixed seed tests로 검증한다.

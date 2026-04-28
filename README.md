@@ -1,111 +1,204 @@
-# AIHack v2.41.1 🏆
-
-> **A Modern Rust Roguelike — Based on NetHack 3.6.7**
-
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![NetHack: NGPL](https://img.shields.io/badge/NetHack-NGPL-orange.svg)](./LICENSE.NGPL)
-
-> **[ 한 / 영 / 일 / 中(繁) / 中(简) ]**
-
-## 🌐 다국어 지원 (Multilingual Support)
-- [한국어](./README.md#한국어)
-- [English](./README.md#english)
-- [日本語](./README.md#日本語)
-- [繁體中文](./README.md#繁體中文)
-- [简体中文](./README.md#简体中文)
-
----
+# AIHack
 
 ## 한국어
 
-### 프로젝트 개요
-AIHack은 클래식 로그라이크 게임인 NetHack 3.6.7의 C 소스 코드를 Rust로 이식하는 현대화 프로젝트입니다. 원본의 복잡한 로직을 Rust의 안정성 위에서 재구현하며, TUI(Ratatui)와 GUI(egui)가 결합된 하이브리드 인터페이스를 제공하는 것을 목표로 합니다.
+AIHack은 NetHack의 핵심 재미를 참고하되, Rust-native 턴 엔진과 AI 연결성을 우선으로 다시 설계하는 로그라이크 프로젝트다.
 
-**현재 상태**: 177,229줄 / 438파일 / 4,177개 테스트 통과 / 이식률 💯 **100%** 🏆 완료! / 안정화 Phase S5b 완료
+이 저장소의 이전 NetHack Rust 포트는 `legacy_nethack_port_reference/`로 격리되었다. 새 개발은 루트 문서세트를 기준으로 진행한다.
 
-### 주요 기능
-- **Legacy Porting**: NetHack 3.6.7 C 소스 로직의 100% Rust 이식 추진.
-- **Hybrid UI**: 클래식한 TUI 뷰와 현대적인 egui 기반 플로팅 윈도우 지원.
-- **Improved Stability**: Rust의 소유권 모델을 통한 메모리 안전성 확보 및 전역 변수 제거.
-- **Modern Interaction**: 마우스 상호작용 및 실시간 상태 정보를 제공하는 HUD.
-- **Advanced Monster AI**: 상징적인 몬스터 마법(Mage/Cleric), 특수 공격(Gaze, Breath), 그리고 수동적 반격 시스템.
-- **Deep Combat**: 다중 공격(Multi-attack), 저항력(Resistance) 및 치명적 상태 이상(Drain, Paralyze) 엔진.
-- **Container System**: Bag of Holding 및 재귀적 인벤토리 보관 시스템.
-- **Special Dungeon Levels**: 오라클(Oracle), 광산 마을(Minetown) 등 원본 NetHack의 고유 레벨 레이아웃 및 NPC 배치 완벽 재현.
-- **안정화 (v2.41.1)**: Grid 역동기화, 기본 상호작용 9개 동사 검증, 시작 장비 자동 장착.
+### 현재 상태
 
-### 라이센스
-- **소스 코드**: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-- **원본 NetHack 파생**: [NetHack General Public License](./LICENSE.NGPL)
+- 이전 포트: `legacy_nethack_port_reference/`
+- 전역 작업 규칙: `AGENTS.md`
+- AI 구현 문서 표준: `AI_IMPLEMENTATION_DOC_STANDARD.md`
+- 새 마스터 스펙: `spec.md`
+- 새 구현 요약: `implementation_summary.md`
+- 새 감사 로드맵: `audit_roadmap.md`
+- Phase 5 실행 대상: `cargo run --bin aihack-headless -- --seed 42 --turns 100`
 
----
+### 기능
+
+- Rust-native `GameSession` 단일 상태 원천
+- seed 기반 deterministic `GameRng`
+- `CommandIntent::Wait` 기반 Phase 1 headless 턴 진행
+- stable FNV-1a snapshot hash
+- `aihack-headless` runner의 seed/turns/final hash 출력
+- 레거시 코드 직접 import 금지 경계
+- 40x20 Phase 2 fixture map, 이동/문/시야/visible tiles
+- Phase 3 `EntityStore`, bump attack, jackal/goblin 전투, 사망 event, player `GameOver`
+- Phase 4 item entity, inventory letter, pickup, dagger wield, healing potion quaff
+- Phase 5 fixed 2-level registry, level-aware entity location, descend/ascend stairs, level snapshot hash
+
+### 핵심 방향
+
+- Headless 테스트와 replay가 가능한 결정론적 런타임
+- AI가 읽을 수 있는 닫힌 `Observation`
+- AI가 실행할 수 있는 제한된 `ActionSpace`
+- UI와 엔진의 강한 분리
+- NetHack 호환 규칙의 선별적, 검증 가능한 흡수
+
+### 문서 읽는 순서
+
+1. `spec.md`
+2. `implementation_summary.md`
+3. `designs.md`
+4. `audit_roadmap.md`
+5. `BUILD_GUIDE.md`
+6. `DESIGN_DECISIONS.md`
+7. `legacy_nethack_port_reference/REFERENCE_INDEX.md`
+
+### 개발 원칙
+
+- 기존 레거시 코드는 참조만 한다.
+- 새 런타임은 `legacy_nethack_port_reference/src`를 직접 import하지 않는다.
+- 모든 기능은 headless 테스트가 먼저 통과해야 UI에 연결된다.
+- LLM은 게임 상태를 직접 수정하지 않는다.
+- AI 행동은 `ActionSpace`에 정의된 명령으로만 들어온다.
 
 ## English
 
-### Project Overview
-AIHack is a modernization project that ports the C source code of the classic roguelike game NetHack 3.6.7 to Rust. It aims to reimplement the original's complex logic on top of Rust's stability and provide a hybrid interface combining TUI (Ratatui) and GUI (egui).
+AIHack is a roguelike project inspired by NetHack, rebuilt around a Rust-native turn engine and AI-friendly integration boundaries.
 
-**Current Status**: 177,229 lines / 438 files / 4,177 tests passing / 💯 **100% ported** 🏆 COMPLETE! / Stabilization Phase S5b done
+The previous Rust NetHack port is isolated under `legacy_nethack_port_reference/`. New development follows the root documentation set.
 
-### Key Features
-- **Legacy Porting**: 100% Rust porting of NetHack 3.6.7 C source logic.
-- **Hybrid UI**: Supports classic TUI view and modern egui-based floating windows.
-- **Improved Stability**: Memory safety via Rust's ownership model and removal of global variables.
-- **Modern Interaction**: Mouse interaction and real-time status HUD.
-- **Advanced Monster AI**: Iconic monster spells (Mage/Cleric), special attacks (Gaze, Breath), and passive counter-attack systems.
-- **Deep Combat**: Multi-attack logic, Resistance checks, and deadly status effects (Drain, Paralyze).
-- **Container System**: Recursive inventory storage and Bag of Holding mechanics.
-- **Special Dungeon Levels**: Perfect reproduction of Oracle, Minetown layouts and unique NPC placements from original NetHack.
-- **Stabilization (v2.41.1)**: Grid reverse-sync, 9 core verbs verified, auto-equip starting gear.
+### Current Status
 
-### License
-- **Source Code**: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-- **Original NetHack Derivative**: [NetHack General Public License](./LICENSE.NGPL)
+- Legacy port: `legacy_nethack_port_reference/`
+- Global working rules: `AGENTS.md`
+- AI documentation standard: `AI_IMPLEMENTATION_DOC_STANDARD.md`
+- Master spec: `spec.md`
+- Implementation summary: `implementation_summary.md`
+- Audit roadmap: `audit_roadmap.md`
+- Phase 5 runner: `cargo run --bin aihack-headless -- --seed 42 --turns 100`
 
----
+### Features
+
+- Rust-native single source of truth through `GameSession`
+- Seed-based deterministic `GameRng`
+- Phase 1 headless turn progression via `CommandIntent::Wait`
+- Stable FNV-1a snapshot hash
+- `aihack-headless` runner outputting seed, turns, and final hash
+- Explicit boundary against direct legacy source imports
+- 40x20 Phase 2 fixture map with movement, doors, vision, and visible tiles
+- Phase 3 `EntityStore`, bump attacks, jackal/goblin combat, death events, and player `GameOver`
+- Phase 4 item entities, inventory letters, pickup, dagger wielding, and healing potion quaffing
+- Phase 5 fixed two-level registry, level-aware entity locations, descend/ascend stairs, and level snapshot hash
+
+### Direction
+
+- Deterministic headless runtime with replay-oriented validation
+- Closed `Observation` contract for AI reads
+- Restricted `ActionSpace` for AI actions
+- Strong separation between UI and engine
+- Selective, testable absorption of NetHack-compatible rules
 
 ## 日本語
 
-### プロジェクト概要
-AIHackは、古典的なローグライクゲームであるNetHack 3.6.7のCソースコードをRustに移植する近代化プロジェクトです。オリジナルの複雑なロジックをRustの安定性の上に再構築し、TUI（Ratatui）とGUI（egui）を組み合わせたハイブリッドインターフェースを提供することを目指しています。
+AIHack は NetHack の中核的な面白さを参考にしつつ、Rust ネイティブのターンエンジンと AI 連携境界を優先して再設計するローグライクプロジェクトです。
 
-### 主な機能
-- **レガシー移植**: NetHack 3.6.7 Cソースロジックの100% Rust移植を推進。
-- **ハイブリッドUI**: クラシックなTUIビューと現代的なeguiベースのフローティングウィンドウをサポート。
-- **安定性の向上**: Rustの所有権モデルによるメモリ安全性のアドバンテージとグローバル変数の排除。
-- **モダンな対話**: マウス操作およびリアルタイムなステータス情報を備えたHUD。
-- **モンスターAI & 戦闘**: 多重攻撃(Multi-attack)、耐性、状態異常(Drain, Paralyze)を含む深層戦闘エンジン。
-- コンテナシステム: Bag of Holdingおよび再帰的インベントリ保管システム。
-- **安定化 (v2.41.1)**: Grid逆同期, 基本インタラクション9個動詞検証, 開始装備の自動装着。
+以前の Rust 版 NetHack ポートは `legacy_nethack_port_reference/` に隔離されています。新規開発はルートの文書セットを基準に進めます。
 
----
+### 現在の状態
+
+- レガシーポート: `legacy_nethack_port_reference/`
+- 全体作業ルール: `AGENTS.md`
+- AI 実装文書標準: `AI_IMPLEMENTATION_DOC_STANDARD.md`
+- マスタースペック: `spec.md`
+- 実装サマリー: `implementation_summary.md`
+- 監査ロードマップ: `audit_roadmap.md`
+- Phase 5 ランナー: `cargo run --bin aihack-headless -- --seed 42 --turns 100`
+
+### 機能
+
+- `GameSession` による Rust ネイティブな単一状態源
+- seed ベースの deterministic `GameRng`
+- `CommandIntent::Wait` による Phase 1 headless ターン進行
+- 安定した FNV-1a snapshot hash
+- seed、turns、final hash を出力する `aihack-headless` ランナー
+- レガシーソースの直接 import を禁止する明示的境界
+- 40x20 Phase 2 fixture map、移動、扉、視界、visible tiles
+- Phase 3 `EntityStore`、bump attack、jackal/goblin 戦闘、死亡 event、player `GameOver`
+- Phase 4 item entity、inventory letter、pickup、dagger wield、healing potion quaff
+- Phase 5 fixed two-level registry、level-aware entity location、descend/ascend stairs、level snapshot hash
+
+### 方向性
+
+- replay 検証に適した deterministic headless runtime
+- AI 読み取り用の閉じた `Observation` 契約
+- AI 行動用の制限された `ActionSpace`
+- UI とエンジンの強い分離
+- NetHack 互換ルールの選択的かつ検証可能な吸収
 
 ## 繁體中文
 
-### 專案概覽
-AIHack 是一個將經典 Roguelike 遊戲 NetHack 3.6.7 的 C 語言原始碼移植到 Rust 的現代化專案。其目標是在 Rust 的穩定性基礎上重新實作原始遊戲的複雜邏輯，並提供結合了 TUI (Ratatui) 與 GUI (egui) 的混合介面。
+AIHack 是參考 NetHack 核心樂趣，並以 Rust-native 回合引擎與 AI 整合邊界為優先重新設計的 roguelike 專案。
 
-### 主要功能
-- **傳統移植**: 推動 NetHack 3.6.7 C 原始碼邏輯的 100% Rust 移植。
-- **混合 UI**: 支援經典 TUI 視圖與現代基於 egui 的懸浮視窗。
-- **改進的穩定性**: 透過 Rust 的所有權模型確保記憶體安全並消除全域變數。
-- **現代化互動**: 滑鼠互動與提供即時狀態資訊的 HUD。
-- **怪物 AI 與戰鬥**: 包含多重攻擊(Multi-attack)、抗性與異常狀態(Drain, Paralyze)的深度戰鬥引擎。
-- **容器系統**: Bag of Holding 與遞歸物品清單儲存系統。
-- **穩定化 (v2.41.1)**: Grid 逆同步, 9個基本互動動詞驗證, 起始裝備自動裝著。
+先前的 Rust NetHack port 已隔離在 `legacy_nethack_port_reference/`。新的開發以根目錄文件集為準。
 
----
+### 目前狀態
+
+- 舊版 port：`legacy_nethack_port_reference/`
+- 全域工作規則：`AGENTS.md`
+- AI 實作文檔標準：`AI_IMPLEMENTATION_DOC_STANDARD.md`
+- 主規格：`spec.md`
+- 實作摘要：`implementation_summary.md`
+- 稽核路線圖：`audit_roadmap.md`
+- Phase 5 runner：`cargo run --bin aihack-headless -- --seed 42 --turns 100`
+
+### 功能
+
+- 透過 `GameSession` 建立 Rust-native 單一狀態來源
+- 以 seed 為基礎的 deterministic `GameRng`
+- 透過 `CommandIntent::Wait` 進行 Phase 1 headless 回合推進
+- 穩定的 FNV-1a snapshot hash
+- 輸出 seed、turns、final hash 的 `aihack-headless` runner
+- 明確禁止直接 import 舊版 source 的邊界
+- 40x20 Phase 2 fixture map、移動、門、視野、visible tiles
+- Phase 3 `EntityStore`、bump attack、jackal/goblin 戰鬥、死亡 event、player `GameOver`
+- Phase 4 item entity、inventory letter、pickup、dagger wield、healing potion quaff
+- Phase 5 fixed two-level registry、level-aware entity location、descend/ascend stairs、level snapshot hash
+
+### 方向
+
+- 可用於 replay 驗證的 deterministic headless runtime
+- AI 讀取用的封閉 `Observation` 契約
+- AI 行動用的受限 `ActionSpace`
+- UI 與引擎的強分離
+- 選擇性且可驗證地吸收 NetHack 相容規則
 
 ## 简体中文
 
-### 项目概览
-AIHack 是一个将经典 Roguelike 游戏 NetHack 3.6.7 的 C 语言源码移植到 Rust 的现代化项目。其目标是在 Rust 的稳定性基础上重新实现原始游戏的复杂逻辑，并提供结合了 TUI (Ratatui) 与 GUI (egui) 的混合界面。
+AIHack 是参考 NetHack 核心乐趣，并以 Rust-native 回合引擎和 AI 集成边界为优先重新设计的 roguelike 项目。
 
-### 主要功能
-- **传统移植**: 推动 NetHack 3.6.7 C 源码逻辑的 100% Rust 移植。
-- **混合 UI**: 支持经典 TUI 视图与现代基于 egui 的悬浮窗口。
-- **改进的稳定性**: 通过 Rust 的所有权模型确保内存安全并消除全局变量。
-- **现代化互动**: 鼠标互动与提供实时状态信息的 HUD。
-- **怪物 AI 与战斗**: 包含多重攻击(Multi-attack)、抗性与异常状态(Drain, Paralyze)的深度战斗引擎。
-- **容器系统**: Bag of Holding 与递归物品清单储存系统。
-- **稳定化 (v2.41.1)**: Grid 逆同步, 9个基本互动动词验证, 起始装备自动装备。
+之前的 Rust NetHack port 已隔离在 `legacy_nethack_port_reference/`。新的开发以根目录文档集为准。
+
+### 当前状态
+
+- 旧版 port：`legacy_nethack_port_reference/`
+- 全局工作规则：`AGENTS.md`
+- AI 实现文档标准：`AI_IMPLEMENTATION_DOC_STANDARD.md`
+- 主规格：`spec.md`
+- 实现摘要：`implementation_summary.md`
+- 审计路线图：`audit_roadmap.md`
+- Phase 5 runner：`cargo run --bin aihack-headless -- --seed 42 --turns 100`
+
+### 功能
+
+- 通过 `GameSession` 建立 Rust-native 单一状态来源
+- 基于 seed 的 deterministic `GameRng`
+- 通过 `CommandIntent::Wait` 进行 Phase 1 headless 回合推进
+- 稳定的 FNV-1a snapshot hash
+- 输出 seed、turns、final hash 的 `aihack-headless` runner
+- 明确禁止直接 import 旧版 source 的边界
+- 40x20 Phase 2 fixture map、移动、门、视野、visible tiles
+- Phase 3 `EntityStore`、bump attack、jackal/goblin 战斗、死亡 event、player `GameOver`
+- Phase 4 item entity、inventory letter、pickup、dagger wield、healing potion quaff
+- Phase 5 fixed two-level registry、level-aware entity location、descend/ascend stairs、level snapshot hash
+
+### 方向
+
+- 可用于 replay 验证的 deterministic headless runtime
+- AI 读取用的封闭 `Observation` 契约
+- AI 行动用的受限 `ActionSpace`
+- UI 与引擎的强分离
+- 选择性且可验证地吸收 NetHack 兼容规则

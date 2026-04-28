@@ -1,0 +1,24 @@
+# Ralplan Context Snapshot: Phase 1 Headless Core
+
+- 작업 슬러그: `phase1-headless-core`
+- 작성시각(UTC): 2026-04-28T06:34:01Z
+- 요청: 루트 문서세트를 읽고 Phase 1 계획만 생성한다. 구현은 하지 않는다.
+- 원하는 산출물: Ralph 실행 전 사용할 수 있는 Phase 1 전용 PRD와 test-spec.
+- 근거 문서:
+  - `spec.md`: `GameSession`, `CommandIntent`, `TurnOutcome`, headless 검증 명령과 deterministic replay 목표.
+  - `implementation_summary.md`: Task 1, 2, 5가 Phase 1의 핵심 구현 단위와 맞닿아 있음.
+  - `audit_roadmap.md`: Phase 1 구현 항목은 Cargo scaffold, `GameRng`, `GameSession::new(seed)`, `CommandIntent::Wait`, `TurnOutcome`, replay hash.
+  - `BUILD_GUIDE.md`: 초기 Cargo.toml, `src/main.rs`, `src/bin/aihack-headless.rs`, 검증 명령.
+  - `DESIGN_DECISIONS.md`: `aihack-headless`가 첫 실행 대상이며 UI는 core deterministic 검증 후 붙인다.
+- 알려진 현재 상태:
+  - 루트에는 아직 새 `Cargo.toml`/`src`가 없다.
+  - 레거시 코드는 `legacy_nethack_port_reference/`에 격리되어 있으며 직접 import 금지.
+- 제약:
+  - Phase 1만 계획한다.
+  - TUI, map/movement/combat/item/AI adapter 구현 계획을 Phase 1 범위에 포함하지 않는다.
+  - 신규 의존성은 `BUILD_GUIDE.md`의 초기 후보 범위를 넘지 않는다.
+  - README 외 문서는 한국어로 작성한다.
+- 주요 리스크:
+  - Phase 1에서 Phase 2 이상의 타입/스텁을 과도하게 만들면 scope creep 발생.
+  - hash 구현이 임시 문자열 출력에 머물면 Phase 2 이후 replay 검증 기반이 약해짐.
+  - `rand` 직접 사용이 퍼지면 `GameRng` wrapper 경계가 무너짐.
