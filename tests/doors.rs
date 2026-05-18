@@ -9,7 +9,8 @@ fn stand_west_of_fixture_door(session: &mut GameSession) {
 
 #[test]
 fn open_door_allows_movement_and_los() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     stand_west_of_fixture_door(&mut session);
 
     let outcome = session.submit(CommandIntent::Open(Direction::East));
@@ -40,7 +41,8 @@ fn open_door_allows_movement_and_los() {
 
 #[test]
 fn close_door_blocks_movement_and_los() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     stand_west_of_fixture_door(&mut session);
     assert!(
         session
@@ -67,7 +69,8 @@ fn close_door_blocks_movement_and_los() {
 
 #[test]
 fn invalid_open_close_are_rejected() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
 
     let open_floor = session.submit(CommandIntent::Open(Direction::East));
     assert!(!open_floor.accepted);

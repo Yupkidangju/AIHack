@@ -19,6 +19,7 @@ pub struct Inventory {
     pub owner: EntityId,
     pub entries: Vec<InventoryEntry>,
     pub equipped_melee: Option<EntityId>,
+    pub equipped_body: Option<EntityId>,
     pub next_letter_index: u8,
 }
 
@@ -28,6 +29,7 @@ impl Inventory {
             owner,
             entries: Vec::new(),
             equipped_melee: None,
+            equipped_body: None,
             next_letter_index: 0,
         }
     }
@@ -43,6 +45,9 @@ impl Inventory {
         let idx = self.entries.iter().position(|entry| entry.item == item)?;
         if self.equipped_melee == Some(item) {
             self.equipped_melee = None;
+        }
+        if self.equipped_body == Some(item) {
+            self.equipped_body = None;
         }
         Some(self.entries.remove(idx))
     }
@@ -60,6 +65,10 @@ impl Inventory {
 
     pub fn equip_melee(&mut self, item: EntityId) {
         self.equipped_melee = Some(item);
+    }
+
+    pub fn equip_body(&mut self, item: EntityId) {
+        self.equipped_body = Some(item);
     }
 
     fn next_letter(&self) -> Option<InventoryLetter> {

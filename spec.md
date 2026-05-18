@@ -168,9 +168,23 @@ pub enum RunState {
 }
 ```
 
-### 8.3 CommandIntent
+### 8.3 CommandIntent, DirectionalAction, InventoryAction
 
 ```rust
+pub enum DirectionalAction {
+    Open,
+    Close,
+    Kick,
+}
+
+pub enum InventoryAction {
+    Drop,
+    Wield,
+    Wear,
+    Quaff,
+    Read,
+}
+
 pub enum CommandIntent {
     Move(Direction),
     Wait,
@@ -190,6 +204,7 @@ pub enum CommandIntent {
     Ascend,
     ShowInventory,
     AcknowledgeMore,
+    Pray,
     Quit,
 }
 ```
@@ -253,6 +268,13 @@ pub enum GameEvent {
     EntityDied { entity: EntityId, cause: DeathCause },
     LevelChanged { entity: EntityId, from: LevelId, to: LevelId },
     Message { priority: MessagePriority, text: String },
+}
+
+pub enum MessagePriority {
+    Low,
+    Info,
+    Warning,
+    Danger,
 }
 ```
 
@@ -326,7 +348,7 @@ hp = 4
 ac = 0
 hit_bonus = 0
 damage = "1d2"
-ai = "wander_then_chase"
+ai = "wander"
 speed = 12
 
 [[monster]]
@@ -386,7 +408,7 @@ size = 40x20
 player_start = (5, 5)
 stairs_down = (34, 15)
 monsters = [
-  { id = "monster.jackal", pos = (12, 5) },
+  { id = "monster.jackal", pos = (6, 5) },
   { id = "monster.goblin", pos = (20, 12) }
 ]
 items = [
@@ -606,6 +628,159 @@ Phase 5는 fixed `main:1`/`main:2` level registry, 명시적 `Descend`/`Ascend` 
 - `tests/stairs.rs`: descend/ascend reject/accept, landing, event order, legal actions
 - `cargo test --test movement --test doors --test vision --test combat --test death --test items --test inventory` 회귀 통과
 
+### 11.6 Phase 6 완료 기준
+
+Phase 6은 current-level hostile monster만 처리하는 최소 monster turn loop를 구현했다. `MonsterAiKind`는 jackal=`Wander`, goblin=`ChaseVisiblePlayer`, floating eye=`Stationary`로 고정되며, accepted + turn advance 된 player command 뒤에만 monster phase가 실행된다. monster AI는 `collect intents -> apply intents`의 두 단계로 분리되고, hostile actor 순서는 `EntityId` 오름차순으로 고정된다. `GameEvent::EntityMoved`는 player/monster 모두 `entity` id를 포함하며, player side resolution 결과 `RunState::GameOver`가 되면 monster phase는 실행되지 않는다.
+
+검증 범위:
+
+- `tests/monster_ai.rs`: current-level filter, turn gate, goblin chase, jackal wander, floating eye stationary, player death stop, actor identity event 검증
+- `tests/combat.rs`, `tests/death.rs`: monster phase가 추가된 이후에도 player combat/death 회귀 유지
+- `tests/levels.rs`, `tests/stairs.rs`, `tests/vision.rs`, `tests/movement.rs`, `tests/doors.rs`, `tests/items.rs`, `tests/inventory.rs`, `tests/observation.rs`: phase regression 통과
+
+검증된 기준값:
+
+```text
+seed=42 turns=0 final_turn=0 final_hash=821520dc302c9ea2
+seed=42 turns=100 final_turn=20 final_hash=2fb549b5d2e1e67f
+seed=43 turns=100 final_turn=21 final_hash=ec98b802759e109c
+```
+
+
+### 11.7 Phase 7 완료 기준
+
+Phase 7은 simple trap, `Search`, `Throw`, `Zap`, `Read`를 current-level deterministic 상호작용으로 구현했다. level1 fixture에는 `HiddenDoor`, `HiddenTrap(Pit)`, `WandMagicMissile`, `ScrollReveal`, `Rock`가 추가되며, hidden tile은 observation에서 `HiddenDoor -> Wall`, `HiddenTrap -> Floor`로만 노출된다. trap 피해는 fixed `3`으로 고정되고, wand charge/item location/reveal state는 snapshot hash 입력에 포함된다.
+
+검증 범위:
+
+- `tests/traps.rs`: hidden door/trap reveal, trap trigger, scroll reveal, snapshot hash 영향 검증
+- `tests/projectiles.rs`: throw land/hit, invalid throw, wand charge/hit/wall stop 검증
+- `tests/items.rs`, `tests/inventory.rs`, `tests/observation.rs`: fixture letter, read/zap legal actions, consumed/charge 상태 검증
+- `tests/monster_ai.rs`, `tests/stairs.rs`, `tests/levels.rs`, `tests/movement.rs`, `tests/vision.rs`: 기존 Phase 5/6 regression 유지
+
+검증된 기준값:
+
+```text
+seed=42 turns=0 final_turn=0 final_hash=dc24b554ed6401aa
+seed=42 turns=100 final_turn=20 final_hash=5aecd83cf284cb25
+seed=43 turns=100 final_turn=21 final_hash=5f5d5b89faa9a834
+```
+
+
+### 11.8 Phase 8 완료 기준
+
+Phase 8은 레거시 규칙 20개를 golden scenario 중심으로 흡수했다. foundational/world interaction/combat-meta/economy-survival의 4개 wave로 정리되며, `tests/golden_phase8_rules.rs`에서 `P8-G01`..`P8-G20` 20개 시나리오가 통과해야 한다. direct import 없이 reference-only 원칙을 유지하고, hunger/luck/prayer cooldown/identified item/encumbrance/score 같은 신규 state는 snapshot hash 입력에 포함된다.
+
+검증 범위:
+
+- `tests/golden_phase8_rules.rs`: 20개 golden scenario 검증
+- `tests/traps.rs`, `tests/projectiles.rs`, `tests/items.rs`, `tests/observation.rs`: Phase 7 interaction regression 유지
+- `tests/monster_ai.rs`, `tests/stairs.rs`, `tests/levels.rs`, `tests/movement.rs`, `tests/vision.rs`: Phase 5/6 core regression 유지
+
+검증된 기준값:
+
+```text
+seed=42 turns=0 final_turn=0 final_hash=53435bb29a2e69ee
+seed=42 turns=100 final_turn=20 final_hash=4c77dafb19dd2226
+seed=43 turns=100 final_turn=21 final_hash=f8324eacbce50087
+```
+
+
+### 11.9 Phase 9 완료 기준
+
+Phase 9는 explicit `SaveDataV1`, load resume, replay JSONL export를 구현했다. RNG continuation state는 `RngStateV1 { seed, draws }`로 저장되며, save/load 직후 snapshot hash equality와 load 후 continuation equality를 보장한다. headless runner는 `--save`, `--load`, `--replay-out` 옵션을 지원하고 replay JSONL line은 `turn_before`, `command`, `outcome`, `snapshot_hash_after`를 기록한다.
+
+검증 범위:
+
+- `tests/save_load.rs`: schema roundtrip, RNG continuation, hash equality, continuation equality, persistent state roundtrip, invalid schema reject
+- `tests/replay.rs`: replay JSONL schema와 load-resume replay equivalence 검증
+- `tests/golden_phase8_rules.rs`, `tests/traps.rs`, `tests/projectiles.rs`, `tests/monster_ai.rs`, `tests/stairs.rs`: Phase 5~8 regression 유지
+
+검증된 기준값:
+
+```text
+seed=42 turns=0 final_turn=0 final_hash=53435bb29a2e69ee
+seed=42 turns=100 final_turn=20 final_hash=4c77dafb19dd2226
+seed=43 turns=100 final_turn=21 final_hash=f8324eacbce50087
+```
+
+
+### 11.10 Phase 10 완료 기준
+
+Phase 10은 `src/ui/tui/*` 기반 ASCII TUI adapter를 구현했다. TUI는 `GameSnapshot`/`Observation`을 읽고 `CommandIntent`만 제출하며, 80x28 미만 터미널에서는 작은 화면 안내를 렌더하고 종료한다. 80x28/100x32/120x36 layout 계약, keyboard-only command mapping, mouse hover/focus mapping, `UiEffectEvent` projection, save/load request bridge가 테스트로 잠겨 있다.
+
+검증 범위:
+
+- `tests/ui_layout.rs`: degraded/standard/roomy layout 무겹침 검증
+- `tests/ui_input_mapping.rs`: keyboard/mouse/save-load bridge 검증
+- `tests/ui_effect_projection.rs`: UI effect projection의 non-hash influence 검증
+- `tests/ui_runtime_smoke.rs`: TUI runtime smoke와 save/load bridge 검증
+- `cargo run --bin aihack -- --seed 42`: terminal lifecycle smoke
+
+검증된 기준값:
+
+```text
+TUI runtime smoke: pass
+seed=42 turns=1000 final_turn=20 final_hash=4c77dafb19dd2226  (headless baseline unchanged)
+```
+
+
+### 11.11 Phase 11 완료 기준
+
+Phase 11은 AI read/write contract를 freeze했다. `Observation`은 `run_state`, `player`, `visible_tiles`, `visible_entities`, `inventory`, `last_events`, `action_space`, compatibility alias `legal_actions`를 포함하는 canonical DTO로 정리되었고, `ActionSpace`는 `Vec<ActionIntent>`를 사용한다. save/load와 TUI는 같은 AI-facing schema를 소비하며, canonical schema는 `tests/ai_api_schema.rs`와 `tests/action_space.rs`로 잠겨 있다.
+
+검증 범위:
+
+- `tests/ai_api_schema.rs`: observation/action_space fixture roundtrip, save-load AI shape stability, runtime leakage audit
+- `tests/action_space.rs`: `legal_actions`와 `action_space` mapping consistency
+- `tests/ui_input_mapping.rs`, `tests/ui_runtime_smoke.rs`: TUI consumer same-contract 확인
+- `tests/golden_phase8_rules.rs`, `tests/save_load.rs`, `tests/replay.rs`: 기존 regression 유지
+
+검증된 기준값:
+
+```text
+AI API schema tests: pass
+Phase 9 headless baseline unchanged: seed=42 turns=100 final_hash=4c77dafb19dd2226
+```
+
+
+### 11.12 Phase 12 완료 기준
+
+Phase 12는 frozen AI API 위에 narrative-only LLM adapter를 구현했다. `src/llm/narrative.rs`는 provider abstraction, 2초 timeout, deterministic fallback response, provider/timeout/empty-output handling을 제공하며, narrative response는 presentation artifact로만 소비된다. TUI는 narrative lines를 읽을 수 있지만 snapshot hash, save/load, replay에는 영향이 없다.
+
+검증 범위:
+
+- `tests/llm_narrative.rs`: success/timeout/failure/empty response/fallback/non-hash tests
+- `tests/ui_runtime_smoke.rs`: narrative consumer smoke
+- `tests/ai_api_schema.rs`, `tests/action_space.rs`: Phase 11 AI API freeze regression 유지
+- `tests/save_load.rs`, `tests/replay.rs`, `tests/ui_*`: persistence/TUI regression 유지
+
+검증된 기준값:
+
+```text
+LLM narrative tests: pass
+Phase 9 headless baseline unchanged: seed=42 turns=100 final_hash=4c77dafb19dd2226
+```
+
+
+### 11.13 Phase 13 완료 기준
+
+Phase 13은 validator-gated LLM decision support를 구현했다. suggestion layer는 `ActionSpace` 위에서만 legal `ActionIntent::Command` 후보를 제안할 수 있으며, illegal/timeout/failure는 fallback/disabled suggestion으로 degrade 된다. 실제 실행은 normal `session.submit(...)` 경로를 통할 때만 발생하며, suggestion metadata는 snapshot hash/save/load/replay에 persistence truth로 저장되지 않는다.
+
+검증 범위:
+
+- `tests/llm_decision_support.rs`: legal/illegal/timeout/non-hash/submit-path tests
+- `tests/ui_runtime_smoke.rs`: decision support consumer smoke
+- `tests/llm_narrative.rs`: Phase 12 narrative regression 유지
+- `tests/ai_api_schema.rs`, `tests/action_space.rs`, `tests/save_load.rs`, `tests/replay.rs`, `tests/ui_*`: frozen API/persistence/TUI regression 유지
+
+검증된 기준값:
+
+```text
+Decision support tests: pass
+Phase 9 headless baseline unchanged: seed=42 turns=100 final_hash=4c77dafb19dd2226
+```
+
 ## 12. 단계별 로드맵
 
 | Phase | 이름 | 완료 기준 |
@@ -616,14 +791,14 @@ Phase 5는 fixed `main:1`/`main:2` level registry, 명시적 `Descend`/`Ascend` 
 | 3 | 전투/사망 | jackal/goblin 전투와 death event 통과 |
 | 4 | 아이템/인벤토리 | pickup, wield, wear, quaff 통과 |
 | 5 | 던전/계단 | 완료: 1층-2층 왕복과 level snapshot 통과 |
-| 6 | 몬스터 AI | 추적/배회/정지 AI 테스트 통과 |
-| 7 | NetHack 상호작용 | trap, wand, throw, read 최소 구현 |
-| 8 | 레거시 규칙 흡수 | 핵심 규칙 20개 golden test 통과 |
-| 9 | 저장/replay | save/load 후 hash 일치 |
-| 10 | UI | TUI에서 v0.1 핵심 루프 플레이 |
-| 11 | AI API | Observation/ActionSpace schema freeze |
-| 12 | LLM narrative | timeout/fallback 포함 narrative only |
-| 13 | LLM decision support | validator 통과 명령만 제한 실행 |
+| 6 | 몬스터 AI | 완료: current-level 추적/배회/정지 AI 테스트 통과 |
+| 7 | NetHack 상호작용 | 완료: trap/search/throw/zap/read 최소 구현 |
+| 8 | 레거시 규칙 흡수 | 완료: 20개 golden scenario 통과 |
+| 9 | 저장/replay | 완료: save/load 후 hash 일치 |
+| 10 | UI | 완료: ASCII TUI adapter와 layout/input/effect smoke 통과 |
+| 11 | AI API | 완료: Observation/ActionSpace schema freeze |
+| 12 | LLM narrative | 완료: timeout/fallback 포함 narrative only |
+| 13 | LLM decision support | 완료: validator-gated suggestion only |
 
 ## 13. 검증 명령
 
@@ -792,6 +967,34 @@ danger_alert_ms = 400
 | 10C | 마우스 입력 | map click to inspect/move, inventory click select, panel focus, mouse event 좌표 매핑 테스트 |
 | 10D | ASCII 효과 | core event 기반 flash/pulse/label effect, reduced motion, replay hash 무영향 검증 |
 | 10E | 고급 UX 후보 | drag/drop inventory와 자동 라벨 우선순위, 설정 파일 기반 UI 옵션 |
+
+2026-05-18 현재 구현 상태:
+
+- 10B 완료: hover read-only inspect, priority message, command hint, low-HP text alert
+- 10C 완료: map hover/click, inspect panel inventory primary-action click, panel focus
+- 10D 완료: `GameEvent -> UiEffectEvent` projection과 replay hash 무영향 검증
+- 10E 완료: reduced motion / high contrast theme token path, 자동 라벨 우선순위(Phase 19) 구현 완료
+
+### 15.9 Phase 16~20 완료 기준
+
+Phase 16~20은 문서-구현 gap closure를 목표로 한다.
+
+| Phase | 이름 | 완료 기준 |
+| --- | --- | --- |
+| 16 | RunState & CommandIntent 정렬 | spec.md 8.2/8.3 계약과 코드 일치, submit() 상태별 분기, headless hash 동일 유지 |
+| 17 | Game Flow Screens | Title/CharacterCreation/GameOver 화면, AwaitingDirection/MorePrompt 상태 처리 |
+| 18 | Debug Observation | F9 토글, 전체 Observation 데이터 표시, hash 무영향 |
+| 19 | Auto-Label Priority | hostile/item/stairs 자동 라벨, 우선순위, 최대 3개, 1200ms 지속 |
+| 20 | 데이터 외부화 | items.toml, monsters.toml, levels/, status.rs, TOML 로더 |
+
+검증 범위:
+
+- `tests/ui_screens.rs`: Title/CharacterCreation/GameOver/ MorePrompt/AwaitingDirection 상태 전환
+- `tests/ui_debug.rs`: F9 토글, debug observation lines, hash 무영향
+- `tests/ui_labels.rs`: 라벨 수집, 우선순위, 최대 3개 제한, 만료 필터링
+- `tests/data_loading.rs`: TOML 파일 로딩, Status 생성, HungerState 계산
+- `cargo test`: 전체 회귀 통과
+- `cargo run --bin aihack-headless -- --seed 42 --turns 1000`: Phase 16 기준 hash 동일
 
 ### 15.8 검증 기준
 

@@ -5,11 +5,11 @@ use aihack::{
 
 #[test]
 fn starting_inventory_letters_are_stable() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
 
     assert_eq!(session.world.inventory.owner, session.world.player_id);
     assert_eq!(session.world.inventory.equipped_melee, None);
-    assert_eq!(session.world.inventory.next_letter_index, 2);
+    assert_eq!(session.world.inventory.next_letter_index, 5);
     assert_eq!(session.world.inventory.entries[0].item, EntityId(5));
     assert_eq!(
         session.world.inventory.entries[0].letter,
@@ -28,11 +28,24 @@ fn starting_inventory_letters_are_stable() {
         session.world.entities.item_letter(EntityId(6)),
         Some(InventoryLetter('b'))
     );
+    assert_eq!(
+        session.world.entities.item_letter(EntityId(7)),
+        Some(InventoryLetter('c'))
+    );
+    assert_eq!(
+        session.world.entities.item_letter(EntityId(8)),
+        Some(InventoryLetter('d'))
+    );
+    assert_eq!(
+        session.world.entities.item_letter(EntityId(9)),
+        Some(InventoryLetter('e'))
+    );
 }
 
 #[test]
 fn observation_exposes_inventory_and_legal_item_actions() {
-    let session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     let observation = session.observation();
 
     assert!(observation.inventory.iter().any(|item| {
@@ -46,6 +59,18 @@ fn observation_exposes_inventory_and_legal_item_actions() {
     assert!(observation
         .legal_actions
         .contains(&CommandIntent::Wield { item: EntityId(5) }));
+    assert!(observation.legal_actions.contains(&CommandIntent::Search));
+    assert!(observation
+        .legal_actions
+        .contains(&CommandIntent::Read { item: EntityId(8) }));
+    assert!(observation.legal_actions.contains(&CommandIntent::Throw {
+        item: EntityId(5),
+        direction: Direction::East,
+    }));
+    assert!(observation.legal_actions.contains(&CommandIntent::Zap {
+        item: EntityId(7),
+        direction: Direction::East,
+    }));
     assert!(!observation
         .legal_actions
         .contains(&CommandIntent::Quaff { item: EntityId(6) }));
@@ -53,7 +78,8 @@ fn observation_exposes_inventory_and_legal_item_actions() {
 
 #[test]
 fn wield_dagger_sets_melee_slot_and_second_wield_is_idempotent() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
 
     let first = session.submit(CommandIntent::Wield { item: EntityId(5) });
 
@@ -82,7 +108,8 @@ fn wield_dagger_sets_melee_slot_and_second_wield_is_idempotent() {
 
 #[test]
 fn wield_non_weapon_is_rejected() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     let outcome = session.submit(CommandIntent::Wield { item: EntityId(6) });
 
     assert!(!outcome.accepted);
@@ -92,7 +119,8 @@ fn wield_non_weapon_is_rejected() {
 
 #[test]
 fn equipped_dagger_drives_player_attack_profile() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.set_alive(EntityId(3), false);
     assert!(
         session
             .submit(CommandIntent::Wield { item: EntityId(5) })
@@ -110,7 +138,7 @@ fn equipped_dagger_drives_player_attack_profile() {
 
 #[test]
 fn inventory_state_affects_snapshot_hash() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.entities.clear_monsters();
     session.world.set_player_pos(Pos { x: 8, y: 5 });
     let before = session.snapshot().stable_hash();
@@ -128,7 +156,7 @@ fn inventory_state_affects_snapshot_hash() {
 
 #[test]
 fn inventory_roundtrip_preserves_letters() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.entities.clear_monsters();
     session.world.set_player_pos(Pos { x: 8, y: 5 });
     assert!(session.submit(CommandIntent::Pickup).accepted);

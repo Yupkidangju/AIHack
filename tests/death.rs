@@ -6,7 +6,7 @@ use aihack::{
 
 #[test]
 fn monster_death_creates_event_and_tombstone() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let jackal = EntityId(2);
 
     for _ in 0..50 {
@@ -36,7 +36,7 @@ fn monster_death_creates_event_and_tombstone() {
 
 #[test]
 fn dead_monster_no_longer_blocks_movement() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let jackal = EntityId(2);
     session.world.entities.set_alive(jackal, false);
 
@@ -48,7 +48,7 @@ fn dead_monster_no_longer_blocks_movement() {
 
 #[test]
 fn player_death_enters_game_over() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let player = session.world.player_id;
     let attacker = EntityId(3);
     session.world.entities.actor_stats_mut(player).unwrap().hp = 0;
@@ -56,7 +56,7 @@ fn player_death_enters_game_over() {
     let events = death::collect_death_events_after_attack(&mut session.world, attacker, player);
     session.state = death::state_after_deaths(&session.world);
 
-    assert_eq!(session.state, RunState::GameOver);
+    assert!(matches!(session.state, RunState::GameOver { .. }));
     assert!(events.iter().any(|event| matches!(
         event,
         GameEvent::EntityDied {
@@ -68,7 +68,7 @@ fn player_death_enters_game_over() {
 
 #[test]
 fn snapshot_hash_changes_when_entity_state_changes() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let before = session.snapshot().stable_hash();
     session
         .world

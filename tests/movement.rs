@@ -1,3 +1,5 @@
+use serde_json::Value;
+
 use aihack::{
     core::{CommandIntent, Direction, GameSession, Pos},
     domain::tile::TileKind,
@@ -5,7 +7,7 @@ use aihack::{
 
 #[test]
 fn movement_to_floor_advances_turn() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.entities.clear_monsters();
     let outcome = session.submit(CommandIntent::Move(Direction::East));
 
@@ -13,11 +15,23 @@ fn movement_to_floor_advances_turn() {
     assert!(outcome.turn_advanced);
     assert_eq!(session.world.player_pos(), Pos { x: 6, y: 5 });
     assert_eq!(session.turn, 1);
+
+    let moved = outcome
+        .events
+        .iter()
+        .find(|event| matches!(event, aihack::core::GameEvent::EntityMoved { .. }))
+        .map(|event| serde_json::to_value(event).expect("movement event must serialize"))
+        .expect("successful movement must emit EntityMoved");
+    let payload = moved
+        .get("EntityMoved")
+        .and_then(Value::as_object)
+        .expect("EntityMoved payload must be object");
+    assert_eq!(payload.get("entity").and_then(Value::as_u64), Some(1));
 }
 
 #[test]
 fn movement_blockers_do_not_advance_turn() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.entities.clear_monsters();
     session.world.set_player_pos(Pos { x: 9, y: 5 });
     let before_hash = session.snapshot().stable_hash();
@@ -32,7 +46,7 @@ fn movement_blockers_do_not_advance_turn() {
 
 #[test]
 fn wall_and_out_of_bounds_movement_are_rejected() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.entities.clear_monsters();
     session.world.set_player_pos(Pos { x: 1, y: 1 });
 
@@ -48,7 +62,7 @@ fn wall_and_out_of_bounds_movement_are_rejected() {
 
 #[test]
 fn diagonal_corner_cutting_is_rejected() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.entities.clear_monsters();
     session.world.set_player_pos(Pos { x: 5, y: 5 });
     session

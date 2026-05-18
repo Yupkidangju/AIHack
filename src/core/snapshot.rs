@@ -30,6 +30,7 @@ pub struct EntitySnapshot {
     pub item_kind: Option<ItemKind>,
     pub location: Option<EntityLocation>,
     pub assigned_letter: Option<InventoryLetter>,
+    pub charges: Option<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +46,7 @@ pub struct InventorySnapshot {
     pub owner: EntityId,
     pub entries: Vec<InventoryEntry>,
     pub equipped_melee: Option<EntityId>,
+    pub equipped_body: Option<EntityId>,
     pub next_letter_index: u8,
 }
 
@@ -61,6 +63,14 @@ pub struct GameSnapshot {
     pub levels: Vec<LevelSnapshot>,
     pub entities: Vec<EntitySnapshot>,
     pub inventory: InventorySnapshot,
+    pub nutrition: i16,
+    pub luck: i16,
+    pub prayer_cooldown: u16,
+    pub paralysis_turns: u8,
+    pub hallucinating: bool,
+    pub kill_count: u32,
+    pub gold: u32,
+    pub identified_items: Vec<ItemKind>,
 }
 
 impl GameSnapshot {
@@ -86,9 +96,10 @@ impl GameSnapshot {
                         item_kind: None,
                         location: Some(EntityLocation::OnMap { level, pos }),
                         assigned_letter: None,
+                        charges: None,
                     }
                 } else {
-                    let (kind, _, location, assigned_letter) =
+                    let (kind, _, location, assigned_letter, charges) =
                         entity.item().expect("actor가 아니면 item payload여야 한다");
                     EntitySnapshot {
                         id: entity.id,
@@ -99,6 +110,7 @@ impl GameSnapshot {
                         item_kind: Some(kind),
                         location: Some(location),
                         assigned_letter,
+                        charges,
                     }
                 }
             })
@@ -132,8 +144,17 @@ impl GameSnapshot {
                 owner: world.inventory.owner,
                 entries: world.inventory.entries.clone(),
                 equipped_melee: world.inventory.equipped_melee,
+                equipped_body: world.inventory.equipped_body,
                 next_letter_index: world.inventory.next_letter_index,
             },
+            nutrition: world.nutrition,
+            luck: world.luck,
+            prayer_cooldown: world.prayer_cooldown,
+            paralysis_turns: world.paralysis_turns,
+            hallucinating: world.hallucinating,
+            kill_count: world.kill_count,
+            gold: world.gold,
+            identified_items: world.identified_items.clone(),
         }
     }
 

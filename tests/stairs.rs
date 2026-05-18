@@ -7,7 +7,7 @@ use aihack::{
 
 #[test]
 fn descend_requires_stairs_down() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let before_hash = session.snapshot().stable_hash();
 
     let outcome = session.submit(CommandIntent::Descend);
@@ -24,7 +24,8 @@ fn descend_requires_stairs_down() {
 
 #[test]
 fn descend_lands_on_level2_stairs_up() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     session.world.set_player_pos(PHASE5_LEVEL1_STAIRS_DOWN);
 
     let outcome = session.submit(CommandIntent::Descend);
@@ -48,7 +49,7 @@ fn descend_lands_on_level2_stairs_up() {
 
 #[test]
 fn ascend_requires_stairs_up() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session
         .world
         .set_player_location(PHASE5_LEVEL2_ID, Pos { x: 6, y: 5 });
@@ -67,7 +68,8 @@ fn ascend_requires_stairs_up() {
 
 #[test]
 fn ascend_returns_to_level1_stairs_down() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     session.world.set_player_pos(PHASE5_LEVEL1_STAIRS_DOWN);
     assert!(session.submit(CommandIntent::Descend).accepted);
 
@@ -92,7 +94,8 @@ fn ascend_returns_to_level1_stairs_down() {
 
 #[test]
 fn level_change_event_order_is_stable() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     session.world.set_player_pos(PHASE5_LEVEL1_STAIRS_DOWN);
 
     let outcome = session.submit(CommandIntent::Descend);
@@ -111,7 +114,8 @@ fn level_change_event_order_is_stable() {
 
 #[test]
 fn landing_positions_are_stable() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     session.world.set_player_pos(PHASE5_LEVEL1_STAIRS_DOWN);
     assert!(session.submit(CommandIntent::Descend).accepted);
     assert_eq!(session.world.player_pos(), PHASE5_LEVEL2_STAIRS_UP_POS);
@@ -121,7 +125,7 @@ fn landing_positions_are_stable() {
 
 #[test]
 fn observation_includes_stairs_actions() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.set_player_pos(PHASE5_LEVEL1_STAIRS_DOWN);
     let level1_stairs = session.observation();
     assert_eq!(level1_stairs.current_level, PHASE5_LEVEL1_ID);

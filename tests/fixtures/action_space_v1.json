@@ -1,0 +1,7 @@
+{
+  "commands": [
+    { "Command": "Wait" },
+    { "Command": "Search" },
+    "Noop"
+  ]
+}

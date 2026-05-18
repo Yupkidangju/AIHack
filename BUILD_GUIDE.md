@@ -5,7 +5,7 @@
 
 ## 1. 현재 루트 상태
 
-현재 루트에는 새 엔진 코드가 없다. 이전 Rust 포트는 `legacy_nethack_port_reference/` 아래에 보존되어 있다.
+현재 루트에는 새 Rust-native 엔진 코드가 있다. 이전 Rust 포트는 `legacy_nethack_port_reference/` 아래에 참조용으로 보존되어 있다.
 
 새 코드 작성 전 기준 파일:
 
@@ -33,11 +33,11 @@ rustc --version
 cargo --version
 ```
 
-## 3. 새 Cargo 스캐폴딩 절차
+## 3. 현재 Cargo 구성 기준
 
-루트에서 새 Cargo 패키지를 만든다. 레거시 폴더는 workspace member로 넣지 않는다.
+루트 Cargo 패키지는 이미 존재한다. 새 스캐폴딩을 다시 실행하지 말고 현재 `Cargo.toml`을 기준으로 수정한다. 레거시 폴더는 workspace member로 넣지 않는다.
 
-필수 `Cargo.toml` 초안:
+현재 `Cargo.toml` 핵심 값:
 
 ```toml
 [package]
@@ -70,7 +70,7 @@ path = "src/bin/aihack-headless.rs"
 
 ```rust
 fn main() {
-    println!("AIHack UI adapter is not implemented yet. Use aihack-headless.");
+    // Phase 10+ TUI entry
 }
 ```
 
@@ -93,7 +93,11 @@ fn main() {
 }
 ```
 
-이 엔트리는 Phase 1에서 실제 `GameSession::new(seed)`와 `CommandIntent::Wait` 실행으로 교체되었다. 현재 runner는 `seed`, `turns`, `final_turn`, `final_hash`를 출력한다.
+현재 기준:
+
+- `src/main.rs`는 Phase 10 이후 `aihack::ui::tui::run_tui(seed)`를 호출하는 TUI entrypoint다.
+- `src/bin/aihack-headless.rs`는 deterministic regression runner로 유지되며 `seed`, `turns`, `final_turn`, `final_hash`를 출력한다.
+- Phase 15까지 hover inspect, priority message, command hint, inspect panel inventory click, reduced motion/high contrast token path가 추가되었다.
 
 ## 5. 런타임 출력 경로
 
@@ -146,12 +150,17 @@ cargo clippy --all-targets -- -D warnings
 
 ## 7. 첫 실행 산출물
 
-Phase 5 현재 기준 출력 예시:
+Phase 10 현재 기준 출력 예시:
 
 ```text
-seed=42 turns=0 final_turn=0 final_hash=821520dc302c9ea2
-seed=42 turns=100 final_turn=100 final_hash=88886c28698a1730
-seed=43 turns=100 final_turn=100 final_hash=948c5ec460bebb99
+seed=42 turns=0 final_turn=0 final_hash=53435bb29a2e69ee
+seed=42 turns=100 final_turn=20 final_hash=4c77dafb19dd2226
+seed=43 turns=100 final_turn=21 final_hash=f8324eacbce50087
+
+save/load 예시:
+aihack-headless --seed 42 --turns 10 --save /tmp/aihack-save-v1.json
+aihack-headless --load /tmp/aihack-save-v1.json --turns 20
+aihack-headless --seed 42 --turns 5 --replay-out /tmp/aihack-replay.jsonl
 ```
 
 
@@ -162,9 +171,9 @@ seed=43 turns=100 final_turn=100 final_hash=948c5ec460bebb99
 
 `--turns 1000`:
 
-- `runtime/replays/42-1000.jsonl` 생성
-- 마지막 줄에 final snapshot hash 포함
-- 같은 명령을 두 번 실행하면 final hash 동일
+- stdout에 `seed`, `turns`, `final_turn`, `final_hash`가 출력된다.
+- monster AI로 player가 조기 사망할 수 있으므로 `final_turn`은 요청 turns보다 작을 수 있다.
+- 같은 명령을 두 번 실행하면 `final_turn`과 `final_hash`가 동일해야 한다.
 
 ## 8. 레거시 빌드
 
@@ -196,3 +205,38 @@ v0.1 release candidate:
 - replay 재생 hash 일치
 - `Observation` schema snapshot 통과
 - 루트 문서와 구현 타입 이름 일치
+
+
+TUI smoke 예시:
+
+```bash
+cargo run --bin aihack -- --seed 42
+```
+
+
+AI API schema freeze 검증 예시:
+
+```bash
+cargo test --test ai_api_schema --test action_space
+```
+
+
+Narrative adapter 검증 예시:
+
+```bash
+cargo test --test llm_narrative
+```
+
+
+Decision support 검증 예시:
+
+```bash
+cargo test --test llm_decision_support
+```
+
+
+## 11. Known Debt Triage
+
+- release blocker: none
+- non-blocking known issue: small-terminal TUI는 fallback message만 렌더한다.
+- post-RC follow-up: advanced TUI polish, provider-backed online integrations, broader packaging automation

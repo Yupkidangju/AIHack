@@ -11,14 +11,16 @@ AIHack의 화면 경험은 "고전 ASCII 로그라이크를 현대적 디버깅/
 
 ## 2. 화면 모드
 
-| ScreenId | 목적 | 입력 | 출력 |
-| --- | --- | --- | --- |
-| `screen.title` | 시작/로드/설정 | Enter, L, Q | `RunState::Title` |
-| `screen.character_creation` | v0.1 기본 캐릭터 확정 | Enter, Esc | `RunState::CharacterCreation` |
-| `screen.play` | 핵심 게임 화면 | command key | `CommandIntent` |
-| `screen.inventory` | 아이템 선택 | letter, Esc | Phase 4 현재 `Wield`/`Quaff`; `Wear`/`Read`/`Drop`은 후속 범위 |
-| `screen.game_over` | 사망/점수/재시작 | N, Q | 새 세션 또는 종료 |
-| `screen.debug_observation` | AI 관찰 디버그 | F9 toggle | read-only |
+[v0.2.0] Phase 17: 모든 화면 모드가 구현되었다.
+
+| ScreenId | 목적 | 입력 | 출력 | 상태 |
+| --- | --- | --- | --- | --- |
+| `screen.title` | 시작/로드/설정 | Enter, L, Q | `RunState::Title` | 구현 완료 |
+| `screen.character_creation` | v0.1 기본 캐릭터 확정 | Enter, Esc | `RunState::CharacterCreation` | 구현 완료 |
+| `screen.play` | 핵심 게임 화면 | command key | `CommandIntent` | 구현 완료 |
+| `screen.inventory` | 아이템 선택 | letter, Esc | Phase 4 `Wield`/`Quaff`/`Wear`/`Read`/`Drop` 모두 구현 완료 | 구현 완료 |
+| `screen.game_over` | 사망/점수/재시작 | N, Q | 새 세션 또는 종료 | 구현 완료 |
+| `screen.debug_observation` | AI 관찰 디버그 | F9 toggle | read-only | 구현 완료 |
 
 ## 3. Play 화면 레이아웃
 
@@ -178,7 +180,7 @@ c - potion of healing
 
 ## 10. Debug Observation 패널
 
-F9로 토글한다. 플레이에는 영향을 주지 않는다.
+[v0.2.0] Phase 18: F9 키로 토글한다. `TuiApp.debug_observation_visible` 상태가 UI-only이며 플레이에는 영향을 주지 않는다. `render_panels::debug_observation_lines()`가 표시 데이터를 생성한다.
 
 표시 항목:
 
@@ -186,22 +188,31 @@ F9로 토글한다. 플레이에는 영향을 주지 않는다.
 - `seed`
 - `turn`
 - `snapshot_hash`
+- `run_state`
+- `player_pos`, `player_hp`
+- `hunger`, `luck`, `prayer_cooldown`, `paralysis_turns`, `hallucinating`
+- `visible_tiles` 수
+- `visible_entities` 수
+- `inventory` 수
+- `action_space` 수
+- `last_events` 수
 - `legal_actions` 최대 20개
 - 최근 event 10개
-- AI가 보는 visible tile/entity 수
 
 이 패널은 AI 통합 전에도 구현한다. Observation이 UI와 테스트 양쪽에서 같은 값을 보여야 하기 때문이다.
 
 ## 11. Game Over 화면
 
+[v0.2.0] Phase 17: Game Over 화면이 구현되었다. `RunState::GameOver { cause, final_score }`를 읽어 렌더링한다.
+
 필수 표시:
 
-- 사망 원인
+- 사망 원인 (`DeathCause` formatter)
 - turn
 - depth
-- defeated monsters count
-- score
-- replay seed
+- defeated monsters count (`world.kill_count`)
+- score (`final_score`)
+- replay seed (`meta.seed`)
 - New Run
 - Quit
 
@@ -209,7 +220,7 @@ F9로 토글한다. 플레이에는 영향을 주지 않는다.
 
 | CTA | 활성 조건 | 결과 |
 | --- | --- | --- |
-| `New Run` | 항상 | 새 `GameSession` 생성 |
+| `New Run` | 항상 | 새 `GameSession` 생성 (seed + 1) |
 | `Quit` | 항상 | 프로세스 종료 또는 title |
 | `Export Replay` | replay log 있음 | `runtime/replays` 경로 출력 |
 
@@ -312,6 +323,7 @@ v0.1 UI 완료:
 | click panel tab | F9/debug/status/log focus | panel pin/filter | 사용자 레이아웃 저장 |
 
 마우스 입력은 항상 `UiInputEvent -> UiCommandCandidate -> CommandIntent` 변환을 거친다. 지도 좌표 변환은 `Viewport { origin: Pos, width, height, cell_width: 1, cell_height: 1 }` 계약을 사용한다.
+Phase 15 구현에서는 별도 inventory panel을 늘리지 않고 inspect panel 기본 행이 inventory primary-action surface를 겸한다. hover가 있으면 inspect 정보가 우선하고, hover가 없으면 inventory row click이 keyboard baseline과 같은 action 후보를 선택한다.
 
 ### 15.4 정보 가독성 규칙
 
@@ -320,6 +332,7 @@ v0.1 UI 완료:
 - 새로 시야에 들어온 hostile/item 라벨은 최대 3개만 표시한다.
 - 라벨 우선순위: `hostile adjacent > low HP warning > stairs > unidentified item > passive monster`.
 - hover inspect는 항상 턴 비진행이며 `Observation` 또는 `GameSnapshot`의 read-only 데이터만 사용한다.
+- command bar는 legal action dump 대신 고정 hint와 focus 상태를 먼저 보여준다.
 
 ### 15.5 ASCII 애니메이션/효과 규칙
 
@@ -365,6 +378,8 @@ v0.1 UI 완료 기준에 다음을 추가한다.
 - TUI adapter 구현 시 `ui_layout`, `ui_input_mapping`, `ui_effect_projection` 테스트를 추가한다.
 - 80x28 degraded layout에서도 command bar와 message log가 겹치지 않는다.
 - mouse 미지원 터미널에서도 keyboard-only parity가 유지된다.
+- [v0.2.0] Phase 19: 자동 라벨 우선순위가 구현되었고, `tests/ui_labels.rs`로 검증되었다.
+- [v0.2.0] Phase 18: F9 debug observation 토글이 구현되었고, `tests/ui_debug.rs`로 검증되었다.
 
 ## Phase 3 전투/사망 Headless 구조 반영
 
@@ -415,3 +430,165 @@ GameWorld
 - `ShowInventory`는 eventless/no-turn이며, 화면은 `Observation.inventory`를 표시한다.
 - 소비된 potion은 inventory에서 사라지지만 item entity는 `Consumed` tombstone과 `assigned_letter`를 유지한다.
 - Phase 4에는 drag/drop, drop, read, zap, throw, file save/load를 구현하지 않는다.
+
+## Phase 6 몬스터 AI Headless 구조 반영
+
+```text
+GameSession::submit(player command)
+├── player-side apply
+├── TurnStarted
+├── player events
+└── systems::monster_ai
+    ├── collect intents (current level hostile only, EntityId asc)
+    │   ├── Jackal -> Wander
+    │   ├── Goblin -> ChaseVisiblePlayer
+    │   └── FloatingEye -> Stationary
+    └── apply intents
+        ├── EntityMoved { entity, from, to }
+        ├── AttackResolved
+        └── EntityDied / RunState::GameOver stop
+```
+
+구현 시 주의사항:
+
+- monster AI는 current level만 다루며 stairs를 타지 않는다.
+- goblin chase는 LOS 안에서만 동작하고 pathfinding/A*는 사용하지 않는다.
+- player side resolution 결과가 `GameOver`면 monster phase를 실행하지 않는다.
+- movement event는 player/monster 모두 actor identity를 포함해야 replay와 UI projection이 일관된다.
+
+
+## Phase 7 NetHack 상호작용 Headless 구조 반영
+
+```text
+GameSession::submit
+├── Search -> systems::traps::search -> TileRevealed*
+├── Move -> EntityMoved -> systems::traps::trigger_player_trap -> TrapTriggered
+├── Read(scroll) -> ScrollRead -> reveal_all_hidden_tiles
+├── Throw(item, dir) -> ItemThrown -> optional AttackResolved/EntityDied -> item OnMap
+└── Zap(wand, dir) -> WandZapped(charges_after) -> optional AttackResolved/EntityDied
+```
+
+구현 시 주의사항:
+
+- hidden door는 observation에서 wall로, hidden trap은 floor로만 보인다.
+- trap 피해는 fixed `3`이며 wait로는 재발동하지 않는다.
+- equipped dagger를 던지면 `equipped_melee`는 즉시 비워진다.
+- wand charge와 thrown item landing location은 snapshot hash 입력에 포함된다.
+
+
+## Phase 8 Legacy Rule Absorption Headless 구조 반영
+
+```text
+Phase 8 state additions
+├── nutrition / hunger tick
+├── luck
+├── prayer_cooldown
+├── paralysis_turns from passive attack
+├── identified_items
+├── gold / kill_count / death_score helper
+└── golden scenarios P8-G01..P8-G20
+```
+
+구현 시 주의사항:
+
+- golden scenario는 규칙 하나당 최소 1개를 유지한다.
+- hallucination은 message only effect이며 core state corruption을 일으키지 않는다.
+- encumbrance는 carry weight threshold로만 구현하고 generalized inventory sim은 미룬다.
+- prayer/shop/score는 deterministic math/cooldown subset만 구현한다.
+
+
+## Phase 9 Save Load Replay Headless 구조 반영
+
+```text
+GameSession
+├── to_save_data() -> SaveDataV1 JSON
+├── from_save_data() <- SaveDataV1 JSON
+└── replay JSONL
+    └── ReplayLineV1 { turn_before, command, outcome, snapshot_hash_after }
+```
+
+구현 시 주의사항:
+
+- save file과 replay file은 역할이 다르므로 분리한다.
+- RNG continuation은 seed만으로는 부족하며 draw count를 함께 저장한다.
+- identified_items, nutrition, luck, prayer_cooldown, kill_count, gold는 모두 save/load 대상이다.
+
+
+## Phase 10 TUI Adapter 구조 반영
+
+```text
+src/ui/tui/
+├── mod.rs            runtime shell / terminal lifecycle
+├── layout.rs         panel rect contract
+├── input.rs          key/mouse -> candidate mapping
+├── viewport.rs       terminal cell <-> dungeon Pos
+├── render_map.rs     ASCII map render
+├── render_panels.rs  status/log/inspect/command bar
+├── effects.rs        GameEvent -> UiEffectEvent
+├── theme.rs          color tokens
+└── config.rs         runtime config
+```
+
+구현 시 주의사항:
+
+- terminal이 80x28보다 작으면 fallback 안내만 렌더하고 안전하게 종료한다.
+- hover/click hit-test는 viewport/layout helper를 공유한다.
+- save/load는 UI가 직접 파일 포맷을 만들지 않고 core save API를 호출한다.
+
+
+## Phase 11 AI API Freeze 구조 반영
+
+```text
+Observation
+├── schema_version / seed / turn / current_level
+├── run_state
+├── player
+├── visible_tiles
+├── visible_entities
+├── inventory
+├── last_events
+├── action_space
+└── legal_actions (compatibility alias)
+```
+
+구현 시 주의사항:
+
+- internal runtime container는 AI-facing JSON에 직접 노출하지 않는다.
+- hidden tile projection과 identified item 상태는 Observation에서만 읽는다.
+- future consumer(TUI, narrative, decision support)는 same schema를 공유해야 한다.
+
+
+## Phase 12 LLM Narrative 구조 반영
+
+```text
+src/llm/
+├── narrative.rs  provider abstraction / timeout / fallback
+└── mod.rs        export
+
+TUI/log consumer
+└── narrative response lines only (non-hash artifact)
+```
+
+구현 시 주의사항:
+
+- narrative response는 save/replay/snapshot hash에 저장하지 않는다.
+- timeout과 provider failure는 deterministic fallback text로 흡수한다.
+- gameplay command generation은 Phase 12 범위가 아니다.
+
+
+## Phase 13 LLM Decision Support 구조 반영
+
+```text
+src/llm/decision.rs
+├── DecisionRequest
+├── SuggestedAction
+├── DecisionSource
+├── request_decision_with_timeout()
+└── execute_suggestion() -> session.submit() only
+```
+
+구현 시 주의사항:
+
+- suggestion과 execution을 분리한다.
+- illegal suggestion은 fallback/disabled로만 남고 state를 바꾸지 않는다.
+- TUI/log는 suggestion metadata를 표시할 수 있지만 save/replay에는 넣지 않는다.

@@ -9,7 +9,7 @@ use crate::{
         combat::{AttackProfile, DamageRoll},
         inventory::InventoryLetter,
         item::{item_data, ItemData, ItemKind},
-        monster::{monster_template, MonsterKind},
+        monster::{monster_ai_kind, monster_template, MonsterAiKind, MonsterKind},
         player::adventurer_template,
     },
 };
@@ -19,6 +19,16 @@ use crate::{
 pub enum ActorKind {
     Player,
     Monster(MonsterKind),
+}
+
+impl ActorKind {
+    /// [v0.1.0] actor가 monster라면 monster kind를 돌려준다.
+    pub fn monster_kind(self) -> Option<MonsterKind> {
+        match self {
+            Self::Monster(kind) => Some(kind),
+            Self::Player => None,
+        }
+    }
 }
 
 /// [v0.1.0] 외부 관찰/snapshot에서 쓰는 통합 entity 종류다.
@@ -89,8 +99,24 @@ pub enum EntityPayload {
         data: ItemData,
         location: EntityLocation,
         assigned_letter: Option<InventoryLetter>,
+        charges: Option<u8>,
     },
 }
+
+pub type ItemView<'a> = (
+    ItemKind,
+    &'a ItemData,
+    EntityLocation,
+    Option<InventoryLetter>,
+    Option<u8>,
+);
+
+pub type ItemViewMut<'a> = (
+    &'a ItemData,
+    &'a mut EntityLocation,
+    &'a mut Option<InventoryLetter>,
+    &'a mut Option<u8>,
+);
 
 /// [v0.1.0] Phase 4 entity store에 저장되는 통합 엔티티다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -126,6 +152,33 @@ impl Entity {
         }
     }
 
+    pub fn actor_kind(&self) -> Option<ActorKind> {
+        match &self.payload {
+            EntityPayload::Actor { kind, .. } => Some(*kind),
+            EntityPayload::Item { .. } => None,
+        }
+    }
+
+    pub fn faction(&self) -> Option<Faction> {
+        match &self.payload {
+            EntityPayload::Actor { faction, .. } => Some(*faction),
+            EntityPayload::Item { .. } => None,
+        }
+    }
+
+    pub fn is_alive_actor(&self) -> bool {
+        match &self.payload {
+            EntityPayload::Actor { alive, .. } => *alive,
+            EntityPayload::Item { .. } => false,
+        }
+    }
+
+    pub fn monster_ai_kind(&self) -> Option<MonsterAiKind> {
+        self.actor_kind()
+            .and_then(ActorKind::monster_kind)
+            .map(monster_ai_kind)
+    }
+
     pub fn actor_mut(&mut self) -> Option<(&mut EntityLocation, &mut ActorStats, &mut bool)> {
         match &mut self.payload {
             EntityPayload::Actor {
@@ -138,28 +191,28 @@ impl Entity {
         }
     }
 
-    pub fn item(&self) -> Option<(ItemKind, &ItemData, EntityLocation, Option<InventoryLetter>)> {
+    pub fn item(&self) -> Option<ItemView<'_>> {
         match &self.payload {
             EntityPayload::Item {
                 kind,
                 data,
                 location,
                 assigned_letter,
-            } => Some((*kind, data, *location, *assigned_letter)),
+                charges,
+            } => Some((*kind, data, *location, *assigned_letter, *charges)),
             EntityPayload::Actor { .. } => None,
         }
     }
 
-    pub fn item_mut(
-        &mut self,
-    ) -> Option<(&ItemData, &mut EntityLocation, &mut Option<InventoryLetter>)> {
+    pub fn item_mut(&mut self) -> Option<ItemViewMut<'_>> {
         match &mut self.payload {
             EntityPayload::Item {
                 data,
                 location,
                 assigned_letter,
+                charges,
                 ..
-            } => Some((data, location, assigned_letter)),
+            } => Some((data, location, assigned_letter, charges)),
             EntityPayload::Actor { .. } => None,
         }
     }
@@ -279,6 +332,7 @@ impl EntityStore {
                 data: item_data(kind),
                 location,
                 assigned_letter: None,
+                charges: item_data(kind).max_charges,
             },
         });
         id
@@ -337,6 +391,23 @@ impl EntityStore {
         })
     }
 
+    pub fn hostile_monsters_on_level(&self, level: LevelId) -> Vec<EntityId> {
+        let mut ids = self
+            .entities
+            .iter()
+            .filter_map(|entity| {
+                let (kind, faction, actor_level, _, _, alive) = entity.actor()?;
+                (alive
+                    && faction == Faction::Hostile
+                    && actor_level == level
+                    && matches!(kind, ActorKind::Monster(_)))
+                .then_some(entity.id)
+            })
+            .collect::<Vec<_>>();
+        ids.sort_by_key(|id| id.0);
+        ids
+    }
+
     pub fn items_at(&self, level: LevelId, pos: Pos) -> Vec<EntityId> {
         let mut items = self
             .entities
@@ -349,6 +420,7 @@ impl EntityStore {
                         level: item_level,
                         pos: item_pos,
                     },
+                    _,
                     _,
                 )) if item_level == level && item_pos == pos => Some(entity.id),
                 _ => None,
@@ -366,7 +438,7 @@ impl EntityStore {
         self.entities
             .iter()
             .filter_map(|entity| match entity.item() {
-                Some((_, _, EntityLocation::Inventory { owner: item_owner }, _))
+                Some((_, _, EntityLocation::Inventory { owner: item_owner }, _, _))
                     if item_owner == owner =>
                 {
                     Some(entity.id)
@@ -399,7 +471,7 @@ impl EntityStore {
             .and_then(|entity| entity.actor().map(|(_, _, level, pos, _, _)| (level, pos)))
     }
 
-    pub(crate) fn set_actor_location(&mut self, id: EntityId, level: LevelId, pos: Pos) -> bool {
+    pub fn set_actor_location(&mut self, id: EntityId, level: LevelId, pos: Pos) -> bool {
         let Some(entity) = self.get_mut(id) else {
             return false;
         };
@@ -414,7 +486,7 @@ impl EntityStore {
         let Some(entity) = self.get_mut(id) else {
             return false;
         };
-        let Some((_, location, _)) = entity.item_mut() else {
+        let Some((_, location, _, _)) = entity.item_mut() else {
             return false;
         };
         *location = next;
@@ -425,7 +497,7 @@ impl EntityStore {
         let Some(entity) = self.get_mut(id) else {
             return false;
         };
-        let Some((_, _, assigned_letter)) = entity.item_mut() else {
+        let Some((_, _, assigned_letter, _)) = entity.item_mut() else {
             return false;
         };
         *assigned_letter = Some(letter);
@@ -444,17 +516,33 @@ impl EntityStore {
 
     pub fn item_data(&self, id: EntityId) -> Option<&ItemData> {
         self.get(id)
-            .and_then(|entity| entity.item().map(|(_, data, _, _)| data))
+            .and_then(|entity| entity.item().map(|(_, data, _, _, _)| data))
     }
 
     pub fn item_location(&self, id: EntityId) -> Option<EntityLocation> {
         self.get(id)
-            .and_then(|entity| entity.item().map(|(_, _, location, _)| location))
+            .and_then(|entity| entity.item().map(|(_, _, location, _, _)| location))
     }
 
     pub fn item_letter(&self, id: EntityId) -> Option<InventoryLetter> {
         self.get(id)
-            .and_then(|entity| entity.item().and_then(|(_, _, _, letter)| letter))
+            .and_then(|entity| entity.item().and_then(|(_, _, _, letter, _)| letter))
+    }
+
+    pub fn item_charges(&self, id: EntityId) -> Option<u8> {
+        self.get(id)
+            .and_then(|entity| entity.item().and_then(|(_, _, _, _, charges)| charges))
+    }
+
+    pub fn set_item_charges(&mut self, id: EntityId, charges: Option<u8>) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let Some((_, _, _, charges_ref)) = entity.item_mut() else {
+            return false;
+        };
+        *charges_ref = charges;
+        true
     }
 
     pub fn clear_monsters(&mut self) {

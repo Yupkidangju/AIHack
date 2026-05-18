@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::core::ids::EntityId;
+use crate::{core::ids::EntityId, domain::tile::TrapKind};
 
 /// [v0.1.0] Phase 3 전투 피해 주사위 계약이다. dice=0 또는 sides=0은 피해 없음 데이터에만 사용한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -46,8 +46,9 @@ impl AttackProfile {
     }
 }
 
-/// [v0.1.0] 사망 원인은 Phase 3에서 근접 전투만 기록한다.
+/// [v0.1.0] 사망 원인은 Phase 7에서 trap까지 기록한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DeathCause {
     Combat { attacker: EntityId },
+    Trap { trap: TrapKind },
 }

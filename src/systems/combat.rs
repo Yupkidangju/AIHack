@@ -1,6 +1,10 @@
 use crate::{
     core::{event::GameEvent, ids::EntityId, rng::GameRng, world::GameWorld},
-    domain::{combat::DamageRoll, entity::Entity, item::UNARMED_ATTACK},
+    domain::{
+        combat::{AttackProfile, DamageRoll},
+        entity::Entity,
+        item::UNARMED_ATTACK,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +24,18 @@ pub fn resolve_attack(
     defender_id: EntityId,
 ) -> Option<AttackResolution> {
     let attacker = world.entities.get(attacker_id)?.clone();
+    let profile = attack_profile_for(world, attacker_id, &attacker);
+    resolve_attack_with_profile(world, rng, attacker_id, defender_id, profile)
+}
+
+pub fn resolve_attack_with_profile(
+    world: &mut GameWorld,
+    rng: &mut GameRng,
+    attacker_id: EntityId,
+    defender_id: EntityId,
+    profile: AttackProfile,
+) -> Option<AttackResolution> {
+    let attacker = world.entities.get(attacker_id)?.clone();
     let defender = world.entities.get(defender_id)?.clone();
     let (_, _, _, _, attacker_stats, attacker_alive) = attacker.actor()?;
     let (_, _, _, _, defender_stats, defender_alive) = defender.actor()?;
@@ -27,7 +43,6 @@ pub fn resolve_attack(
         return None;
     }
 
-    let profile = attack_profile_for(world, attacker_id, &attacker);
     let d20 = roll_die(rng, 20);
     let attack_roll = d20 + attacker_stats.hit_bonus + profile.hit_bonus;
     let defense = 10 + defender_stats.ac;

@@ -5,15 +5,31 @@ use rand::{rngs::StdRng, RngCore, SeedableRng};
 #[derive(Debug, Clone)]
 pub struct GameRng {
     seed: u64,
+    draws: u64,
     inner: StdRng,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RngStateV1 {
+    pub seed: u64,
+    pub draws: u64,
 }
 
 impl GameRng {
     pub fn new(seed: u64) -> Self {
         Self {
             seed,
+            draws: 0,
             inner: StdRng::seed_from_u64(seed),
         }
+    }
+
+    pub fn from_state(state: RngStateV1) -> Self {
+        let mut rng = Self::new(state.seed);
+        for _ in 0..state.draws {
+            let _ = rng.next_u64();
+        }
+        rng
     }
 
     pub fn seed(&self) -> u64 {
@@ -21,7 +37,15 @@ impl GameRng {
     }
 
     pub fn next_u64(&mut self) -> u64 {
+        self.draws += 1;
         self.inner.next_u64()
+    }
+
+    pub fn snapshot_state(&self) -> RngStateV1 {
+        RngStateV1 {
+            seed: self.seed,
+            draws: self.draws,
+        }
     }
 }
 

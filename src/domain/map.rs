@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     core::{error::GameError, position::Pos},
-    domain::tile::{DoorState, TileKind},
+    domain::tile::{DoorState, TileKind, TrapKind},
 };
 
 pub const PHASE2_WIDTH: i16 = 40;
@@ -11,6 +11,8 @@ pub const PHASE2_PLAYER_START: Pos = Pos { x: 5, y: 5 };
 pub const PHASE2_STAIRS_DOWN: Pos = Pos { x: 34, y: 15 };
 pub const PHASE2_CLOSED_DOOR: Pos = Pos { x: 10, y: 5 };
 pub const PHASE2_SECOND_CLOSED_DOOR: Pos = Pos { x: 14, y: 5 };
+pub const PHASE7_HIDDEN_DOOR: Pos = Pos { x: 12, y: 5 };
+pub const PHASE7_HIDDEN_TRAP: Pos = Pos { x: 16, y: 5 };
 pub const PHASE5_LEVEL2_STAIRS_UP: Pos = Pos { x: 5, y: 5 };
 pub const PHASE5_LEVEL2_CLOSED_DOOR: Pos = Pos { x: 8, y: 5 };
 
@@ -53,9 +55,11 @@ impl GameMap {
         for y in 4..=8 {
             map.set_tile_unchecked(Pos { x: 12, y }, TileKind::Wall);
         }
+        map.set_tile_unchecked(PHASE7_HIDDEN_DOOR, TileKind::HiddenDoor);
 
         map.set_tile_unchecked(PHASE2_CLOSED_DOOR, TileKind::Door(DoorState::Closed));
         map.set_tile_unchecked(PHASE2_SECOND_CLOSED_DOOR, TileKind::Door(DoorState::Closed));
+        map.set_tile_unchecked(PHASE7_HIDDEN_TRAP, TileKind::HiddenTrap(TrapKind::Pit));
         map.set_tile_unchecked(PHASE2_STAIRS_DOWN, TileKind::StairsDown);
         map
     }

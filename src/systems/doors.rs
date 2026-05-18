@@ -1,5 +1,5 @@
 use crate::{
-    core::{error::GameError, position::Direction, world::GameWorld},
+    core::{error::GameError, event::GameEvent, position::Direction, world::GameWorld},
     domain::tile::{DoorState, TileKind},
 };
 
@@ -15,6 +15,43 @@ pub fn close_door(
     direction: Direction,
 ) -> Result<(DoorState, DoorState), GameError> {
     change_door(world, direction, DoorState::Open, DoorState::Closed)
+}
+
+pub fn kick_door(world: &mut GameWorld, direction: Direction) -> Result<Vec<GameEvent>, GameError> {
+    let pos = world.player_pos().offset(direction.delta());
+    let tile = world.current_map().tile(pos)?;
+    let mut events = Vec::new();
+    match tile {
+        TileKind::HiddenDoor => {
+            world
+                .current_map_mut()
+                .set_tile(pos, TileKind::Door(DoorState::Open))?;
+            events.push(GameEvent::TileRevealed {
+                pos,
+                tile: TileKind::Door(DoorState::Closed),
+            });
+            events.push(GameEvent::DoorKicked { pos });
+            events.push(GameEvent::DoorChanged {
+                pos,
+                from: DoorState::Closed,
+                to: DoorState::Open,
+            });
+            Ok(events)
+        }
+        TileKind::Door(DoorState::Closed) => {
+            world
+                .current_map_mut()
+                .set_tile(pos, TileKind::Door(DoorState::Open))?;
+            events.push(GameEvent::DoorKicked { pos });
+            events.push(GameEvent::DoorChanged {
+                pos,
+                from: DoorState::Closed,
+                to: DoorState::Open,
+            });
+            Ok(events)
+        }
+        other => Err(GameError::NoDoor { pos, tile: other }),
+    }
 }
 
 pub fn door_state_in_direction(world: &GameWorld, direction: Direction) -> Option<DoorState> {

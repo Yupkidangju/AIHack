@@ -9,7 +9,7 @@ use aihack::{
 
 #[test]
 fn level_registry_contains_two_fixed_levels() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
 
     assert_eq!(session.world.levels.len(), 2);
     assert!(session.world.levels.contains(LevelId {
@@ -25,7 +25,7 @@ fn level_registry_contains_two_fixed_levels() {
 
 #[test]
 fn fixed_level_stairs_match_spec() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
 
     assert_eq!(
         session
@@ -55,7 +55,7 @@ fn fixed_level_stairs_match_spec() {
 
 #[test]
 fn actor_and_item_locations_are_level_aware() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
 
     assert_eq!(
         session
@@ -110,7 +110,8 @@ fn actor_and_item_locations_are_level_aware() {
 
 #[test]
 fn level1_state_survives_round_trip() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
 
     session.world.set_player_pos(Pos { x: 9, y: 5 });
     assert!(
@@ -149,8 +150,8 @@ fn level1_state_survives_round_trip() {
 
 #[test]
 fn current_level_affects_snapshot_hash() {
-    let mut a = GameSession::new(42);
-    let mut b = GameSession::new(42);
+    let mut a = GameSession::new_for_playing(42);
+    let mut b = GameSession::new_for_playing(42);
     b.world
         .set_player_location(PHASE5_LEVEL2_ID, Pos { x: 5, y: 5 });
 
@@ -162,8 +163,8 @@ fn current_level_affects_snapshot_hash() {
 
 #[test]
 fn level_map_state_affects_snapshot_hash() {
-    let a = GameSession::new(42);
-    let mut b = GameSession::new(42);
+    let a = GameSession::new_for_playing(42);
+    let mut b = GameSession::new_for_playing(42);
     b.world
         .map_mut(PHASE5_LEVEL2_ID)
         .set_tile(Pos { x: 8, y: 5 }, TileKind::Door(DoorState::Open))
@@ -176,7 +177,8 @@ fn level_map_state_affects_snapshot_hash() {
 
 #[test]
 fn current_level_invariant_survives_session_commands() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
 
     assert_eq!(
         session.world.current_level(),

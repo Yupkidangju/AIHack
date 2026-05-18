@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "seed": 42,
+  "turn": 0,
+  "current_level": { "branch": "Main", "depth": 1 },
+  "run_state": "Playing",
+  "player": {
+    "entity": 1,
+    "pos": { "x": 5, "y": 5 },
+    "hp": 16,
+    "max_hp": 16,
+    "current_level": { "branch": "Main", "depth": 1 },
+    "hunger": 900,
+    "luck": 0,
+    "prayer_cooldown": 0,
+    "paralysis_turns": 0,
+    "hallucinating": false
+  },
+  "player_pos": { "x": 5, "y": 5 },
+  "visible_tiles": [],
+  "visible_entities": [],
+  "inventory": [],
+  "last_events": [],
+  "action_space": { "commands": [] },
+  "legal_actions": []
+}

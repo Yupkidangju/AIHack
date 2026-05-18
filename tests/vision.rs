@@ -6,7 +6,7 @@ use aihack::{
 
 #[test]
 fn vision_respects_radius_8() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
     let visible = visible_positions(&session.world);
 
     assert!(visible
@@ -17,7 +17,8 @@ fn vision_respects_radius_8() {
 
 #[test]
 fn vision_respects_door_blockers() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     session.world.set_player_pos(Pos { x: 9, y: 5 });
     let behind_door = Pos { x: 11, y: 5 };
 
@@ -41,7 +42,8 @@ fn vision_respects_door_blockers() {
 
 #[test]
 fn wall_blocks_los_but_wall_tile_can_be_seen() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
     session.world.set_player_pos(Pos { x: 11, y: 5 });
     let wall = Pos { x: 12, y: 5 };
     let behind_wall = Pos { x: 13, y: 5 };
@@ -60,7 +62,7 @@ fn wall_blocks_los_but_wall_tile_can_be_seen() {
 
 #[test]
 fn observation_contains_visible_tiles() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
     let observation = session.observation();
 
     assert_eq!(observation.schema_version, 1);
@@ -78,7 +80,7 @@ fn observation_contains_visible_tiles() {
 
 #[test]
 fn observation_legal_actions_include_wait_move_and_door_actions() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     session.world.entities.clear_monsters();
     let observation = session.observation();
     assert!(observation.legal_actions.contains(&CommandIntent::Wait));

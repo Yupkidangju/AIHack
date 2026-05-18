@@ -137,6 +137,10 @@ TUI 리팩토링은 단계형 혼합 로드맵으로 문서에 선반영한다. 
 
 `spec.md`, `designs.md`, `implementation_summary.md`, `audit_roadmap.md`는 현대 TUI 계획을 같은 단계와 검증 기준으로 참조한다. 후속 구현자는 UI 편의 기능을 추가하더라도 `GameSession` 단일 상태 원천과 `CommandIntent` 경계를 유지해야 한다.
 
+추가 메모 (2026-05-18):
+
+Phase 15에서는 v0.2 범위를 넓히지 않기 위해 inspect panel이 hover read-only inspect와 inventory primary-action surface를 함께 맡는다. 즉, 별도 drag/drop inventory나 동적 레이아웃 저장을 도입하지 않고도 layout/hit-test contract를 유지한 채 keyboard baseline과 mouse mixed-input parity를 맞춘다.
+
 ## ADR-0008: Phase 1 replay hash는 고정 FNV-1a로 계산하고 RNG 업그레이드를 replay 영향 변경으로 취급한다
 
 배경:
@@ -238,3 +242,232 @@ Phase 5는 1층-2층 왕복, 1층 상태 보존, current level snapshot hash 반
 결과:
 
 `Descend`/`Ascend`는 stairs tile에서만 accepted되고 `TurnStarted -> LevelChanged` event order를 만든다. Phase 5 기준 `seed=42`, `turns=100` final hash는 `88886c28698a1730`이다. Phase 6 monster AI는 반드시 level-aware query helper를 사용해야 한다.
+
+## ADR-0009: Phase 6 monster AI는 current-level deterministic 후처리로 제한한다
+
+Context:
+
+Phase 5에서 level registry와 current-level invariant가 도입되면서 monster AI를 바로 all-level simulation으로 확장하면 stairs 추적, persistence, pathfinding이 한 번에 들어온다. 하지만 Phase 6 목표는 최소 monster turn loop와 deterministic replay 유지다.
+
+Decision:
+
+monster AI는 `GameSession`의 accepted-turn 공용 후처리에서만 실행한다. 대상은 `world.current_level()`의 살아있는 hostile monster이며, 순서는 `EntityId` 오름차순이다. jackal=`Wander`, goblin=`ChaseVisiblePlayer`, floating eye=`Stationary`로 고정한다. `EntityMoved`는 player/monster 모두 `entity`를 포함하도록 확장한다.
+
+Consequences:
+
+- `ShowInventory` 같은 no-turn command와 rejected command는 monster phase를 트리거하지 않는다.
+- player side resolution으로 `GameOver`가 되면 남은 monster action은 중단된다.
+- stairs traversal, door manipulation, memory/pathfinding, ranged/passive ability는 Phase 7+로 미룬다.
+- Phase 6 기준 `seed=42`, `turns=100` final hash는 `2fb549b5d2e1e67f`이며 `seed=43`, `turns=100` final hash는 `ec98b802759e109c`다.
+
+
+## ADR-0010: Phase 7 상호작용은 fixture-driven 최소 typed contract로 제한한다
+
+Context:
+
+Phase 6까지의 deterministic core 위에 NetHack flavor를 추가해야 하지만, generalized projectile/trap/identify framework를 먼저 만들면 snapshot/event/item taxonomy 변경이 너무 넓어진다.
+
+Decision:
+
+Phase 7은 `Search`, `Throw`, `Zap`, `Read`, `Trap(Pit)`만 current-level fixture 계약으로 구현한다. hidden tile은 `HiddenDoor`/`HiddenTrap(Pit)`로 표현하고, trap 피해는 fixed `3`으로 고정한다. `WandMagicMissile`은 charge를 갖고 `ScrollReveal`은 current level hidden tile 전체 reveal만 수행한다.
+
+Consequences:
+
+- replay/hash는 hidden/revealed tile, item charge, thrown item location까지 포함해야 한다.
+- identify, reflection, bounce, hunger, curse, save/load, TUI는 Phase 8+로 미룬다.
+- Phase 7 기준 `seed=42`, `turns=100` final hash는 `5aecd83cf284cb25`, `seed=43`, `turns=100` final hash는 `5f5d5b89faa9a834`다.
+
+
+## ADR-0011: Phase 8 규칙 흡수는 golden scenario 중심 wave 실행으로 제한한다
+
+Context:
+
+레거시 규칙 20개를 한 번에 넓게 이식하면 deterministic closure와 regression 관리가 무너진다. 현재 repo는 phase-gated verification 문화가 강하므로 wave + golden scenario 접근이 더 적합하다.
+
+Decision:
+
+Phase 8은 20개 규칙을 4개 wave로 나누고, 각 규칙마다 최소 1개 golden scenario를 구현한다. 구현은 direct import가 아니라 typed helper/command/state 재구성으로 제한한다.
+
+Consequences:
+
+- golden tests가 문서/제품 계약 역할을 겸한다.
+- Phase 8 기준 `seed=42`, `turns=100` final hash는 `4c77dafb19dd2226`, `seed=43`, `turns=100` final hash는 `f8324eacbce50087`이다.
+- Phase 9 save/load는 identified_items, prayer_cooldown, nutrition, gold, kill_count 등 신규 persistent state를 모두 serialization 대상으로 재검토해야 한다.
+
+
+## ADR-0012: Phase 9 persistence는 explicit schema와 replay artifact를 분리한다
+
+Context:
+
+Phase 8까지 state가 커지면서 raw session dump는 schema control과 auditability가 약해졌다. 동시에 replay는 debugging artifact로서 save file과 역할이 다르다.
+
+Decision:
+
+Phase 9는 `SaveDataV1`/`SavedWorldV1` explicit schema와 `ReplayLineV1` JSONL line schema를 분리한다. RNG는 `RngStateV1 { seed, draws }`로 continuation을 복원한다.
+
+Consequences:
+
+- save/load correctness는 snapshot hash equality와 continuation equality로 검증된다.
+- replay JSONL은 command/outcome trace용 artifact로 유지된다.
+- Phase 9 기준 `seed=42`, `turns=100` final hash는 `4c77dafb19dd2226`, `seed=43`, `turns=100` final hash는 `f8324eacbce50087`이다.
+
+
+## ADR-0013: Phase 10 TUI는 adapter boundary와 layout-driven hit test를 고정한다
+
+Context:
+
+headless core와 persistence가 완료된 상태에서 실제 플레이 가능한 terminal UI가 필요하지만, UI가 core state를 직접 만지면 지금까지의 deterministic architecture가 무너진다.
+
+Decision:
+
+Phase 10은 `src/ui/tui/*` 분리형 adapter를 도입하고, layout/input/effect를 별도 모듈로 유지한다. UI는 `Observation`/`GameSnapshot`을 읽고 `CommandIntent`만 제출한다. mouse hit-test는 layout/viewport contract를 렌더와 공유한다.
+
+Consequences:
+
+- 80x28 degraded layout과 keyboard-only parity가 Phase 10의 최소 closure가 된다.
+- replay hash는 UI effect projection과 무관해야 한다.
+- Phase 11 AI API freeze는 TUI와 별개로 observation schema 안정화를 다룬다.
+
+
+## ADR-0014: Phase 11은 explicit AI DTO와 fixture-locked schema freeze를 사용한다
+
+Context:
+
+Observation/legal_actions가 내부 구현과 너무 가깝게 붙어 있으면 future refactor가 public breakage로 이어진다. save/load와 TUI도 같은 AI-facing contract를 공유해야 한다.
+
+Decision:
+
+Phase 11은 `Observation`, `PlayerObservation`, `EntityObservation`, `ActionSpace`, `ActionIntent`를 explicit AI DTO로 고정하고 canonical schema tests로 freeze한다. `legal_actions`는 compatibility alias로 유지하되 public future surface는 `action_space`가 주도한다.
+
+Consequences:
+
+- TUI와 headless/save-load는 같은 schema를 소비해야 한다.
+- future breaking change는 version bump와 migration note가 필요하다.
+- Phase 12/13는 이 frozen AI API 위에서만 확장해야 한다.
+
+
+## ADR-0015: Phase 12 narrative layer는 provider-agnostic timeout/fallback adapter로 제한한다
+
+Context:
+
+AI API freeze 이후에도 LLM integration은 core determinism과 분리되어야 한다. narrative text는 가치가 있지만 provider failure가 gameplay를 막으면 안 된다.
+
+Decision:
+
+Phase 12는 provider-agnostic narrative adapter와 2초 timeout, deterministic fallback policy를 도입한다. narrative response는 presentation artifact이며 snapshot hash, save/load, replay에 포함되지 않는다.
+
+Consequences:
+
+- no-provider mode와 provider failure는 모두 fallback text로 degrade 된다.
+- Phase 13 decision support는 narrative layer와 별도 safety policy가 필요하다.
+- TUI/log consumer는 same narrative response envelope를 읽는다.
+
+
+## ADR-0016: Phase 13 decision support는 suggestion envelope와 validator gate를 분리한다
+
+Context:
+
+narrative-only layer 이후 user utility를 높이기 위해 command suggestion이 필요하지만, LLM이 core command를 직접 실행하면 boundary가 무너진다.
+
+Decision:
+
+Phase 13은 suggestion envelope와 validator-gated execution을 분리한다. provider는 legal/illegal suggestion을 생성할 수 있지만, 실제 실행은 `ActionSpace` membership와 기존 submit path를 통과한 경우에만 허용된다.
+
+Consequences:
+
+- suggestion metadata는 persistence truth가 아니다.
+- timeout/failure는 fallback/disabled suggestion으로 degrade 된다.
+- autonomous play는 별도 safety layer 없이는 허용되지 않는다.
+
+
+## ADR-0017: Phase 16에서 RunState를 spec.md 8.2 계약과 일치시킨다
+
+Context:
+
+Phase 15 완료 시점에서 실제 코드의 `RunState`는 `Playing`과 `GameOver` 2개 변이체만 존재했다. 하지만 `spec.md` 8.2에는 `Title`, `CharacterCreation`, `AwaitingDirection`, `AwaitingInventorySelection`, `MorePrompt`, `GameOver { cause, final_score }`가 명시되어 있었다. 이 불일치는 문서-구현 gap closure의 핵심 대상이었다.
+
+Decision:
+
+Phase 16에서 `RunState`를 spec.md 8.2 계약과 완전히 일치시킨다. `GameOver`는 bare variant에서 `GameOver { cause: DeathCause, final_score: i32 }`로 확장하고, 나머지 5개 변이체도 모두 추가한다. `CommandIntent`에는 `AcknowledgeMore`를 추가하고, `DirectionalAction`과 `InventoryAction`을 신규 정의한다.
+
+기각:
+
+- `RunState`를 현재 2개로 유지하고 TUI에서만 별도 상태 관리: spec.md "spec is law" 원칙 위반
+- `GameOver`에 필드 추가 없이 TUI에서만 사망 정보 표시: core-UI 경계 원칙 위반, observation에 사망 정보 누락
+- `GameSession::new()`를 Playing으로 유지: Title 화면 구현 시 core 상태와 UI 상태 불일치
+
+Consequences:
+
+- `GameSession::new()`는 `Title` 상태로 시작하므로 기존 테스트/headless runner에 영향이 있다. 호환성을 위해 `new_for_playing()`을 추가한다.
+- `submit()`이 상태별 분기를 처리하므로 기존 단일 match arm에서 7개 상태 분기로 확장되었다.
+- snapshot hash가 변경되었다. Phase 16 기준 `seed=42 turns=1000` final hash는 `569bc36895258349`이다.
+- `GameEvent::Message { priority, text }`와 `MessagePriority` enum이 추가되어 TUI 메시지 로그의 중요도 표시 계약이 완성되었다.
+
+
+## ADR-0018: Phase 16에서 snapshot hash 변경을 수용한다
+
+Context:
+
+Phase 16의 `RunState` 확장과 `MessagePriority` enum 추가로 인해 `GameSnapshot`의 serde_json 직렬화 결과가 변경되었다. 이로 인해 `seed=42 turns=1000` 기준 hash가 `4c77dafb19dd2226`에서 `569bc36895258349`로 변경되었다.
+
+Decision:
+
+snapshot hash 변경을 수용하고, 새로운 기준 hash를 문서와 테스트에 갱신한다. hash 변경의 직접적인 원인은 `RunState` enum 확장으로 인한 serde 처리 변경과 `GameEvent` enum에 `Message` variant 추가로 인한 직렬화 결과 변화이다.
+
+기각:
+
+- hash 변경을 방지하기 위해 RunState/MessagePriority를 별도 모듈로 분리: serde_json이 enum variant 이름을 사용하므로, 동일 모듈 내 variant 추가/확장은 여전히 직렬화 결과에 영향을 줄 수 있다.
+- 이전 hash를 강제로 유지하기 위해 GameSnapshot 직렬화를 커스텀으로 고정: 유지보수성 저하, serde_json의 안정성 보장을 무시함.
+
+Consequences:
+
+- `tests/release_candidate.rs`의 기준 hash 3종을 모두 갱신해야 한다.
+- `cargo run --bin aihack-headless -- --seed 42 --turns 1000`의 출력 hash가 변경된다.
+- 향후 Phase 17~20에서 추가 UI-only 변경은 hash에 영향을 주지 않아야 한다 (GameSnapshot에 UI 상태 불포함 원칙 유지).
+
+
+## ADR-0019: Phase 19에서 자동 라벨은 UI-only 상태로 수집하고 렌더링한다
+
+Context:
+
+Phase 18 완료 후 TUI는 headless core와 격리되어 있지만, 플레이어가 시야 내 새로운 위협/아이템을 즉시 인지하는 UX가 필요하다. spec.md 15.4에 자동 라벨 우선순위와 최대 3개 제한이 명시되어 있다.
+
+Decision:
+
+자동 라벨은 `TuiApp.active_labels` Vec으로 UI-only 상태를 관리하고, `collect_auto_labels()`가 매 턴 `Observation`을 읽어 라벨을 생성한다. 라벨 수집은 턴이 진행된 경우에만 실행되며, `MapWidget` 렌더링 시 overlay로 표시한다. 라벨 정보는 snapshot hash, save, replay에 포함되지 않는다.
+
+기각:
+
+- 라벨 정보를 `GameWorld`에 포함: core-UI 경계 원칙 위반, deterministic hash에 영향
+- 라벨을 `GameEvent`로 생성: presentation layer와 core event의 분리 원칙 위반
+- 라벨 수집을 매 프레임이 아니라 매 턴에만 실행: 프레임 누락은 gameplay 누락이 아니므로, 턴 기준 수집으로 충분
+
+Consequences:
+
+- `tests/ui_labels.rs`가 라벨 수집/우선순위/만료를 검증한다.
+- headless baseline hash에 영향이 없다.
+- `UiEffectKind::NewEntityLabel`은 effect projection 용도만 사용된다.
+
+
+## ADR-0020: Phase 20에서 상태 필드는 getter/setter로 분리하고 외부 데이터는 TOML로 이동한다
+
+Context:
+
+spec.md 7의 디렉터리 구조에는 `src/domain/status.rs`와 `src/data/`가 예정되어 있었다. 현재 `GameWorld`에는 nutrition, luck, prayer_cooldown 등 상태 필드가 산재해 있고, 아이템/몬스터/레벨 데이터는 하드코딩되어 있다.
+
+Decision:
+
+`Status` struct와 `HungerState` enum을 `src/domain/status.rs`에 생성하고, `GameWorld`에는 기존 개별 필드를 유지하되 `status()`/`set_status()` getter/setter를 추가한다. 외부 데이터는 `items.toml`, `monsters.toml`, `levels/main_1.toml`로 이동하고, `src/data/mod.rs`에 `include_str!` 기반 로더를 구현한다.
+
+기각:
+
+- `GameWorld` 필드를 `Status`로 완전 대체: snapshot hash 입력 변경으로 인해 Phase 16 기준값이 깨진다
+- 외부 데이터를 별도 크레이트로 분리: Phase 20 범위를 벗어나며, 현재는 단일 바이너리가 모든 데이터를 포함해야 한다
+- 동적 파일 IO 대신 `include_str!`: TOML 데이터는 빌드 시점에 고정되며, 런타임 파일 IO는 불필요한 복잡도를 추가한다
+
+Consequences:
+
+- `Status`는 getter/setter를 통해서만 접근하고, 개별 필드는 snapshot/hash 호환성을 위해 유지된다.
+- TOML 데이터는 `include_str!`로 빌드에 임베드되어 별도 배포 파일 없이 동작한다.
+- `tests/data_loading.rs`가 TOML 파싱과 Status/HungerState 계산을 검증한다.
+- headless baseline hash에 영향이 없다 (`GameWorld` 필드 구조 유지).

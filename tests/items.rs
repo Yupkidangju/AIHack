@@ -1,9 +1,9 @@
 use aihack::{
-    core::{CommandIntent, EntityId, GameEvent, GameSession, Pos},
+    core::{CommandIntent, Direction, EntityId, GameEvent, GameSession, Pos},
     domain::{
         entity::{EntityKind, EntityLocation},
         inventory::InventoryLetter,
-        item::{item_data, ConsumableEffect, ItemClass, ItemKind},
+        item::{item_data, ConsumableEffect, ItemClass, ItemKind, WandEffect},
     },
 };
 
@@ -17,6 +17,9 @@ fn item_factories_match_spec_data() {
     let dagger = item_data(ItemKind::Dagger);
     let food = item_data(ItemKind::FoodRation);
     let potion = item_data(ItemKind::PotionHealing);
+    let wand = item_data(ItemKind::WandMagicMissile);
+    let scroll = item_data(ItemKind::ScrollReveal);
+    let rock = item_data(ItemKind::Rock);
 
     assert_eq!(dagger.class, ItemClass::Weapon);
     assert_eq!(dagger.glyph, ')');
@@ -41,11 +44,24 @@ fn item_factories_match_spec_data() {
             bonus: 4,
         })
     );
+
+    assert_eq!(wand.class, ItemClass::Wand);
+    assert_eq!(wand.wand_effect, Some(WandEffect::MagicMissile));
+    assert_eq!(wand.max_charges, Some(3));
+
+    assert_eq!(scroll.class, ItemClass::Scroll);
+    assert_eq!(
+        scroll.consumable_effect,
+        Some(ConsumableEffect::RevealLevel)
+    );
+
+    assert_eq!(rock.class, ItemClass::Rock);
+    assert_eq!(rock.attack_profile.unwrap().damage.sides, 3);
 }
 
 #[test]
 fn item_entities_have_expected_ids_and_locations() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
 
     assert!(matches!(
         session.world.entities.get(EntityId(4)).unwrap().kind(),
@@ -70,11 +86,24 @@ fn item_entities_have_expected_ids_and_locations() {
             owner: session.world.player_id
         })
     );
+    assert_eq!(session.world.entities.item_charges(EntityId(7)), Some(3));
+    assert_eq!(
+        session.world.entities.item_location(EntityId(8)),
+        Some(EntityLocation::Inventory {
+            owner: session.world.player_id
+        })
+    );
+    assert_eq!(
+        session.world.entities.item_location(EntityId(9)),
+        Some(EntityLocation::Inventory {
+            owner: session.world.player_id
+        })
+    );
 }
 
 #[test]
 fn pickup_assigns_next_letter_and_event_order() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     stand_on_potion(&mut session);
 
     let outcome = session.submit(CommandIntent::Pickup);
@@ -90,14 +119,14 @@ fn pickup_assigns_next_letter_and_event_order() {
         Some(GameEvent::ItemPickedUp {
             entity,
             item: EntityId(4),
-            letter: InventoryLetter('c')
+            letter: InventoryLetter('f')
         }) if *entity == session.world.player_id
     ));
     assert_eq!(
         session.world.inventory.letter_for(EntityId(4)),
-        Some(InventoryLetter('c'))
+        Some(InventoryLetter('f'))
     );
-    assert_eq!(session.world.inventory.next_letter_index, 3);
+    assert_eq!(session.world.inventory.next_letter_index, 6);
     assert_eq!(
         session.world.entities.item_location(EntityId(4)),
         Some(EntityLocation::Inventory {
@@ -108,7 +137,7 @@ fn pickup_assigns_next_letter_and_event_order() {
 
 #[test]
 fn pickup_without_item_is_rejected_without_turn() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let before_hash = session.snapshot().stable_hash();
 
     let outcome = session.submit(CommandIntent::Pickup);
@@ -125,8 +154,14 @@ fn pickup_without_item_is_rejected_without_turn() {
 
 #[test]
 fn show_inventory_is_no_turn_and_eventless() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let before_hash = session.snapshot().stable_hash();
+    let before_hp = session
+        .world
+        .entities
+        .actor_stats(session.world.player_id)
+        .expect("player stats must exist")
+        .hp;
 
     let outcome = session.submit(CommandIntent::ShowInventory);
 
@@ -134,12 +169,21 @@ fn show_inventory_is_no_turn_and_eventless() {
     assert!(!outcome.turn_advanced);
     assert!(outcome.events.is_empty());
     assert_eq!(outcome.snapshot_hash, before_hash);
+    assert_eq!(
+        session
+            .world
+            .entities
+            .actor_stats(session.world.player_id)
+            .expect("player stats must exist")
+            .hp,
+        before_hp
+    );
 }
 
 #[test]
 fn quaff_healing_potion_heals_and_consumes_repeatably() {
     fn run() -> (i16, i16) {
-        let mut session = GameSession::new(42);
+        let mut session = GameSession::new_for_playing(42);
         stand_on_potion(&mut session);
         assert!(session.submit(CommandIntent::Pickup).accepted);
         session
@@ -179,7 +223,7 @@ fn quaff_healing_potion_heals_and_consumes_repeatably() {
         );
         assert_eq!(
             session.world.entities.item_letter(EntityId(4)),
-            Some(InventoryLetter('c'))
+            Some(InventoryLetter('f'))
         );
         assert!(!session.world.inventory.contains(EntityId(4)));
         (amount, hp_after)
@@ -190,7 +234,7 @@ fn quaff_healing_potion_heals_and_consumes_repeatably() {
 
 #[test]
 fn healing_clamps_to_max_hp_with_effective_amount() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     stand_on_potion(&mut session);
     assert!(session.submit(CommandIntent::Pickup).accepted);
     session
@@ -218,7 +262,7 @@ fn healing_clamps_to_max_hp_with_effective_amount() {
 
 #[test]
 fn invalid_quaffs_are_rejected_without_turn() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let before_hash = session.snapshot().stable_hash();
 
     let food = session.submit(CommandIntent::Quaff { item: EntityId(6) });
@@ -233,7 +277,7 @@ fn invalid_quaffs_are_rejected_without_turn() {
 
 #[test]
 fn consumed_potion_is_not_legal_action() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     stand_on_potion(&mut session);
     assert!(session.submit(CommandIntent::Pickup).accepted);
     assert!(session
@@ -255,4 +299,56 @@ fn consumed_potion_is_not_legal_action() {
         .inventory
         .iter()
         .any(|item| item.item == EntityId(4)));
+}
+
+#[test]
+fn read_scroll_reveals_hidden_tiles_and_consumes_scroll() {
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
+
+    let outcome = session.submit(CommandIntent::Read { item: EntityId(8) });
+
+    assert!(outcome.accepted);
+    assert!(outcome.turn_advanced);
+    assert!(outcome.events.iter().any(|event| matches!(
+        event,
+        GameEvent::ScrollRead {
+            item: EntityId(8),
+            ..
+        }
+    )));
+    assert!(outcome.events.iter().any(|event| matches!(
+        event,
+        GameEvent::TileRevealed {
+            pos: Pos { x: 12, y: 5 },
+            ..
+        }
+    )));
+    assert_eq!(
+        session.world.entities.item_location(EntityId(8)),
+        Some(EntityLocation::Consumed)
+    );
+}
+
+#[test]
+fn wand_zap_spends_charge() {
+    let mut session = GameSession::new_for_playing(42);
+    session.world.entities.clear_monsters();
+
+    let outcome = session.submit(CommandIntent::Zap {
+        item: EntityId(7),
+        direction: Direction::East,
+    });
+
+    assert!(outcome.accepted);
+    assert!(outcome.turn_advanced);
+    assert!(outcome.events.iter().any(|event| matches!(
+        event,
+        GameEvent::WandZapped {
+            item: EntityId(7),
+            charges_after: 2,
+            ..
+        }
+    )));
+    assert_eq!(session.world.entities.item_charges(EntityId(7)), Some(2));
 }

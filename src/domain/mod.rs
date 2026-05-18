@@ -6,4 +6,5 @@ pub mod level;
 pub mod map;
 pub mod monster;
 pub mod player;
+pub mod status;
 pub mod tile;

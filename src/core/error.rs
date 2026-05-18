@@ -22,6 +22,14 @@ pub enum GameError {
         expected: DoorState,
         actual: DoorState,
     },
+    #[error("io error: {0}")]
+    Io(String),
+    #[error("serialization error: {0}")]
+    Serialization(String),
+    #[error("save schema mismatch: expected {expected}, actual {actual}")]
+    SaveSchemaVersionMismatch { expected: u16, actual: u16 },
+    #[error("invalid CLI option: {0}")]
+    InvalidCliOption(String),
 }
 
 pub type GameResult<T> = Result<T, GameError>;

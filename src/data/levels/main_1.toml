@@ -1,0 +1,40 @@
+level_id = "main:1"
+branch = "Main"
+depth = 1
+width = 40
+height = 20
+player_start = [5, 5]
+stairs_down = [34, 15]
+
+[[wall]]
+x = 12
+y_range = [4, 8]
+
+[[door]]
+pos = [10, 5]
+state = "closed"
+
+[[door]]
+pos = [14, 5]
+state = "closed"
+
+[[hidden_door]]
+pos = [20, 5]
+tile = "wall"
+
+[[hidden_trap]]
+pos = [15, 10]
+trap = "pit"
+tile = "floor"
+
+[[monster]]
+id = "monster.jackal"
+pos = [6, 5]
+
+[[monster]]
+id = "monster.goblin"
+pos = [20, 12]
+
+[[item]]
+id = "item.potion.healing"
+pos = [8, 5]

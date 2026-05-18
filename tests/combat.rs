@@ -150,7 +150,7 @@ fn damage_formula_rolls_dice_and_clamps_minimum_one() {
 
 #[test]
 fn bump_attack_keeps_player_in_place_and_emits_attack_event() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let before = session.world.player_pos();
     let outcome = session.submit(CommandIntent::Move(Direction::East));
 
@@ -166,7 +166,7 @@ fn bump_attack_keeps_player_in_place_and_emits_attack_event() {
 
 #[test]
 fn attack_event_damage_shape_is_consistent() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let outcome = session.submit(CommandIntent::Move(Direction::East));
     let event = outcome
         .events
@@ -186,7 +186,7 @@ fn attack_event_damage_shape_is_consistent() {
 
 #[test]
 fn legal_actions_include_adjacent_bump_attack() {
-    let session = GameSession::new(42);
+    let session = GameSession::new_for_playing(42);
     let observation = session.observation();
 
     assert!(observation
@@ -196,7 +196,7 @@ fn legal_actions_include_adjacent_bump_attack() {
 
 #[test]
 fn goblin_can_be_attacked_by_bump_combat() {
-    let mut session = GameSession::new(42);
+    let mut session = GameSession::new_for_playing(42);
     let goblin = EntityId(3);
     let before_hp = session.world.entities.actor_stats(goblin).unwrap().hp;
     session.world.set_player_pos(Pos { x: 19, y: 12 });
@@ -213,8 +213,8 @@ fn goblin_can_be_attacked_by_bump_combat() {
 }
 
 #[test]
-fn bump_attack_event_order_is_turn_started_then_attack_then_optional_death() {
-    let mut session = GameSession::new(42);
+fn bump_attack_event_order_keeps_player_resolution_before_monster_phase() {
+    let mut session = GameSession::new_for_playing(42);
     let outcome = session.submit(CommandIntent::Move(Direction::East));
 
     assert!(matches!(
@@ -223,12 +223,20 @@ fn bump_attack_event_order_is_turn_started_then_attack_then_optional_death() {
     ));
     assert!(matches!(
         outcome.events.get(1),
-        Some(GameEvent::AttackResolved { .. })
+        Some(GameEvent::AttackResolved { attacker, defender, .. })
+            if *attacker == session.world.player_id && *defender == EntityId(2)
     ));
-    if outcome.events.len() > 2 {
+    if matches!(outcome.events.get(2), Some(GameEvent::EntityDied { .. })) {
+        if let Some(next) = outcome.events.get(3) {
+            assert!(matches!(
+                next,
+                GameEvent::EntityMoved { .. } | GameEvent::AttackResolved { .. }
+            ));
+        }
+    } else if let Some(next) = outcome.events.get(2) {
         assert!(matches!(
-            outcome.events.get(2),
-            Some(GameEvent::EntityDied { .. })
+            next,
+            GameEvent::EntityMoved { .. } | GameEvent::AttackResolved { .. }
         ));
     }
 }

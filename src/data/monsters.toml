@@ -1,0 +1,33 @@
+[[monster]]
+id = "monster.jackal"
+glyph = "d"
+hp = 4
+ac = 0
+hit_bonus = 0
+damage = "1d2"
+ai = "wander"
+speed = 12
+difficulty = 1
+
+[[monster]]
+id = "monster.goblin"
+glyph = "g"
+hp = 6
+ac = 1
+hit_bonus = 1
+damage = "1d4"
+ai = "chase_on_sight"
+speed = 12
+difficulty = 2
+
+[[monster]]
+id = "monster.floating_eye"
+glyph = "e"
+hp = 8
+ac = 2
+hit_bonus = 0
+damage = "0"
+ai = "stationary"
+passive = "paralyze_on_melee"
+speed = 0
+difficulty = 3
