@@ -1,5 +1,32 @@
 # AIHack Changelog
 
+## [Unreleased] - 2026-07-15
+
+### Added
+
+- `AI_IMPLEMENTATION_DOC_STANDARD.md`에 맞춘 v0.3.0 리팩터링 구현 계획을 `spec.md`, `IMPLEMENTATION_SUMMARY.md`, `GAP_CLOSURE_ROADMAP.md`, `audit_roadmap.md`에 작성했다.
+- build reproducibility, private state transaction, runtime content registry, accepted-turn 1000 검증, workspace 경계, local LLM transport/revision gate, provenance/compatibility의 R0~R8 Task와 종료 게이트를 정의했다.
+- `PROVENANCE.md`와 `docs/compatibility/README.md`를 추가해 NetHack 3.6.7 공식 source checksum, 자산 상태, runtime 포함 차단 조건, NH367-C001..C010 record schema를 정의했다.
+- `DOCUMENTATION_AUDIT_REPORT.md`를 추가해 AI 구현 문서 표준 12항목과 R0 자동 검증의 PASS 증거를 기록했다.
+- ADR-0021~ADR-0027을 추가해 제품 범위, toolchain, state, content, workspace, LLM 권한, provenance 결정을 동결했다.
+- 성장한 계획 문서 원문을 `.archive/*_archive_260715.md`에 immutable snapshot으로 보존했다.
+
+### Changed
+
+- README와 BUILD_GUIDE의 현재 실행 명령을 두 binary 환경에 맞는 `cargo run --locked --bin ...` 형태로 수정했다.
+- `designs.md`를 local LLM CTA, 상태, timeout/stale/error, 접근성, core 무결성 계약 중심의 v0.3.0 target 문서로 재구성했다.
+- 현재 구현과 v0.3.0 target을 분리하고, 과거 Phase 완료 기록은 archive와 기존 changelog 이력으로 이동했다.
+
+### Security
+
+- LLM은 loopback endpoint와 presentation-only 권한을 기본으로 하며, stale/invalid response와 자유 텍스트 state mutation을 차단하는 계획을 명시했다.
+- 출처 상태가 `Approved`가 아닌 legacy 코드·데이터·문자열은 runtime 포함 및 배포를 금지하는 gate를 명시했다.
+
+### Verification
+
+- 이번 항목은 문서 계획만 반영한다. Rust source, test, Cargo manifest, build script의 구현 변경은 포함하지 않는다.
+- R0 문서 gate는 PASS이며 R1~R8 구현 checkpoint는 NOT RUN이다.
+
 ## 2026-05-18
 
 ### Added
@@ -205,7 +232,7 @@
   - `README.md`
   - `spec.md`
   - `designs.md`
-  - `implementation_summary.md`
+  - `IMPLEMENTATION_SUMMARY.md`
   - `DESIGN_DECISIONS.md`
   - `BUILD_GUIDE.md`
   - `audit_roadmap.md`

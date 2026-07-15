@@ -1,594 +1,304 @@
-# AIHack Design Specification
+# AIHack Design Specification v2
 
-문서 상태: active
-작성일: 2026-04-28
+> Archive chain
+> - Latest: `.archive/designs_archive_260715.md`
+> - Previous: first archive
+>
+> Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-## 1. 핵심 경험
+문서 상태: active target design
+작성일: 2026-07-15
+기준: `spec.md`
+관련 Task: R2-1, R5-2, R6-1..R6-3
 
-AIHack의 화면 경험은 "고전 ASCII 로그라이크를 현대적 디버깅/AI 관찰 도구와 함께 플레이한다"이다.
+## 1. 경험 목표
 
-기본 플레이어는 키보드 중심으로 게임을 한다. 개발자와 AI 연구자는 같은 화면에서 현재 관찰 상태, 이벤트 로그, legal action을 확인할 수 있어야 한다.
+사용자는 로컬 LLM이 없어도 완전한 deterministic 로그라이크를 플레이할 수 있어야 한다. LLM을 켜면 다음 세 가지 presentation 기능만 추가된다.
 
-## 2. 화면 모드
+1. 최근 사건을 1~240자로 요약한 narrative
+2. 현재 `ActionSpace` 안에서 하나를 고르는 suggestion
+3. 사용자가 서술한 시도에 대한 effect 없는 soft verdict
 
-[v0.2.0] Phase 17: 모든 화면 모드가 구현되었다.
+LLM은 이동, 전투, HP, RNG, inventory, score, save, replay를 직접 변경하지 않는다. suggestion도 사용자가 명시적으로 승인한 뒤 기존 `CommandIntent` 경로로 들어간다.
 
-| ScreenId | 목적 | 입력 | 출력 | 상태 |
+## 2. 현재와 target
+
+| 영역 | 현재 v0.1 코드 | v0.3.0 target |
+| --- | --- | --- |
+| Game flow | Title, character creation, play, game over | 동일 |
+| TUI | ratatui/crossterm, fixed panels | 동일 시각 구조, workspace app으로 이동 |
+| Narrative | trait와 mock 중심 | loopback provider, timeout/status 표시 |
+| Suggestion | validator scaffold | request/revision gate + explicit approval |
+| 판정 | 없음 | presentation-only soft verdict |
+| state read | 일부 내부 구조 접근 | `GameClient`의 Observation/ActionSpace만 사용 |
+| error | log/fallback 중심 | 상태별 텍스트와 재시도 CTA |
+| accessibility | reduced motion/high contrast | LLM 상태도 색 이외 텍스트·기호로 구분 |
+
+## 3. 구조
+
+```mermaid
+flowchart LR
+    K[Keyboard and Mouse] --> T[aihack-tui]
+    T --> C[GameClient]
+    C --> O[Observation and ActionSpace]
+    C --> S[GameSession]
+    S --> W[World Transaction]
+    W --> H[Snapshot Hash]
+    O --> V[Panels and Map]
+    O --> L[Local LLM Adapter]
+    L --> R[Narrative Suggestion Soft Verdict]
+    R --> G[Revision Gate]
+    G --> V
+    G -->|approved legal action only| C
+```
+
+경계:
+
+- `GameSession`은 UI node나 LLM request를 보관하지 않는다.
+- TUI는 `Observation`, `ActionSpace`, `UiState`만 render한다.
+- LLM adapter는 `SessionRevision { turn, snapshot_hash }`를 request/response에 복사한다.
+- revision 불일치는 화면에 stale 상태로 표시하고 폐기한다.
+- core event에서 UI effect를 투영할 수 있지만 UI effect가 core event를 만들지는 않는다.
+
+## 4. 화면 흐름
+
+```text
+Title
+  N or Enter
+    -> CharacterCreation
+         Enter
+           -> Playing
+                I -> Inventory overlay -> Esc -> Playing
+                F9 -> Debug overlay -> F9 -> Playing
+                G -> Narrative request -> Playing
+                A -> Suggestion request -> SuggestionReady
+                       Y -> current legal action submit -> Playing
+                       N or Esc -> dismiss -> Playing
+                J -> SoftJudgment input -> result -> Playing
+                death -> GameOver
+                          N -> Title
+                          Q -> Exit
+```
+
+LLM 요청 중에도 core input은 block하지 않는다. 요청 뒤 turn이 진행되면 도착한 응답은 `Stale`이며 자동 표시나 실행을 하지 않는다.
+
+## 5. Play 화면
+
+### 5.1 120x36 이상
+
+```text
+┌ AIHack ─ Dungeon main:1 ─ Turn 0042 ─ Hash ab12cd34ef56ab78 ┐
+│ Message / Narrative [LLM: Ready]                             │
+├───────────────────────────────────────┬──────────────────────┤
+│                                       │ Player               │
+│               MAP                     │ HP 14/20  AC 3       │
+│                                       │ Hunger Normal        │
+│                                       ├──────────────────────┤
+│                                       │ Inspect / Inventory  │
+│                                       │                      │
+├───────────────────────────────────────┴──────────────────────┤
+│ [G] Narrative  [A] Suggest  [J] Judge  [I] Inventory  [F9] AI│
+│ LLM result: none                                             │
+└──────────────────────────────────────────────────────────────┘
+```
+
+높이 배분:
+
+- header 1행
+- message/narrative 3행
+- map/HUD body: 남은 높이 - 7행
+- CTA 1행
+- LLM result 2행
+
+폭 배분:
+
+- terminal width 120 이상: map 70%, side panel 30%
+- 80..119: map 65%, side panel 35%
+- 60..79: map 위, HUD 아래 수직 배치
+- 60 미만 또는 높이 24 미만: core status와 “terminal requires 60x24”만 표시하고 clean input loop 유지
+
+### 5.2 정보 우선순위
+
+1. blocking prompt와 GameOver
+2. player HP와 immediate danger
+3. core message
+4. map
+5. action hint
+6. LLM status/result
+7. debug information
+
+LLM 패널이 core prompt나 HP를 가리지 않는다.
+
+### 5.3 New run reset
+
+`GameOver`에서 N을 누르면 `new_seed = previous_seed.wrapping_add(1)`로 `GameSession::new(new_seed)`를 만들고 Title로 이동한다. 다음 N 또는 Enter에서 CharacterCreation으로 이동한다. world, turn, RNG, event log, outstanding LLM request, LLM result, hover, focus, modal, debug overlay를 초기화한다. theme, reduced-motion, high-contrast 설정은 유지한다. 기존 save/replay 파일은 삭제하거나 덮어쓰지 않는다.
+
+## 6. CTA와 입력 계약
+
+| ID | 표시 | 입력 | 활성 조건 | 결과 |
 | --- | --- | --- | --- | --- |
-| `screen.title` | 시작/로드/설정 | Enter, L, Q | `RunState::Title` | 구현 완료 |
-| `screen.character_creation` | v0.1 기본 캐릭터 확정 | Enter, Esc | `RunState::CharacterCreation` | 구현 완료 |
-| `screen.play` | 핵심 게임 화면 | command key | `CommandIntent` | 구현 완료 |
-| `screen.inventory` | 아이템 선택 | letter, Esc | Phase 4 `Wield`/`Quaff`/`Wear`/`Read`/`Drop` 모두 구현 완료 | 구현 완료 |
-| `screen.game_over` | 사망/점수/재시작 | N, Q | 새 세션 또는 종료 | 구현 완료 |
-| `screen.debug_observation` | AI 관찰 디버그 | F9 toggle | read-only | 구현 완료 |
+| CTA-LLM-GENERATE | `[G] Narrative` | G | Playing, LLM enabled, outstanding narrative 없음 | `NarrativePending` |
+| CTA-LLM-SUGGEST | `[A] Suggest` | A | Playing, ActionSpace 비어 있지 않음, outstanding suggestion 없음 | `SuggestionPending` |
+| CTA-LLM-JUDGE | `[J] Judge` | J | Playing, LLM enabled | 최대 240자 입력 modal |
+| CTA-LLM-APPLY | `[Y] Apply` | Y | current revision의 valid suggestion 존재 | normal `GameClient::submit` |
+| CTA-LLM-DISMISS | `[N] Dismiss` | N 또는 Esc | suggestion/verdict/result 존재 | result만 제거 |
+| CTA-LLM-RETRY | `[R] Retry` | R | Busy, Timeout 또는 Unavailable | 새 request ID로 같은 종류 재요청 |
 
-## 3. Play 화면 레이아웃
+규칙:
 
-초기 TUI 기준:
+- 비활성 CTA는 dim 처리하되 이유를 footer에 텍스트로 표시한다.
+- `Y`는 suggestion action을 현재 `ActionSpace`에서 다시 검증한다.
+- `N`과 Esc는 core turn을 소비하지 않는다.
+- narrative와 soft verdict는 apply CTA를 갖지 않는다.
+- mouse click은 같은 CTA ID를 생성하며 별도 command path를 만들지 않는다.
+- Pending에서 Dismiss는 request ID를 `ignored`로 표시하고 panel만 닫는다. blocking worker를 강제 종료하지 않으며 해당 kind는 응답 또는 deadline까지 재요청할 수 없다. ignored response는 표시·submit 없이 폐기한다.
 
-```text
-+------------------------------------------------------------+
-| Dungeon Map 40x20                       | Player/Status    |
-|                                         | HP 16/16          |
-| @....                                   | AC 0              |
-|                                         | Turn 42           |
-|                                         | Depth 1           |
-|                                         +------------------+
-|                                         | Visible Entities  |
-|                                         | g goblin 12,5     |
-+-----------------------------------------+------------------+
-| Message Log                                                |
-| You hit the goblin.                                        |
-+------------------------------------------------------------+
-| Command Hint / More Prompt                                 |
-+------------------------------------------------------------+
-```
-
-최소 터미널 크기:
-
-- width: 80
-- height: 28
-
-지도 viewport:
-
-- v0.1 고정 40x20
-- 플레이어 중심 scrolling은 v0.2
-- 지도 glyph는 `TileObservation`과 `EntityObservation`에서만 읽는다.
-
-## 4. 컬러 토큰
-
-| Token | RGB | 용도 |
-| --- | --- | --- |
-| `color.bg` | `#0b0d0e` | 전체 배경 |
-| `color.panel` | `#15191c` | 상태/로그 패널 |
-| `color.text` | `#d8d5c8` | 기본 텍스트 |
-| `color.dim` | `#7d8178` | 비활성/기억 타일 |
-| `color.player` | `#f5f1d0` | 플레이어 |
-| `color.monster.hostile` | `#d75f5f` | 적대 몬스터 |
-| `color.item` | `#d7b95f` | 아이템 |
-| `color.wall` | `#8a8f98` | 벽 |
-| `color.floor` | `#4f5458` | 바닥 |
-| `color.warning` | `#e0a84f` | 경고 |
-| `color.danger` | `#ff5f5f` | 치명 상태 |
-
-## 5. 타이포그래피
-
-TUI:
-
-- monospace only
-- negative letter spacing 금지
-- map glyph cell은 동일 폭/높이 유지
-
-GUI adapter가 생길 경우:
-
-- map은 monospace grid
-- panel text는 13-15px
-- 버튼은 기능 텍스트 + 단축키 표시
-
-## 6. 입력 정책
-
-기본 키:
-
-| Key | CommandIntent |
-| --- | --- |
-| `h`/Left | `Move(West)` |
-| `j`/Down | `Move(South)` |
-| `k`/Up | `Move(North)` |
-| `l`/Right | `Move(East)` |
-| `y` | `Move(NorthWest)` |
-| `u` | `Move(NorthEast)` |
-| `b` | `Move(SouthWest)` |
-| `n` | `Move(SouthEast)` |
-| `.` | `Wait` |
-| `o` then dir | `Open(dir)` |
-| `c` then dir | `Close(dir)` |
-| `,` | `Pickup` |
-| `i` | `ShowInventory` |
-| `>` | `Descend` |
-| `<` | `Ascend` |
-| `s` | 후속 Phase `Search` |
-| `q` in inventory | `Quaff(item)` if potion |
-| `w` in inventory | `Wield(item)` if weapon |
-| `W` in inventory | 후속 Phase `Wear(item)` if armor |
-| `Esc` | cancel current selection |
-
-입력은 UI 내부 상태를 직접 바꾸지 않고 `CommandIntent`를 생성한다. 방향 대기 상태는 후속 UI Phase에서 core 상태와 동기화한다.
-
-## 7. HUD 데이터 연결
-
-| UI 요소 | 데이터 소스 | 갱신 시점 |
-| --- | --- | --- |
-| HP | `GameSnapshot.player.hp` | 매 `TurnOutcome` |
-| AC | `GameSnapshot.player.ac` | 장비/상태 변경 후 |
-| Turn | `GameSnapshot.turn` | 턴 진행 후 |
-| Depth | `GameSnapshot.current_level.depth` | 레벨 변경 후 |
-| Visible Entities | `Observation.visible_entities` | 매 렌더 |
-| Inventory | `Observation.inventory` | 인벤토리 열 때 |
-| Legal Actions | `Observation.legal_actions` | debug panel |
-
-## 7.1 Phase 5 계단/레벨 상태 구조
-
-```text
-GameWorld
-├── levels: LevelRegistry
-│   ├── main:1 GameMap (stairs down 34,15)
-│   └── main:2 GameMap (stairs up 5,5)
-├── current_level: LevelId
-├── entities: EntityStore
-│   ├── Actor location: OnMap { level, pos }
-│   └── Item location: OnMap { level, pos } | Inventory | Consumed
-└── inventory: Inventory
-```
-
-UI는 stairs tile에서 `Observation.legal_actions`에 포함된 `Descend`/`Ascend`만 표시한다. `Move` 입력은 계단 타일 진입까지만 처리하고 층 이동은 하지 않는다.
-
-## 8. Message Log 정책
-
-로그는 `GameEvent::Message`와 event formatter에서만 생성한다.
-
-표시 규칙:
-
-- 최근 5줄 표시
-- priority `High` 이상은 `color.warning`
-- `Death` 관련 메시지는 `color.danger`
-- 같은 턴 동일 텍스트는 1회로 압축하고 `(xN)` 표기
-- More prompt 기준: 한 턴에 5개 초과 메시지가 발생하면 `RunState::MorePrompt`
-
-## 9. Inventory 화면
-
-표시 열:
-
-```text
-a - dagger (wielded)
-b - food ration
-c - potion of healing
-```
-
-아이템 상태 suffix:
-
-- `(wielded)`
-- `(worn)`
-- `(quivered)`
-- `(cursed)`는 식별된 경우만 표시
-- `(unknown)`은 미식별 potion/scroll/wand에 표시
-
-선택 정책:
-
-- 선택 불가능한 아이템은 dim 처리
-- 잘못된 선택은 `CommandRejected`를 만들고 턴을 진행하지 않음
-- inventory letter는 save/load 후 유지
-
-## 10. Debug Observation 패널
-
-[v0.2.0] Phase 18: F9 키로 토글한다. `TuiApp.debug_observation_visible` 상태가 UI-only이며 플레이에는 영향을 주지 않는다. `render_panels::debug_observation_lines()`가 표시 데이터를 생성한다.
-
-표시 항목:
-
-- `schema_version`
-- `seed`
-- `turn`
-- `snapshot_hash`
-- `run_state`
-- `player_pos`, `player_hp`
-- `hunger`, `luck`, `prayer_cooldown`, `paralysis_turns`, `hallucinating`
-- `visible_tiles` 수
-- `visible_entities` 수
-- `inventory` 수
-- `action_space` 수
-- `last_events` 수
-- `legal_actions` 최대 20개
-- 최근 event 10개
-
-이 패널은 AI 통합 전에도 구현한다. Observation이 UI와 테스트 양쪽에서 같은 값을 보여야 하기 때문이다.
-
-## 11. Game Over 화면
-
-[v0.2.0] Phase 17: Game Over 화면이 구현되었다. `RunState::GameOver { cause, final_score }`를 읽어 렌더링한다.
-
-필수 표시:
-
-- 사망 원인 (`DeathCause` formatter)
-- turn
-- depth
-- defeated monsters count (`world.kill_count`)
-- score (`final_score`)
-- replay seed (`meta.seed`)
-- New Run
-- Quit
-
-버튼 정책:
-
-| CTA | 활성 조건 | 결과 |
-| --- | --- | --- |
-| `New Run` | 항상 | 새 `GameSession` 생성 (seed + 1) |
-| `Quit` | 항상 | 프로세스 종료 또는 title |
-| `Export Replay` | replay log 있음 | `runtime/replays` 경로 출력 |
-
-## 12. UI/Core 경계
-
-UI가 호출 가능한 core API:
+## 7. LLM UI 상태
 
 ```rust
-pub trait GameClient {
-    fn snapshot(&self) -> GameSnapshot;
-    fn observation(&self) -> Observation;
-    fn submit(&mut self, intent: CommandIntent) -> TurnOutcome;
+pub enum LlmUiStatus {
+    Disabled,
+    Connecting,
+    Ready,
+    Pending { kind: LlmRequestKind, request_id: String },
+    Busy,
+    Timeout { kind: LlmRequestKind },
+    Unavailable,
+    Invalid,
+    Stale,
 }
 ```
 
-UI 금지 사항:
-
-- entity vector 직접 수정
-- map tile 직접 수정
-- RNG 직접 호출
-- event log 직접 push
-- save 파일 직접 serialize
-
-## 13. AI 디자인 경계
-
-AI용 표현은 사람 UI와 다르다. AI는 glyph가 아니라 typed observation을 우선 사용한다.
-
-AI observation에서 위치는 절대 좌표와 플레이어 상대 좌표를 모두 제공한다.
-
-```rust
-pub struct EntityObservation {
-    pub id: EntityId,
-    pub kind: EntityKind,
-    pub name: String,
-    pub pos: Pos,
-    pub rel: Delta,
-    pub hp_band: HpBand,
-    pub attitude: Attitude,
-}
-```
-
-`hp_band`는 정확한 HP 은닉을 위해 `Healthy`, `Wounded`, `Critical`, `Unknown` 중 하나다. 플레이어 본인 HP는 정확히 제공한다.
-
-## 14. 완료 기준
-
-v0.1 UI 완료:
-
-- 80x28 터미널에서 텍스트 겹침 없음
-- Play 화면에서 map/status/log가 동시에 표시
-- inventory letter 선택이 core command로 연결
-- F9 debug observation이 core observation과 동일
-- Game Over 화면에서 seed와 turn 표시
-- UI 없이도 headless 테스트 통과
-
-## 15. 현대 TUI/UX 리팩토링 선반영
-
-2026-04-28 deep-interview 결정에 따라 디자인 목표는 `단계형 혼합 로드맵`으로 고정한다. 첫 체감 개선 우선순위는 마우스 자체가 아니라 **정보 가독성**이다.
-
-### 15.1 현대화 핵심 경험
-
-플레이어는 키보드만으로 빠르게 플레이할 수 있고, 마우스로는 같은 정보를 더 쉽게 발견하고 선택할 수 있어야 한다. 화면 효과는 게임 상태를 바꾸지 않는 presentation layer이며, 전투/위험/획득/문 상태 변화의 인지를 돕는 보조 채널이다.
-
-### 15.2 현대화 후 화면 구조
-
-```text
-+--------------------------------------------------------------------------------+
-| Dungeon Map / Labels / Hover Inspect                         | Status + Alerts  |
-| @..g.        [g goblin]                                      | HP 12/16 ALERT   |
-| ....!        [! potion]                                      | AC 0  Turn 42    |
-| ....#                                                         | Depth 1 Seed 42  |
-|                                                                +----------------+
-|                                                                | Inspect / Hints |
-| Hover: goblin, hostile, wounded                               | l-click inspect |
-| Path: 5 steps, safe known tiles                               | r-click command |
-+---------------------------------------------------------------+----------------+
-| Message Log: priority color, duplicate compression, category markers            |
-| ! The goblin hits you.  -4 HP                                                 |
-+--------------------------------------------------------------------------------+
-| Command Bar: [i] Inventory [.] Wait [o] Open [F9] Observation [?/hover] Help   |
-+--------------------------------------------------------------------------------+
-```
-
-레이어 순서:
-
-1. `MapGlyphLayer`: tile/entity glyph.
-2. `MemoryLayer`: visible이 아닌 기억 타일 dim 처리.
-3. `LabelLayer`: 새 hostile/item/danger 라벨 최대 3개.
-4. `EffectLayer`: damage/heal/miss/door/item flash.
-5. `CursorHoverLayer`: hover 대상 outline 또는 inverse style.
-6. `PanelLayer`: status, inspect, log, command bar.
-
-### 15.3 마우스 정책
-
-| 입력 | v0.1 | v0.2 | v0.3 후보 |
+| 상태 | badge | 본문 | 허용 CTA |
 | --- | --- | --- | --- |
-| left click map | inspect 또는 adjacent move 후보 표시 | reachable tile 이동 intent 후보 | path preview + confirm 정책 |
-| right click map | command menu 후보 표시 | open/close/search/context action | 상황별 radial/text menu |
-| hover map | 없음 | tile/entity read-only inspect | threat/path/item 비교 tooltip |
-| click inventory row | 선택 | use/wield/wear/drop action 후보 | drag/drop reorder/drop |
-| click panel tab | F9/debug/status/log focus | panel pin/filter | 사용자 레이아웃 저장 |
+| Disabled | `LLM: OFF` | `Local LLM disabled; core play is available.` | 설정 안내만 |
+| Connecting | `LLM: ...` | `Connecting to 127.0.0.1.` | Dismiss |
+| Ready | `LLM: READY` | 마지막 성공 시간 없음 | G, A, J |
+| Pending | `LLM: WAIT` | 종류와 request ID 앞 8자 | Dismiss |
+| Busy | `LLM: BUSY` | request queue 16개가 사용 중 | Retry, Dismiss |
+| Timeout | `LLM: TIMEOUT` | 제한 500/1500/2000ms 표시 | Retry, Dismiss |
+| Unavailable | `LLM: DOWN` | 연결 거부/transport 분류만 표시 | Retry, Dismiss |
+| Invalid | `LLM: INVALID` | 응답 schema 또는 legal action 불일치 | Dismiss |
+| Stale | `LLM: STALE` | 요청 turn과 현재 turn 표시 | Dismiss |
 
-마우스 입력은 항상 `UiInputEvent -> UiCommandCandidate -> CommandIntent` 변환을 거친다. 지도 좌표 변환은 `Viewport { origin: Pos, width, height, cell_width: 1, cell_height: 1 }` 계약을 사용한다.
-Phase 15 구현에서는 별도 inventory panel을 늘리지 않고 inspect panel 기본 행이 inventory primary-action surface를 겸한다. hover가 있으면 inspect 정보가 우선하고, hover가 없으면 inventory row click이 keyboard baseline과 같은 action 후보를 선택한다.
+에러 원문, prompt, response body, endpoint credential은 기본 화면에 출력하지 않는다. debug overlay에도 response 원문은 넣지 않는다.
 
-### 15.4 정보 가독성 규칙
+## 8. LLM 결과 표현
 
-- hostile, low HP, unknown item, stairs, closed door는 색상만으로 구분하지 않고 glyph/style/text 중 2개 이상 채널을 사용한다.
-- `MessagePriority::High` 이상은 로그와 status alert 양쪽에 표시한다.
-- 새로 시야에 들어온 hostile/item 라벨은 최대 3개만 표시한다.
-- 라벨 우선순위: `hostile adjacent > low HP warning > stairs > unidentified item > passive monster`.
-- hover inspect는 항상 턴 비진행이며 `Observation` 또는 `GameSnapshot`의 read-only 데이터만 사용한다.
-- command bar는 legal action dump 대신 고정 hint와 focus 상태를 먼저 보여준다.
+### 8.1 Narrative
 
-### 15.5 ASCII 애니메이션/효과 규칙
+```text
+Narrative · turn 42
+The corridor falls quiet as the jackal retreats.
+```
 
-| 효과 | 트리거 `GameEvent` | duration | 표시 | 비고 |
+- 1..=240 Unicode scalar chars
+- 최대 2행, 넘으면 `…`
+- `session_revision` 일치 시에만 표시
+- event log, save, replay에 저장하지 않음
+
+### 8.2 Suggestion
+
+```text
+Suggestion · turn 42 · confidence 0.72
+Move East — the tile is visible and unoccupied.
+[Y] Apply  [N] Dismiss
+```
+
+- action은 `ActionIntent` typed value다.
+- rationale은 1..=160자다.
+- confidence는 0.0..=1.0 표시용이며 실행 권한을 높이지 않는다.
+- stale/invalid이면 action text 대신 상태 메시지만 표시한다.
+
+### 8.3 Soft verdict
+
+```text
+Soft judgment · Neutral · SOCIAL_UNCERTAIN
+The attempt is plausible, but no core rule effect is applied.
+[N] Dismiss
+```
+
+- verdict: Favorable, Neutral, Unfavorable
+- reason_code: `[A-Z0-9_]{1,32}`
+- message: 1..=240자
+- effect, modifier, dice, state patch field를 포함하지 않는다.
+
+## 9. 데이터 연결
+
+| UI 값 | 유일한 source |
+| --- | --- |
+| turn, hash | `SessionRevision` |
+| map, entities, inventory, HP | `Observation` |
+| 활성 command와 CTA apply 검사 | `ActionSpace` |
+| core message | `GameEvent::Message` projection |
+| narrative/suggestion/verdict | `LlmPresentationState` |
+| request status | `LlmUiStatus` |
+| hover/focus/overlay | `UiState` |
+
+UI가 `GameWorld`의 field를 직접 읽으면 R2/R5 실패다.
+
+## 10. 상태와 오류 처리
+
+- terminal resize: 다음 frame에서 layout 재계산; core turn 불변
+- provider disabled: LLM CTA 비활성, 게임 입력 유지
+- connection refused: 1회 실패 후 자동 재시도 없음
+- request queue full: Busy 표시, 새 요청 enqueue 없음
+- timeout: 현재 요청 취소, Retry만 제공
+- invalid JSON 또는 empty response: Invalid 표시, body 폐기
+- stale response: Stale 표시 후 action 폐기
+- rejected suggestion: current action space 재검증 결과 표시, submit 미호출
+- invariant error: core error panel을 최상위로 표시하며 LLM 결과 숨김
+- save/load error: typed error 요약과 경로만 표시하며 secret/path traversal detail 숨김
+
+## 11. 접근성
+
+- 색만으로 상태를 구분하지 않는다: OFF, WAIT, TIMEOUT, DOWN, INVALID, STALE 텍스트 사용
+- high contrast에서 foreground/background contrast 목표 7:1
+- reduced motion에서는 spinner 대신 `...` 고정 문자열 사용
+- 모든 mouse CTA에 keyboard equivalent가 있다.
+- focus 순서: map → HUD → inventory/inspect → LLM result → footer
+- suggestion rationale와 verdict를 screen reader 친화적인 한 문장으로 유지한다.
+- status 갱신은 core message를 덮어쓰지 않는다.
+- key repeat는 LLM 요청 중복 생성에 사용하지 않는다.
+
+## 12. 구현 제약
+
+- render 함수는 `&Observation`, `&ActionSpace`, `&UiState`만 받는다.
+- transport future/channel은 TUI app layer에 있고 core crate에 없다.
+- 동시에 같은 종류의 outstanding request는 1개다.
+- response queue 최대 16개; 초과 시 가장 오래된 presentation response를 버리고 core는 유지한다.
+- 같은 CTA의 enqueue cooldown은 250ms이며 key repeat는 새 request를 만들지 않는다.
+- endpoint host는 `127.0.0.1`, `localhost`, `[::1]`만 기본 허용한다.
+- user text 240자, narrative 240자, rationale 160자, reason code 32자 제한을 render 이전에 검사한다.
+- prompt injection text는 command로 parse하지 않는다.
+- LLM result에 ANSI escape/control character를 허용하지 않는다.
+- app exit는 terminal을 먼저 복원하고 request sender를 닫은 뒤 worker 종료 확인을 최대 250ms 기다린다. 250ms 안에 확인이 없으면 JoinHandle을 drop하고 process exit를 계속한다.
+
+## 13. 검증
+
+자동:
+
+```bash
+cargo test --workspace --locked --test ui_layout
+cargo test --workspace --locked --test ui_input_mapping
+cargo test --workspace --locked --test ui_runtime_smoke
+cargo test --workspace --locked --test llm_revision_gate
+cargo test --workspace --locked --test llm_soft_adjudication
+```
+
+수동 matrix:
+
+| terminal | theme | motion | provider | 기대 |
 | --- | --- | --- | --- | --- |
-| DamageFlash | `AttackResolved { hit: true }` | 120ms | defender cell red/inverse flash + `-N` | replay hash 제외 |
-| MissWisp | `AttackResolved { hit: false }` | 80ms | defender 주변 dim `*` 1 frame | reduced motion에서 생략 |
-| HealPulse | healing event/message | 160ms | player cell green pulse + `+N` | 색맹 모드에서는 `+` 텍스트 유지 |
-| DoorToggle | `DoorChanged` | 100ms | 문 glyph highlight | open/close 구분 텍스트 |
-| ItemPickup | `ItemPickedUp` | 120ms | item cell fade 또는 status blink | inventory letter 표시 |
-| DangerAlert | HP 30% 이하 또는 death-adjacent event | 400ms | status border warning flash | reduced motion에서 고정 warning |
+| 120x36 | default | normal | disabled | core play와 OFF badge |
+| 80x24 | high contrast | reduced | success | 모든 CTA 텍스트 판독 |
+| 60x24 | default | reduced | timeout | TIMEOUT과 Retry |
+| 59x23 | default | normal | any | 최소 크기 안내, clean exit |
+| 120x36 | high contrast | reduced | stale | STALE, submit 0회 |
 
-프레임 정책:
+완료 조건:
 
-- 기본 `frame_rate = 30.0`.
-- 기본 `tick_rate = 8.0`.
-- 애니메이션은 최대 400ms 이내로 끝난다.
-- UI frame 누락은 gameplay turn 누락으로 취급하지 않는다.
-
-### 15.6 색상/접근성 토큰 추가
-
-| Token | RGB | 용도 |
-| --- | --- | --- |
-| `color.inspect` | `#7aa2f7` | hover/inspect outline |
-| `color.path.safe` | `#87af87` | 안전 경로 preview |
-| `color.path.risky` | `#d7af5f` | 위험 경로 preview |
-| `color.effect.damage` | `#ff5f5f` | damage flash |
-| `color.effect.heal` | `#87d75f` | heal pulse |
-| `color.label.bg` | `#20262b` | 자동 라벨 배경 |
-| `color.focus` | `#5fd7ff` | focused panel border |
-
-색맹/저모션 정책:
-
-- `UiColorProfile::ColorBlindSafe`에서는 red/green 단독 대비 금지.
-- `UiColorProfile::Monochrome`에서는 bold, underline, inverse, glyph prefix를 사용한다.
-- `reduced_motion=true`에서는 반복 점멸 금지.
-
-### 15.7 완료 기준 확장
-
-v0.1 UI 완료 기준에 다음을 추가한다.
-
-- 정보 가독성 개선 계획의 타입/수치/비목표가 `spec.md`와 일치한다.
-- TUI adapter 구현 시 `ui_layout`, `ui_input_mapping`, `ui_effect_projection` 테스트를 추가한다.
-- 80x28 degraded layout에서도 command bar와 message log가 겹치지 않는다.
-- mouse 미지원 터미널에서도 keyboard-only parity가 유지된다.
-- [v0.2.0] Phase 19: 자동 라벨 우선순위가 구현되었고, `tests/ui_labels.rs`로 검증되었다.
-- [v0.2.0] Phase 18: F9 debug observation 토글이 구현되었고, `tests/ui_debug.rs`로 검증되었다.
-
-## Phase 3 전투/사망 Headless 구조 반영
-
-```text
-GameSession
-├── GameWorld
-│   ├── GameMap 40x20
-│   ├── player_id: EntityId(1)
-│   └── EntityStore
-│       ├── Player @ (5,5), hp 16, dagger 1d4
-│       ├── Jackal @ (6,5), hp 4, 1d2
-│       └── Goblin @ (20,12), hp 6, 1d4
-├── systems::movement
-│   └── 빈 passable tile 이동
-├── systems::combat
-│   └── hostile occupied tile bump attack
-└── systems::death
-    ├── monster: alive=false tombstone
-    └── player: RunState::GameOver
-```
-
-구현 시 주의사항:
-
-- UI/TUI는 Phase 3 combat state를 직접 수정하지 않고 `GameSession::submit(CommandIntent::Move(direction))` 결과 event만 표현한다.
-- 공격 animation/effect는 후속 UI Phase에서 `AttackResolved`/`EntityDied` event를 projection하는 presentation layer로만 구현한다.
-- 사망 monster는 즉시 Vec에서 제거하지 않는다. `EntityId` 안정성이 replay/hash의 일부이므로 tombstone 정책을 유지한다.
-- Phase 4 이후 player 공격은 `Inventory.equipped_melee`의 item profile 또는 unarmed fallback으로 해석한다.
-
-
-## Phase 4 아이템/인벤토리 Headless 구조 반영
-
-```text
-GameWorld
-├── EntityStore
-│   ├── Actor: Player / Monster
-│   └── Item
-│       ├── PotionHealing @ OnMap(8,5), letter=None
-│       ├── Dagger @ Inventory(player), letter=a
-│       └── FoodRation @ Inventory(player), letter=b
-└── Inventory(player)
-    ├── entries: [dagger=a, food=b, picked potion=c]
-    └── equipped_melee: Option<EntityId>
-```
-
-구현 시 주의사항:
-
-- Inventory UI는 core state를 직접 바꾸지 않고 `CommandIntent::Pickup`, `ShowInventory`, `Wield`, `Quaff`만 제출한다.
-- `ShowInventory`는 eventless/no-turn이며, 화면은 `Observation.inventory`를 표시한다.
-- 소비된 potion은 inventory에서 사라지지만 item entity는 `Consumed` tombstone과 `assigned_letter`를 유지한다.
-- Phase 4에는 drag/drop, drop, read, zap, throw, file save/load를 구현하지 않는다.
-
-## Phase 6 몬스터 AI Headless 구조 반영
-
-```text
-GameSession::submit(player command)
-├── player-side apply
-├── TurnStarted
-├── player events
-└── systems::monster_ai
-    ├── collect intents (current level hostile only, EntityId asc)
-    │   ├── Jackal -> Wander
-    │   ├── Goblin -> ChaseVisiblePlayer
-    │   └── FloatingEye -> Stationary
-    └── apply intents
-        ├── EntityMoved { entity, from, to }
-        ├── AttackResolved
-        └── EntityDied / RunState::GameOver stop
-```
-
-구현 시 주의사항:
-
-- monster AI는 current level만 다루며 stairs를 타지 않는다.
-- goblin chase는 LOS 안에서만 동작하고 pathfinding/A*는 사용하지 않는다.
-- player side resolution 결과가 `GameOver`면 monster phase를 실행하지 않는다.
-- movement event는 player/monster 모두 actor identity를 포함해야 replay와 UI projection이 일관된다.
-
-
-## Phase 7 NetHack 상호작용 Headless 구조 반영
-
-```text
-GameSession::submit
-├── Search -> systems::traps::search -> TileRevealed*
-├── Move -> EntityMoved -> systems::traps::trigger_player_trap -> TrapTriggered
-├── Read(scroll) -> ScrollRead -> reveal_all_hidden_tiles
-├── Throw(item, dir) -> ItemThrown -> optional AttackResolved/EntityDied -> item OnMap
-└── Zap(wand, dir) -> WandZapped(charges_after) -> optional AttackResolved/EntityDied
-```
-
-구현 시 주의사항:
-
-- hidden door는 observation에서 wall로, hidden trap은 floor로만 보인다.
-- trap 피해는 fixed `3`이며 wait로는 재발동하지 않는다.
-- equipped dagger를 던지면 `equipped_melee`는 즉시 비워진다.
-- wand charge와 thrown item landing location은 snapshot hash 입력에 포함된다.
-
-
-## Phase 8 Legacy Rule Absorption Headless 구조 반영
-
-```text
-Phase 8 state additions
-├── nutrition / hunger tick
-├── luck
-├── prayer_cooldown
-├── paralysis_turns from passive attack
-├── identified_items
-├── gold / kill_count / death_score helper
-└── golden scenarios P8-G01..P8-G20
-```
-
-구현 시 주의사항:
-
-- golden scenario는 규칙 하나당 최소 1개를 유지한다.
-- hallucination은 message only effect이며 core state corruption을 일으키지 않는다.
-- encumbrance는 carry weight threshold로만 구현하고 generalized inventory sim은 미룬다.
-- prayer/shop/score는 deterministic math/cooldown subset만 구현한다.
-
-
-## Phase 9 Save Load Replay Headless 구조 반영
-
-```text
-GameSession
-├── to_save_data() -> SaveDataV1 JSON
-├── from_save_data() <- SaveDataV1 JSON
-└── replay JSONL
-    └── ReplayLineV1 { turn_before, command, outcome, snapshot_hash_after }
-```
-
-구현 시 주의사항:
-
-- save file과 replay file은 역할이 다르므로 분리한다.
-- RNG continuation은 seed만으로는 부족하며 draw count를 함께 저장한다.
-- identified_items, nutrition, luck, prayer_cooldown, kill_count, gold는 모두 save/load 대상이다.
-
-
-## Phase 10 TUI Adapter 구조 반영
-
-```text
-src/ui/tui/
-├── mod.rs            runtime shell / terminal lifecycle
-├── layout.rs         panel rect contract
-├── input.rs          key/mouse -> candidate mapping
-├── viewport.rs       terminal cell <-> dungeon Pos
-├── render_map.rs     ASCII map render
-├── render_panels.rs  status/log/inspect/command bar
-├── effects.rs        GameEvent -> UiEffectEvent
-├── theme.rs          color tokens
-└── config.rs         runtime config
-```
-
-구현 시 주의사항:
-
-- terminal이 80x28보다 작으면 fallback 안내만 렌더하고 안전하게 종료한다.
-- hover/click hit-test는 viewport/layout helper를 공유한다.
-- save/load는 UI가 직접 파일 포맷을 만들지 않고 core save API를 호출한다.
-
-
-## Phase 11 AI API Freeze 구조 반영
-
-```text
-Observation
-├── schema_version / seed / turn / current_level
-├── run_state
-├── player
-├── visible_tiles
-├── visible_entities
-├── inventory
-├── last_events
-├── action_space
-└── legal_actions (compatibility alias)
-```
-
-구현 시 주의사항:
-
-- internal runtime container는 AI-facing JSON에 직접 노출하지 않는다.
-- hidden tile projection과 identified item 상태는 Observation에서만 읽는다.
-- future consumer(TUI, narrative, decision support)는 same schema를 공유해야 한다.
-
-
-## Phase 12 LLM Narrative 구조 반영
-
-```text
-src/llm/
-├── narrative.rs  provider abstraction / timeout / fallback
-└── mod.rs        export
-
-TUI/log consumer
-└── narrative response lines only (non-hash artifact)
-```
-
-구현 시 주의사항:
-
-- narrative response는 save/replay/snapshot hash에 저장하지 않는다.
-- timeout과 provider failure는 deterministic fallback text로 흡수한다.
-- gameplay command generation은 Phase 12 범위가 아니다.
-
-
-## Phase 13 LLM Decision Support 구조 반영
-
-```text
-src/llm/decision.rs
-├── DecisionRequest
-├── SuggestedAction
-├── DecisionSource
-├── request_decision_with_timeout()
-└── execute_suggestion() -> session.submit() only
-```
-
-구현 시 주의사항:
-
-- suggestion과 execution을 분리한다.
-- illegal suggestion은 fallback/disabled로만 남고 state를 바꾸지 않는다.
-- TUI/log는 suggestion metadata를 표시할 수 있지만 save/replay에는 넣지 않는다.
+- 위 자동 test 전부 PASS
+- 다섯 수동 case 전부 PASS
+- 모든 LLM failure case에서 snapshot hash 불변
+- CTA ID, input, 활성 조건, 결과가 코드 test 이름과 일치

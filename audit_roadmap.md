@@ -1,674 +1,400 @@
-# AIHack Audit Roadmap
+# AIHack Audit Roadmap v2
 
-문서 상태: active
-작성일: 2026-04-28
+> Archive chain
+> - Latest: `.archive/audit_roadmap_archive_260715.md`
+> - Previous: first archive
+>
+> 과거 Phase 0~20 감사 이력은 아카이브에 있다. 이 문서는 v0.3.0 리팩터링의 활성 검증 게이트만 정의한다.
 
-## 1. 감사 원칙
+문서 상태: active verification contract
+작성일: 2026-07-15
+목표 버전: 0.3.0
+기준: `spec.md`, `IMPLEMENTATION_SUMMARY.md`, `GAP_CLOSURE_ROADMAP.md`, `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
-로드맵의 목적은 일정 관리가 아니라 "다음 Phase로 넘어가도 되는가"를 판정하는 것이다.
+## 1. 판정 규칙
 
-각 Phase는 다음을 가져야 한다.
+### 1.1 상태
 
-- 닫힌 목표
-- 구현 항목
-- 검증 명령
-- 완료 판정
-- 다음 Phase 진입 조건
+| 상태 | 의미 |
+| --- | --- |
+| NOT RUN | 구현 또는 검증을 시작하지 않음 |
+| FAIL | 필수 명령, 수동 시나리오, 산출물 중 하나 이상 실패 |
+| BLOCKED | 외부 승인·환경 때문에 검증 불가하며 우회 증거도 없음 |
+| PASS | 이 문서에 명시한 자동·수동 증거가 모두 충족 |
+| PASS WITH KNOWN RISKS | 선택 게이트만 남고 필수 성공 기준은 모두 충족 |
 
-## 2. 정합성 감사
+### 1.2 공통 원칙
 
-항목:
+- 구현 존재 여부가 아니라 재현 가능한 명령과 산출물로 판정한다.
+- 한 필수 항목이 FAIL이면 해당 checkpoint 전체는 FAIL이다.
+- baseline hash는 예상값 불일치를 숨기기 위해 갱신하지 않는다.
+- `--locked` 없는 Cargo 결과는 릴리즈 증거로 사용하지 않는다.
+- 조기 `GameOver`는 1000 accepted-turn 성공이 아니다.
+- LLM 응답 내용은 core 정합성 증거가 아니다.
+- `Unknown` 또는 `Blocked` provenance 자산은 런타임 포함 즉시 FAIL이다.
+- 문서가 target 구현을 현재 완료 상태로 표현하면 R0 FAIL이다.
 
-- `spec.md` 타입 이름과 실제 Rust 타입 이름 일치
-- `designs.md` 화면 이벤트와 `GameEvent` 일치
-- `implementation_summary.md` 파일 책임과 실제 파일 구조 일치
-- `BUILD_GUIDE.md` 명령이 실제 실행 가능
-- `CHANGELOG.md`가 큰 구조 변경을 기록
+## 2. 감사 환경과 증거 보존
 
-검증:
+검증 루트는 repository root다. clean target을 사용하여 기존 산출물에 의한 오판을 막는다.
 
 ```bash
-rg "TODO|TBD|PLACEHOLDER" spec.md designs.md implementation_summary.md BUILD_GUIDE.md audit_roadmap.md
+export CARGO_TARGET_DIR=/tmp/aihack-audit-target
+rustc --version
+cargo --version
+git status --short
 ```
 
-추가로 `AI_IMPLEMENTATION_DOC_STANDARD.md`의 금지 표현 목록을 기준으로 수동 확인한다. 허용 범위는 명시적으로 "잔여 리스크" 섹션에 격리된 표현뿐이다.
+필수 기록:
 
-## 3. 위험요소 감사
+- 실행 일시와 OS
+- `rustc --version`, `cargo --version`
+- 명령, exit code, 실패한 test 이름
+- long-run seed별 accepted/submitted/final hash
+- LLM mock 요청의 request ID, revision, status
+- provenance report와 compatibility report
+- 최종 Git diff의 변경 파일 목록
 
-| 위험 | 감사 방법 | 실패 기준 |
+`/tmp/aihack-audit-target`은 검증 캐시이며 저장소 산출물이 아니다.
+
+## 3. R0 문서 구현 가능성 게이트
+
+현재 판정 대상은 문서만이다. 이 게이트 PASS는 R1~R8 코드 구현 완료를 뜻하지 않는다.
+
+### 3.1 필수 파일
+
+```bash
+test -s spec.md
+test -s IMPLEMENTATION_SUMMARY.md
+test -s GAP_CLOSURE_ROADMAP.md
+test -s designs.md
+test -s DESIGN_DECISIONS.md
+test -s BUILD_GUIDE.md
+test -s audit_roadmap.md
+test -s CHANGELOG.md
+test -s PROVENANCE.md
+test -s docs/compatibility/README.md
+test -s DOCUMENTATION_AUDIT_REPORT.md
+```
+
+### 3.2 계약 ID 폐쇄성
+
+다음 ID는 정의 문서와 실행 계획·감사 문서에 모두 나타나야 한다.
+
+```bash
+for id in \
+  SC-BUILD-01 SC-BUILD-02 SC-CORE-01 SC-CORE-02 SC-DATA-01 \
+  SC-TEST-01 SC-TEST-02 SC-ARCH-01 SC-LLM-01 SC-LLM-02 SC-LLM-03 \
+  SC-COMPAT-01 SC-LICENSE-01 SC-DOC-01; do
+  rg -q "$id" spec.md
+  rg -q "$id" GAP_CLOSURE_ROADMAP.md audit_roadmap.md
+done
+
+for id in DEC-PRODUCT-01 DEC-RUST-01 DEC-STATE-01 DEC-LLM-01 \
+  DEC-LLM-02 DEC-CONTENT-01 DEC-WORKSPACE-01 DEC-LICENSE-01; do
+  rg -q "$id" spec.md
+  rg -q "$id" DESIGN_DECISIONS.md
+done
+
+for id in R0-1 R0-2 R0-3 R1-1 R1-2 R1-3 R2-1 R2-2 R2-3 \
+  R3-1 R3-2 R3-3 R4-1 R4-2 R5-1 R5-2 R6-1 R6-2 R6-3 R7-1 R7-2 R8-1; do
+  rg -q "$id" IMPLEMENTATION_SUMMARY.md
+  rg -q "$id" GAP_CLOSURE_ROADMAP.md audit_roadmap.md
+done
+```
+
+### 3.3 표준 금지 표현과 링크
+
+활성 계획 문서에서 아래 표현은 구체적 수치·주체·파일로 교체한다.
+
+```bash
+bad_terms='적당''히|필요''시|원하''면|추후'' 고려|게임답''게|자연스럽''게|유연하''게|대충'' 이 정도|적절''히|알''아서|충분''히|일반적인'' 방식|적당한'' 값|나중에'' 결정'
+! rg -n "$bad_terms" \
+  spec.md IMPLEMENTATION_SUMMARY.md GAP_CLOSURE_ROADMAP.md designs.md \
+  DESIGN_DECISIONS.md BUILD_GUIDE.md audit_roadmap.md PROVENANCE.md \
+  README.md docs/compatibility/README.md
+```
+
+상대 경로로 참조한 필수 문서와 archive가 실제로 존재해야 한다.
+
+```bash
+test -s .archive/spec_archive_260715.md
+test -s .archive/IMPLEMENTATION_SUMMARY_archive_260715.md
+test -s .archive/GAP_CLOSURE_ROADMAP_archive_260715.md
+test -s .archive/audit_roadmap_archive_260715.md
+test -s .archive/designs_archive_260715.md
+test -s .archive/BUILD_GUIDE_archive_260715.md
+test -s .archive/DESIGN_DECISIONS_archive_260715.md
+```
+
+### 3.4 AI 구현 문서 표준 12항목
+
+| # | 검사 | PASS 증거 |
 | --- | --- | --- |
-| 레거시 직접 의존 | `rg "legacy_nethack_port_reference" src Cargo.toml` | src/Cargo에서 발견 |
-| 상태 이중화 | `rg "clone\\(\\).*GameMap|resources|global" src` | 동기화용 복제 상태 발견 |
-| non-determinism | seed별 replay hash 비교 | 같은 seed hash 불일치 |
-| AI 우회 | `ActionIntent` 외 AI entry 검색 | AI가 session 직접 수정 |
-| UI 직접 수정 | UI에서 domain mutable 접근 검색 | UI가 map/entity 수정 |
+| 1 | 목표·성공·비목표 폐쇄 | `spec.md` 2~4절 |
+| 2 | 현재와 target 분리 | 모든 활성 문서의 상태 표 |
+| 3 | architecture와 의존 방향 | `spec.md` 6절, `designs.md` 3절 |
+| 4 | typed contract | `spec.md` 9절 |
+| 5 | concrete number/default | `spec.md` 10~12절 |
+| 6 | real data sample | `spec.md` 11절, compatibility template |
+| 7 | error/degraded behavior | `spec.md` 9.5, `designs.md` 7절 |
+| 8 | task file/dependency/acceptance | `IMPLEMENTATION_SUMMARY.md` 7절 |
+| 9 | command/artifact path | `BUILD_GUIDE.md`, 이 문서 R1~R8 |
+| 10 | decision/alternative/consequence | ADR-0021~ADR-0027 |
+| 11 | cross-document ID closure | R0 3.2 명령 |
+| 12 | final completion gate | R8-1, `DOCUMENTATION_AUDIT_REPORT.md` |
 
-## 4. Phase별 로드맵
+R0는 위 12항목과 3.1~3.3 명령이 모두 통과할 때만 PASS다.
 
-### Phase 0: 문서/레거시 경계
+## 4. R1 재현 빌드 게이트
 
-목표:
-
-- 레거시 코드가 격리되어 있고 새 문서세트가 루트에 존재한다.
-
-구현 항목:
-
-- [x] `legacy_nethack_port_reference/` 생성
-- [x] 기존 포트 파일 이동
-- [x] `REFERENCE_INDEX.md` 작성
-- [x] 새 문서세트 작성
-- [x] `.gitignore`에서 주요 문서 ignore 제거
-
-완료 기준:
-
-- 루트에 `src/`와 `Cargo.toml`이 없음
-- 루트에 `spec.md`, `designs.md`, `implementation_summary.md`, `DESIGN_DECISIONS.md`, `BUILD_GUIDE.md`, `audit_roadmap.md`, `CHANGELOG.md` 있음
-
-### Phase 1: Headless Core
-
-목표:
-
-- 코드 없이 문서만 있던 상태에서 첫 deterministic runner를 만든다.
-
-구현 항목:
-
-- [x] Cargo 스캐폴딩
-- [x] `GameRng`
-- [x] `GameSession::new(seed)`
-- [x] `CommandIntent::Wait`
-- [x] `TurnOutcome`
-- [x] replay hash
-
-검증:
+연결 gap: G-BUILD-001..004, G-RUN-001
+성공 기준: SC-BUILD-01, SC-BUILD-02
 
 ```bash
-cargo test
-cargo run --bin aihack-headless -- --seed 42 --turns 100
+test "$(rustc --version | awk '{print $2}')" = "1.94.1"
+cargo metadata --locked --no-deps --format-version 1
+cargo tree -d
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --all-targets --locked
+cargo build --workspace --all-targets --locked
+cargo build --workspace --release --locked
+cargo audit
+cargo deny check licenses bans sources
+cargo run --locked --bin aihack -- --seed 42
+./build.sh --test
+test -x output/aihack
+test -x output/aihack-headless
 ```
 
-완료 기준:
+추가 판정:
 
-- 같은 seed 42를 두 번 실행하면 final hash 동일
+- `Cargo.lock`은 검증 전후 byte-identical이다.
+- `cargo tree -d`에 crossterm이 한 버전만 있다.
+- Linux와 Windows CI가 동일 commit에서 green이다.
+- `build.sh`와 `build.bat`은 artifact 누락을 exit code 0으로 숨기지 않는다.
 
-검증 증거(2026-04-28):
+Checkpoint R1 현재 상태: NOT RUN.
+
+## 5. R2 상태 무결성 게이트
+
+연결 gap: G-CORE-001..003
+성공 기준: SC-CORE-01, SC-CORE-02
+
+```bash
+cargo test --locked --test world_invariants
+cargo test --locked --test transaction
+cargo test --locked --test save_load --test replay
+cargo test --locked --test golden_phase8_rules
+! rg -n "session\.(meta|rng|turn|state|world|event_log)\s*=" src tests
+! rg -n "world\.(levels|current_level|entities|inventory|status)\s*=" src/ui src/llm tests
+```
+
+PASS 조건:
+
+- accepted turn당 검사한 invariant 수는 6이다.
+- reject와 invariant error에서 turn, RNG draw, snapshot hash가 모두 불변이다.
+- transaction 전후 시스템 순서가 player, tile/item, monster, status, death, commit 순서다.
+- 기존 P8-G01..P8-G20 결과가 바뀌지 않는다.
+
+Checkpoint R2 현재 상태: NOT RUN.
+
+## 6. R3 콘텐츠 레지스트리 게이트
+
+연결 gap: G-DATA-001..002
+성공 기준: SC-DATA-01
+
+```bash
+cargo test --locked --test content_validation
+cargo test --locked --test content_runtime
+cargo test --locked --test data_loading --test items --test monster_ai --test levels
+```
+
+PASS 조건:
+
+- embedded TOML은 process 시작 시 1회 파싱된다.
+- duplicate ID, unknown reference, invalid dice, out-of-bounds position, unpaired stairs, unsupported schema가 typed error로 반환된다.
+- dagger, jackal, main:1, main:2가 registry 정의로 생성된다.
+- 동일 embedded content hash를 3회 생성했을 때 같은 16자리 lowercase hex다.
+- invalid content 테스트에서 panic 0건이다.
+
+Checkpoint R3 현재 상태: NOT RUN.
+
+## 7. R4 장기 결정론 게이트
+
+연결 gap: G-TEST-001..002
+성공 기준: SC-TEST-01, SC-TEST-02
+
+```bash
+cargo test --locked --release --test headless_policy
+cargo test --locked --release --test long_run
+cargo test --locked --test save_load --test replay
+for seed in 42 7 1234; do
+  cargo run --locked --release --bin aihack-headless -- \
+    --seed "$seed" --turns 1000 --policy survival-v1
+done
+```
+
+각 run의 필수 report:
+
+```json
+{
+  "policy": "survival-v1",
+  "requested_turns": 1000,
+  "accepted_turns": 1000,
+  "submitted_commands": 1017,
+  "final_state": "Playing",
+  "final_hash": "16-lowercase-hex"
+}
+```
+
+PASS 조건:
+
+- seed 42, 7, 1234 각각 accepted_turns가 정확히 1000이다.
+- 각 성공 report는 `accepted_turns <= submitted_commands <= accepted_turns * 16`을 만족한다.
+- 각 seed의 동일 command sequence 3회 hash가 일치한다.
+- policy가 한 turn에 16개 legal candidate를 모두 거부당하면 성공이 아니라 `NoAcceptedAction`이다.
+- save/load continuation hash가 direct run hash와 같다.
+
+Checkpoint R4 현재 상태: NOT RUN.
+
+## 8. R5 workspace 경계 게이트
+
+연결 gap: G-ARCH-001
+
+성공 기준: SC-ARCH-01
+
+```bash
+cargo metadata --workspace --locked --format-version 1
+cargo tree -p aihack-core
+cargo test --workspace --all-targets --locked
+cargo run --locked --bin aihack -- --seed 42
+cargo run --locked --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
+```
+
+PASS 조건:
+
+- `aihack-core` dependency tree에 ratatui, crossterm, HTTP client가 없다.
+- `aihack-ai-contract`은 mutable core type을 export하지 않는다.
+- TUI/headless binary 이름, CLI flag, save/replay v1 경로가 유지된다.
+- R4의 command sequence와 hash가 workspace 이동 전후 동일하다.
+
+Checkpoint R5 현재 상태: NOT RUN.
+
+## 9. R6 local LLM 격리 게이트
+
+연결 gap: G-LLM-001..004
+성공 기준: SC-LLM-01, SC-LLM-02, SC-LLM-03
+
+```bash
+cargo test --workspace --locked --test llm_transport
+cargo test --workspace --locked --test llm_narrative
+cargo test --workspace --locked --test llm_decision_support
+cargo test --workspace --locked --test llm_revision_gate
+cargo test --workspace --locked --test llm_soft_adjudication
+```
+
+필수 failure matrix:
+
+| case | 기대 status | core hash |
+| --- | --- | --- |
+| disabled | Disabled | 불변 |
+| queue 16개 사용 중 | Busy | 불변 |
+| endpoint가 non-loopback으로 resolve | Invalid | 불변 |
+| request JSON 32,768 bytes 초과 | Invalid | 불변 |
+| connection refused | Unavailable | 불변 |
+| connect 500ms 초과 | Timeout | 불변 |
+| narrative 2000ms 초과 | Timeout | 불변 |
+| invalid JSON | Invalid | 불변 |
+| empty text | Invalid | 불변 |
+| unknown request ID | Invalid | 불변 |
+| stale turn/hash | Stale | 불변 |
+| action outside current ActionSpace | Invalid | 불변 |
+
+수동 PASS:
+
+1. provider 없이 TUI 시작
+2. `G`, `A`, `J` CTA를 각각 실행
+3. fallback/status 텍스트 확인
+4. core snapshot hash 비교
+5. suggestion은 `Y` 명시 승인 전 submit되지 않음을 확인
+
+transport test는 redirect 0회, system proxy 미사용, response body 65,536 bytes 제한, request body 32,768 bytes 제한, queue capacity 16, C0/C1/ANSI 제거를 추가로 검증한다.
+
+exit smoke는 pending request 중 terminal restore가 먼저 수행되고 worker 종료 대기가 250ms를 넘지 않는지 검증한다.
+
+Checkpoint R6 현재 상태: NOT RUN.
+
+## 10. R7 출처·호환성 게이트
+
+연결 gap: G-LICENSE-001, G-COMPAT-001
+성공 기준: SC-COMPAT-01, SC-LICENSE-01
+
+```bash
+test -s PROVENANCE.md
+test -s docs/compatibility/README.md
+rg -q "98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2" PROVENANCE.md
+! rg -n "legacy_nethack_port_reference" Cargo.toml crates apps src --glob '*.toml' --glob '*.rs'
+cargo test --workspace --locked --test nethack_367_compat
+cargo test --workspace --locked --test golden_phase8_rules
+```
+
+PASS 조건:
+
+- runtime 포함 파일의 provenance status가 모두 `Approved`다.
+- 공식 source archive checksum이 `PROVENANCE.md`와 일치한다.
+- NH367-C001..C010 각각 source locator, 관찰, 명령, 기대 event, test function이 있다.
+- 레거시 경로 직접 import와 path dependency가 0건이다.
+- 라이선스 적용 범위는 담당자 검토 결과와 배포 결정을 기록한다. 본 감사는 법률 자문을 대체하지 않는다.
+
+Checkpoint R7 현재 상태: NOT RUN.
+
+## 11. R8 통합 릴리즈 게이트
+
+연결 gap: G-DOC-001
+선행: R1~R7 모두 PASS
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --all-targets --locked
+cargo build --workspace --release --locked
+cargo metadata --locked --no-deps --format-version 1
+cargo audit
+cargo deny check licenses bans sources
+git diff --check
+```
+
+최종 수동 확인:
+
+- Cargo, README, CHANGELOG의 release version이 0.3.0이다.
+- Title → character creation → play → inventory → game over → new run 흐름이 동작한다.
+- reduced motion과 high contrast에서 LLM 상태와 CTA를 텍스트만으로 구분한다.
+- provider disabled/timeout/stale flow에서 core hash가 변하지 않는다.
+- archive chain의 모든 경로가 존재하며 이전 파일을 덮어쓰지 않았다.
+- `AI_IMPLEMENTATION_DOC_STANDARD.md` 12항목을 다시 PASS한다.
+
+## 12. 최종 판정 템플릿
 
 ```text
-cargo fmt --check: pass
-cargo clippy --all-targets -- -D warnings: pass
-cargo test: 7 passed
-seed=42 turns=100 final_hash=f827bc2d4155ef66
-seed=42 turns=100 repeated final_hash=f827bc2d4155ef66
-seed=43 turns=100 final_hash=3ed5b4db4d5e7157
-rg "legacy_nethack_port_reference" src Cargo.toml: no direct refs
+AIHack v0.3.0 Audit
+Commit:
+Date/OS/Rust:
+R0 Documentation: PASS|FAIL
+R1 Build: PASS|FAIL
+R2 State: PASS|FAIL
+R3 Content: PASS|FAIL
+R4 Long-run: PASS|FAIL
+R5 Workspace: PASS|FAIL
+R6 Local LLM: PASS|FAIL
+R7 Provenance/Compatibility: PASS|FAIL
+R8 Release: PASS|FAIL
+Mandatory failures:
+Known risks:
+Evidence paths:
+Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-### Phase 2: Map, Movement, Doors, Vision
-
-목표:
-
-- 40x20 fixture map에서 플레이어가 deterministic하게 움직인다.
-
-구현 항목:
-
-- [x] `GameMap`
-- [x] `TileKind`
-- [x] `DoorState`
-- [x] movement blocker
-- [x] open/close
-- [x] LOS radius 8
-- [x] `Observation.visible_tiles`
-
-검증:
-
-```bash
-cargo test map movement doors vision
-```
-
-완료 기준:
-
-- 닫힌 문은 이동/LOS를 막고 열린 문은 통과 가능
-
-검증 증거(2026-04-28 Phase 2):
-
-```text
-cargo fmt --check: pass
-cargo clippy --all-targets -- -D warnings: pass
-cargo test: pass
-cargo test map: pass
-cargo test movement: pass
-cargo test doors: pass
-cargo test vision: pass
-cargo test observation: pass
-seed=42 turns=100 final_hash=1aad6f4049778b0e
-rg "legacy_nethack_port_reference" src Cargo.toml: no direct refs
-```
-
-### Phase 3: Combat and Death
-
-목표:
-
-- bump attack과 사망 이벤트를 구현한다.
-
-구현 항목:
-
-- [x] hit formula
-- [x] damage formula
-- [x] jackal/goblin combat
-- [x] `EntityDied`
-- [x] `RunState::GameOver`
-
-검증:
-
-```bash
-cargo test --test combat
-cargo test --test death
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo run --bin aihack-headless -- --seed 42 --turns 100
-```
-
-검증 증거(2026-04-28 Phase 3):
-
-```text
-cargo fmt --check: pass
-cargo clippy --all-targets -- -D warnings: pass
-cargo test: pass
-cargo test --test combat: pass
-cargo test --test death: pass
-seed=42 turns=100 final_hash=8b20a23301eea977
-rg "legacy_nethack_port_reference" src Cargo.toml tests: no direct refs
-```
-
-완료 기준:
-
-- seed 고정 전투 결과가 snapshot과 일치
-
-### Phase 4: Items and Inventory
-
-목표:
-
-- 아이템 pickup, inventory letter, wield, quaff를 구현한다.
-
-구현 항목:
-
-- [x] item store
-- [x] inventory letter map
-- [x] pickup
-- [x] wield dagger
-- [x] quaff healing
-- [x] item consumed event
-
-검증:
-
-```bash
-cargo test --test inventory
-cargo test --test items
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo run --bin aihack-headless -- --seed 42 --turns 100
-```
-
-검증 증거(2026-04-28 Phase 4):
-
-```text
-cargo fmt --check: pass
-cargo clippy --all-targets -- -D warnings: pass
-cargo test: pass
-cargo test --test items: pass
-cargo test --test inventory: pass
-seed=42 turns=100 final_hash=00ba578d933177f2
-rg "legacy_nethack_port_reference" src Cargo.toml tests: no direct refs
-rg "Drop|Read|Zap|Throw|Descend|Ascend|save/load|ratatui|crossterm|monster AI|pathfind" src: no matches
-rg "rand::|thread_rng|random" src: only src/core/rng.rs
-```
-
-완료 기준:
-
-- serde/snapshot roundtrip 후 inventory letter 유지. 실제 file save/load는 Phase 9 범위
-
-### Phase 5: Levels and Stairs
-
-목표:
-
-- 1층과 2층을 왕복하고 level state를 보존한다.
-
-구현 항목:
-
-- [x] `LevelId`
-- [x] level registry
-- [x] stairs up/down
-- [x] current level snapshot
-
-검증:
-
-```bash
-cargo test --test stairs --test levels
-```
-
-완료 기준:
-
-- 1층 아이템 상태가 2층 왕복 후 유지
-
-Phase 5 완료 메모:
-
-- `tests/levels.rs`, `tests/stairs.rs`, `cargo test` 통과.
-- `seed=42 turns=100 final_hash=88886c28698a1730`.
-
-### Phase 6: Monster AI
-
-목표:
-
-- 몬스터 의도 수집과 적용을 player action과 분리한다.
-
-구현 항목:
-
-- [x] `MonsterAiKind`
-- [x] wander
-- [x] chase on sight
-- [x] stationary
-- [x] hostile attitude
-
-검증:
-
-```bash
-cargo test --test monster_ai
-cargo test
-cargo run --bin aihack-headless -- --seed 42 --turns 100
-```
-
-완료 기준:
-
-- goblin은 LOS 내에서 거리가 줄어드는 방향으로 이동
-
-Phase 6 완료 메모:
-
-- `tests/monster_ai.rs` 추가, current-level filter / turn gate / chase / wander / stationary / death stop 검증 완료.
-- `EntityMoved { entity, from, to }` event shape로 player/monster movement identity를 통일했다.
-- `seed=42 turns=100 final_turn=20 final_hash=2fb549b5d2e1e67f`.
-
-### Phase 7: NetHack Interaction Set 1
-
-목표:
-
-- NetHack 느낌을 만드는 핵심 상호작용 일부를 추가한다.
-
-구현 항목:
-
-- [x] simple trap
-- [x] wand zap
-- [x] throw item
-- [x] read scroll
-- [x] search hidden door
-
-완료 기준:
-
-- 각 기능은 하나 이상의 golden scenario를 가진다.
-
-Phase 7 완료 메모:
-
-- `tests/traps.rs`, `tests/projectiles.rs`, `tests/items.rs`, `tests/observation.rs`로 hidden tile / trap / throw / zap / read를 검증했다.
-- `seed=42 turns=100 final_turn=20 final_hash=5aecd83cf284cb25`.
-
-### Phase 8: Legacy Rule Absorption
-
-목표:
-
-- 레거시 코드에서 선별한 규칙 20개를 새 계약으로 재작성한다.
-
-규칙 후보:
-
-- [x] dice/RNG
-- [x] monster difficulty
-- [x] inventory letter policy
-- [x] hunger tick
-- [x] trap detection
-- [x] door kicking
-- [x] passive attack
-- [x] wand beam
-- [x] potion healing
-- [x] scroll identify
-- [x] level teleport
-- [x] corpse drop
-- [x] hallucination message
-- [x] encumbrance
-- [x] armor AC
-- [x] weapon damage
-- [x] luck adjustment
-- [x] shop price base
-- [x] prayer cooldown
-- [x] death score
-
-완료 기준:
-
-- 20개 golden test 통과
-
-Phase 8 완료 메모:
-
-- `tests/golden_phase8_rules.rs`에 P8-G01~P8-G20 20개 golden scenario를 추가했다.
-- `seed=42 turns=100 final_turn=20 final_hash=4c77dafb19dd2226`.
-
-### Phase 9: Save, Load, Replay
-
-목표:
-
-- 세션을 저장하고 같은 hash path로 재개한다.
-
-Phase 9 완료 메모:
-
-- `tests/save_load.rs`, `tests/replay.rs`로 save/load hash equality와 replay JSONL schema를 검증했다.
-- `seed=42 turns=100 final_turn=20 final_hash=4c77dafb19dd2226`.
-
-검증:
-
-```bash
-cargo test save replay
-cargo run --bin aihack-headless -- --seed 42 --turns 1000
-```
-
-완료 기준:
-
-- save at turn 100, load, continue to 1000 hash equals uninterrupted run
-
-### Phase 10: TUI Adapter
-
-목표:
-
-- core를 수정하지 않고 TUI로 플레이한다.
-
-Phase 10 완료 메모:
-
-- `tests/ui_layout.rs`, `tests/ui_input_mapping.rs`, `tests/ui_effect_projection.rs`, `tests/ui_runtime_smoke.rs`를 추가했다.
-- `cargo run --bin aihack -- --seed 42`가 small-terminal fallback과 clean exit를 보였다.
-
-완료 기준:
-
-- UI code가 `GameClient` trait만 사용
-- 80x28 화면에서 겹침 없음
-
-### Phase 11: AI Observation/ActionSpace
-
-Phase 11 완료 메모:
-
-- `tests/ai_api_schema.rs`, `tests/action_space.rs`를 추가해 Observation/ActionSpace schema freeze를 검증했다.
-- save/load와 TUI consumer가 같은 AI-facing schema를 사용하도록 고정했다.
-
-
-목표:
-
-- AI가 매 턴 typed observation을 받고 legal action만 실행한다.
-
-완료 기준:
-
-- observation JSON schema snapshot 통과
-- illegal action은 reject event
-
-### Phase 12: LLM Narrative
-
-Phase 12 완료 메모:
-
-- `tests/llm_narrative.rs`를 추가해 timeout/fallback/non-hash narrative adapter를 검증했다.
-- TUI consumer smoke가 same narrative response contract를 읽는 것을 확인했다.
-
-
-목표:
-
-- LLM은 메시지 꾸밈만 담당한다.
-
-완료 기준:
-
-- timeout 2초
-- fallback text 존재
-- LLM 실패 시 game hash 불변
-
-### Phase 13: Limited LLM Decision Support
-
-목표:
-
-- LLM이 명령 후보를 제안하되 validator가 최종 결정한다.
-
-완료 기준:
-
-- LLM 출력이 invalid여도 게임 상태 불변
-- legal action 중 하나만 실행 가능
-
-## 5. 릴리즈 게이트
-
-v0.1:
-
-- Phase 1-15 완료
-- `cargo test` 통과
-- seed 42/7/1234 headless 1000턴 통과
-- save/load hash 일치
-- replay 재생 hash 일치
-- `Observation` schema snapshot 통과
-- known debt triage 완료
-
-v0.2:
-
-- Phase 7-9 완료
-- golden rules 20개 통과
-
-v0.3:
-
-- Phase 10-11 완료
-- TUI와 AI observation 안정화
-
-v0.4:
-
-- Phase 12-13 완료
-- LLM timeout/fallback 검증
-
-### Phase 10A~10E: Modern TUI/UX
-
-목표:
-
-- headless core와 AI observation 경계를 유지하면서 ASCII TUI의 정보 가독성, 마우스 접근성, presentation-only 효과를 단계적으로 도입한다.
-
-구현 항목:
-
-- [x] 10A layout snapshot과 keyboard-only TUI 안정화
-- [x] 10B hover/inspect, priority message, command hint
-- [x] 10C mouse click/hover 좌표 매핑과 inventory click selection
-- [x] 10D `GameEvent -> UiEffectEvent` projection
-- [x] 10E reduced motion, color profile
-- [ ] 10E 자동 라벨 우선순위
-
-검증:
-
-```bash
-cargo test ui_layout
-cargo test ui_input_mapping
-cargo test ui_effect_projection
-cargo test replay_hash_ignores_ui_effects
-cargo run --bin aihack-headless -- --seed 42 --turns 1000
-```
-
-완료 기준:
-
-- 80x28에서 map/status/log/command bar가 겹치지 않는다.
-- hover/inspect와 panel focus는 턴을 진행하지 않는다.
-- mouse disabled 환경에서도 모든 v0.1 필수 명령이 keyboard-only로 가능하다.
-- animation on/off 및 reduced motion 설정이 headless replay hash를 바꾸지 않는다.
-- 그래픽 타일셋 관련 의존성 또는 렌더러가 추가되지 않는다.
-
-
-### Phase 13 완료 메모
-
-- `tests/llm_decision_support.rs`를 추가해 legal/illegal/timeout/non-hash suggestion layer를 검증했다.
-- suggestion execution은 `session.submit(...)` 경로를 통하는 경우에만 허용되도록 고정했다.
-
----
-
-### Phase 16: RunState & CommandIntent 계약 정렬
-
-목표:
-
-- `spec.md` 8.2 `RunState` 계약과 실제 코드를 일치시킨다.
-- `spec.md` 8.3 `CommandIntent` 계약과 실제 코드를 일치시킨다.
-
-구현 항목:
-
-- [x] `RunState` 확장: Title, CharacterCreation, AwaitingDirection, AwaitingInventorySelection, MorePrompt, GameOver with cause/final_score
-- [x] `DirectionalAction`, `InventoryAction` 신규 정의
-- [x] `AcknowledgeMore` CommandIntent 추가
-- [x] `submit()` RunState 분기 처리
-- [x] `RunStateSummary` 확장
-- [x] `GameWorld.last_death_cause` 추가
-
-Phase 16 완료 메모:
-
-- `spec.md` 8.2/8.3 계약과 실제 코드를 일치시켰다.
-- `GameSession::new()`는 Title 상태로 시작하고, `new_for_playing()`은 Playing 상태로 시작한다.
-- snapshot hash가 변경되었고, 새 기준값 `seed=42 turns=1000 final_hash=569bc36895258349`으로 갱신했다.
-
-검증:
-
-```bash
-cargo test --test observation --test action_space
-cargo run --bin aihack-headless -- --seed 42 --turns 100
-```
-
-완료 기준:
-
-- `tests/observation.rs`, `tests/action_space.rs`가 새 RunState 종류별 legal_actions를 검증한다.
-- headless baseline hash 동일 유지.
-
----
-
-### Phase 17: Game Flow Screens
-
-목표:
-
-- `designs.md` 2의 Title, Character Creation, Game Over 화면을 구현한다.
-- `designs.md` 11의 Game Over 필수 표시 항목을 구현한다.
-
-구현 항목:
-
-- [x] TUI 화면 분기: Title/CharacterCreation/Playing/GameOver
-- [x] Title 화면: "AIHack", "Press Enter to Start", L/Q
-- [x] Character Creation 화면: 기본 캐릭터 정보, Enter/Esc
-- [x] Game Over 화면: 사망 원인, turn, depth, defeated, score, seed, N/Q/E
-- [x] `AwaitingDirection` 상태: "Choose direction" 표시
-- [x] `AwaitingInventorySelection` 상태: 인벤토리 오버레이
-- [x] `MorePrompt` 상태: "--More--" 표시
-
-Phase 17 완료 메모:
-
-- `tests/ui_screens.rs` 8개 테스트 통과.
-- headless baseline hash 동일 유지.
-
-검증:
-
-```bash
-cargo test --test ui_runtime_smoke --test ui_layout --test ui_input_mapping
-cargo run --bin aihack -- --seed 42
-```
-
-완료 기준:
-
-- 80x28 터미널에서 Title -> Character Creation -> Playing -> Game Over 흐름 확인
-- Game Over에서 N/Q/E 입력 동작 확인
-
----
-
-### Phase 18: Debug Observation Panel (F9 Toggle)
-
-목표:
-
-- `designs.md` 10의 Debug Observation 패널을 F9 키로 토글 가능하게 구현한다.
-- schema_version, seed, turn, snapshot_hash, legal_actions, recent events, visible tile/entity 수를 표시한다.
-
-구현 항목:
-
-- [x] `TuiApp.debug_observation_visible` 상태 추가
-- [x] F9 키 입력 처리 (UI-only 토글)
-- [x] Debug Observation lines 생성 함수
-- [x] 80x28에서도 overlay로 표시
-
-검증:
-
-```bash
-cargo test --test ui_debug --test ui_layout
-```
-
-완료 기준:
-
-- F9 키 입력 시 debug 패널 토글 동작
-- debug 패널이 기존 패널과 겹치지 않음
-
-Phase 18 완료 메모:
-
-- `tests/ui_debug.rs` 3개 테스트 통과.
-- headless baseline hash 동일 유지 (UI-only 변경).
-
----
-
-### Phase 19: Auto-Label Priority System
-
-목표:
-
-- `spec.md` 15.7의 Phase 10E 후속 "자동 라벨 우선순위"를 구현한다.
-- 새로 보인 hostile/item/danger 라벨을 최대 3개, 1200ms 표시한다.
-
-구현 항목:
-
-- [x] `AutoLabel`, `LabelKind` 타입 정의
-- [x] 라벨 우선순위: hostile adjacent > low HP > stairs > unidentified item > passive monster
-- [x] `collect_auto_labels()` 함수
-- [x] 맵 overlay 라벨 렌더링
-- [x] `NewEntityLabel` effect 통합
-
-검증:
-
-```bash
-cargo test --test ui_labels --test ui_effect_projection --test ui_layout
-```
-
-완료 기준:
-
-- 최대 3개 라벨 표시
-- 우선순위 정렬
-- 1200ms 지속 시간
-- headless hash 무영향
-
-Phase 19 완료 메모:
-
-- `tests/ui_labels.rs` 7개 테스트 통과.
-- headless baseline hash 동일 유지 (UI-only 변경).
-
----
-
-### Phase 20: 데이터 외부화 및 모듈 분리
-
-목표:
-
-- `spec.md` 7의 예정 구조와 실제 구조를 일치시킨다.
-- `src/domain/status.rs`, `src/data/`, `src/ui/debug/`를 생성한다.
-
-구현 항목:
-
-- [x] `src/domain/status.rs`: Status, HungerState 분리
-- [x] `src/data/items.toml`, `monsters.toml`, `levels/main_1.toml`
-- [x] `src/data/mod.rs`: TOML 로더
-- [x] `GameWorld` 필드 재배치: `status()`/`set_status()` getter/setter 추가
-
-검증:
-
-```bash
-cargo test --test data_loading --test save_load
-cargo run --bin aihack-headless -- --seed 42 --turns 1000
-```
-
-완료 기준:
-
-- TOML 파일 로드 검증
-- Status save/load roundtrip 검증
-- headless baseline hash 동일 유지
-
-Phase 20 완료 메모:
-
-- `tests/data_loading.rs` 9개 테스트 통과.
-- `GameWorld` 내부 필드 구조를 유지하여 hash 변경 없음.
-- `src/ui/debug/`는 inline 구현으로 대체하여 선택적 분리는 미룸.
+현재 전체 구현 판정: NOT RUN
+현재 문서 계획 판정: PASS (`DOCUMENTATION_AUDIT_REPORT.md`)

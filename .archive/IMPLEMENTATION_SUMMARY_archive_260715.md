@@ -1,3 +1,12 @@
+# AIHack Implementation Summary — Archive
+
+> 📂 Archived: 2026-07-15
+> 🔗 Previous archive: First archive
+> 📄 Source document: `IMPLEMENTATION_SUMMARY.md` (continues with v2)
+> 🧬 DNA inherited in source: 고정 턴 파이프라인, 파일 책임, Phase 1-20 구현 이력, headless 우선 검증
+
+---
+
 # AIHack Implementation Summary
 
 문서 상태: active
@@ -11,9 +20,9 @@
 Input/UI/AI
   -> CommandIntent
   -> GameSession::submit()
-  -> validate_command()
-  -> apply_turn()
+  -> 상태별 submit_*()
   -> systems run in fixed order
+  -> accept_turn()
   -> TurnOutcome
   -> GameSnapshot + Observation
   -> UI render / replay write / AI read
@@ -37,7 +46,7 @@ Input/UI/AI
 10. snapshot hash calculation
 11. observation build
 
-이 순서는 `systems/turn_pipeline.rs`에 상수로 둔다.
+이 순서는 `src/core/session.rs`의 `GameSession::submit()` → 상태별 `submit_*` → `accept_turn()` 흐름에 고정되어 있다.
 
 ## 3. 파일 책임
 
@@ -574,9 +583,9 @@ Phase 13에서 의도적으로 제외된 항목:
 cargo fmt --check: pass
 cargo clippy --all-targets -- -D warnings: pass
 cargo test: pass
-seed=42 turns=1000 final_turn=20 final_hash=4c77dafb19dd2226
-seed=7 turns=1000 final_turn=28 final_hash=6eb33e9470d41b66
-seed=1234 turns=1000 final_turn=18 final_hash=b88149ab5bb10bda
+seed=42 turns=1000 final_turn=20 final_hash=569bc36895258349
+seed=7 turns=1000 final_turn=28 final_hash=f1ee87dc33c32533
+seed=1234 turns=1000 final_turn=18 final_hash=58762b2adea01615
 ```
 
 Known debt triage:
@@ -890,3 +899,4 @@ cargo run --bin aihack-headless -- --seed 42 --turns 1000
 - `CommandIntent::Descend`, `CommandIntent::Ascend`, `GameEvent::LevelChanged`를 추가했다.
 - `tests/levels.rs`, `tests/stairs.rs`를 추가했고 전체 `cargo test`를 통과했다.
 - Phase 7 기준 hash: `seed=42 turns=100 final_turn=20 final_hash=5aecd83cf284cb25`.
+

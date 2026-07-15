@@ -1,242 +1,385 @@
-# AIHack Build Guide
+# AIHack Build Guide v2
 
-문서 상태: active
-작성일: 2026-04-28
+> Archive chain
+> - Latest: `.archive/BUILD_GUIDE_archive_260715.md`
+> - Previous: first archive
+>
+> 과거 Phase 빌드 절차와 hash 이력은 아카이브에 있다. 이 문서는 현재 실행법과 v0.3.0 target build contract를 구분한다.
 
-## 1. 현재 루트 상태
+문서 상태: active build contract
+작성일: 2026-07-15
+관련 Task: R1-1..R1-3, R4-1..R4-2, R5-1..R5-2, R8-1
 
-현재 루트에는 새 Rust-native 엔진 코드가 있다. 이전 Rust 포트는 `legacy_nethack_port_reference/` 아래에 참조용으로 보존되어 있다.
+## 1. 현재 상태
 
-새 코드 작성 전 기준 파일:
+| 항목 | 현재 working tree | v0.3.0 target |
+| --- | --- | --- |
+| Rust | 로컬 1.94.1, repository 고정 없음 | `rust-toolchain.toml` 1.94.1 |
+| package | `aihack 0.1.0` 단일 package | workspace, release 0.3.0 |
+| edition/MSRV | edition 2021, rust-version 없음 | edition 2021, rust-version 1.94 |
+| UI | ratatui 0.30 + direct crossterm 0.28 | ratatui 0.29 + crossterm 0.28.1 |
+| binary 선택 | 두 binary, default-run 없음 | 같은 이름 + default-run aihack |
+| CI | 없음 | Linux/Windows |
+| script | `--locked` 없음, Unix copy 실패 무시 | locked, artifact fail-fast |
+| long run | wait-only, 조기 사망도 exit 0 | survival-v1, accepted turn 1000 |
 
-- `AGENTS.md`
-- `AI_IMPLEMENTATION_DOC_STANDARD.md`
-- `README.md`
-- `spec.md`
-- `designs.md`
-- `implementation_summary.md`
-- `DESIGN_DECISIONS.md`
-- `audit_roadmap.md`
-- `CHANGELOG.md`
+현재 `cargo run -- --seed 42`는 binary를 선택하지 못하므로 사용하지 않는다.
 
 ## 2. 사전 준비
 
-필수:
-
-- Rust stable
-- Cargo
-
-확인:
+현재 검증:
 
 ```bash
 rustc --version
 cargo --version
+cargo metadata --locked --no-deps --format-version 1
 ```
 
-## 3. 현재 Cargo 구성 기준
+v0.3.0 구현 후 기대:
 
-루트 Cargo 패키지는 이미 존재한다. 새 스캐폴딩을 다시 실행하지 말고 현재 `Cargo.toml`을 기준으로 수정한다. 레거시 폴더는 workspace member로 넣지 않는다.
+```text
+rustc 1.94.1 (...)
+cargo 1.94.1 (...)
+```
 
-현재 `Cargo.toml` 핵심 값:
+필수 도구:
+
+- Rustup 또는 Rust 1.94.1 toolchain
+- Cargo
+- Git
+- Bash: Linux script 및 로컬 audit
+- PowerShell 또는 cmd: Windows script
+- `rg`: 문서·경계 audit
+- `cargo-audit 0.22.1`: RustSec dependency advisory gate
+- `cargo-deny 0.19.4`: license, source, duplicate dependency gate
+
+local LLM은 core build와 test의 필수 조건이 아니다. LLM integration test는 loopback mock server를 사용하고 외부 네트워크를 사용하지 않는다.
+
+R6 dependency는 `reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json"] }`로 고정한다. HTTP loopback만 허용하므로 TLS feature를 넣지 않는다. `ClientBuilder::no_proxy()`, connect timeout 500ms, request별 total timeout을 사용한다.
+
+## 3. 현재 빠른 실행
+
+TUI:
+
+```bash
+cargo run --locked --bin aihack -- --seed 42
+```
+
+Headless 현재 진단:
+
+```bash
+cargo run --locked --bin aihack-headless -- --seed 42 --turns 100
+```
+
+현재 headless의 `--turns`는 accepted turn 보장이 아니라 최대 loop 요청값이다. 조기 GameOver가 발생할 수 있으므로 long-run 품질 증거로 쓰지 않는다.
+
+현재 기본 검증:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --all-targets --locked
+cargo build --all-targets --locked
+cargo build --release --locked
+```
+
+## 4. R1 toolchain과 dependency 고정 계획
+
+### 4.1 `rust-toolchain.toml`
+
+Task R1-1에서 생성할 값:
+
+```toml
+[toolchain]
+channel = "1.94.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+```
+
+### 4.2 root package baseline
+
+workspace 추출 전 R1의 target:
 
 ```toml
 [package]
 name = "aihack"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.94"
+default-run = "aihack"
 license = "UNLICENSED"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "1"
-rand = "0.8"
-clap = { version = "4", features = ["derive"] }
-
-[[bin]]
-name = "aihack"
-path = "src/main.rs"
-
-[[bin]]
-name = "aihack-headless"
-path = "src/bin/aihack-headless.rs"
+ratatui = "0.29"
+crossterm = "0.28.1"
 ```
 
-`license = "UNLICENSED"`는 초기 개발 중 임시값이다. NetHack 파생 여부가 결정되면 별도 라이선스 결정을 `DESIGN_DECISIONS.md`에 추가한다.
+- 다른 dependency version은 R1에서 기능 변경 없이 lockfile 결과만 검증한다.
+- crossterm duplicate가 1개라도 남으면 R1 실패다.
+- `license = "UNLICENSED"`는 R7 법적 검토 전 유지한다.
+- R8 release gate 직전 승인된 라이선스 값과 0.3.0 version을 동기화한다.
 
-## 4. 필수 엔트리와 현재 구현 상태
+검증:
 
-`src/main.rs`:
+```bash
+cargo update -p ratatui --precise 0.29.0
+cargo metadata --locked --no-deps --format-version 1
+cargo tree -d
+cargo check --locked --all-targets
+```
 
-```rust
-fn main() {
-    // Phase 10+ TUI entry
+첫 번째 명령은 R1 구현 세션에서 lockfile을 의도적으로 갱신할 때 한 번 실행한다. 감사 세션에서는 실행하지 않는다.
+
+## 5. R1 build script 계약
+
+### 5.1 Linux
+
+`./build.sh [--release] [--test]`:
+
+1. `set -euo pipefail`
+2. `--test`이면 `cargo test --locked --all-targets`
+3. debug면 `cargo build --locked --all-targets`
+4. release면 `cargo build --locked --release --all-targets`
+5. host suffix를 계산해 두 binary를 `output/`에 복사
+6. 두 artifact를 `test -x`로 확인
+7. 하나라도 없으면 exit code 1
+8. 모두 있으면 마지막 줄에 정확한 artifact 경로 출력
+
+`cp ... || true`와 stderr 폐기는 금지한다.
+
+### 5.2 Windows
+
+`build.bat [--release] [--test]`은 같은 8단계를 수행한다. 필수 artifact:
+
+```text
+output\aihack.exe
+output\aihack-headless.exe
+```
+
+copy 실패 뒤 성공 메시지를 출력하면 R1 실패다.
+
+### 5.3 현재와 target artifact
+
+| 모드 | Cargo artifact | 배포 staging |
+| --- | --- | --- |
+| current debug | `target/debug/aihack[.exe]` | `output/aihack[.exe]` |
+| current headless | `target/debug/aihack-headless[.exe]` | `output/aihack-headless[.exe]` |
+| target workspace TUI | `target/debug/aihack[.exe]` | 동일 |
+| target workspace headless | `target/debug/aihack-headless[.exe]` | 동일 |
+| release | `target/release/*` | `output/*` |
+
+사용자 CLI와 artifact 이름은 workspace 추출 뒤에도 바꾸지 않는다.
+
+## 6. R1 CI 계약
+
+생성 파일: `.github/workflows/ci.yml`
+
+trigger:
+
+- `push`
+- `pull_request`
+
+matrix:
+
+- `ubuntu-latest`
+- `windows-latest`
+
+job 순서:
+
+```text
+checkout
+-> install Rust from rust-toolchain.toml
+-> cargo metadata --locked
+-> cargo fmt --all -- --check
+-> cargo clippy --workspace --all-targets --locked -- -D warnings
+-> cargo test --workspace --all-targets --locked
+-> cargo build --workspace --release --locked
+-> cargo audit
+-> cargo deny check licenses bans sources
+-> assert Cargo.lock unchanged
+```
+
+Linux와 Windows에서 command 의미가 같아야 한다. OS별 shell 차이 때문에 lockfile 검사 구현은 달라도 결과는 동일해야 한다.
+
+CI tool 설치는 `cargo install --locked cargo-audit --version 0.22.1`과 `cargo install --locked cargo-deny --version 0.19.4`로 고정한다. `deny.toml`은 crates.io만 허용하고 license allowlist와 crossterm duplicate deny를 정의한다. exception은 crate, version, 이유, owner, 만료일을 가져야 하며 최대 90일이다.
+
+## 7. R4 headless contract
+
+target 명령:
+
+```bash
+cargo run --locked --release --bin aihack-headless -- \
+  --seed 42 \
+  --turns 1000 \
+  --policy survival-v1 \
+  --report runtime/reports/seed-42.json
+```
+
+flag contract:
+
+| flag | type/default | validation and effect |
+| --- | --- | --- |
+| `--seed` | u64, default 42 | `--load`와 동시 사용 금지 |
+| `--turns` | u64, default 1000 | absolute target turn, 1..=1,000,000 |
+| `--policy` | wait-v1, survival-v1, replay-file; default survival-v1 | replay-file은 `--replay-in`이 있어야 함 |
+| `--save` | optional relative path | 성공 종료 시 SaveDataV1 atomic replace |
+| `--load` | optional relative path | SaveDataV1 load, seed 대신 save seed 사용 |
+| `--replay-in` | optional relative path | replay-file policy의 CommandIntent JSONL source |
+| `--replay-out` | optional relative path | 이번 invocation의 ReplayLineV1 JSONL 기록 |
+| `--report` | optional relative path | 기본 `runtime/reports/long-run-<seed>.json` |
+
+`--turns`는 현재 CLI와 같이 final target turn이다. 새 session의 turn 0에서 `--turns 1000`이면 1000번의 `turn_advanced=true`가 필요하다. load turn이 400이면 target 1000까지 600번을 수행하며 report의 `accepted_turns`는 600이다. load turn이 target보다 크면 exit code 2다.
+
+path flag는 repository `runtime/`을 canonical root로 사용한다. absolute path, `..` 탈출, symlink로 root 밖을 가리키는 path를 거부한다. save는 같은 directory의 temp file에 write/flush한 뒤 rename하고, 실패 시 기존 save를 보존한다. `--replay-in`과 `--replay-out`은 같은 canonical path일 수 없다.
+
+필수 stdout 한 줄:
+
+```text
+seed=42 policy=survival-v1 requested=1000 accepted=1000 submitted=1017 final_state=Playing final_hash=0123456789abcdef
+```
+
+필수 report schema:
+
+```json
+{
+  "schema_version": 1,
+  "seed": 42,
+  "policy": "survival-v1",
+  "requested_turns": 1000,
+  "accepted_turns": 1000,
+  "submitted_commands": 1017,
+  "final_state": "Playing",
+  "final_hash": "0123456789abcdef",
+  "error": null
 }
 ```
 
-`src/bin/aihack-headless.rs`:
+exit code:
 
-```rust
-use clap::Parser;
+- 0: accepted_turns가 requested_turns와 같음
+- 2: CLI 또는 policy 이름 오류
+- 3: accepted action 16회 탐색 실패
+- 4: 조기 GameOver
+- 5: invariant 실패
+- 6: save/replay/report read-write 실패
 
-#[derive(Parser, Debug)]
-struct Args {
-    #[arg(long, default_value_t = 42)]
-    seed: u64,
-    #[arg(long, default_value_t = 1000)]
-    turns: u64,
-}
+`accepted_turns <= submitted_commands <= accepted_turns * 16`이어야 한다. reject 후 다음 legal candidate를 시도하므로 submitted 값은 accepted보다 클 수 있다.
 
-fn main() {
-    let args = Args::parse();
-    println!("seed={} turns={}", args.seed, args.turns);
-}
+report write 실패를 stdout 성공으로 숨기지 않는다.
+
+## 8. R5 workspace build
+
+target members:
+
+```text
+crates/aihack-core
+crates/aihack-content
+crates/aihack-ai-contract
+crates/aihack-llm
+apps/aihack-tui
+apps/aihack-headless
 ```
 
-현재 기준:
+root `aihack` package는 `publish = false` compatibility facade와 `tests/**` host로 남는다. workspace `default-members`는 `apps/aihack-tui`이고 `default-run = "aihack"`은 R5에서 TUI app manifest로 이동한다. 따라서 root의 `cargo run --locked -- --seed 42`와 명시적 `cargo run --locked --bin aihack -- --seed 42`가 같은 binary를 선택해야 한다.
 
-- `src/main.rs`는 Phase 10 이후 `aihack::ui::tui::run_tui(seed)`를 호출하는 TUI entrypoint다.
-- `src/bin/aihack-headless.rs`는 deterministic regression runner로 유지되며 `seed`, `turns`, `final_turn`, `final_hash`를 출력한다.
-- Phase 15까지 hover inspect, priority message, command hint, inspect panel inventory click, reduced motion/high contrast token path가 추가되었다.
+root 명령:
 
-## 5. 런타임 출력 경로
+```bash
+cargo check --workspace --all-targets --locked
+cargo test --workspace --all-targets --locked
+cargo build --workspace --release --locked
+cargo run --locked --bin aihack -- --seed 42
+cargo run --locked --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
+```
 
-초기 구현은 다음 경로를 사용한다.
+dependency 경계:
+
+```bash
+cargo tree -p aihack-core
+cargo tree -p aihack-content
+cargo tree -p aihack-llm
+```
+
+`aihack-core` tree에 ratatui, crossterm, reqwest 또는 다른 HTTP client가 나타나면 실패다.
+
+## 9. Local LLM 개발 실행
+
+v0.3.0의 기본값은 disabled다. enabled 예시:
+
+```bash
+AIHACK_LLM_ENABLED=true \
+AIHACK_LLM_ENDPOINT=http://127.0.0.1:11434/v1 \
+AIHACK_LLM_MODEL=local-model \
+cargo run --locked --bin aihack -- --seed 42
+```
+
+허용 환경변수:
+
+| 이름 | 기본값 | 검사 |
+| --- | --- | --- |
+| AIHACK_LLM_ENABLED | false | true/false |
+| AIHACK_LLM_ENDPOINT | http://127.0.0.1:11434/v1 | host가 127.0.0.1, localhost, [::1] 중 하나 |
+| AIHACK_LLM_MODEL | empty | enabled=true면 1..=128자 |
+| AIHACK_LLM_CONNECT_TIMEOUT_MS | 500 | 100..=5000 |
+| AIHACK_LLM_NARRATIVE_TIMEOUT_MS | 2000 | 100..=10000 |
+| AIHACK_LLM_DECISION_TIMEOUT_MS | 1500 | 100..=10000 |
+| AIHACK_LLM_MAX_CHARS | 240 | 1..=240 |
+
+API key는 기본 local flow에서 요구하지 않는다. endpoint URL에 credential을 넣지 않는다.
+
+## 10. Clean-room 감사
+
+기존 `target/`을 지우지 않고 별도 target을 사용한다.
+
+```bash
+CARGO_TARGET_DIR=/tmp/aihack-audit-target cargo check --workspace --all-targets --locked
+CARGO_TARGET_DIR=/tmp/aihack-audit-target cargo test --workspace --all-targets --locked
+CARGO_TARGET_DIR=/tmp/aihack-audit-target cargo build --workspace --release --locked
+```
+
+이 명령은 R5 구현 전에는 `--workspace`가 현재 단일 package를 가리킨다.
+
+## 11. 런타임 산출물
 
 ```text
 runtime/
-  save/
-    dev_save.json
+  saves/
+    *.json
   replays/
-    {seed}-{turns}.jsonl
-  snapshots/
-    {seed}-{turn}.json
+    *.jsonl
+  reports/
+    seed-*.json
   logs/
-    headless.log
+    aihack.log
 ```
 
-`runtime/`은 git 추적 대상이 아니다. 필요 시 `.gitignore`에 추가한다.
+- `runtime/`은 Git 추적 대상이 아니다.
+- save/replay schema v1은 R8까지 유지한다.
+- LLM prompt, response body, API credential은 save/replay/report에 기록하지 않는다.
+- deterministic test는 고정 fixture path를 사용하고 사용자 runtime을 덮어쓰지 않는다.
 
-## 6. 검증 명령
+## 12. 실패 진단 순서
 
-기본:
+1. 실패 명령을 그대로 한 번 재현
+2. `rustc --version`, `cargo metadata --locked`, `cargo tree -d` 확인
+3. 실패 test 하나만 `--exact --nocapture`로 실행
+4. clean target에서 재실행
+5. 첫 표적 수정이 실패하거나 version behavior가 의심될 때 공식 Rust/crate 문서 확인
+6. 같은 실패를 세 번 반복하지 않고 오류, 변경, 남은 가설을 기록
 
-```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo test --test levels
-cargo test --test stairs
-cargo run --bin aihack-headless -- --seed 42 --turns 0
-```
+## 13. 릴리즈 체크리스트
 
-Phase 1 이후:
-
-```bash
-cargo run --bin aihack-headless -- --seed 42 --turns 100
-```
-
-Phase 5 이후:
-
-```bash
-cargo run --bin aihack-headless -- --seed 42 --turns 1000
-```
-
-품질 게이트:
-
-```bash
-cargo clippy --all-targets -- -D warnings
-```
-
-## 7. 첫 실행 산출물
-
-Phase 10 현재 기준 출력 예시:
-
-```text
-seed=42 turns=0 final_turn=0 final_hash=53435bb29a2e69ee
-seed=42 turns=100 final_turn=20 final_hash=4c77dafb19dd2226
-seed=43 turns=100 final_turn=21 final_hash=f8324eacbce50087
-
-save/load 예시:
-aihack-headless --seed 42 --turns 10 --save /tmp/aihack-save-v1.json
-aihack-headless --load /tmp/aihack-save-v1.json --turns 20
-aihack-headless --seed 42 --turns 5 --replay-out /tmp/aihack-replay.jsonl
-```
-
-
-`--turns 0`:
-
-- stdout에 seed/turns 표시
-- exit code 0
-
-`--turns 1000`:
-
-- stdout에 `seed`, `turns`, `final_turn`, `final_hash`가 출력된다.
-- monster AI로 player가 조기 사망할 수 있으므로 `final_turn`은 요청 turns보다 작을 수 있다.
-- 같은 명령을 두 번 실행하면 `final_turn`과 `final_hash`가 동일해야 한다.
-
-## 8. 레거시 빌드
-
-이전 포트를 빌드해야 할 경우:
-
-```bash
-cd legacy_nethack_port_reference
-cargo test
-```
-
-이 명령은 새 엔진 검증이 아니다. 레거시 상태 확인용이다.
-
-## 9. 금지 사항
-
-- `legacy_nethack_port_reference`를 workspace member로 추가하지 않는다.
-- 새 `src/`에서 `legacy_nethack_port_reference/src`를 path import하지 않는다.
-- UI 구현 전 core 없이 빈 화면만 만드는 작업을 완료로 보지 않는다.
-- `cargo test` 없이 Phase 완료를 주장하지 않는다.
-
-## 10. 배포 전 체크리스트
-
-v0.1 release candidate:
-
-- `cargo fmt --check`
-- `cargo clippy --all-targets -- -D warnings`
-- `cargo test`
-- headless 1000턴 seed 42/7/1234 통과
-- save/load hash 일치
-- replay 재생 hash 일치
-- `Observation` schema snapshot 통과
-- 루트 문서와 구현 타입 이름 일치
-
-
-TUI smoke 예시:
-
-```bash
-cargo run --bin aihack -- --seed 42
-```
-
-
-AI API schema freeze 검증 예시:
-
-```bash
-cargo test --test ai_api_schema --test action_space
-```
-
-
-Narrative adapter 검증 예시:
-
-```bash
-cargo test --test llm_narrative
-```
-
-
-Decision support 검증 예시:
-
-```bash
-cargo test --test llm_decision_support
-```
-
-
-## 11. Known Debt Triage
-
-- release blocker: none
-- non-blocking known issue: small-terminal TUI는 fallback message만 렌더한다.
-- post-RC follow-up: advanced TUI polish, provider-backed online integrations, broader packaging automation
+- [ ] R1~R7 checkpoint PASS
+- [ ] `cargo fmt --all -- --check`
+- [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
+- [ ] `cargo test --workspace --all-targets --locked`
+- [ ] `cargo build --workspace --release --locked`
+- [ ] seed 42, 7, 1234 accepted turn 1000
+- [ ] save/load/replay v1 hash equality
+- [ ] provider disabled/timeout/stale에서 core hash 불변
+- [ ] provenance Unknown/Blocked runtime 자산 0건
+- [ ] Cargo/README/CHANGELOG 0.3.0 동기화
+- [ ] Linux/Windows CI green
+- [ ] `cargo audit` vulnerability 0건
+- [ ] `cargo deny check licenses bans sources` PASS
+- [ ] `audit_roadmap.md` R8 PASS
