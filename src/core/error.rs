@@ -33,3 +33,23 @@ pub enum GameError {
 }
 
 pub type GameResult<T> = Result<T, GameError>;
+
+/// Embedded content를 시작 전에 검증할 때 반환하는 오류다.
+///
+/// Registry는 fallback 데이터를 사용하지 않으므로, 이 오류는 게임 시작을 중단해야
+/// 하는 콘텐츠 계약 위반을 의미한다.
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum ContentError {
+    #[error("content parse error in {file}: {message}")]
+    Parse { file: String, message: String },
+    #[error("duplicate content id: {id}")]
+    DuplicateId { id: String },
+    #[error("unknown content reference from {owner} to {target}")]
+    UnknownReference { owner: String, target: String },
+    #[error("invalid damage dice: {value}")]
+    InvalidDice { value: String },
+    #[error("invalid coordinate in {level}: ({x}, {y})")]
+    InvalidCoordinate { level: String, x: i16, y: i16 },
+    #[error("missing paired stairs for level: {level}")]
+    MissingStairsPair { level: String },
+}

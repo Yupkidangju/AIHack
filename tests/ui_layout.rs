@@ -26,9 +26,10 @@ fn larger_layout_tiers_preserve_panel_contract() {
 #[test]
 fn priority_message_and_command_hint_render_have_accessible_text() {
     let mut session = GameSession::new_for_playing(42);
-    let player = session.world.player_id;
-    let stats = session.world.entities.actor_stats_mut(player).unwrap();
-    stats.hp = 3;
+    let player = session.world().player_id();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.actor_stats_mut(player).unwrap().hp = 3;
+    });
     let observation = session.observation();
     let log_lines = render_panels::log_lines(&observation, &["Narrative(idle)".to_string()]);
     let command_lines = render_panels::command_lines(&observation, UiPanel::Inspect);

@@ -36,8 +36,8 @@ fn main() {
         GameSession::new_for_playing(args.seed.unwrap_or(42))
     };
 
-    while session.turn < args.turns {
-        let turn_before = session.turn;
+    while session.turn() < args.turns {
+        let turn_before = session.turn();
         let command = CommandIntent::Wait;
         let outcome = session.submit(command);
         if let Some(path) = &args.replay_out {
@@ -52,7 +52,7 @@ fn main() {
                 std::process::exit(2);
             }
         }
-        if matches!(session.state, aihack::core::RunState::GameOver { .. }) {
+        if matches!(session.run_state(), aihack::core::RunState::GameOver { .. }) {
             break;
         }
     }
@@ -67,6 +67,9 @@ fn main() {
     let final_hash = session.snapshot().stable_hash();
     println!(
         "seed={} turns={} final_turn={} final_hash={}",
-        session.meta.seed, args.turns, session.turn, final_hash.0
+        session.seed(),
+        args.turns,
+        session.turn(),
+        final_hash.0
     );
 }

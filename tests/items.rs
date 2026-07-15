@@ -8,8 +8,12 @@ use aihack::{
 };
 
 fn stand_on_potion(session: &mut GameSession) {
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 8, y: 5 });
+    aihack::testing::SessionBuilder::mutate(session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(session, |world| {
+        world.set_player_pos(Pos { x: 8, y: 5 })
+    });
 }
 
 #[test]
@@ -64,39 +68,42 @@ fn item_entities_have_expected_ids_and_locations() {
     let session = GameSession::new_for_playing(42);
 
     assert!(matches!(
-        session.world.entities.get(EntityId(4)).unwrap().kind(),
+        session.world().entities().get(EntityId(4)).unwrap().kind(),
         EntityKind::Item(ItemKind::PotionHealing)
     ));
     assert_eq!(
-        session.world.entities.item_location(EntityId(4)),
+        session.world().entities().item_location(EntityId(4)),
         Some(EntityLocation::OnMap {
-            level: session.world.current_level(),
+            level: session.world().current_level(),
             pos: Pos { x: 8, y: 5 },
         })
     );
     assert_eq!(
-        session.world.entities.item_location(EntityId(5)),
+        session.world().entities().item_location(EntityId(5)),
         Some(EntityLocation::Inventory {
-            owner: session.world.player_id
+            owner: session.world().player_id()
         })
     );
     assert_eq!(
-        session.world.entities.item_location(EntityId(6)),
+        session.world().entities().item_location(EntityId(6)),
         Some(EntityLocation::Inventory {
-            owner: session.world.player_id
-        })
-    );
-    assert_eq!(session.world.entities.item_charges(EntityId(7)), Some(3));
-    assert_eq!(
-        session.world.entities.item_location(EntityId(8)),
-        Some(EntityLocation::Inventory {
-            owner: session.world.player_id
+            owner: session.world().player_id()
         })
     );
     assert_eq!(
-        session.world.entities.item_location(EntityId(9)),
+        session.world().entities().item_charges(EntityId(7)),
+        Some(3)
+    );
+    assert_eq!(
+        session.world().entities().item_location(EntityId(8)),
         Some(EntityLocation::Inventory {
-            owner: session.world.player_id
+            owner: session.world().player_id()
+        })
+    );
+    assert_eq!(
+        session.world().entities().item_location(EntityId(9)),
+        Some(EntityLocation::Inventory {
+            owner: session.world().player_id()
         })
     );
 }
@@ -120,17 +127,17 @@ fn pickup_assigns_next_letter_and_event_order() {
             entity,
             item: EntityId(4),
             letter: InventoryLetter('f')
-        }) if *entity == session.world.player_id
+        }) if *entity == session.world().player_id()
     ));
     assert_eq!(
-        session.world.inventory.letter_for(EntityId(4)),
+        session.world().inventory().letter_for(EntityId(4)),
         Some(InventoryLetter('f'))
     );
-    assert_eq!(session.world.inventory.next_letter_index, 6);
+    assert_eq!(session.world().inventory().next_letter_index, 6);
     assert_eq!(
-        session.world.entities.item_location(EntityId(4)),
+        session.world().entities().item_location(EntityId(4)),
         Some(EntityLocation::Inventory {
-            owner: session.world.player_id
+            owner: session.world().player_id()
         })
     );
 }
@@ -144,7 +151,7 @@ fn pickup_without_item_is_rejected_without_turn() {
 
     assert!(!outcome.accepted);
     assert!(!outcome.turn_advanced);
-    assert_eq!(session.turn, 0);
+    assert_eq!(session.turn(), 0);
     assert_eq!(outcome.snapshot_hash, before_hash);
     assert!(matches!(
         outcome.events.as_slice(),
@@ -157,9 +164,9 @@ fn show_inventory_is_no_turn_and_eventless() {
     let mut session = GameSession::new_for_playing(42);
     let before_hash = session.snapshot().stable_hash();
     let before_hp = session
-        .world
-        .entities
-        .actor_stats(session.world.player_id)
+        .world()
+        .entities()
+        .actor_stats(session.world().player_id())
         .expect("player stats must exist")
         .hp;
 
@@ -171,9 +178,9 @@ fn show_inventory_is_no_turn_and_eventless() {
     assert_eq!(outcome.snapshot_hash, before_hash);
     assert_eq!(
         session
-            .world
-            .entities
-            .actor_stats(session.world.player_id)
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
             .expect("player stats must exist")
             .hp,
         before_hp
@@ -186,12 +193,10 @@ fn quaff_healing_potion_heals_and_consumes_repeatably() {
         let mut session = GameSession::new_for_playing(42);
         stand_on_potion(&mut session);
         assert!(session.submit(CommandIntent::Pickup).accepted);
-        session
-            .world
-            .entities
-            .actor_stats_mut(session.world.player_id)
-            .unwrap()
-            .hp = 5;
+        let player = session.world().player_id();
+        aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+            world.saved().entities.actor_stats_mut(player).unwrap().hp = 5;
+        });
         let outcome = session.submit(CommandIntent::Quaff { item: EntityId(4) });
         assert!(outcome.accepted);
         assert!(outcome.turn_advanced);
@@ -218,14 +223,14 @@ fn quaff_healing_potion_heals_and_consumes_repeatably() {
             .unwrap();
         assert!((5..=12).contains(&amount));
         assert_eq!(
-            session.world.entities.item_location(EntityId(4)),
+            session.world().entities().item_location(EntityId(4)),
             Some(EntityLocation::Consumed)
         );
         assert_eq!(
-            session.world.entities.item_letter(EntityId(4)),
+            session.world().entities().item_letter(EntityId(4)),
             Some(InventoryLetter('f'))
         );
-        assert!(!session.world.inventory.contains(EntityId(4)));
+        assert!(!session.world().inventory().contains(EntityId(4)));
         (amount, hp_after)
     }
 
@@ -237,12 +242,10 @@ fn healing_clamps_to_max_hp_with_effective_amount() {
     let mut session = GameSession::new_for_playing(42);
     stand_on_potion(&mut session);
     assert!(session.submit(CommandIntent::Pickup).accepted);
-    session
-        .world
-        .entities
-        .actor_stats_mut(session.world.player_id)
-        .unwrap()
-        .hp = 15;
+    let player = session.world().player_id();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.actor_stats_mut(player).unwrap().hp = 15;
+    });
 
     let outcome = session.submit(CommandIntent::Quaff { item: EntityId(4) });
 
@@ -304,7 +307,9 @@ fn consumed_potion_is_not_legal_action() {
 #[test]
 fn read_scroll_reveals_hidden_tiles_and_consumes_scroll() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
 
     let outcome = session.submit(CommandIntent::Read { item: EntityId(8) });
 
@@ -325,7 +330,7 @@ fn read_scroll_reveals_hidden_tiles_and_consumes_scroll() {
         }
     )));
     assert_eq!(
-        session.world.entities.item_location(EntityId(8)),
+        session.world().entities().item_location(EntityId(8)),
         Some(EntityLocation::Consumed)
     );
 }
@@ -333,7 +338,9 @@ fn read_scroll_reveals_hidden_tiles_and_consumes_scroll() {
 #[test]
 fn wand_zap_spends_charge() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
 
     let outcome = session.submit(CommandIntent::Zap {
         item: EntityId(7),
@@ -350,5 +357,8 @@ fn wand_zap_spends_charge() {
             ..
         }
     )));
-    assert_eq!(session.world.entities.item_charges(EntityId(7)), Some(2));
+    assert_eq!(
+        session.world().entities().item_charges(EntityId(7)),
+        Some(2)
+    );
 }

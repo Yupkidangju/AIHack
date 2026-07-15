@@ -40,12 +40,12 @@ pub enum RunState {
 /// Phase 4에서는 map + actor/item store + inventory 상태를 소유한다.
 #[derive(Debug, Clone)]
 pub struct GameSession {
-    pub meta: GameMeta,
-    pub rng: GameRng,
-    pub turn: u64,
-    pub state: RunState,
-    pub world: GameWorld,
-    pub event_log: Vec<GameEvent>,
+    pub(crate) meta: GameMeta,
+    pub(crate) rng: GameRng,
+    pub(crate) turn: u64,
+    pub(crate) state: RunState,
+    pub(crate) world: GameWorld,
+    pub(crate) event_log: Vec<GameEvent>,
 }
 
 impl GameSession {
@@ -63,13 +63,54 @@ impl GameSession {
     /// [v0.2.0] Phase 16: Title -> CharacterCreation -> Playing로 즉시 전환하여
     /// 기존 테스트와 headless runner의 호환성을 유지한다.
     pub fn new_for_playing(seed: u64) -> Self {
-        let mut session = Self::new(seed);
-        session.state = RunState::Playing;
-        session
+        Self {
+            state: RunState::Playing,
+            ..Self::new(seed)
+        }
     }
 
-    /// [v0.2.0] Phase 16: RunState에 따라 명령 처리를 분기한다.
+    /// 재현과 저장 식별에 사용하는 초기 난수 시드다.
+    pub fn seed(&self) -> u64 {
+        self.meta.seed
+    }
+
+    /// 현재 승인된 턴 수다.
+    pub fn turn(&self) -> u64 {
+        self.turn
+    }
+
+    /// 현재 실행 상태를 값으로 반환한다.
+    pub fn run_state(&self) -> RunState {
+        self.state
+    }
+
+    /// 최근 게임 이벤트를 읽기 전용으로 제공한다.
+    pub fn event_log(&self) -> &[GameEvent] {
+        &self.event_log
+    }
+
+    /// 현재 월드의 읽기 전용 조회 경계다.
+    pub fn world(&self) -> &GameWorld {
+        &self.world
+    }
+
+    /// working copy에서 명령을 적용하고 invariant가 유효할 때만 전체 상태를 교체한다.
     pub fn submit(&mut self, intent: CommandIntent) -> TurnOutcome {
+        let mut transaction = crate::core::transaction::TurnTransaction::prepare(self);
+        let outcome = transaction.apply(intent);
+        let report = transaction.validate();
+        if !report.is_valid() {
+            return self.reject(crate::core::transaction::TurnTransaction::invariant_reason(
+                &report,
+            ));
+        }
+
+        *self = transaction.commit();
+        outcome
+    }
+
+    /// transaction working copy 내부에서만 상태 전이를 수행한다.
+    pub(crate) fn submit_uncommitted(&mut self, intent: CommandIntent) -> TurnOutcome {
         match self.state {
             RunState::Title => self.submit_in_title(intent),
             RunState::CharacterCreation => self.submit_in_character_creation(intent),
@@ -238,12 +279,12 @@ impl GameSession {
             Ok(()) => {
                 let to = self.world.player_pos();
                 let mut events = vec![GameEvent::EntityMoved {
-                    entity: self.world.player_id,
+                    entity: self.world.player_id(),
                     from,
                     to,
                 }];
                 events.extend(traps::trigger_player_trap(&mut self.world));
-                let player_id = self.world.player_id;
+                let player_id = self.world.player_id();
                 events.extend(death::collect_death_events_if_hp_depleted(
                     &mut self.world,
                     player_id,
@@ -259,7 +300,7 @@ impl GameSession {
     }
 
     fn submit_bump_attack(&mut self, defender: EntityId) -> TurnOutcome {
-        let attacker = self.world.player_id;
+        let attacker = self.world.player_id();
         let Some(resolution) =
             combat::resolve_attack(&mut self.world, &mut self.rng, attacker, defender)
         else {
@@ -372,7 +413,7 @@ impl GameSession {
         }
         self.world.prayer_cooldown = 20;
         self.accept_turn(vec![GameEvent::PrayerOffered {
-            entity: self.world.player_id,
+            entity: self.world.player_id(),
             cooldown_after: self.world.prayer_cooldown,
         }])
     }

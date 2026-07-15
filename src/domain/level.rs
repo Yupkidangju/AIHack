@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     core::{ids::LevelId, position::Pos},
+    data::{self, ContentRegistry},
     domain::{
         map::{GameMap, PHASE2_STAIRS_DOWN, PHASE5_LEVEL2_STAIRS_UP},
         tile::TileKind,
@@ -23,18 +24,26 @@ pub struct LevelRegistry {
 
 impl LevelRegistry {
     pub fn fixture_phase5() -> Self {
-        Self {
-            levels: vec![
-                GameLevel {
-                    id: LevelId::main(1),
-                    map: GameMap::fixture_phase2(),
-                },
-                GameLevel {
-                    id: LevelId::main(2),
-                    map: GameMap::fixture_phase5_level2(),
-                },
-            ],
-        }
+        Self::from_content_registry(
+            data::registry().expect("embedded content registry must validate"),
+        )
+        .expect("embedded level definitions must create maps")
+    }
+
+    pub fn from_content_registry(
+        registry: &ContentRegistry,
+    ) -> Result<Self, crate::core::error::ContentError> {
+        let mut levels = registry
+            .levels()
+            .map(|definition| {
+                Ok(GameLevel {
+                    id: LevelId::main(definition.depth),
+                    map: GameMap::from_level_data(definition)?,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        levels.sort_by_key(|level| level.id);
+        Ok(Self { levels })
     }
 
     pub fn len(&self) -> usize {

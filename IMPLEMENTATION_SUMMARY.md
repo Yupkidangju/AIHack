@@ -205,10 +205,10 @@ trap_pit_damage = 3
 
 **수용 기준:**
 
-- [ ] `rust-toolchain.toml`은 channel 1.94.1
-- [ ] Cargo package에 `rust-version = "1.94"`와 `default-run = "aihack"`
-- [ ] ratatui 0.29, crossterm 0.28.1
-- [ ] `cargo tree -d`에 crossterm 중복 0건
+- [x] `rust-toolchain.toml`은 channel 1.94.1
+- [x] Cargo package에 `rust-version = "1.94"`와 `default-run = "aihack"`
+- [x] ratatui 0.30, crossterm 0.29
+- [x] `cargo tree -d`에 crossterm 중복 0건
 
 **검증:**
 
@@ -228,10 +228,10 @@ cargo check --locked --all-targets
 
 **수용 기준:**
 
-- [ ] `--test`는 locked test 실행
-- [ ] debug/release build는 `--locked` 사용
-- [ ] 두 binary 중 하나라도 없으면 exit code 1
-- [ ] Linux/Windows script 동작 계약 동일
+- [x] `--test`는 locked test 실행
+- [x] debug/release build는 `--locked` 사용
+- [x] 두 binary 중 하나라도 없으면 exit code 1
+- [x] Linux/Windows script 동작 계약 동일
 
 **검증:**
 
@@ -253,12 +253,12 @@ Windows는 `build.bat --test` 후 두 exe 존재를 확인한다.
 
 **수용 기준:**
 
-- [ ] push와 pull request에서 실행
-- [ ] fmt, clippy -D warnings, all-target tests, release build 포함
-- [ ] lockfile 변경 여부를 job 종료 시 확인
-- [ ] cargo-audit 0.22.1, cargo-deny 0.19.4를 pinned install
-- [ ] vulnerability, license, source, crossterm duplicate gate 포함
-- [ ] 실패 단계와 명령이 로그에 표시
+- [x] push와 pull request에서 실행하도록 구성
+- [x] fmt, clippy -D warnings, all-target tests, release build 포함
+- [x] lockfile 변경 여부를 job 종료 시 확인
+- [x] cargo-audit 0.22.1, cargo-deny 0.19.4를 pinned install
+- [x] vulnerability, license, source, crossterm duplicate gate 포함
+- [ ] Linux/Windows 원격 CI green 및 실패 단계 로그 확인
 
 **검증:**
 
@@ -271,21 +271,23 @@ Windows는 `build.bat --test` 후 두 exe 존재를 확인한다.
 
 ### Checkpoint R1
 
-- [ ] SC-BUILD-01 PASS
-- [ ] SC-BUILD-02 PASS
-- [ ] README quick start 실제 실행
-- [ ] package/version 상태가 문서와 일치
+- [x] SC-BUILD-01 PASS (R1 local audit 통과)
+- [ ] SC-BUILD-02 PASS (원격 CI 실행 대기)
+- [x] README quick start를 default-run 계약에 맞춤
+- [x] package/version 상태가 문서와 일치
 
 ### Task R2-1: GameSession 캡슐화
 
 **설명:** session 필드를 private으로 만들고 query API와 test builder를 도입한다.
 
+**진행 상태 (2026-07-15):** 완료. `meta`, `rng`, `turn`, `state`, `world`, `event_log`은 crate 외부에서 보이지 않게 전환했고, `seed()`, `turn()`, `run_state()`, `event_log()`, `world()` 읽기 API를 제공한다. headless/TUI 생산 경로와 integration test 조회는 이 API를 사용하며, 특수 상태 구성은 저장 스키마 기반 `aihack::testing::SessionBuilder` fixture 경계에서만 수행한다.
+
 **수용 기준:**
 
-- [ ] 외부 module의 session field 직접 대입 0건
-- [ ] seed, turn, state, snapshot, observation getter 존재
-- [ ] 기존 save/load와 TUI 동작 유지
-- [ ] test fixture는 builder로만 상태 구성
+- [x] 외부 module의 session field 직접 대입 0건
+- [x] seed, turn, state, snapshot, observation getter 존재
+- [x] 기존 save/load와 TUI 동작 유지
+- [x] test fixture는 builder로만 상태 구성
 
 **검증:**
 
@@ -304,12 +306,14 @@ cargo test --locked --test save_load --test ui_runtime_smoke
 
 **설명:** world public field 변경을 typed API로 교체하고 6개 invariant를 검사한다.
 
+**진행 상태 (2026-07-15):** 완료. `WorldInvariantError` 6종과 `InvariantReport`를 도입했고, 정상 fixture와 save-schema로 구성한 각 위반 상태를 `tests/world_invariants.rs`로 검증한다. `GameWorld.levels`, `entities`, `inventory`와 status·score·식별·사망원인·player identity 필드는 crate 외부 비공개이며, 조회는 `levels()`, `entities()`, `inventory()` 및 typed getter로 제공한다. integration test의 상태 변경은 `aihack::testing::SessionBuilder`를 통해 저장 스키마를 재구성한다. 모든 submit은 transaction validation을 거쳐 invariant 오류 시 원본 world/turn/RNG/snapshot을 유지한다.
+
 **수용 기준:**
 
-- [ ] `WorldInvariantError` 6종 구현
-- [ ] accepted turn마다 `InvariantReport.checked == 6`
-- [ ] UI/LLM/test에서 world field 직접 대입 0건
-- [ ] invariant failure는 no-commit/no-turn
+- [x] `WorldInvariantError` 6종 구현
+- [x] accepted turn마다 `InvariantReport.checked == 6`
+- [x] UI/LLM/test에서 world field 직접 대입 0건
+- [x] invariant failure는 no-commit/no-turn
 
 **검증:**
 
@@ -326,13 +330,15 @@ cargo test --locked --test levels --test inventory --test save_load
 
 **설명:** `accept_turn`의 mutation을 prepare, validate, commit 단계로 나눈다.
 
+**진행 상태 (2026-07-15):** 구현 및 동작 검증 완료. `TurnTransaction`이 cloned working copy에서 명령을 적용하고, 6개 invariant를 검증한 뒤에만 원본 session을 교체한다. invariant 오류는 reject로 projection하며 turn, snapshot hash, RNG state를 보존한다. 기존 AwaitingDirection의 reject 후 Playing 복귀 계약도 유지한다.
+
 **수용 기준:**
 
-- [ ] `TurnTransaction` 구현
-- [ ] player/monster/status/death 순서 유지
-- [ ] 기존 golden hash 유지
-- [ ] reject와 invariant error에서 RNG draws 유지
-- [ ] internal Result API를 ReplayTurnOutcomeV1로 projection해 replay v1 JSON shape 유지
+- [x] `TurnTransaction` 구현
+- [x] player/monster/status/death 순서 유지
+- [x] 기존 golden hash 유지
+- [x] reject와 invariant error에서 RNG draws 유지
+- [x] internal Result API를 ReplayTurnOutcomeV1로 projection해 replay v1 JSON shape 유지
 
 **검증:**
 
@@ -347,21 +353,23 @@ cargo test --locked --test golden_phase8_rules
 
 ### Checkpoint R2
 
-- [ ] SC-CORE-01 PASS
-- [ ] SC-CORE-02 PASS
-- [ ] Phase 20 baseline hash 유지
-- [ ] public mutable state audit PASS
+- [x] SC-CORE-01 PASS (R2 local gate: UI/LLM/integration test의 직접 대입 0건)
+- [x] SC-CORE-02 PASS (accepted command transaction validation, invariant 오류 no-commit)
+- [x] Phase 20 baseline hash 유지 (P8-G01..G20, replay/save regression 통과)
+- [x] public mutable state type-level 완전 은닉
 
 ### Task R3-1: Content schema와 validator
 
 **설명:** panic 기반 TOML parsing을 typed error와 registry validation으로 교체한다.
 
+**상태:** 구현 완료, checkpoint 보류. `ContentRegistry`는 schema v1 embedded TOML을 `OnceLock`으로 한 번 parse·검증하며 canonical FNV-1a hash를 제공한다. 다만 malformed embedded content의 session bootstrap 오류를 `ContentError`로 반환하는 R3-4가 남아 있다.
+
 **수용 기준:**
 
-- [ ] ContentError 6종 구현
-- [ ] duplicate ID, unknown reference, invalid dice/coordinate 테스트
-- [ ] schema_version 1
-- [ ] canonical content hash 안정
+- [x] ContentError 6종 구현
+- [x] duplicate ID, unknown reference, invalid dice/coordinate 테스트
+- [x] schema_version 1
+- [x] canonical content hash 안정
 
 **검증:**
 
@@ -378,12 +386,14 @@ cargo test --locked --test data_loading
 
 **설명:** hardcoded factory가 registry definition을 사용하게 한다.
 
+**상태:** 구현 완료, checkpoint 보류. `item_data`와 `monster_template`은 registry ID 조회 및 typed conversion을 사용한다. public API와 bootstrap error path의 최종 정렬은 R3-4가 담당한다.
+
 **수용 기준:**
 
-- [ ] dagger/jackal 값이 TOML에서 생성
-- [ ] unknown ID는 ContentError
-- [ ] 기존 combat/item golden test 유지
-- [ ] runtime에서 `load_items/load_monsters` 중복 parsing 0회
+- [x] dagger/jackal 값이 TOML에서 생성
+- [x] unknown ID는 ContentError
+- [x] 기존 combat/item golden test 유지
+- [x] runtime에서 `load_items/load_monsters` 중복 parsing 0회
 
 **검증:**
 
@@ -400,12 +410,14 @@ cargo test --locked --test content_runtime
 
 **설명:** main:1과 main:2를 TOML level definition에서 생성한다.
 
+**상태:** 구현 완료, checkpoint 보류. level map, player start, stairs 및 TOML에 선언된 monster/item 배치를 registry definition에서 생성한다. fallible bootstrap 전환은 R3-4가 담당한다.
+
 **수용 기준:**
 
-- [ ] 시작 위치, stairs, door, monster, item이 registry에서 생성
-- [ ] map bounds와 stairs pair 검증
-- [ ] 왕복 후 level state 유지
-- [ ] hardcoded fixture는 test builder로 이동
+- [x] 시작 위치, stairs, door, monster, item이 registry에서 생성
+- [x] map bounds와 stairs pair 검증
+- [x] 왕복 후 level state 유지
+- [x] hardcoded fixture는 test builder로 이동
 
 **검증:**
 
@@ -418,12 +430,36 @@ cargo test --locked --test content_runtime
 **파일:** `src/domain/map.rs`, `src/domain/level.rs`, `src/core/world.rs`, `src/data/levels/main_2.toml`, `tests/content_runtime.rs`
 **범위:** M, 5개
 
+### Task R3-4: Content bootstrap 오류 경계 정렬
+
+**설명:** embedded content 검증 실패가 `GameSession`/world bootstrap에서 panic이 아니라 `ContentError`로 반환되도록 전환하고, public registry API를 `spec.md` 9.3 계약과 정렬한다.
+
+**수용 기준:**
+
+- [ ] malformed embedded content에서 fallible session/world bootstrap이 `Err(ContentError)`를 반환
+- [ ] production registry 생성 경로에 `expect`/`panic!` 0건
+- [ ] test-only TOML source injection은 명시적 test-support 경계로 제한하거나 public API 이유를 `spec.md`에 기록
+- [ ] `ContentRegistry` ID와 query surface가 `spec.md` 9.3과 type/signature 단위로 일치
+
+**검증:**
+
+```bash
+cargo test --locked --test content_validation --test content_runtime
+rg -n 'registry\(\).*expect|try_item_data\(kind\)\.expect|try_monster_template\(kind\)\.expect' \
+  src/core src/data src/domain
+```
+
+**선행:** R3-1..R3-3
+**파일:** `src/data/schema.rs`, `src/data/mod.rs`, `src/core/session.rs`, `src/core/world.rs`, `src/domain/item.rs`, `src/domain/level.rs`, `src/domain/monster.rs`, `tests/content_validation.rs`, `tests/content_runtime.rs`
+**범위:** M, 9개
+
 ### Checkpoint R3
 
-- [ ] SC-DATA-01 PASS
-- [ ] registry parse는 process당 1회
-- [ ] content hash 3회 동일
-- [ ] panic path 0건
+- [ ] SC-DATA-01 PASS (R3-4 전 Hold)
+- [x] registry parse는 process당 1회
+- [x] content hash 3회 동일
+- [x] injected invalid content 검증 path panic 0건
+- [ ] production bootstrap invalid content path panic 0건
 
 ### Task R4-1: Headless policy와 report
 
@@ -746,4 +782,4 @@ cargo test --workspace --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 구현 세션은 `Task R1-1`부터 시작한다. R0 문서 gate가 PASS하기 전에는 코드 구현을 시작하지 않는다.
+다음 구현 세션은 `Task R3-4`부터 시작한다. R1·R2는 local PASS이며, R3 checkpoint는 bootstrap 오류 경계가 닫힐 때까지 Hold다.

@@ -10,12 +10,27 @@
 - `DOCUMENTATION_AUDIT_REPORT.md`를 추가해 AI 구현 문서 표준 12항목과 R0 자동 검증의 PASS 증거를 기록했다.
 - ADR-0021~ADR-0027을 추가해 제품 범위, toolchain, state, content, workspace, LLM 권한, provenance 결정을 동결했다.
 - 성장한 계획 문서 원문을 `.archive/*_archive_260715.md`에 immutable snapshot으로 보존했다.
+- R1을 위해 `rust-toolchain.toml`, `deny.toml`, Linux/Windows CI workflow, build contract test를 추가했다.
+- R2-1의 첫 세로 슬라이스로 `GameSession` 읽기 API(`seed`, `turn`, `run_state`, `event_log`)와 접근자 회귀 테스트를 추가했다.
+- `tests/support/session_builder.rs`를 추가해 UI 상태 전환 테스트가 세션 필드 직접 대입 없이 fixture를 구성하도록 했다.
+- `WorldInvariantError` 6종, `InvariantReport`, `tests/world_invariants.rs`를 추가해 현재 level/player/inventory 소유 관계를 명시적으로 검증하기 시작했다.
+- `GameWorld`의 status·score·식별·사망원인 상태를 crate 외부 비공개로 전환하고 `Status` 및 score accessor로 테스트 fixture를 구성하도록 했다.
+- `GameWorld::player_id()`를 추가하고 player identity 필드를 crate 외부 비공개로 전환했다.
+- `TurnTransaction` working-copy 경로를 추가해 submit이 invariant 검증을 통과할 때만 world/turn/RNG/event log를 commit하도록 전환했다.
+- `GameSession.world`와 `GameWorld.levels/entities/inventory`를 crate 외부 비공개로 전환하고, 읽기 accessor 및 저장 기반 `SessionBuilder` fixture로 integration test 경계를 정리했다.
+- embedded TOML `ContentRegistry`와 `ContentError` 6종을 추가하고, item/monster factory와 main:1/main:2 map·초기 배치를 registry runtime으로 전환했다.
+- `audit_report_1.md`를 추가하고, R1/R2 local PASS와 R3 bootstrap `ContentError` 경계가 아직 Hold라는 현재 상태를 활성 문서에 동기화했다.
 
 ### Changed
 
 - README와 BUILD_GUIDE의 현재 실행 명령을 두 binary 환경에 맞는 `cargo run --locked --bin ...` 형태로 수정했다.
 - `designs.md`를 local LLM CTA, 상태, timeout/stale/error, 접근성, core 무결성 계약 중심의 v0.3.0 target 문서로 재구성했다.
 - 현재 구현과 v0.3.0 target을 분리하고, 과거 Phase 완료 기록은 archive와 기존 changelog 이력으로 이동했다.
+- UI dependency를 RustSec 경고가 없는 ratatui 0.30/crossterm 0.29 단일 계열로 올리고 ADR-0028에 근거를 기록했다.
+- build script를 locked command와 artifact fail-fast 계약으로 전환하고 TUI default-run을 `aihack`으로 고정했다.
+- headless runner와 TUI가 세션 메타데이터·turn·상태·event log를 공개 field가 아니라 `GameSession` 읽기 API로 소비하도록 전환했다.
+- `GameSession`의 meta/RNG/turn/run-state/event-log 저장 필드를 crate 외부 비공개로 전환했다.
+- invariant 오류는 원본 session을 보존한 reject로 처리하고, AwaitingDirection의 실패 입력 후 Playing 복귀 동작은 유지했다.
 
 ### Security
 
@@ -24,8 +39,8 @@
 
 ### Verification
 
-- 이번 항목은 문서 계획만 반영한다. Rust source, test, Cargo manifest, build script의 구현 변경은 포함하지 않는다.
-- R0 문서 gate는 PASS이며 R1~R8 구현 checkpoint는 NOT RUN이다.
+- R0 문서 gate는 PASS다.
+- R1의 로컬 fmt, clippy, test, release build, cargo audit, cargo deny gate는 통과했다. Linux/Windows 원격 CI는 workflow push 후에만 PASS로 기록한다.
 
 ## 2026-05-18
 

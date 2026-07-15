@@ -22,16 +22,16 @@ kind = "potion"
 glyph = "!"
 weight = 20
 effect = "heal_1d8_plus_4"
-base_price = 100
+base_price = 50
 
 [[item]]
 id = "item.wand.magic_missile"
 kind = "wand"
 glyph = "/"
 weight = 7
-charges = 4
+charges = 3
 effect = "magic_missile"
-base_price = 150
+base_price = 175
 
 [[item]]
 id = "item.scroll.identify"
@@ -39,7 +39,7 @@ kind = "scroll"
 glyph = "?"
 weight = 5
 effect = "identify"
-base_price = 20
+base_price = 80
 
 [[item]]
 id = "item.scroll.reveal"
@@ -47,7 +47,7 @@ kind = "scroll"
 glyph = "?"
 weight = 5
 effect = "reveal"
-base_price = 20
+base_price = 60
 
 [[item]]
 id = "item.scroll.teleport"
@@ -55,16 +55,16 @@ kind = "scroll"
 glyph = "?"
 weight = 5
 effect = "teleport"
-base_price = 20
+base_price = 100
 
 [[item]]
 id = "item.armor.leather"
 kind = "armor"
 glyph = "["
-weight = 40
+weight = 15
 slot = "body"
 ac_bonus = 1
-base_price = 5
+base_price = 8
 
 [[item]]
 id = "item.weapon.rock"
@@ -74,4 +74,12 @@ weight = 10
 slot = "melee"
 hit_bonus = 0
 damage = "1d3"
+base_price = 1
+
+[[item]]
+id = "item.corpse.jackal"
+kind = "corpse"
+glyph = "%"
+weight = 12
+nutrition = 50
 base_price = 0

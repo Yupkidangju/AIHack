@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0021: NetHack 3.6.7 행동 호환 clean reimplementation
 
-Status: Accepted for v0.3.0 plan; implementation pending
+Status: Implemented (2026-07-15)
 Date: 2026-07-15
 Decision ID: DEC-PRODUCT-01
 
@@ -41,21 +41,21 @@ Consequences:
 
 ## ADR-0022: Rust 1.94.1과 단일 UI dependency 계열 고정
 
-Status: Accepted for v0.3.0 plan; implementation pending
+Status: Accepted; UI dependency 선택은 ADR-0028로 대체됨
 Date: 2026-07-15
 Decision IDs: DEC-RUST-01, DEC-UI-DEP-01
 
 Context:
 
-현재 환경에서는 빌드가 통과하지만 repository toolchain과 MSRV가 없고, ratatui 0.30이 crossterm 0.29를 추가하여 direct crossterm 0.28과 공존한다. 두 binary에 default-run도 없다.
+R1 시작 전에는 빌드가 통과하지만 repository toolchain과 MSRV가 없고, ratatui 0.30이 crossterm 0.29를 추가하여 direct crossterm 0.28과 공존했다. 두 binary에 default-run도 없었다.
 
 Decision:
 
-`rust-toolchain.toml` channel을 1.94.1로, Cargo rust-version을 1.94로 고정한다. v0.3.0 UI는 ratatui 0.29와 crossterm 0.28.1 한 계열을 사용한다. Cargo 자동화에는 `--locked`를 사용하고 default-run은 `aihack`이다.
+`rust-toolchain.toml` channel을 1.94.1로, Cargo rust-version을 1.94로 고정한다. Cargo 자동화에는 `--locked`를 사용하고 default-run은 `aihack`이다. UI dependency 선택은 ADR-0028을 따른다.
 
 Alternatives Considered:
 
-- ratatui 0.30과 crossterm 0.29로 동시 상향: 현재 직접 API와 test 회귀 범위가 커서 기각
+- ratatui 0.30과 crossterm 0.29로 동시 상향: 당시에는 회귀 범위가 불명확하여 보류했으나 RustSec advisory 확인 후 ADR-0028에서 채택
 - dependency duplicate 허용: event/key type 혼선과 build drift가 남아 기각
 - stable 최신을 매 실행 사용: 재현 불가능하여 기각
 
@@ -63,11 +63,37 @@ Consequences:
 
 - R1에서 lockfile 변경과 UI compile regression을 한 번 검증한다.
 - toolchain upgrade는 별도 ADR과 CI matrix 변경이 필요하다.
-- 현재 quick start는 구현 전까지 `--bin aihack`을 명시한다.
+- R1 이후 quick start는 `default-run = "aihack"`을 사용한다.
+
+## ADR-0028: RustSec 경고 없는 ratatui 0.30/crossterm 0.29 계열
+
+Status: Accepted; R1 local verification complete, remote CI pending
+Date: 2026-07-15
+Decision ID: DEC-UI-DEP-01
+
+Context:
+
+ADR-0022의 ratatui 0.29 계열은 crossterm 중복을 피했지만, 현재 RustSec advisory에서 필수 dependency `lru 0.12.5`의 memory-corruption unsound 문제와 `paste 1.0.15`의 unmaintained 상태가 확인됐다. `lru`는 ratatui 0.29의 비선택 dependency이며 수정된 버전은 0.16.3 이상이다.
+
+Decision:
+
+UI dependency를 `ratatui = "0.30"`과 `crossterm = "0.29"`로 함께 올린다. lockfile은 ratatui 0.30.2, crossterm 0.29.0, lru 0.18.1을 고정하며 `cargo audit`, `cargo deny check licenses bans sources`, crossterm 단일 버전 검증을 R1 gate에 포함한다.
+
+Alternatives Considered:
+
+- ratatui 0.29 유지와 RustSec 예외: memory-corruption advisory와 유지보수 중단 dependency를 release baseline에 남기므로 기각
+- lru만 단독 상향 또는 feature 제거: ratatui 0.29가 요구하는 API/의존성 제약과 맞지 않아 기각
+- ratatui 0.29 fork/patch: 보안 수정의 장기 유지 책임을 프로젝트가 떠안으므로 기각
+
+Consequences:
+
+- R1 lockfile diff와 full test/UI compile regression을 검증한다.
+- 기존 UI API가 바뀔 경우 최소 호환 수정과 회귀 테스트를 같은 Task에 포함한다.
+- R1의 SC-BUILD-02는 Linux/Windows 원격 CI가 green일 때만 PASS다.
 
 ## ADR-0023: private state와 transaction/invariant commit
 
-Status: Accepted for v0.3.0 plan; implementation pending
+Status: Implemented (2026-07-15)
 Date: 2026-07-15
 Decision IDs: DEC-STATE-01, DEC-RUNTIME-01, DEC-RNG-01
 
@@ -94,13 +120,13 @@ Consequences:
 
 ## ADR-0024: embedded TOML ContentRegistry가 runtime 데이터 원천
 
-Status: Accepted for v0.3.0 plan; implementation pending
+Status: Partially implemented; R3-4 bootstrap error boundary pending
 Date: 2026-07-15
 Decision ID: DEC-CONTENT-01
 
 Context:
 
-현재 TOML loader는 data test에서만 사용되고 runtime factory와 level 생성은 hardcoded 값에 의존한다. invalid data의 일부는 `expect` 또는 panic으로 끝난다.
+기존 TOML loader는 data test에서만 사용되고 runtime factory와 level 생성은 hardcoded 값에 의존했으며, invalid data의 일부는 `expect` 또는 panic으로 끝났다.
 
 Decision:
 
@@ -115,7 +141,7 @@ Alternatives Considered:
 Consequences:
 
 - content schema/version과 hash가 save/replay compatibility metadata가 된다.
-- invalid embedded data는 게임 시작 실패이며 fallback hardcoded data를 쓰지 않는다.
+- invalid embedded data는 게임 시작 실패이며 fallback hardcoded data를 쓰지 않는다. 현재 bootstrap의 `expect` 경로는 이 결과와 불일치하므로 R3-4에서 fallible `ContentError` 경계로 교체한다.
 - R3에서 현재 TOML 값의 provenance도 함께 조사한다.
 
 ## ADR-0025: core/content/AI/adapter workspace 경계

@@ -13,8 +13,8 @@ fn monster_death_creates_event_and_tombstone() {
         let outcome = session.submit(CommandIntent::Move(Direction::East));
         assert!(outcome.accepted);
         if !session
-            .world
-            .entities
+            .world()
+            .entities()
             .get(jackal)
             .unwrap()
             .actor()
@@ -26,7 +26,7 @@ fn monster_death_creates_event_and_tombstone() {
                 GameEvent::EntityDied {
                     entity,
                     cause: DeathCause::Combat { attacker }
-                } if *entity == jackal && *attacker == session.world.player_id
+                } if *entity == jackal && *attacker == session.world().player_id()
             )));
             return;
         }
@@ -38,25 +38,30 @@ fn monster_death_creates_event_and_tombstone() {
 fn dead_monster_no_longer_blocks_movement() {
     let mut session = GameSession::new_for_playing(42);
     let jackal = EntityId(2);
-    session.world.entities.set_alive(jackal, false);
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.set_alive(jackal, false)
+    });
 
     let outcome = session.submit(CommandIntent::Move(Direction::East));
 
     assert!(outcome.accepted);
-    assert_eq!(session.world.player_pos(), Pos { x: 6, y: 5 });
+    assert_eq!(session.world().player_pos(), Pos { x: 6, y: 5 });
 }
 
 #[test]
 fn player_death_enters_game_over() {
     let mut session = GameSession::new_for_playing(42);
-    let player = session.world.player_id;
+    let player = session.world().player_id();
     let attacker = EntityId(3);
-    session.world.entities.actor_stats_mut(player).unwrap().hp = 0;
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.actor_stats_mut(player).unwrap().hp = 0;
+    });
 
-    let events = death::collect_death_events_after_attack(&mut session.world, attacker, player);
-    session.state = death::state_after_deaths(&session.world);
+    let mut world = aihack::core::GameWorld::from_saved_world(session.to_save_data().world);
+    let events = death::collect_death_events_after_attack(&mut world, attacker, player);
+    let run_state = death::state_after_deaths(&world);
 
-    assert!(matches!(session.state, RunState::GameOver { .. }));
+    assert!(matches!(run_state, RunState::GameOver { .. }));
     assert!(events.iter().any(|event| matches!(
         event,
         GameEvent::EntityDied {
@@ -70,12 +75,14 @@ fn player_death_enters_game_over() {
 fn snapshot_hash_changes_when_entity_state_changes() {
     let mut session = GameSession::new_for_playing(42);
     let before = session.snapshot().stable_hash();
-    session
-        .world
-        .entities
-        .actor_stats_mut(EntityId(2))
-        .unwrap()
-        .hp -= 1;
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world
+            .saved()
+            .entities
+            .actor_stats_mut(EntityId(2))
+            .unwrap()
+            .hp -= 1;
+    });
     let after = session.snapshot().stable_hash();
 
     assert_ne!(before, after);

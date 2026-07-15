@@ -124,7 +124,9 @@ fn suggestion_does_not_affect_snapshot_hash() {
 #[test]
 fn approved_suggestion_executes_via_submit() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
     let observation = session.observation();
     let request = DecisionRequest {
         observation: observation.clone(),

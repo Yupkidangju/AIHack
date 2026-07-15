@@ -7,37 +7,40 @@ use aihack::{
 fn starting_inventory_letters_are_stable() {
     let session = GameSession::new_for_playing(42);
 
-    assert_eq!(session.world.inventory.owner, session.world.player_id);
-    assert_eq!(session.world.inventory.equipped_melee, None);
-    assert_eq!(session.world.inventory.next_letter_index, 5);
-    assert_eq!(session.world.inventory.entries[0].item, EntityId(5));
     assert_eq!(
-        session.world.inventory.entries[0].letter,
+        session.world().inventory().owner,
+        session.world().player_id()
+    );
+    assert_eq!(session.world().inventory().equipped_melee, None);
+    assert_eq!(session.world().inventory().next_letter_index, 5);
+    assert_eq!(session.world().inventory().entries[0].item, EntityId(5));
+    assert_eq!(
+        session.world().inventory().entries[0].letter,
         InventoryLetter('a')
     );
-    assert_eq!(session.world.inventory.entries[1].item, EntityId(6));
+    assert_eq!(session.world().inventory().entries[1].item, EntityId(6));
     assert_eq!(
-        session.world.inventory.entries[1].letter,
+        session.world().inventory().entries[1].letter,
         InventoryLetter('b')
     );
     assert_eq!(
-        session.world.entities.item_letter(EntityId(5)),
+        session.world().entities().item_letter(EntityId(5)),
         Some(InventoryLetter('a'))
     );
     assert_eq!(
-        session.world.entities.item_letter(EntityId(6)),
+        session.world().entities().item_letter(EntityId(6)),
         Some(InventoryLetter('b'))
     );
     assert_eq!(
-        session.world.entities.item_letter(EntityId(7)),
+        session.world().entities().item_letter(EntityId(7)),
         Some(InventoryLetter('c'))
     );
     assert_eq!(
-        session.world.entities.item_letter(EntityId(8)),
+        session.world().entities().item_letter(EntityId(8)),
         Some(InventoryLetter('d'))
     );
     assert_eq!(
-        session.world.entities.item_letter(EntityId(9)),
+        session.world().entities().item_letter(EntityId(9)),
         Some(InventoryLetter('e'))
     );
 }
@@ -45,7 +48,9 @@ fn starting_inventory_letters_are_stable() {
 #[test]
 fn observation_exposes_inventory_and_legal_item_actions() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
     let observation = session.observation();
 
     assert!(observation.inventory.iter().any(|item| {
@@ -79,13 +84,18 @@ fn observation_exposes_inventory_and_legal_item_actions() {
 #[test]
 fn wield_dagger_sets_melee_slot_and_second_wield_is_idempotent() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
 
     let first = session.submit(CommandIntent::Wield { item: EntityId(5) });
 
     assert!(first.accepted);
     assert!(first.turn_advanced);
-    assert_eq!(session.world.inventory.equipped_melee, Some(EntityId(5)));
+    assert_eq!(
+        session.world().inventory().equipped_melee,
+        Some(EntityId(5))
+    );
     assert!(matches!(
         first.events.as_slice(),
         [
@@ -109,18 +119,22 @@ fn wield_dagger_sets_melee_slot_and_second_wield_is_idempotent() {
 #[test]
 fn wield_non_weapon_is_rejected() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
     let outcome = session.submit(CommandIntent::Wield { item: EntityId(6) });
 
     assert!(!outcome.accepted);
     assert!(!outcome.turn_advanced);
-    assert_eq!(session.world.inventory.equipped_melee, None);
+    assert_eq!(session.world().inventory().equipped_melee, None);
 }
 
 #[test]
 fn equipped_dagger_drives_player_attack_profile() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.set_alive(EntityId(3), false);
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.set_alive(EntityId(3), false)
+    });
     assert!(
         session
             .submit(CommandIntent::Wield { item: EntityId(5) })
@@ -139,8 +153,12 @@ fn equipped_dagger_drives_player_attack_profile() {
 #[test]
 fn inventory_state_affects_snapshot_hash() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 8, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 8, y: 5 })
+    });
     let before = session.snapshot().stable_hash();
     assert!(session.submit(CommandIntent::Pickup).accepted);
     let after_pickup = session.snapshot().stable_hash();
@@ -157,8 +175,12 @@ fn inventory_state_affects_snapshot_hash() {
 #[test]
 fn inventory_roundtrip_preserves_letters() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 8, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 8, y: 5 })
+    });
     assert!(session.submit(CommandIntent::Pickup).accepted);
     assert!(
         session

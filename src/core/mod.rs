@@ -2,18 +2,22 @@ pub mod action;
 pub mod error;
 pub mod event;
 pub mod ids;
+pub mod invariant;
 pub mod observation;
 pub mod position;
 pub mod rng;
 pub mod save;
 pub mod session;
 pub mod snapshot;
+pub mod transaction;
 pub mod turn;
 pub mod world;
 
 pub use action::{ActionIntent, CommandIntent, NarrativeTopic};
+pub use error::ContentError;
 pub use event::GameEvent;
 pub use ids::{BranchId, EntityId, LevelId};
+pub use invariant::{InvariantReport, WorldInvariantError, WORLD_INVARIANT_COUNT};
 pub use observation::{
     ActionSpace, EntityObservation, ItemObservation, Observation, PlayerObservation,
     RunStateSummary, TileObservation,

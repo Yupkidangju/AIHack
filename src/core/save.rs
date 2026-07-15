@@ -113,6 +113,7 @@ fn ensure_parent_dir(path: &Path) -> Result<(), GameError> {
 
 impl GameSession {
     pub fn to_save_data(&self) -> SaveDataV1 {
+        let world = self.world();
         SaveDataV1 {
             schema_version: SAVE_SCHEMA_VERSION_V1,
             seed: self.meta.seed,
@@ -120,19 +121,19 @@ impl GameSession {
             run_state: self.state,
             rng_state: self.rng.snapshot_state(),
             world: SavedWorldV1 {
-                levels: self.world.levels.clone(),
-                current_level: self.world.current_level(),
-                entities: self.world.entities.clone(),
-                player_id: self.world.player_id,
-                inventory: self.world.inventory.clone(),
-                nutrition: self.world.nutrition,
-                luck: self.world.luck,
-                prayer_cooldown: self.world.prayer_cooldown,
-                paralysis_turns: self.world.paralysis_turns,
-                hallucinating: self.world.hallucinating,
-                kill_count: self.world.kill_count,
-                gold: self.world.gold,
-                identified_items: self.world.identified_items.clone(),
+                levels: world.levels.clone(),
+                current_level: world.current_level(),
+                entities: world.entities.clone(),
+                player_id: world.player_id,
+                inventory: world.inventory.clone(),
+                nutrition: world.nutrition,
+                luck: world.luck,
+                prayer_cooldown: world.prayer_cooldown,
+                paralysis_turns: world.paralysis_turns,
+                hallucinating: world.hallucinating,
+                kill_count: world.kill_count,
+                gold: world.gold,
+                identified_items: world.identified_items.clone(),
             },
             event_log: self.event_log.clone(),
         }

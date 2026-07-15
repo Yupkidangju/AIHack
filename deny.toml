@@ -1,0 +1,16 @@
+# R1에서는 crates.io 의존성만 허용하고, 라이선스 정책은 R7의 법적 검토 전까지
+# 현재 dependency graph에서 확인된 permissive SPDX 식별자만 명시한다.
+
+[licenses]
+allow = ["Apache-2.0", "MIT", "Unicode-3.0", "Zlib"]
+private = { ignore = true }
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+deny = [{ crate = "crossterm", deny-multiple-versions = true }]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

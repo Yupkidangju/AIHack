@@ -2,7 +2,10 @@
 name = "aihack"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.94"
+default-run = "aihack"
 license = "UNLICENSED"
+publish = false
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -10,8 +13,8 @@ serde_json = "1"
 thiserror = "1"
 rand = "0.8"
 clap = { version = "4", features = ["derive"] }
-ratatui = "0.29"
-crossterm = "0.28"
+ratatui = "0.30"
+crossterm = "0.29"
 toml = "0.8"
 
 [[bin]]

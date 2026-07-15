@@ -2,13 +2,13 @@ use aihack::core::{CommandIntent, GameSession};
 
 fn run_seed(seed: u64, turns: u64) -> (u64, String) {
     let mut session = GameSession::new_for_playing(seed);
-    while session.turn < turns {
+    while session.turn() < turns {
         let _ = session.submit(CommandIntent::Wait);
-        if matches!(session.state, aihack::core::RunState::GameOver { .. }) {
+        if matches!(session.run_state(), aihack::core::RunState::GameOver { .. }) {
             break;
         }
     }
-    (session.turn, session.snapshot().stable_hash().0)
+    (session.turn(), session.snapshot().stable_hash().0)
 }
 
 #[test]

@@ -86,7 +86,7 @@ impl TuiApp {
 
     pub fn project_effects(&mut self) -> Vec<UiEffectEvent> {
         let mut out = Vec::new();
-        for event in self.session.event_log.iter().rev().take(8).rev() {
+        for event in self.session.event_log().iter().rev().take(8).rev() {
             if let Some(effect) =
                 effects::project_event_with_config(event, self.next_effect_id, &self.config)
             {
@@ -201,7 +201,7 @@ impl TuiApp {
             }
             UiCommandCandidate::Quit => Ok(true),
             UiCommandCandidate::NewRun => {
-                self.session = GameSession::new(self.session.meta.seed.wrapping_add(1));
+                self.session = GameSession::new(self.session.seed().wrapping_add(1));
                 Ok(false)
             }
         }
@@ -233,7 +233,7 @@ pub fn run_tui(seed: u64) -> Result<(), Box<dyn std::error::Error>> {
                 );
                 return;
             }
-            match app.session.state {
+            match app.session.run_state() {
                 crate::core::session::RunState::Title => render_title_screen(frame, size),
                 crate::core::session::RunState::CharacterCreation => {
                     render_character_creation_screen(frame, size)
@@ -258,7 +258,7 @@ pub fn run_tui(seed: u64) -> Result<(), Box<dyn std::error::Error>> {
             let candidate = match event::read()? {
                 Event::Key(key) => match key.code {
                     KeyCode::Char(ch) => {
-                        key_to_candidate_for_state(ch, &app.session.state, &app.observation())
+                        key_to_candidate_for_state(ch, &app.session.run_state(), &app.observation())
                     }
                     KeyCode::Esc => Some(UiCommandCandidate::Quit),
                     // [v0.2.0] Phase 18: F9 키로 debug observation 패널을 토글한다.
@@ -339,7 +339,7 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
     labels::filter_expired_labels(&mut app.active_labels, current_time_ms);
 
     // AwaitingDirection, AwaitingInventorySelection, MorePrompt 상태일 때 상태 메시지 오버레이
-    let state_overlay = match app.session.state {
+    let state_overlay = match app.session.run_state() {
         crate::core::session::RunState::AwaitingDirection { action } => {
             let action_name = match action {
                 crate::core::action::DirectionalAction::Open => "open",
@@ -468,13 +468,14 @@ fn render_game_over_screen(
         }
     };
     let observation = app.observation();
+    let snapshot = app.session.snapshot();
     let lines = render_panels::game_over_lines(
         &cause_text,
-        app.session.turn,
+        app.session.turn(),
         observation.current_level.depth,
-        app.session.world.kill_count,
+        snapshot.kill_count,
         final_score,
-        app.session.meta.seed,
+        app.session.seed(),
     );
     frame.render_widget(
         render_panels::TextPanel {
@@ -527,7 +528,7 @@ fn map_mouse_event_for_state(
     app: &TuiApp,
 ) -> Option<UiCommandCandidate> {
     use crate::core::session::RunState;
-    match app.session.state {
+    match app.session.run_state() {
         RunState::Title | RunState::CharacterCreation | RunState::GameOver { .. } => None,
         _ => map_mouse_event(event, layout, viewport, &app.observation()),
     }

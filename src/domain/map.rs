@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::{error::GameError, position::Pos},
+    core::{
+        error::{ContentError, GameError},
+        position::Pos,
+    },
+    data::LevelData,
     domain::tile::{DoorState, TileKind, TrapKind},
 };
 
@@ -25,6 +29,80 @@ pub struct GameMap {
 }
 
 impl GameMap {
+    /// ContentRegistry definition에서 deterministic tile map을 생성한다.
+    pub fn from_level_data(level: &LevelData) -> Result<Self, ContentError> {
+        let mut map = Self {
+            width: level.width,
+            height: level.height,
+            tiles: vec![
+                TileKind::Floor;
+                (i32::from(level.width) * i32::from(level.height)) as usize
+            ],
+        };
+        for x in 0..level.width {
+            map.set_content_tile(level, Pos { x, y: 0 }, TileKind::Wall)?;
+            map.set_content_tile(
+                level,
+                Pos {
+                    x,
+                    y: level.height - 1,
+                },
+                TileKind::Wall,
+            )?;
+        }
+        for y in 0..level.height {
+            map.set_content_tile(level, Pos { x: 0, y }, TileKind::Wall)?;
+            map.set_content_tile(
+                level,
+                Pos {
+                    x: level.width - 1,
+                    y,
+                },
+                TileKind::Wall,
+            )?;
+        }
+        for wall in level.wall.as_deref().unwrap_or_default() {
+            for y in wall.y_range[0]..=wall.y_range[1] {
+                map.set_content_tile(level, Pos { x: wall.x, y }, TileKind::Wall)?;
+            }
+        }
+        for door in level.door.as_deref().unwrap_or_default() {
+            let state = match door.state.as_str() {
+                "closed" => DoorState::Closed,
+                "open" => DoorState::Open,
+                state => {
+                    return Err(ContentError::UnknownReference {
+                        owner: level.level_id.clone(),
+                        target: state.to_owned(),
+                    })
+                }
+            };
+            map.set_content_tile(level, pos(&door.pos), TileKind::Door(state))?;
+        }
+        for door in level.hidden_door.as_deref().unwrap_or_default() {
+            map.set_content_tile(level, pos(&door.pos), TileKind::HiddenDoor)?;
+        }
+        for trap in level.hidden_trap.as_deref().unwrap_or_default() {
+            let tile = match trap.trap.as_str() {
+                "pit" => TileKind::HiddenTrap(TrapKind::Pit),
+                trap => {
+                    return Err(ContentError::UnknownReference {
+                        owner: level.level_id.clone(),
+                        target: trap.to_owned(),
+                    })
+                }
+            };
+            map.set_content_tile(level, pos(&trap.pos), tile)?;
+        }
+        if let Some(stairs) = &level.stairs_down {
+            map.set_content_tile(level, pos(stairs), TileKind::StairsDown)?;
+        }
+        if let Some(stairs) = &level.stairs_up {
+            map.set_content_tile(level, pos(stairs), TileKind::StairsUp)?;
+        }
+        Ok(map)
+    }
+
     pub fn fixture_phase2() -> Self {
         let mut map = Self {
             width: PHASE2_WIDTH,
@@ -133,6 +211,27 @@ impl GameMap {
     fn set_tile_unchecked(&mut self, pos: Pos, tile: TileKind) {
         let idx = (pos.y as usize * self.width as usize) + pos.x as usize;
         self.tiles[idx] = tile;
+    }
+
+    fn set_content_tile(
+        &mut self,
+        level: &LevelData,
+        pos: Pos,
+        tile: TileKind,
+    ) -> Result<(), ContentError> {
+        self.set_tile(pos, tile)
+            .map_err(|_| ContentError::InvalidCoordinate {
+                level: level.level_id.clone(),
+                x: pos.x,
+                y: pos.y,
+            })
+    }
+}
+
+fn pos(value: &[i16]) -> Pos {
+    Pos {
+        x: value[0],
+        y: value[1],
     }
 }
 

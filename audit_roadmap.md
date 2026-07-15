@@ -162,7 +162,8 @@ cargo build --workspace --all-targets --locked
 cargo build --workspace --release --locked
 cargo audit
 cargo deny check licenses bans sources
-cargo run --locked --bin aihack -- --seed 42
+# default-run이 TUI binary를 선택하는지 확인한다. TUI event loop은 CI에서 열지 않는다.
+cargo run --locked -- --help
 ./build.sh --test
 test -x output/aihack
 test -x output/aihack-headless
@@ -175,7 +176,7 @@ test -x output/aihack-headless
 - Linux와 Windows CI가 동일 commit에서 green이다.
 - `build.sh`와 `build.bat`은 artifact 누락을 exit code 0으로 숨기지 않는다.
 
-Checkpoint R1 현재 상태: NOT RUN.
+Checkpoint R1 현재 상태: SC-BUILD-01 local PASS; SC-BUILD-02 remote CI pending.
 
 ## 5. R2 상태 무결성 게이트
 
@@ -198,7 +199,7 @@ PASS 조건:
 - transaction 전후 시스템 순서가 player, tile/item, monster, status, death, commit 순서다.
 - 기존 P8-G01..P8-G20 결과가 바뀌지 않는다.
 
-Checkpoint R2 현재 상태: NOT RUN.
+Checkpoint R2 현재 상태: local command PASS (2026-07-15). `world/levels/entities/inventory`는 crate 외부 비공개이며, integration test는 읽기 accessor 및 저장 기반 fixture 경계만 사용한다.
 
 ## 6. R3 콘텐츠 레지스트리 게이트
 
@@ -219,7 +220,7 @@ PASS 조건:
 - 동일 embedded content hash를 3회 생성했을 때 같은 16자리 lowercase hex다.
 - invalid content 테스트에서 panic 0건이다.
 
-Checkpoint R3 현재 상태: NOT RUN.
+Checkpoint R3 현재 상태: HOLD (2026-07-16). `ContentRegistry`의 OnceLock parse·validation, runtime item/monster/level factory 및 main:1/main:2 초기 배치는 local test를 통과했다. 다만 malformed embedded content가 session bootstrap에서 `ContentError`가 아닌 panic으로 끝날 수 있어 R3-4를 완료하기 전 SC-DATA-01 PASS를 선언하지 않는다.
 
 ## 7. R4 장기 결정론 게이트
 
@@ -396,5 +397,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 전체 구현 판정: NOT RUN
-현재 문서 계획 판정: PASS (`DOCUMENTATION_AUDIT_REPORT.md`)
+현재 구현 판정: R1 local PASS, R2 local PASS, R3 HOLD (R3-4 필요), R4~R8 NOT RUN
+현재 문서 감사 판정: HOLD (`audit_report_1.md`); R0 계획 문서 감사는 PASS (`DOCUMENTATION_AUDIT_REPORT.md`)

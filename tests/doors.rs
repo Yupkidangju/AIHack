@@ -4,13 +4,17 @@ use aihack::{
 };
 
 fn stand_west_of_fixture_door(session: &mut GameSession) {
-    session.world.set_player_pos(Pos { x: 9, y: 5 });
+    aihack::testing::SessionBuilder::mutate(session, |world| {
+        world.set_player_pos(Pos { x: 9, y: 5 })
+    });
 }
 
 #[test]
 fn open_door_allows_movement_and_los() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
     stand_west_of_fixture_door(&mut session);
 
     let outcome = session.submit(CommandIntent::Open(Direction::East));
@@ -27,7 +31,7 @@ fn open_door_allows_movement_and_los() {
     )));
     assert_eq!(
         session
-            .world
+            .world()
             .current_map()
             .tile(Pos { x: 10, y: 5 })
             .unwrap(),
@@ -36,13 +40,15 @@ fn open_door_allows_movement_and_los() {
 
     let movement = session.submit(CommandIntent::Move(Direction::East));
     assert!(movement.accepted);
-    assert_eq!(session.world.player_pos(), Pos { x: 10, y: 5 });
+    assert_eq!(session.world().player_pos(), Pos { x: 10, y: 5 });
 }
 
 #[test]
 fn close_door_blocks_movement_and_los() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
     stand_west_of_fixture_door(&mut session);
     assert!(
         session
@@ -57,7 +63,7 @@ fn close_door_blocks_movement_and_los() {
 
     assert_eq!(
         session
-            .world
+            .world()
             .current_map()
             .tile(Pos { x: 10, y: 5 })
             .unwrap(),
@@ -70,11 +76,13 @@ fn close_door_blocks_movement_and_los() {
 #[test]
 fn invalid_open_close_are_rejected() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
 
     let open_floor = session.submit(CommandIntent::Open(Direction::East));
     assert!(!open_floor.accepted);
-    assert_eq!(session.turn, 0);
+    assert_eq!(session.turn(), 0);
 
     stand_west_of_fixture_door(&mut session);
     assert!(

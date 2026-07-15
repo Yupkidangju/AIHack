@@ -33,16 +33,16 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | G-PRODUCT-001 | P0 | inspired game와 3.6.7 변환 목표 충돌 | 과거 spec은 1:1 포트 비목표 | R0-1, R0-2 | SC-DOC-01 | Closed |
 | G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | legacy에 두 license, NGPL prose 손상 | R7-1 | SC-LICENSE-01 | Open |
-| G-BUILD-001 | P1 | toolchain/MSRV 미고정 | rust-toolchain 없음 | R1-1 | SC-BUILD-01 | Open |
-| G-BUILD-002 | P1 | ratatui 0.30이 crossterm 0.29를 추가 | direct 0.28과 transitive 0.29 공존 | R1-1 | SC-BUILD-01 | Open |
-| G-BUILD-003 | P1 | build script가 copy 실패를 무시 | `cp ... || true` | R1-2 | SC-BUILD-01 | Open |
-| G-BUILD-004 | P1 | CI 부재 | workflow 없음 | R1-3 | SC-BUILD-02 | Open |
-| G-RUN-001 | P1 | README 기본 실행 명령 실패 | binary 2개, default-run 없음 | R1-1 | SC-BUILD-01 | Open |
-| G-CORE-001 | P0 | session/world mutable field 공개 | public fields와 test 직접 대입 | R2-1, R2-2 | SC-CORE-01 | Open |
-| G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | session.rs 단일 orchestration | R2-3 | SC-CORE-02 | Open |
-| G-CORE-003 | P1 | invariant가 타입으로 검증되지 않음 | current level 등 expect 기반 | R2-2 | SC-CORE-02 | Open |
-| G-DATA-001 | P1 | TOML loader가 runtime과 분리 | loader는 data tests에서만 호출 | R3-1..R3-3 | SC-DATA-01 | Open |
-| G-DATA-002 | P1 | invalid content가 panic | parse/load expect와 unknown level panic | R3-1 | SC-DATA-01 | Open |
+| G-BUILD-001 | P1 | toolchain/MSRV 미고정 | R1 이전에는 rust-toolchain 없음 | R1-1 | SC-BUILD-01 | Verified |
+| G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | R1 이전 0.30/0.28 혼재 | R1-1 | SC-BUILD-01 | Verified |
+| G-BUILD-003 | P1 | build script가 copy 실패를 무시 | R1 이전 `cp ... || true` | R1-2 | SC-BUILD-01 | Verified |
+| G-BUILD-004 | P1 | CI 부재 | workflow 추가, 원격 실행 대기 | R1-3 | SC-BUILD-02 | Implemented |
+| G-RUN-001 | P1 | README 기본 실행 명령 실패 | R1 이전 binary 2개, default-run 없음 | R1-1 | SC-BUILD-01 | Verified |
+| G-CORE-001 | P0 | session/world mutable field 공개 | session/world 및 world container 필드를 crate 외부 비공개화하고, 조회 accessor와 저장 기반 test fixture로 전환 | R2-1, R2-2 | SC-CORE-01 | Verified |
+| G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy `TurnTransaction`으로 prepare/apply/validate/commit 분리 | R2-3 | SC-CORE-02 | Verified |
+| G-CORE-003 | P1 | invariant가 타입으로 검증되지 않음 | 6종 typed invariant와 accepted command validation, no-commit regression | R2-2 | SC-CORE-02 | Verified |
+| G-DATA-001 | P1 | TOML loader가 runtime과 분리 | immutable ContentRegistry로 item/monster/level runtime factory를 연결 | R3-1..R3-3 | SC-DATA-01 | Verified |
+| G-DATA-002 | P1 | invalid embedded content가 session bootstrap에서 panic 가능 | registry validation은 ContentError를 반환하지만 production bootstrap의 `expect` 경로가 남음 | R3-1, R3-4 | SC-DATA-01 | Implemented |
 | G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | wait-only runner와 early break | R4-1, R4-2 | SC-TEST-01 | Open |
 | G-TEST-002 | P1 | long-run 반복 hash가 실제 1000 accepted turn을 증명하지 않음 | release test final_turn 20/28/18 | R4-2 | SC-TEST-02 | Open |
 | G-ARCH-001 | P2 | core/UI/LLM이 한 package dependency tree 공유 | 단일 Cargo package | R5-1, R5-2 | SC-ARCH-01 | Open |
@@ -79,7 +79,7 @@
 **수정:**
 
 - Rust 1.94.1과 rust-version 1.94
-- ratatui 0.29/crossterm 0.28.1
+- ratatui 0.30/crossterm 0.29
 - default-run aihack
 - 모든 자동 명령에 `--locked`
 - build script artifact fail-fast

@@ -7,24 +7,28 @@ use aihack::{
 #[test]
 fn vision_respects_radius_8() {
     let session = GameSession::new_for_playing(42);
-    let visible = visible_positions(&session.world);
+    let visible = visible_positions(session.world());
 
     assert!(visible
         .iter()
-        .all(|pos| session.world.player_pos().chebyshev_distance(*pos) <= DEFAULT_VISION_RADIUS));
+        .all(|pos| session.world().player_pos().chebyshev_distance(*pos) <= DEFAULT_VISION_RADIUS));
     assert!(!visible.contains(&Pos { x: 14, y: 14 }));
 }
 
 #[test]
 fn vision_respects_door_blockers() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 9, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 9, y: 5 })
+    });
     let behind_door = Pos { x: 11, y: 5 };
 
     assert!(!has_line_of_sight(
-        &session.world,
-        session.world.player_pos(),
+        session.world(),
+        session.world().player_pos(),
         behind_door
     ));
 
@@ -34,8 +38,8 @@ fn vision_respects_door_blockers() {
             .accepted
     );
     assert!(has_line_of_sight(
-        &session.world,
-        session.world.player_pos(),
+        session.world(),
+        session.world().player_pos(),
         behind_door
     ));
 }
@@ -43,19 +47,23 @@ fn vision_respects_door_blockers() {
 #[test]
 fn wall_blocks_los_but_wall_tile_can_be_seen() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 11, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 11, y: 5 })
+    });
     let wall = Pos { x: 12, y: 5 };
     let behind_wall = Pos { x: 13, y: 5 };
 
     assert!(has_line_of_sight(
-        &session.world,
-        session.world.player_pos(),
+        session.world(),
+        session.world().player_pos(),
         wall
     ));
     assert!(!has_line_of_sight(
-        &session.world,
-        session.world.player_pos(),
+        session.world(),
+        session.world().player_pos(),
         behind_wall
     ));
 }
@@ -81,24 +89,29 @@ fn observation_contains_visible_tiles() {
 #[test]
 fn observation_legal_actions_include_wait_move_and_door_actions() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
     let observation = session.observation();
     assert!(observation.legal_actions.contains(&CommandIntent::Wait));
     assert!(observation
         .legal_actions
         .contains(&CommandIntent::Move(Direction::East)));
 
-    session.world.set_player_pos(Pos { x: 9, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 9, y: 5 })
+    });
     let closed = session.observation();
     assert!(closed
         .legal_actions
         .contains(&CommandIntent::Open(Direction::East)));
 
-    session
-        .world
-        .current_map_mut()
-        .set_tile(Pos { x: 10, y: 5 }, TileKind::Door(DoorState::Open))
-        .unwrap();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world
+            .current_map_mut()
+            .set_tile(Pos { x: 10, y: 5 }, TileKind::Door(DoorState::Open))
+            .unwrap();
+    });
     let open = session.observation();
     assert!(open
         .legal_actions

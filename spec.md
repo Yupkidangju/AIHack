@@ -82,7 +82,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오별로 재구�
 | DEC-PRODUCT-01 | NetHack 3.6.7 행동 호환 재구현, 줄 단위 포트 금지 |
 | DEC-VERSION-01 | v0.3.0 구현 종료 시 Cargo와 문서 버전을 0.3.0으로 동기화 |
 | DEC-RUST-01 | `rust-toolchain.toml` channel 1.94.1, `rust-version = "1.94"` |
-| DEC-UI-DEP-01 | v0.3.0은 `ratatui 0.29`와 `crossterm 0.28.1` 한 계열 사용 |
+| DEC-UI-DEP-01 | v0.3.0은 RustSec 경고가 없는 `ratatui 0.30`와 `crossterm 0.29` 한 계열 사용 |
 | DEC-RUNTIME-01 | 단일 스레드 deterministic turn transaction |
 | DEC-STATE-01 | `GameSession`이 유일한 mutable session owner이며 필드는 private |
 | DEC-AI-01 | AI read는 `Observation`, write 제안은 `ActionIntent` |
@@ -296,6 +296,10 @@ pub enum ContentError {
 
 `schema_version = 1`. 동일 ID 중복, 존재하지 않는 참조, 맵 밖 좌표는 시작 실패다. panic fallback은 허용하지 않는다.
 `schema_version()`, `content_hash()`, `item(id)`, `monster(id)`, `level(id)` read-only query만 공개한다.
+
+### 9.3.1 현재 구현 상태와 R3-4 정렬 조건
+
+R3-1..R3-3은 TOML validation과 runtime factory 연결까지 구현됐다. 그러나 현재 구현은 `String` ID와 test/import를 위한 추가 public iterator·source constructor를 사용하며, session bootstrap에는 `expect` 경로가 남아 있다. 이는 위 target 계약의 완료 상태가 아니다. `R3-4`는 fallible bootstrap, 공개 surface, typed ID/error를 이 절과 정렬한 뒤에만 `SC-DATA-01`을 PASS로 변경한다. 근거와 재감사 방법은 `audit_report_1.md`의 `IMP-F003`을 따른다.
 
 ### 9.4 LLM 설정과 요청
 

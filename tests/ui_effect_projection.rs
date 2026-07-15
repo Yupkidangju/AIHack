@@ -19,8 +19,8 @@ fn reduced_motion_shortens_effect_without_touching_hash() {
     let before = session.snapshot().stable_hash();
     let standard = aihack::ui::tui::effects::project_event_with_config(
         &GameEvent::AttackResolved {
-            attacker: session.world.player_id,
-            defender: session.world.player_id,
+            attacker: session.world().player_id(),
+            defender: session.world().player_id(),
             attack_roll: 12,
             defense: 10,
             hit: true,
@@ -32,8 +32,8 @@ fn reduced_motion_shortens_effect_without_touching_hash() {
     .unwrap();
     let reduced = aihack::ui::tui::effects::project_event_with_config(
         &GameEvent::AttackResolved {
-            attacker: session.world.player_id,
-            defender: session.world.player_id,
+            attacker: session.world().player_id(),
+            defender: session.world().player_id(),
             attack_roll: 12,
             defense: 10,
             hit: true,

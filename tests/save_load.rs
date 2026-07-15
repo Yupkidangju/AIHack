@@ -68,7 +68,7 @@ fn loaded_session_matches_direct_continuation() {
         assert_eq!(a.next_state, b.next_state);
     }
 
-    assert_eq!(direct.turn, loaded.turn);
+    assert_eq!(direct.turn(), loaded.turn());
     assert_eq!(
         direct.snapshot().stable_hash(),
         loaded.snapshot().stable_hash()
@@ -80,22 +80,24 @@ fn loaded_session_matches_direct_continuation() {
 fn phase8_state_roundtrip_is_complete() {
     let path = temp_path("save-state");
     let mut session = GameSession::new_for_playing(42);
-    session.world.nutrition = 777;
-    session.world.luck = 2;
-    session.world.prayer_cooldown = 5;
-    session.world.paralysis_turns = 1;
-    session.world.hallucinating = true;
-    session.world.gold = 123;
-    session.world.kill_count = 4;
-    session
-        .world
-        .identify_item_kind(aihack::domain::item::ItemKind::Dagger);
-    session
-        .world
-        .entities
-        .set_item_charges(EntityId(7), Some(2));
-    session.world.inventory.equipped_body = Some(EntityId(10));
-    session.world.inventory.entries[0].letter = InventoryLetter('z');
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_status(aihack::domain::status::Status {
+            nutrition: 777,
+            luck: 2,
+            prayer_cooldown: 5,
+            paralysis_turns: 1,
+            hallucinating: true,
+        });
+        world.set_gold(123);
+        world.set_kill_count(4);
+        world.identify_item_kind(aihack::domain::item::ItemKind::Dagger);
+        assert!(world
+            .saved()
+            .entities
+            .set_item_charges(EntityId(7), Some(2)));
+        world.saved().inventory.equipped_body = Some(EntityId(10));
+        world.saved().inventory.entries[0].letter = InventoryLetter('z');
+    });
     save::save_session_to_path(&session, &path).unwrap();
     let loaded = save::load_session_from_path(&path).unwrap();
     let loaded_snapshot: GameSnapshot = loaded.snapshot();
@@ -109,10 +111,10 @@ fn phase8_state_roundtrip_is_complete() {
     assert!(loaded_snapshot
         .identified_items
         .contains(&aihack::domain::item::ItemKind::Dagger));
-    assert_eq!(loaded.world.entities.item_charges(EntityId(7)), Some(2));
-    assert_eq!(loaded.world.inventory.equipped_body, Some(EntityId(10)));
+    assert_eq!(loaded.world().entities().item_charges(EntityId(7)), Some(2));
+    assert_eq!(loaded.world().inventory().equipped_body, Some(EntityId(10)));
     assert_eq!(
-        loaded.world.inventory.entries[0].letter,
+        loaded.world().inventory().entries[0].letter,
         InventoryLetter('z')
     );
     let _ = fs::remove_file(path);

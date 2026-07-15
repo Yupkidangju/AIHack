@@ -6,3 +6,6 @@ pub mod systems;
 pub mod ui;
 
 pub mod llm;
+
+#[doc(hidden)]
+pub mod testing;

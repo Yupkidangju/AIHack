@@ -14,16 +14,16 @@
 
 | 항목 | 현재 working tree | v0.3.0 target |
 | --- | --- | --- |
-| Rust | 로컬 1.94.1, repository 고정 없음 | `rust-toolchain.toml` 1.94.1 |
+| Rust | `rust-toolchain.toml` 1.94.1 고정 | `rust-toolchain.toml` 1.94.1 |
 | package | `aihack 0.1.0` 단일 package | workspace, release 0.3.0 |
-| edition/MSRV | edition 2021, rust-version 없음 | edition 2021, rust-version 1.94 |
-| UI | ratatui 0.30 + direct crossterm 0.28 | ratatui 0.29 + crossterm 0.28.1 |
-| binary 선택 | 두 binary, default-run 없음 | 같은 이름 + default-run aihack |
-| CI | 없음 | Linux/Windows |
-| script | `--locked` 없음, Unix copy 실패 무시 | locked, artifact fail-fast |
+| edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
+| UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
+| binary 선택 | TUI default-run `aihack`, headless는 `--bin` | 같은 이름 + default-run aihack |
+| CI | Linux/Windows workflow 구성, 원격 green 대기 | Linux/Windows green |
+| script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | wait-only, 조기 사망도 exit 0 | survival-v1, accepted turn 1000 |
 
-현재 `cargo run -- --seed 42`는 binary를 선택하지 못하므로 사용하지 않는다.
+현재 `cargo run --locked -- --seed 42`는 TUI binary를 선택한다.
 
 ## 2. 사전 준비
 
@@ -62,7 +62,7 @@ R6 dependency는 `reqwest = { version = "0.13.4", default-features = false, feat
 TUI:
 
 ```bash
-cargo run --locked --bin aihack -- --seed 42
+cargo run --locked -- --seed 42
 ```
 
 Headless 현재 진단:
@@ -83,11 +83,11 @@ cargo build --all-targets --locked
 cargo build --release --locked
 ```
 
-## 4. R1 toolchain과 dependency 고정 계획
+## 4. R1 toolchain과 dependency 고정 결과
 
 ### 4.1 `rust-toolchain.toml`
 
-Task R1-1에서 생성할 값:
+R1-1에서 적용·검증한 값:
 
 ```toml
 [toolchain]
@@ -98,7 +98,7 @@ components = ["rustfmt", "clippy"]
 
 ### 4.2 root package baseline
 
-workspace 추출 전 R1의 target:
+workspace 추출 전 R1에서 고정한 baseline:
 
 ```toml
 [package]
@@ -108,27 +108,28 @@ edition = "2021"
 rust-version = "1.94"
 default-run = "aihack"
 license = "UNLICENSED"
+publish = false
 
 [dependencies]
-ratatui = "0.29"
-crossterm = "0.28.1"
+ratatui = "0.30"
+crossterm = "0.29"
 ```
 
-- 다른 dependency version은 R1에서 기능 변경 없이 lockfile 결과만 검증한다.
-- crossterm duplicate가 1개라도 남으면 R1 실패다.
+- 다른 dependency version은 R1에서 기능 변경 없이 lockfile 결과를 검증했다.
+- crossterm duplicate 0건을 local gate로 확인했다.
 - `license = "UNLICENSED"`는 R7 법적 검토 전 유지한다.
 - R8 release gate 직전 승인된 라이선스 값과 0.3.0 version을 동기화한다.
 
 검증:
 
 ```bash
-cargo update -p ratatui --precise 0.29.0
+cargo update -p ratatui --precise 0.30.2
 cargo metadata --locked --no-deps --format-version 1
 cargo tree -d
 cargo check --locked --all-targets
 ```
 
-첫 번째 명령은 R1 구현 세션에서 lockfile을 의도적으로 갱신할 때 한 번 실행한다. 감사 세션에서는 실행하지 않는다.
+첫 번째 명령은 이미 R1 구현에서 lockfile을 의도적으로 갱신할 때 사용했다. 이후 감사 세션에서는 실행하지 않는다.
 
 ## 5. R1 build script 계약
 

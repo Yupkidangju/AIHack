@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::combat::{AttackProfile, DamageRoll};
+use crate::{
+    core::error::ContentError,
+    data,
+    domain::combat::{AttackProfile, DamageRoll},
+};
 
 /// [v0.1.0] Phase 7 최소 아이템 종류다. wand/scroll/throw 테스트용 rock을 포함한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -68,132 +72,143 @@ pub struct ItemData {
 }
 
 pub fn item_data(kind: ItemKind) -> ItemData {
-    match kind {
-        ItemKind::Dagger => ItemData {
-            kind,
-            class: ItemClass::Weapon,
-            glyph: ')',
-            weight: 10,
-            base_price: 4,
-            attack_profile: Some(AttackProfile::dagger()),
-            consumable_effect: None,
-            wand_effect: None,
-            max_charges: None,
-            nutrition: None,
-        },
-        ItemKind::FoodRation => ItemData {
-            kind,
-            class: ItemClass::Food,
-            glyph: '%',
-            weight: 20,
-            base_price: 45,
-            attack_profile: None,
-            consumable_effect: None,
-            wand_effect: None,
-            max_charges: None,
-            nutrition: Some(800),
-        },
-        ItemKind::PotionHealing => ItemData {
-            kind,
-            class: ItemClass::Potion,
-            glyph: '!',
-            weight: 20,
-            base_price: 50,
-            attack_profile: None,
-            consumable_effect: Some(ConsumableEffect::Heal {
-                dice: 1,
-                sides: 8,
-                bonus: 4,
-            }),
-            wand_effect: None,
-            max_charges: None,
-            nutrition: None,
-        },
-        ItemKind::WandMagicMissile => ItemData {
-            kind,
-            class: ItemClass::Wand,
-            glyph: '/',
-            weight: 7,
-            base_price: 175,
-            attack_profile: None,
-            consumable_effect: None,
-            wand_effect: Some(WandEffect::MagicMissile),
-            max_charges: Some(3),
-            nutrition: None,
-        },
-        ItemKind::ScrollReveal => ItemData {
-            kind,
-            class: ItemClass::Scroll,
-            glyph: '?',
-            weight: 5,
-            base_price: 60,
-            attack_profile: None,
-            consumable_effect: Some(ConsumableEffect::RevealLevel),
-            wand_effect: None,
-            max_charges: None,
-            nutrition: None,
-        },
-        ItemKind::ScrollIdentify => ItemData {
-            kind,
-            class: ItemClass::Scroll,
-            glyph: '?',
-            weight: 5,
-            base_price: 80,
-            attack_profile: None,
-            consumable_effect: Some(ConsumableEffect::IdentifySingle),
-            wand_effect: None,
-            max_charges: None,
-            nutrition: None,
-        },
-        ItemKind::ScrollLevelTeleport => ItemData {
-            kind,
-            class: ItemClass::Scroll,
-            glyph: '?',
-            weight: 5,
-            base_price: 100,
-            attack_profile: None,
-            consumable_effect: Some(ConsumableEffect::LevelTeleport),
-            wand_effect: None,
-            max_charges: None,
-            nutrition: None,
-        },
-        ItemKind::Rock => ItemData {
-            kind,
-            class: ItemClass::Rock,
-            glyph: '*',
-            weight: 10,
-            base_price: 1,
-            attack_profile: Some(AttackProfile::natural("rock", DamageRoll::new(1, 3))),
-            consumable_effect: None,
-            wand_effect: None,
-            max_charges: None,
-            nutrition: None,
-        },
-        ItemKind::ArmorLeather => ItemData {
-            kind,
-            class: ItemClass::Armor,
-            glyph: '[',
-            weight: 15,
-            base_price: 8,
-            attack_profile: None,
-            consumable_effect: None,
-            wand_effect: None,
-            max_charges: None,
-            nutrition: None,
-        },
-        ItemKind::CorpseJackal => ItemData {
-            kind,
-            class: ItemClass::Corpse,
-            glyph: '%',
-            weight: 12,
-            base_price: 0,
-            attack_profile: None,
-            consumable_effect: None,
-            wand_effect: None,
-            max_charges: None,
-            nutrition: Some(50),
-        },
+    try_item_data(kind).expect("embedded content registry is validated before item creation")
+}
+
+pub fn try_item_data(kind: ItemKind) -> Result<ItemData, ContentError> {
+    let id = item_id(kind);
+    let definition = data::registry()?
+        .item(id)
+        .ok_or_else(|| ContentError::UnknownReference {
+            owner: "item factory".to_owned(),
+            target: id.to_owned(),
+        })?;
+    let class = match definition.kind.as_str() {
+        "weapon" => ItemClass::Weapon,
+        "food" => ItemClass::Food,
+        "potion" => ItemClass::Potion,
+        "wand" => ItemClass::Wand,
+        "scroll" => ItemClass::Scroll,
+        "armor" => ItemClass::Armor,
+        "corpse" => ItemClass::Corpse,
+        _ => {
+            return Err(ContentError::UnknownReference {
+                owner: id.to_owned(),
+                target: definition.kind.clone(),
+            })
+        }
+    };
+    let class = if kind == ItemKind::Rock {
+        ItemClass::Rock
+    } else {
+        class
+    };
+    let glyph = definition
+        .glyph
+        .chars()
+        .next()
+        .ok_or_else(|| ContentError::Parse {
+            file: id.to_owned(),
+            message: "glyph must contain one character".to_owned(),
+        })?;
+    let attack_profile = definition
+        .damage
+        .as_deref()
+        .map(|value| {
+            let damage = parse_damage(value)?;
+            let name = match kind {
+                ItemKind::Dagger => "dagger",
+                ItemKind::Rock => "rock",
+                _ => "weapon",
+            };
+            Ok(AttackProfile {
+                name,
+                hit_bonus: definition.hit_bonus.unwrap_or_default(),
+                damage,
+            })
+        })
+        .transpose()?;
+    let consumable_effect = match definition.effect.as_deref() {
+        Some("heal_1d8_plus_4") => Some(ConsumableEffect::Heal {
+            dice: 1,
+            sides: 8,
+            bonus: 4,
+        }),
+        Some("reveal") => Some(ConsumableEffect::RevealLevel),
+        Some("identify") => Some(ConsumableEffect::IdentifySingle),
+        Some("teleport") => Some(ConsumableEffect::LevelTeleport),
+        Some("magic_missile") | None => None,
+        Some(effect) => {
+            return Err(ContentError::UnknownReference {
+                owner: id.to_owned(),
+                target: effect.to_owned(),
+            })
+        }
+    };
+    Ok(ItemData {
+        kind,
+        class,
+        glyph,
+        weight: definition.weight,
+        base_price: definition.base_price.unwrap_or_default() as u32,
+        attack_profile,
+        consumable_effect,
+        wand_effect: (definition.effect.as_deref() == Some("magic_missile"))
+            .then_some(WandEffect::MagicMissile),
+        max_charges: definition.charges,
+        nutrition: definition.nutrition,
+    })
+}
+
+pub fn item_kind_from_id(id: &str) -> Result<ItemKind, ContentError> {
+    match id {
+        "item.weapon.dagger" => Ok(ItemKind::Dagger),
+        "item.food.ration" => Ok(ItemKind::FoodRation),
+        "item.potion.healing" => Ok(ItemKind::PotionHealing),
+        "item.wand.magic_missile" => Ok(ItemKind::WandMagicMissile),
+        "item.scroll.reveal" => Ok(ItemKind::ScrollReveal),
+        "item.scroll.identify" => Ok(ItemKind::ScrollIdentify),
+        "item.scroll.teleport" => Ok(ItemKind::ScrollLevelTeleport),
+        "item.weapon.rock" => Ok(ItemKind::Rock),
+        "item.armor.leather" => Ok(ItemKind::ArmorLeather),
+        "item.corpse.jackal" => Ok(ItemKind::CorpseJackal),
+        _ => Err(ContentError::UnknownReference {
+            owner: "item kind".to_owned(),
+            target: id.to_owned(),
+        }),
     }
+}
+
+fn item_id(kind: ItemKind) -> &'static str {
+    match kind {
+        ItemKind::Dagger => "item.weapon.dagger",
+        ItemKind::FoodRation => "item.food.ration",
+        ItemKind::PotionHealing => "item.potion.healing",
+        ItemKind::WandMagicMissile => "item.wand.magic_missile",
+        ItemKind::ScrollReveal => "item.scroll.reveal",
+        ItemKind::ScrollIdentify => "item.scroll.identify",
+        ItemKind::ScrollLevelTeleport => "item.scroll.teleport",
+        ItemKind::Rock => "item.weapon.rock",
+        ItemKind::ArmorLeather => "item.armor.leather",
+        ItemKind::CorpseJackal => "item.corpse.jackal",
+    }
+}
+
+fn parse_damage(value: &str) -> Result<DamageRoll, ContentError> {
+    if value == "0" {
+        return Ok(DamageRoll::none());
+    }
+    let Some((dice, sides)) = value.split_once('d') else {
+        return Err(ContentError::InvalidDice {
+            value: value.to_owned(),
+        });
+    };
+    let (Ok(dice), Ok(sides)) = (dice.parse(), sides.parse()) else {
+        return Err(ContentError::InvalidDice {
+            value: value.to_owned(),
+        });
+    };
+    Ok(DamageRoll::new(dice, sides))
 }
 
 pub const UNARMED_ATTACK: AttackProfile = AttackProfile {

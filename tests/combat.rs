@@ -151,16 +151,16 @@ fn damage_formula_rolls_dice_and_clamps_minimum_one() {
 #[test]
 fn bump_attack_keeps_player_in_place_and_emits_attack_event() {
     let mut session = GameSession::new_for_playing(42);
-    let before = session.world.player_pos();
+    let before = session.world().player_pos();
     let outcome = session.submit(CommandIntent::Move(Direction::East));
 
     assert!(outcome.accepted);
     assert!(outcome.turn_advanced);
-    assert_eq!(session.world.player_pos(), before);
+    assert_eq!(session.world().player_pos(), before);
     assert!(outcome.events.iter().any(|event| matches!(
         event,
         GameEvent::AttackResolved { attacker, defender, .. }
-            if *attacker == session.world.player_id && *defender == EntityId(2)
+            if *attacker == session.world().player_id() && *defender == EntityId(2)
     )));
 }
 
@@ -198,18 +198,20 @@ fn legal_actions_include_adjacent_bump_attack() {
 fn goblin_can_be_attacked_by_bump_combat() {
     let mut session = GameSession::new_for_playing(42);
     let goblin = EntityId(3);
-    let before_hp = session.world.entities.actor_stats(goblin).unwrap().hp;
-    session.world.set_player_pos(Pos { x: 19, y: 12 });
+    let before_hp = session.world().entities().actor_stats(goblin).unwrap().hp;
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 19, y: 12 })
+    });
 
     let outcome = session.submit(CommandIntent::Move(Direction::East));
 
     assert!(outcome.accepted);
-    assert_eq!(session.world.player_pos(), Pos { x: 19, y: 12 });
+    assert_eq!(session.world().player_pos(), Pos { x: 19, y: 12 });
     assert!(outcome.events.iter().any(|event| matches!(
         event,
         GameEvent::AttackResolved { defender, .. } if *defender == goblin
     )));
-    assert!(session.world.entities.actor_stats(goblin).unwrap().hp <= before_hp);
+    assert!(session.world().entities().actor_stats(goblin).unwrap().hp <= before_hp);
 }
 
 #[test]
@@ -224,7 +226,7 @@ fn bump_attack_event_order_keeps_player_resolution_before_monster_phase() {
     assert!(matches!(
         outcome.events.get(1),
         Some(GameEvent::AttackResolved { attacker, defender, .. })
-            if *attacker == session.world.player_id && *defender == EntityId(2)
+            if *attacker == session.world().player_id() && *defender == EntityId(2)
     ));
     if matches!(outcome.events.get(2), Some(GameEvent::EntityDied { .. })) {
         if let Some(next) = outcome.events.get(3) {

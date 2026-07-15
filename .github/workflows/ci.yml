@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: ${{ matrix.os }} quality gate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.94.1
+        uses: dtolnay/rust-toolchain@1.94.1
+        with:
+          components: rustfmt, clippy
+      - name: Verify locked metadata
+        run: cargo metadata --locked --no-deps --format-version 1
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Run tests
+        run: cargo test --workspace --all-targets --locked
+      - name: Build release artifacts
+        run: cargo build --workspace --release --locked
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit --version 0.22.1
+      - name: Audit RustSec advisories
+        run: cargo audit
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny --version 0.19.4
+      - name: Check licenses, bans, and sources
+        run: cargo deny check licenses bans sources
+      - name: Ensure the lockfile stays unchanged
+        run: git diff --exit-code -- Cargo.lock

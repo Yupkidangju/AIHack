@@ -10,10 +10,10 @@ use crate::{
         combat::DeathCause,
         entity::{EntityLocation, EntityStore},
         inventory::Inventory,
-        item::ItemKind,
+        item::{item_kind_from_id, ItemKind},
         level::{LevelRegistry, PHASE5_LEVEL1_ID},
-        map::{GameMap, PHASE2_PLAYER_START},
-        monster::MonsterKind,
+        map::GameMap,
+        monster::monster_kind_from_id,
         status::{HungerState, Status},
     },
 };
@@ -26,22 +26,22 @@ pub const PHASE7_WAND_START_CHARGES: u8 = 3;
 /// [v0.1.0] Phase 5 world는 fixed level registry와 단일 entity namespace를 보유한다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameWorld {
-    pub levels: LevelRegistry,
+    pub(crate) levels: LevelRegistry,
     current_level: LevelId,
-    pub entities: EntityStore,
-    pub player_id: EntityId,
-    pub inventory: Inventory,
-    pub nutrition: i16,
-    pub luck: i16,
-    pub prayer_cooldown: u16,
-    pub paralysis_turns: u8,
-    pub hallucinating: bool,
-    pub kill_count: u32,
-    pub gold: u32,
-    pub identified_items: Vec<ItemKind>,
+    pub(crate) entities: EntityStore,
+    pub(crate) player_id: EntityId,
+    pub(crate) inventory: Inventory,
+    pub(crate) nutrition: i16,
+    pub(crate) luck: i16,
+    pub(crate) prayer_cooldown: u16,
+    pub(crate) paralysis_turns: u8,
+    pub(crate) hallucinating: bool,
+    pub(crate) kill_count: u32,
+    pub(crate) gold: u32,
+    pub(crate) identified_items: Vec<ItemKind>,
     /// [v0.2.0] Phase 16: 플레이어 사망 시 사망 원인을 기록한다.
     /// GameOver 상태 생성 시 이 필드를 읽어 cause를 결정한다.
-    pub last_death_cause: Option<DeathCause>,
+    pub(crate) last_death_cause: Option<DeathCause>,
 }
 
 impl GameWorld {
@@ -59,16 +59,35 @@ impl GameWorld {
 
     pub fn fixture_phase5() -> Self {
         let mut entities = EntityStore::new();
-        let player_id = entities.spawn_player(PHASE2_PLAYER_START);
-        entities.spawn_monster(MonsterKind::Jackal, PHASE3_JACKAL_START);
-        entities.spawn_monster(MonsterKind::Goblin, PHASE3_GOBLIN_START);
-        entities.spawn_item(
-            ItemKind::PotionHealing,
-            EntityLocation::OnMap {
-                level: PHASE5_LEVEL1_ID,
-                pos: PHASE4_POTION_START,
-            },
-        );
+        let registry = crate::data::registry().expect("embedded content registry must validate");
+        let level_one = registry
+            .level("main:1")
+            .expect("embedded main:1 definition must exist");
+        let player_id = entities.spawn_player(Pos {
+            x: level_one.player_start[0],
+            y: level_one.player_start[1],
+        });
+        for monster in level_one.monster.as_deref().unwrap_or_default() {
+            entities.spawn_monster(
+                monster_kind_from_id(&monster.id).expect("level monster reference must validate"),
+                Pos {
+                    x: monster.pos[0],
+                    y: monster.pos[1],
+                },
+            );
+        }
+        for item in level_one.item.as_deref().unwrap_or_default() {
+            entities.spawn_item(
+                item_kind_from_id(&item.id).expect("level item reference must validate"),
+                EntityLocation::OnMap {
+                    level: PHASE5_LEVEL1_ID,
+                    pos: Pos {
+                        x: item.pos[0],
+                        y: item.pos[1],
+                    },
+                },
+            );
+        }
 
         let mut inventory = Inventory::new(player_id);
         let dagger = entities.spawn_item(
@@ -162,8 +181,29 @@ impl GameWorld {
         world
     }
 
+    /// Turn commit 및 save/load 경계에서 사용하는 world 관계 검증 결과다.
+    pub fn validate_invariants(&self) -> crate::core::invariant::InvariantReport {
+        crate::core::invariant::validate(self)
+    }
+
     pub fn current_level(&self) -> LevelId {
         self.current_level
+    }
+
+    pub fn player_id(&self) -> EntityId {
+        self.player_id
+    }
+
+    pub fn levels(&self) -> &LevelRegistry {
+        &self.levels
+    }
+
+    pub fn entities(&self) -> &EntityStore {
+        &self.entities
+    }
+
+    pub fn inventory(&self) -> &Inventory {
+        &self.inventory
     }
 
     pub fn current_map(&self) -> &GameMap {
@@ -234,6 +274,22 @@ impl GameWorld {
 
     pub fn is_item_identified(&self, kind: ItemKind) -> bool {
         self.identified_items.contains(&kind)
+    }
+
+    pub fn gold(&self) -> u32 {
+        self.gold
+    }
+
+    pub fn set_gold(&mut self, gold: u32) {
+        self.gold = gold;
+    }
+
+    pub fn kill_count(&self) -> u32 {
+        self.kill_count
+    }
+
+    pub fn set_kill_count(&mut self, kill_count: u32) {
+        self.kill_count = kill_count;
     }
 
     pub fn carried_weight(&self) -> i16 {

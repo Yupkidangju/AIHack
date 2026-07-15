@@ -12,7 +12,7 @@ fn temp_path(name: &str) -> std::path::PathBuf {
 fn replay_jsonl_schema_is_stable() {
     let path = temp_path("replay-schema");
     let mut session = aihack::core::GameSession::new_for_playing(42);
-    let turn_before = session.turn;
+    let turn_before = session.turn();
     let command = CommandIntent::Wait;
     let outcome = session.submit(command);
     let line = ReplayLineV1 {
@@ -40,7 +40,7 @@ fn load_resume_replay_matches_direct_run() {
     let mut loaded = save::load_session_from_path(&save_path).unwrap();
 
     for _ in 0..3 {
-        let turn_a = direct.turn;
+        let turn_a = direct.turn();
         let outcome_a = direct.submit(CommandIntent::Wait);
         save::append_replay_line(
             &replay_a,
@@ -53,7 +53,7 @@ fn load_resume_replay_matches_direct_run() {
         )
         .unwrap();
 
-        let turn_b = loaded.turn;
+        let turn_b = loaded.turn();
         let outcome_b = loaded.submit(CommandIntent::Wait);
         save::append_replay_line(
             &replay_b,

@@ -1,5 +1,7 @@
 # AIHack Documentation Audit Report
 
+> Historical scope notice (2026-07-16): 이 문서는 2026-07-15의 **R0 계획 문서 전용** 감사 기록이다. R1~R3 구현과 현재 문서 동기화 상태는 [audit_report_1.md](audit_report_1.md)를 authority로 사용한다.
+
 감사일: 2026-07-15
 감사 범위: v0.3.0 리팩터링 구현 계획 문서
 판정 기준: `AI_IMPLEMENTATION_DOC_STANDARD.md`

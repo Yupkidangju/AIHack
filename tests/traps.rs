@@ -9,8 +9,12 @@ use aihack::{
 #[test]
 fn search_reveals_hidden_door() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 11, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 11, y: 5 })
+    });
 
     let outcome = session.submit(CommandIntent::Search);
 
@@ -24,7 +28,7 @@ fn search_reveals_hidden_door() {
         }
     )));
     assert_eq!(
-        session.world.current_map().tile(Pos { x: 12, y: 5 }),
+        session.world().current_map().tile(Pos { x: 12, y: 5 }),
         Ok(TileKind::Door(aihack::domain::tile::DoorState::Closed))
     );
 }
@@ -32,8 +36,12 @@ fn search_reveals_hidden_door() {
 #[test]
 fn search_reveals_hidden_trap() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 15, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 15, y: 5 })
+    });
 
     let outcome = session.submit(CommandIntent::Search);
 
@@ -49,12 +57,16 @@ fn search_reveals_hidden_trap() {
 #[test]
 fn hidden_trap_triggers_on_entry() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 15, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 15, y: 5 })
+    });
     let before_hp = session
-        .world
-        .entities
-        .actor_stats(session.world.player_id)
+        .world()
+        .entities()
+        .actor_stats(session.world().player_id())
         .unwrap()
         .hp;
 
@@ -72,9 +84,9 @@ fn hidden_trap_triggers_on_entry() {
     )));
     assert_eq!(
         session
-            .world
-            .entities
-            .actor_stats(session.world.player_id)
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
             .unwrap()
             .hp,
         before_hp - 3
@@ -84,8 +96,12 @@ fn hidden_trap_triggers_on_entry() {
 #[test]
 fn waiting_on_trap_tile_does_not_retrigger() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
-    session.world.set_player_pos(Pos { x: 15, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.set_player_pos(Pos { x: 15, y: 5 })
+    });
     assert!(
         session
             .submit(CommandIntent::Move(Direction::East))
@@ -104,9 +120,13 @@ fn waiting_on_trap_tile_does_not_retrigger() {
 fn phase7_state_affects_snapshot_hash() {
     let mut a = GameSession::new_for_playing(42);
     let mut b = GameSession::new_for_playing(42);
-    a.world.entities.clear_monsters();
-    b.world.entities.clear_monsters();
-    b.world.set_player_pos(Pos { x: 11, y: 5 });
+    aihack::testing::SessionBuilder::mutate(&mut a, |world| {
+        world.saved().entities.clear_monsters();
+    });
+    aihack::testing::SessionBuilder::mutate(&mut b, |world| {
+        world.saved().entities.clear_monsters();
+        world.set_player_pos(Pos { x: 11, y: 5 });
+    });
     assert!(b.submit(CommandIntent::Search).accepted);
 
     assert_ne!(a.snapshot().stable_hash(), b.snapshot().stable_hash());
@@ -115,7 +135,9 @@ fn phase7_state_affects_snapshot_hash() {
 #[test]
 fn scroll_reveal_reveals_all_hidden_tiles() {
     let mut session = GameSession::new_for_playing(42);
-    session.world.entities.clear_monsters();
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters()
+    });
 
     let outcome = session.submit(CommandIntent::Read { item: EntityId(8) });
 
@@ -127,15 +149,15 @@ fn scroll_reveal_reveals_all_hidden_tiles() {
         }
     )));
     assert_eq!(
-        session.world.current_map().tile(Pos { x: 12, y: 5 }),
+        session.world().current_map().tile(Pos { x: 12, y: 5 }),
         Ok(TileKind::Door(aihack::domain::tile::DoorState::Closed))
     );
     assert_eq!(
-        session.world.current_map().tile(Pos { x: 16, y: 5 }),
+        session.world().current_map().tile(Pos { x: 16, y: 5 }),
         Ok(TileKind::Trap(TrapKind::Pit))
     );
     assert_eq!(
-        session.world.entities.item_location(EntityId(8)),
+        session.world().entities().item_location(EntityId(8)),
         Some(EntityLocation::Consumed)
     );
 }
