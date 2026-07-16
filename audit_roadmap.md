@@ -184,10 +184,10 @@ Checkpoint R1 현재 상태: SC-BUILD-01 local PASS; SC-BUILD-02 remote CI pendi
 성공 기준: SC-CORE-01, SC-CORE-02
 
 ```bash
-cargo test --locked --test world_invariants
-cargo test --locked --test transaction
-cargo test --locked --test save_load --test replay
-cargo test --locked --test golden_phase8_rules
+cargo test -p aihack --locked --test world_invariants
+cargo test -p aihack --locked --test transaction
+cargo test -p aihack --locked --test save_load --test replay
+cargo test -p aihack --locked --test golden_phase8_rules
 ! rg -n "session\.(meta|rng|turn|state|world|event_log)\s*=" src tests
 ! rg -n "world\.(levels|current_level|entities|inventory|status)\s*=" src/ui src/llm tests
 ```
@@ -207,9 +207,9 @@ Checkpoint R2 현재 상태: local command PASS (2026-07-15). `world/levels/enti
 성공 기준: SC-DATA-01
 
 ```bash
-cargo test --locked --test content_validation
-cargo test --locked --test content_runtime
-cargo test --locked --test data_loading --test items --test monster_ai --test levels
+cargo test -p aihack --locked --test content_validation
+cargo test -p aihack --locked --test content_runtime
+cargo test -p aihack --locked --test data_loading --test items --test monster_ai --test levels
 ```
 
 PASS 조건:
@@ -220,7 +220,7 @@ PASS 조건:
 - 동일 embedded content hash를 3회 생성했을 때 같은 16자리 lowercase hex다.
 - invalid content 테스트에서 panic 0건이다.
 
-Checkpoint R3 현재 상태: HOLD (2026-07-16). `ContentRegistry`의 OnceLock parse·validation, runtime item/monster/level factory 및 main:1/main:2 초기 배치는 local test를 통과했다. 다만 malformed embedded content가 session bootstrap에서 `ContentError`가 아닌 panic으로 끝날 수 있어 R3-4를 완료하기 전 SC-DATA-01 PASS를 선언하지 않는다.
+Checkpoint R3 현재 상태: LOCAL PASS (2026-07-16). `ContentRegistry`의 OnceLock parse·validation, runtime item/monster/level factory 및 main:1/main:2 초기 배치는 local test를 통과했다. TUI/headless는 fallible `GameSession` bootstrap을 사용하며, injected malformed content와 누락된 시작 아이템은 `ContentError`로 반환하는 regression test로 고정했다.
 
 ## 7. R4 장기 결정론 게이트
 
@@ -228,11 +228,11 @@ Checkpoint R3 현재 상태: HOLD (2026-07-16). `ContentRegistry`의 OnceLock pa
 성공 기준: SC-TEST-01, SC-TEST-02
 
 ```bash
-cargo test --locked --release --test headless_policy
-cargo test --locked --release --test long_run
-cargo test --locked --test save_load --test replay
+cargo test -p aihack --locked --release --test headless_policy
+cargo test -p aihack --locked --release --test long_run
+cargo test -p aihack --locked --test save_load --test replay
 for seed in 42 7 1234; do
-  cargo run --locked --release --bin aihack-headless -- \
+  cargo run --locked --release -p aihack-headless --bin aihack-headless -- \
     --seed "$seed" --turns 1000 --policy survival-v1
 done
 ```
@@ -258,7 +258,7 @@ PASS 조건:
 - policy가 한 turn에 16개 legal candidate를 모두 거부당하면 성공이 아니라 `NoAcceptedAction`이다.
 - save/load continuation hash가 direct run hash와 같다.
 
-Checkpoint R4 현재 상태: NOT RUN.
+Checkpoint R4 현재 상태: LOCAL PASS. `tests/long_run.rs`는 seed 42, 7, 1234 각각의 1000 accepted turn과 seed별 3회 hash 일치를 검증한다. release runner report hash는 각각 `7dc03ca706e350df`, `360a7c07904c78e2`, `0c73bd75ff8cd540`이다.
 
 ## 8. R5 workspace 경계 게이트
 
@@ -267,11 +267,11 @@ Checkpoint R4 현재 상태: NOT RUN.
 성공 기준: SC-ARCH-01
 
 ```bash
-cargo metadata --workspace --locked --format-version 1
+cargo metadata --locked --no-deps --format-version 1
 cargo tree -p aihack-core
 cargo test --workspace --all-targets --locked
 cargo run --locked --bin aihack -- --seed 42
-cargo run --locked --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
+cargo run --locked -p aihack-headless --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
 ```
 
 PASS 조건:
@@ -281,7 +281,7 @@ PASS 조건:
 - TUI/headless binary 이름, CLI flag, save/replay v1 경로가 유지된다.
 - R4의 command sequence와 hash가 workspace 이동 전후 동일하다.
 
-Checkpoint R5 현재 상태: NOT RUN.
+Checkpoint R5 현재 상태: **PASS**. core/content/AI contract/LLM/runtime/TUI/headless 분리, root compatibility facade, binary CLI, R4 hash, cargo-deny와 문서 시정을 `audit_report_9.md`가 재검증했다. 다음 구현 단계는 R6다.
 
 ## 9. R6 local LLM 격리 게이트
 
@@ -289,11 +289,11 @@ Checkpoint R5 현재 상태: NOT RUN.
 성공 기준: SC-LLM-01, SC-LLM-02, SC-LLM-03
 
 ```bash
-cargo test --workspace --locked --test llm_transport
-cargo test --workspace --locked --test llm_narrative
-cargo test --workspace --locked --test llm_decision_support
-cargo test --workspace --locked --test llm_revision_gate
-cargo test --workspace --locked --test llm_soft_adjudication
+cargo test -p aihack --locked --test llm_transport
+cargo test -p aihack --locked --test llm_narrative
+cargo test -p aihack --locked --test llm_decision_support
+cargo test -p aihack --locked --test llm_revision_gate
+cargo test -p aihack --locked --test llm_soft_adjudication
 ```
 
 필수 failure matrix:
@@ -337,8 +337,8 @@ test -s PROVENANCE.md
 test -s docs/compatibility/README.md
 rg -q "98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2" PROVENANCE.md
 ! rg -n "legacy_nethack_port_reference" Cargo.toml crates apps src --glob '*.toml' --glob '*.rs'
-cargo test --workspace --locked --test nethack_367_compat
-cargo test --workspace --locked --test golden_phase8_rules
+cargo test -p aihack --locked --test nethack_367_compat
+cargo test -p aihack --locked --test golden_phase8_rules
 ```
 
 PASS 조건:
@@ -397,5 +397,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1 local PASS, R2 local PASS, R3 HOLD (R3-4 필요), R4~R8 NOT RUN
-현재 문서 감사 판정: HOLD (`audit_report_1.md`); R0 계획 문서 감사는 PASS (`DOCUMENTATION_AUDIT_REPORT.md`)
+현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R5 PASS, R6~R8 NOT RUN
+현재 문서 감사 판정: `audit_report_9.md`가 보고서 8의 IMP-F008과 이전 문서 시정 계보를 PASS로 종결했다. 전체 program PASS는 R6~R8 및 SC-BUILD-02 원격 CI evidence가 완료된 뒤에만 선언한다.

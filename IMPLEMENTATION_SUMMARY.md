@@ -13,7 +13,7 @@
 
 ## 1. 현재 기준과 목표
 
-현재 코드는 fmt, clippy, 전체 186개 test, release build를 통과한다. 그러나 다음은 완료되지 않았다.
+현재 코드는 fmt, clippy, 전체 245개 test, release build를 통과한다. 그러나 다음은 완료되지 않았다.
 
 - 고정 toolchain과 CI
 - 단일 crossterm dependency
@@ -55,27 +55,21 @@ LLM은 마지막 presentation branch에서만 호출한다. core turn은 LLM 응
 
 ## 3. 시스템 분해와 파일 책임
 
-### 3.1 R1~R4 현재 구조
+### 3.1 R5 현재 구조와 compatibility facade
 
-| 경로 | 목표 책임 |
+| 경로 | 현재 책임 |
 | --- | --- |
-| `src/core/session.rs` | private session, state dispatch, transaction commit |
-| `src/core/invariant.rs` | 6개 world invariant 검사 |
-| `src/core/action.rs` | command/action typed contract |
-| `src/core/observation.rs` | read-only AI DTO |
-| `src/core/snapshot.rs` | deterministic snapshot/hash |
-| `src/core/save.rs` | SaveDataV1, ReplayLineV1 |
-| `src/core/world.rs` | private world와 query/mutation API |
-| `src/data/mod.rs` | ContentRegistry 생성·검증 |
-| `src/data/schema.rs` | TOML DTO와 ContentError |
-| `src/domain/*` | engine domain types와 공식 |
-| `src/systems/*` | 한 시스템당 검증·적용 함수 |
-| `src/llm/*` | R6 전까지 contract scaffold, core mutation 금지 |
-| `src/ui/tui/*` | Observation render, CommandIntent 생성 |
-| `src/bin/aihack-headless.rs` | policy 실행과 HeadlessRunReport |
+| `crates/aihack-core/src/*` | 순수 domain, 결정론 규칙, generic state/save/transaction primitive |
+| `crates/aihack-content/src/*` | embedded schema, TOML asset, registry 검증 |
+| `crates/aihack-ai-contract/src/*` | read-only Observation/ActionSpace/ClientRevision 계약 |
+| `crates/aihack-llm/src/*` | R6 전까지 provider-independent contract scaffold |
+| `crates/aihack-runtime/src/*` | content-aware world/session/system, projection, save/replay I/O |
+| `apps/aihack-tui/src/*` | Observation render, CommandIntent 생성, `aihack` binary |
+| `apps/aihack-headless/src/*` | policy 실행, report/replay CLI, `aihack-headless` binary |
+| `src/*` | 기존 public module path를 유지하는 root compatibility facade |
 | `tests/support/*` | 공개 필드 대입을 대체하는 fixture builder |
 
-### 3.2 R5 목표 workspace
+### 3.2 R5 구현 workspace
 
 | crate/app | 허용 의존 |
 | --- | --- |
@@ -84,15 +78,16 @@ LLM은 마지막 presentation branch에서만 호출한다. core turn은 LLM 응
 | `aihack-content` | aihack-core ID/domain contract, serde, toml |
 | `aihack-ai-contract` | aihack-core read-only DTO |
 | `aihack-llm` | aihack-ai-contract, reqwest 0.13.4 blocking/json |
-| `aihack-tui` | core, AI contract, LLM, ratatui, crossterm |
-| `aihack-headless` | core, content, AI contract |
+| `aihack-runtime` | core, content, AI contract; `GameClient` 구현과 save/bootstrap |
+| `aihack-tui` | runtime, AI contract, LLM, ratatui, crossterm |
+| `aihack-headless` | runtime, AI contract |
 
 core Cargo manifest에 ratatui, crossterm, HTTP client가 나타나면 R5 실패다.
 
 ## 4. 경계 계약 요약
 
-- mutable entry: `GameSession::submit(CommandIntent) -> Result<TurnOutcome, SubmitError>` 한 개
-- read entries: snapshot, observation, action_space, seed, turn, run_state
+- mutable entry: `GameSession::submit(CommandIntent) -> TurnOutcome` 한 개
+- read entries: snapshot, observation (내부 action_space 포함), seed, turn, run_state
 - content entry: `ContentRegistry::from_embedded() -> Result<ContentRegistry, ContentError>`
 - LLM entry: `LocalLlmService::request(context, kind)`
 - replay truth: command, deterministic outcome, snapshot hash
@@ -215,7 +210,7 @@ trap_pit_damage = 3
 ```bash
 cargo metadata --locked --no-deps --format-version 1
 cargo tree -d
-cargo check --locked --all-targets
+cargo check --workspace --all-targets --locked
 ```
 
 **선행:** R0-3
@@ -293,13 +288,13 @@ Windows는 `build.bat --test` 후 두 exe 존재를 확인한다.
 
 ```bash
 rg -n "session\.(meta|rng|turn|state|world|event_log)\s*=" src tests
-cargo test --locked --test save_load --test ui_runtime_smoke
+cargo test -p aihack --locked --test save_load --test ui_runtime_smoke
 ```
 
 첫 명령 결과는 `tests/support` 내부 허용 목록 외 0건이다.
 
 **선행:** R1 checkpoint
-**파일:** `src/core/session.rs`, `src/core/save.rs`, `tests/support/session_builder.rs`, `tests/support/mod.rs`
+**현재 파일:** `crates/aihack-runtime/src/session.rs`, `crates/aihack-runtime/src/save.rs`, `tests/support/session_builder.rs`, `tests/support/mod.rs`
 **범위:** M, 4개
 
 ### Task R2-2: GameWorld 캡슐화와 invariant
@@ -318,19 +313,19 @@ cargo test --locked --test save_load --test ui_runtime_smoke
 **검증:**
 
 ```bash
-cargo test --locked --test world_invariants
-cargo test --locked --test levels --test inventory --test save_load
+cargo test -p aihack --locked --test world_invariants
+cargo test -p aihack --locked --test levels --test inventory --test save_load
 ```
 
 **선행:** R2-1
-**파일:** `src/core/world.rs`, `src/core/invariant.rs`, `src/core/mod.rs`, `tests/world_invariants.rs`
+**현재 파일:** `crates/aihack-runtime/src/world.rs`, `crates/aihack-core/src/world.rs`, `crates/aihack-core/src/invariant.rs`, `tests/world_invariants.rs`
 **범위:** M, 4개
 
 ### Task R2-3: submit transaction 분리
 
 **설명:** `accept_turn`의 mutation을 prepare, validate, commit 단계로 나눈다.
 
-**진행 상태 (2026-07-15):** 구현 및 동작 검증 완료. `TurnTransaction`이 cloned working copy에서 명령을 적용하고, 6개 invariant를 검증한 뒤에만 원본 session을 교체한다. invariant 오류는 reject로 projection하며 turn, snapshot hash, RNG state를 보존한다. 기존 AwaitingDirection의 reject 후 Playing 복귀 계약도 유지한다.
+**진행 상태 (2026-07-15):** 구현 및 동작 검증 완료. `TurnTransaction`이 cloned working copy에서 명령을 적용하고, 6개 invariant를 검증한 뒤에만 원본 session을 교체한다. invariant 오류는 `accepted=false` outcome으로 projection하며 turn, snapshot hash, RNG state를 보존한다. 기존 AwaitingDirection의 reject 후 Playing 복귀 계약도 유지한다.
 
 **수용 기준:**
 
@@ -338,17 +333,17 @@ cargo test --locked --test levels --test inventory --test save_load
 - [x] player/monster/status/death 순서 유지
 - [x] 기존 golden hash 유지
 - [x] reject와 invariant error에서 RNG draws 유지
-- [x] internal Result API를 ReplayTurnOutcomeV1로 projection해 replay v1 JSON shape 유지
+- [x] accepted-bool `TurnOutcome` replay wire shape와 save/load continuation 유지
 
 **검증:**
 
 ```bash
-cargo test --locked --test combat --test monster_ai --test replay
-cargo test --locked --test golden_phase8_rules
+cargo test -p aihack --locked --test combat --test monster_ai --test replay
+cargo test -p aihack --locked --test golden_phase8_rules
 ```
 
 **선행:** R2-2
-**파일:** `src/core/session.rs`, `src/core/transaction.rs`, `src/core/rng.rs`, `tests/transaction.rs`, `tests/fixtures/replay_v1.json`
+**현재 파일:** `crates/aihack-runtime/src/session.rs`, `crates/aihack-runtime/src/transaction.rs`, `crates/aihack-core/src/rng.rs`, `tests/transaction.rs`, `tests/replay.rs`
 **범위:** M, 5개
 
 ### Checkpoint R2
@@ -362,7 +357,7 @@ cargo test --locked --test golden_phase8_rules
 
 **설명:** panic 기반 TOML parsing을 typed error와 registry validation으로 교체한다.
 
-**상태:** 구현 완료, checkpoint 보류. `ContentRegistry`는 schema v1 embedded TOML을 `OnceLock`으로 한 번 parse·검증하며 canonical FNV-1a hash를 제공한다. 다만 malformed embedded content의 session bootstrap 오류를 `ContentError`로 반환하는 R3-4가 남아 있다.
+**상태:** 구현 완료. `ContentRegistry`는 schema v1 embedded TOML을 `OnceLock`으로 한 번 parse·검증하며 canonical FNV-1a hash를 제공한다. malformed/injected content의 session bootstrap은 R3-4에서 `ContentError`로 반환한다.
 
 **수용 기준:**
 
@@ -374,19 +369,19 @@ cargo test --locked --test golden_phase8_rules
 **검증:**
 
 ```bash
-cargo test --locked --test content_validation
-cargo test --locked --test data_loading
+cargo test -p aihack --locked --test content_validation
+cargo test -p aihack --locked --test data_loading
 ```
 
 **선행:** R2 checkpoint
-**파일:** `src/data/schema.rs`, `src/data/mod.rs`, `src/core/error.rs`, `tests/content_validation.rs`
+**현재 파일:** `crates/aihack-content/src/schema.rs`, `crates/aihack-content/src/lib.rs`, `crates/aihack-core/src/error.rs`, `tests/content_validation.rs`
 **범위:** M, 4개
 
 ### Task R3-2: Item과 monster registry 실연결
 
 **설명:** hardcoded factory가 registry definition을 사용하게 한다.
 
-**상태:** 구현 완료, checkpoint 보류. `item_data`와 `monster_template`은 registry ID 조회 및 typed conversion을 사용한다. public API와 bootstrap error path의 최종 정렬은 R3-4가 담당한다.
+**상태:** 구현 완료. `item_data`와 `monster_template`은 registry ID 조회 및 typed conversion을 사용한다. R3-4의 injected registry 경로는 초기 entity 생성에도 같은 registry를 사용한다.
 
 **수용 기준:**
 
@@ -398,19 +393,19 @@ cargo test --locked --test data_loading
 **검증:**
 
 ```bash
-cargo test --locked --test items --test combat --test monster_ai
-cargo test --locked --test content_runtime
+cargo test -p aihack --locked --test items --test combat --test monster_ai
+cargo test -p aihack --locked --test content_runtime
 ```
 
 **선행:** R3-1
-**파일:** `src/domain/item.rs`, `src/domain/monster.rs`, `src/domain/entity.rs`, `tests/content_runtime.rs`
-**범위:** M, 4개
+**현재 파일:** `crates/aihack-content/src/schema.rs`, `crates/aihack-runtime/src/domain/item.rs`, `crates/aihack-runtime/src/domain/monster.rs`, `crates/aihack-runtime/src/domain/entity.rs`, `tests/content_runtime.rs`
+**범위:** M, 5개
 
 ### Task R3-3: Level registry 실연결
 
 **설명:** main:1과 main:2를 TOML level definition에서 생성한다.
 
-**상태:** 구현 완료, checkpoint 보류. level map, player start, stairs 및 TOML에 선언된 monster/item 배치를 registry definition에서 생성한다. fallible bootstrap 전환은 R3-4가 담당한다.
+**상태:** 구현 완료. level map, player start, stairs 및 TOML에 선언된 monster/item 배치는 registry definition에서 생성하며, bootstrap 오류는 R3-4에서 fallible result로 전환됐다.
 
 **수용 기준:**
 
@@ -422,13 +417,13 @@ cargo test --locked --test content_runtime
 **검증:**
 
 ```bash
-cargo test --locked --test map --test levels --test stairs
-cargo test --locked --test content_runtime
+cargo test -p aihack --locked --test map --test levels --test stairs
+cargo test -p aihack --locked --test content_runtime
 ```
 
 **선행:** R3-2
-**파일:** `src/domain/map.rs`, `src/domain/level.rs`, `src/core/world.rs`, `src/data/levels/main_2.toml`, `tests/content_runtime.rs`
-**범위:** M, 5개
+**현재 파일:** `crates/aihack-content/src/schema.rs`, `crates/aihack-content/src/data/levels/main_2.toml`, `crates/aihack-runtime/src/world.rs`, `tests/content_runtime.rs`
+**범위:** M, 4개
 
 ### Task R3-4: Content bootstrap 오류 경계 정렬
 
@@ -436,30 +431,30 @@ cargo test --locked --test content_runtime
 
 **수용 기준:**
 
-- [ ] malformed embedded content에서 fallible session/world bootstrap이 `Err(ContentError)`를 반환
-- [ ] production registry 생성 경로에 `expect`/`panic!` 0건
-- [ ] test-only TOML source injection은 명시적 test-support 경계로 제한하거나 public API 이유를 `spec.md`에 기록
-- [ ] `ContentRegistry` ID와 query surface가 `spec.md` 9.3과 type/signature 단위로 일치
+- [x] malformed/injected content에서 fallible session/world bootstrap이 `Err(ContentError)`를 반환
+- [x] TUI/headless production registry 생성 경로에 `expect`/`panic!` 0건
+- [x] `from_toml_sources`의 test/import public boundary 이유를 `spec.md`에 기록
+- [x] `ContentRegistry` String ID와 query surface를 `spec.md` 9.3 계약에 일치
 
 **검증:**
 
 ```bash
-cargo test --locked --test content_validation --test content_runtime
+cargo test -p aihack --locked --test content_validation --test content_runtime
 rg -n 'registry\(\).*expect|try_item_data\(kind\)\.expect|try_monster_template\(kind\)\.expect' \
   src/core src/data src/domain
 ```
 
 **선행:** R3-1..R3-3
-**파일:** `src/data/schema.rs`, `src/data/mod.rs`, `src/core/session.rs`, `src/core/world.rs`, `src/domain/item.rs`, `src/domain/level.rs`, `src/domain/monster.rs`, `tests/content_validation.rs`, `tests/content_runtime.rs`
-**범위:** M, 9개
+**현재 파일:** `crates/aihack-content/src/schema.rs`, `crates/aihack-content/src/lib.rs`, `crates/aihack-runtime/src/session.rs`, `crates/aihack-runtime/src/world.rs`, `crates/aihack-runtime/src/domain/item.rs`, `crates/aihack-runtime/src/domain/monster.rs`, `tests/content_validation.rs`, `tests/content_runtime.rs`
+**범위:** M, 8개
 
 ### Checkpoint R3
 
-- [ ] SC-DATA-01 PASS (R3-4 전 Hold)
+- [x] SC-DATA-01 PASS (R3-4 완료)
 - [x] registry parse는 process당 1회
 - [x] content hash 3회 동일
 - [x] injected invalid content 검증 path panic 0건
-- [ ] production bootstrap invalid content path panic 0건
+- [x] production bootstrap invalid content path panic 0건
 
 ### Task R4-1: Headless policy와 report
 
@@ -467,23 +462,23 @@ rg -n 'registry\(\).*expect|try_item_data\(kind\)\.expect|try_monster_template\(
 
 **수용 기준:**
 
-- [ ] `wait-v1`, `survival-v1`, `replay-file` 지원
-- [ ] replay-file은 `--replay-in` 필수이며 input/output canonical path 충돌 거부
-- [ ] report에 requested/accepted/submitted/final state/hash 포함
-- [ ] `--turns`는 absolute target turn, load run accepted 수는 target-current
-- [ ] save/load/replay/report path traversal와 symlink escape 거부
-- [ ] 16회 안에 accepted action이 없으면 명시적 실패
-- [ ] GameOver 조기 종료를 성공으로 출력하지 않음
+- [x] `wait-v1`, `survival-v1`, `replay-file` 지원
+- [x] replay-file은 `--replay-in` 필수이며 input/output canonical path 충돌 거부
+- [x] report에 requested/accepted/submitted/final state/hash 포함
+- [x] `--turns`는 absolute target turn, load run accepted 수는 target-current
+- [x] save/load/replay/report path traversal와 symlink escape 거부
+- [x] 16회 안에 accepted action이 없으면 명시적 실패
+- [x] GameOver 조기 종료를 성공으로 출력하지 않음
 
 **검증:**
 
 ```bash
-cargo test --locked --test headless_policy
-cargo run --locked --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
+cargo test -p aihack --locked --test headless_policy
+cargo run --locked -p aihack-headless --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
 ```
 
 **선행:** R3 checkpoint
-**파일:** `src/bin/aihack-headless.rs`, `src/core/policy.rs`, `src/core/save.rs`, `src/core/mod.rs`, `tests/headless_policy.rs`
+**현재 파일:** `apps/aihack-headless/src/main.rs`, `apps/aihack-headless/src/lib.rs`, `crates/aihack-runtime/src/save.rs`, `tests/headless_policy.rs`, `tests/headless_paths.rs`
 **범위:** M, 5개
 
 ### Task R4-2: 실제 장기 결정론 테스트
@@ -492,28 +487,28 @@ cargo run --locked --bin aihack-headless -- --seed 42 --turns 1000 --policy surv
 
 **수용 기준:**
 
-- [ ] seed 42, 7, 1234 모두 accepted_turns 1000
-- [ ] 각 seed 3회 hash 동일
-- [ ] 실패 report에 seed, turn, command index 포함
-- [ ] save/load continuation이 direct run과 동일
+- [x] seed 42, 7, 1234 모두 accepted_turns 1000
+- [x] 각 seed 3회 hash 동일
+- [x] 실패 report에 seed, turn, command index 포함
+- [x] save/load continuation이 direct run과 동일
 
 **검증:**
 
 ```bash
-cargo test --locked --test long_run --release
-cargo test --locked --test save_load --test replay
+cargo test -p aihack --locked --test long_run --release
+cargo test -p aihack --locked --test save_load --test replay
 ```
 
 **선행:** R4-1
-**파일:** `tests/long_run.rs`, `tests/save_load.rs`, `tests/replay.rs`
-**범위:** M, 3개
+**파일:** `tests/long_run.rs`, `tests/release_candidate.rs`, `tests/save_load.rs`, `tests/replay.rs`
+**범위:** M, 4개
 
 ### Checkpoint R4
 
-- [ ] SC-TEST-01 PASS
-- [ ] SC-TEST-02 PASS
-- [ ] 기존 release_candidate의 조기 사망 성공 기준 제거
-- [ ] long-run report 3개 생성
+- [x] SC-TEST-01 PASS (`tests/long_run.rs`: three seeds × three deterministic runs)
+- [x] SC-TEST-02 PASS (`tests/save_load.rs`, `tests/replay.rs`)
+- [x] 기존 release_candidate의 조기 사망 성공 기준 제거
+- [x] long-run report 3개 생성 (`runtime/reports/r4-seed-{42,7,1234}.json`, ignored runtime artifacts)
 
 ### Task R5-1: Core와 content crate 추출
 
@@ -537,6 +532,8 @@ cargo test --workspace --locked
 
 이동 slice는 순서를 바꾸지 않는다. `source -> target`은 한 파일 이동으로 계산하며 각 slice 뒤 `cargo check --workspace --all-targets --locked`를 실행한다.
 
+**진행 상태 (R5-1):** 완료. R5-1A workspace skeleton과 `action`/`ids`/`position`/`rng`/`GameMeta`/`RunState`/`SnapshotHash`/`TurnOutcome`, `tile`/`combat`/`player`/`status`, `inventory`, item 및 monster 데이터 계약, `error`, `event`, `map`, `level`, `EntityStore` 저장·조회·변이 본체, world invariant 계약·검증, score·luck·hallucination 규칙, map 기반 LOS·가시 타일 계산, door 상태 전이, hidden tile reveal, combat 주사위·피해 계산을 `aihack-core`로 옮겼다. `WorldState<E>`, generic save DTO, `SessionState<W>`, cloned working-copy transaction과 death run-state 결정도 core가 소유한다. root의 `EntityStore`는 embedded content를 조회하는 기본 item/monster 생성 API만 호환 wrapper로 유지하고, root `GameWorld`는 content bootstrap 및 runtime adapter를 제공한다. content의 `LevelData`는 core `MapLayout` trait을 구현하고 world는 content layout iterator를 adapter로 전달한다. `aihack-content`가 schema Rust 파일, embedded registry, TOML asset을 물리적으로 단독 소유하고 item/monster 변환, level tile override, typed spawn plan을 제공하며 contract test로 schema v1, 필수 ID, hash `c491b83c6f499a62`를 검증한다. root `data`와 item/monster factory는 compatibility facade다. 기본 world fixture도 fallible production bootstrap으로 단일화해 content 검증을 우회하지 않는다. `tests/workspace_boundaries.rs`가 core의 UI/HTTP 무의존, content→core 단방향, content physical ownership 및 entity 저장소의 content-factory 무의존을 회귀 검사한다. core dependency tree, content/save/hash regression, headless CLI smoke를 통과했다.
+
 | Slice | 파일, 최대 5개 |
 | --- | --- |
 | R5-1A | `Cargo.toml`, `crates/aihack-core/Cargo.toml`, `crates/aihack-core/src/lib.rs`, `crates/aihack-content/Cargo.toml`, `crates/aihack-content/src/lib.rs` |
@@ -557,18 +554,21 @@ cargo test --workspace --locked
 
 **설명:** Observation/ActionSpace를 AI contract crate로, TUI/headless를 app으로 이동한다.
 
+**진행 상태 (R5-2A~H):** 완료. `aihack-ai-contract`, `aihack-llm`, `aihack-runtime`, `apps/aihack-tui`, `apps/aihack-headless` workspace package를 생성했다. contract는 현재 turn과 snapshot hash를 담는 `ClientRevision`, `Observation`/`ActionSpace` 및 관련 DTO·read-only action type을 공개하며 mutable world/session은 노출하지 않는다. LLM의 decision/narrative request·fallback·provider 정책은 `aihack-llm`으로 이동했고, `GameSession::submit`을 호출하는 `execute_suggestion`만 compatibility adapter에 남긴다. `aihack-runtime`은 content-aware `EntityStore`, item/monster factory, content bootstrap, `GameWorld`, 모든 system adapter, observation projection, snapshot/hash, cloned transaction orchestration, 저장·replay I/O와 구체 `GameSession`을 소유한다. TUI는 `GameClient`를 확장한 저장·새 게임용 `TuiClient` trait object를 보유하고, headless policy는 generic `GameClient`만 소비한다. 두 app manifest는 root facade와 `aihack-core`를 직접 의존하지 않는다. production binary 소유권은 각 app package로 이동했고 root package는 기존 module path와 integration test를 유지하는 compatibility facade로 축소했다. transport/config의 실제 local provider 동작은 R6-1 범위이므로 아직 구현하지 않았다.
+
 **수용 기준:**
 
-- [ ] AI contract는 mutable core type export 금지
-- [ ] TUI와 headless가 `GameClient`만 사용
-- [ ] binary 이름과 CLI 유지
-- [ ] save/replay 경로 유지
+- [x] AI contract는 mutable core type export 금지
+- [x] TUI와 headless가 `GameClient`만 사용
+- [x] binary 이름과 CLI 유지
+- [x] save/replay 경로 유지
 
 **검증:**
 
 ```bash
 cargo test --workspace --all-targets --locked
 cargo run --locked --bin aihack -- --seed 42
+cargo run --locked -p aihack-headless --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
 ```
 
 **선행:** R5-1
@@ -578,6 +578,7 @@ cargo run --locked --bin aihack -- --seed 42
 | R5-2A | `crates/aihack-ai-contract/Cargo.toml`, `src/lib.rs`, `crates/aihack-llm/Cargo.toml`, `src/lib.rs`, `apps/aihack-tui/Cargo.toml` |
 | R5-2B | `src/core/observation.rs -> crates/aihack-ai-contract/src/observation.rs`, `crates/aihack-ai-contract/src/action_space.rs`, `crates/aihack-ai-contract/src/llm.rs` |
 | R5-2C | `src/llm/mod.rs -> crates/aihack-llm/src/contract.rs`, `src/llm/decision.rs -> crates/aihack-llm/src/decision.rs`, `src/llm/narrative.rs -> crates/aihack-llm/src/narrative.rs`, `crates/aihack-llm/src/config.rs`, `crates/aihack-llm/src/transport.rs` |
+| R5-2D0 | `crates/aihack-runtime/Cargo.toml`, `src/lib.rs`, `src/client.rs`, `src/domain/{entity,item,monster}.rs`, `tests/{game_client_contract,entity_store_contract}.rs`, root workspace manifest |
 | R5-2D | `src/main.rs -> apps/aihack-tui/src/main.rs`, `apps/aihack-tui/src/lib.rs`, `src/ui/tui/mod.rs -> apps/aihack-tui/src/app.rs`, `src/ui/mod.rs -> apps/aihack-tui/src/ui.rs` |
 | R5-2E | `src/ui/tui/config.rs -> apps/aihack-tui/src/config.rs`, `src/ui/tui/effects.rs -> apps/aihack-tui/src/effects.rs`, `src/ui/tui/input.rs -> apps/aihack-tui/src/input.rs`, `src/ui/tui/labels.rs -> apps/aihack-tui/src/labels.rs`, `src/ui/tui/layout.rs -> apps/aihack-tui/src/layout.rs` |
 | R5-2F | `src/ui/tui/render_map.rs -> apps/aihack-tui/src/render_map.rs`, `src/ui/tui/render_panels.rs -> apps/aihack-tui/src/render_panels.rs`, `src/ui/tui/theme.rs -> apps/aihack-tui/src/theme.rs`, `src/ui/tui/viewport.rs -> apps/aihack-tui/src/viewport.rs` |
@@ -590,11 +591,13 @@ cargo run --locked --bin aihack -- --seed 42
 
 ### Checkpoint R5
 
-- [ ] SC-ARCH-01 PASS
-- [ ] workspace dependency 방향 PASS
-- [ ] binary CLI compatibility PASS
-- [ ] core dependency tree에 TUI/HTTP 0건
-- [ ] R4 hash 유지
+**2026-07-17 종료 노트:** R5 구현 slice는 완료됐다. core는 순수 도메인 계약·결정론 규칙·generic state/save/transaction primitive를, content는 embedded schema와 registry를, runtime은 content-aware entity/world/bootstrap·system adapter·projection·저장 I/O·구체 `GameSession`을 소유한다. `audit_report_9.md`가 보고서 8의 IMP-F008 시정과 R1~R5 전체 회귀를 PASS로 종결했다. R6~R8은 시작하지 않았다.
+
+- [x] SC-ARCH-01 PASS (`audit_report_6.md`)
+- [x] workspace dependency 방향 PASS
+- [x] binary CLI compatibility PASS
+- [x] core dependency tree에 TUI/HTTP 0건
+- [x] R4 hash 유지
 
 ### Task R6-1: Local LLM transport와 narrative
 
@@ -614,8 +617,8 @@ cargo run --locked --bin aihack -- --seed 42
 **검증:**
 
 ```bash
-cargo test --workspace --locked --test llm_transport
-cargo test --workspace --locked --test llm_narrative
+cargo test -p aihack --locked --test llm_transport
+cargo test -p aihack --locked --test llm_narrative
 ```
 
 **선행:** R5 checkpoint
@@ -636,8 +639,8 @@ cargo test --workspace --locked --test llm_narrative
 **검증:**
 
 ```bash
-cargo test --workspace --locked --test llm_decision_support
-cargo test --workspace --locked --test llm_revision_gate
+cargo test -p aihack --locked --test llm_decision_support
+cargo test -p aihack --locked --test llm_revision_gate
 ```
 
 **선행:** R6-1
@@ -659,8 +662,8 @@ cargo test --workspace --locked --test llm_revision_gate
 **검증:**
 
 ```bash
-cargo test --workspace --locked --test llm_soft_adjudication
-cargo test --workspace --locked --test ui_runtime_smoke
+cargo test -p aihack --locked --test llm_soft_adjudication
+cargo test -p aihack --locked --test ui_runtime_smoke
 ```
 
 **선행:** R6-2
@@ -709,8 +712,8 @@ cargo test --workspace --locked --test ui_runtime_smoke
 **검증:**
 
 ```bash
-cargo test --workspace --locked --test nethack_367_compat
-cargo test --workspace --locked --test golden_phase8_rules
+cargo test -p aihack --locked --test nethack_367_compat
+cargo test -p aihack --locked --test golden_phase8_rules
 ```
 
 **선행:** R3 checkpoint, R7-1
@@ -782,4 +785,4 @@ cargo test --workspace --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 구현 세션은 `Task R3-4`부터 시작한다. R1·R2는 local PASS이며, R3 checkpoint는 bootstrap 오류 경계가 닫힐 때까지 Hold다.
+다음 구현 단계는 `Task R6-1`이다. `audit_report_9.md`가 R5 문서 시정과 전체 회귀를 PASS했고 G-TEST-001/002와 G-ARCH-001의 closure도 유지된다. 전체 program PASS와 R8 release gate는 아직 열려 있다.

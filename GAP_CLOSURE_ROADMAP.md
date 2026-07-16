@@ -18,13 +18,14 @@
 - 한 gap은 최소 하나의 Task와 하나의 성공 기준 ID에 연결한다.
 - baseline hash는 의도와 ADR 없이 갱신하지 않는다.
 - 이 문서의 계획 작성은 코드 구현 완료를 의미하지 않는다.
+- `Closed`는 해당 gap의 독립 audit 또는 동등한 re-audit evidence가 source·test·문서 정합성을 확인했음을 뜻한다. `Verified`는 구현 검증이 끝났지만 독립 closure evidence가 아직 없는 중간 상태다.
 
 ## 2. 우선순위
 
 | 등급 | 의미 | 다음 단계 진입 |
 | --- | --- | --- |
-| P0 | 제품·법적·상태 무결성 위험 | 해당 gate 전 반드시 Closed |
-| P1 | 빌드·테스트·경계 신뢰성 위험 | R4 전 반드시 Closed |
+| P0 | 제품·법적·상태 무결성 위험 | 해당 gap이 소속된 phase checkpoint를 PASS로 선언하기 전 반드시 Closed |
+| P1 | 빌드·테스트·경계 신뢰성 위험 | 해당 gap이 소속된 phase checkpoint를 PASS로 선언하기 전 반드시 Closed. 후속 phase 착수는 명시된 dependency와 local evidence를 따르며, 외부 CI 같은 별도 evidence pending은 해당 phase의 final PASS만 막는다. |
 | P2 | 구조 확장성·문서 드리프트 | R8 전 반드시 Closed |
 
 ## 3. Active gap 목록
@@ -33,19 +34,19 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | G-PRODUCT-001 | P0 | inspired game와 3.6.7 변환 목표 충돌 | 과거 spec은 1:1 포트 비목표 | R0-1, R0-2 | SC-DOC-01 | Closed |
 | G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | legacy에 두 license, NGPL prose 손상 | R7-1 | SC-LICENSE-01 | Open |
-| G-BUILD-001 | P1 | toolchain/MSRV 미고정 | R1 이전에는 rust-toolchain 없음 | R1-1 | SC-BUILD-01 | Verified |
-| G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | R1 이전 0.30/0.28 혼재 | R1-1 | SC-BUILD-01 | Verified |
-| G-BUILD-003 | P1 | build script가 copy 실패를 무시 | R1 이전 `cp ... || true` | R1-2 | SC-BUILD-01 | Verified |
+| G-BUILD-001 | P1 | toolchain/MSRV 미고정 | rust-toolchain과 locked local build/audit evidence; `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
+| G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | locked dependency/security policy와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
+| G-BUILD-003 | P1 | build script가 copy 실패를 무시 | fail-fast script와 `audit_report_3.md` independent verification | R1-2 | SC-BUILD-01 | Closed |
 | G-BUILD-004 | P1 | CI 부재 | workflow 추가, 원격 실행 대기 | R1-3 | SC-BUILD-02 | Implemented |
-| G-RUN-001 | P1 | README 기본 실행 명령 실패 | R1 이전 binary 2개, default-run 없음 | R1-1 | SC-BUILD-01 | Verified |
-| G-CORE-001 | P0 | session/world mutable field 공개 | session/world 및 world container 필드를 crate 외부 비공개화하고, 조회 accessor와 저장 기반 test fixture로 전환 | R2-1, R2-2 | SC-CORE-01 | Verified |
-| G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy `TurnTransaction`으로 prepare/apply/validate/commit 분리 | R2-3 | SC-CORE-02 | Verified |
-| G-CORE-003 | P1 | invariant가 타입으로 검증되지 않음 | 6종 typed invariant와 accepted command validation, no-commit regression | R2-2 | SC-CORE-02 | Verified |
-| G-DATA-001 | P1 | TOML loader가 runtime과 분리 | immutable ContentRegistry로 item/monster/level runtime factory를 연결 | R3-1..R3-3 | SC-DATA-01 | Verified |
-| G-DATA-002 | P1 | invalid embedded content가 session bootstrap에서 panic 가능 | registry validation은 ContentError를 반환하지만 production bootstrap의 `expect` 경로가 남음 | R3-1, R3-4 | SC-DATA-01 | Implemented |
-| G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | wait-only runner와 early break | R4-1, R4-2 | SC-TEST-01 | Open |
-| G-TEST-002 | P1 | long-run 반복 hash가 실제 1000 accepted turn을 증명하지 않음 | release test final_turn 20/28/18 | R4-2 | SC-TEST-02 | Open |
-| G-ARCH-001 | P2 | core/UI/LLM이 한 package dependency tree 공유 | 단일 Cargo package | R5-1, R5-2 | SC-ARCH-01 | Open |
+| G-RUN-001 | P1 | README 기본 실행 명령 실패 | default binary/run command와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
+| G-CORE-001 | P0 | session/world mutable field 공개 | private state, read accessor, fixture boundary와 `audit_report_3.md` independent verification | R2-1, R2-2 | SC-CORE-01 | Closed |
+| G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy transaction과 no-commit regression, `audit_report_3.md` independent verification | R2-3 | SC-CORE-02 | Closed |
+| G-CORE-003 | P1 | invariant가 타입으로 검증되지 않음 | 6종 invariant/no-commit regression과 `audit_report_3.md` independent verification | R2-2 | SC-CORE-02 | Closed |
+| G-DATA-001 | P1 | TOML loader가 runtime과 분리 | runtime ContentRegistry factory/level construction과 `audit_report_3.md` independent verification | R3-1..R3-3 | SC-DATA-01 | Closed |
+| G-DATA-002 | P1 | invalid embedded content가 session bootstrap에서 panic 가능 | fallible TUI/headless bootstrap, injected missing level/item regression, `audit_report_3.md` independent verification | R3-1, R3-4 | SC-DATA-01 | Closed |
+| G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | policy runner 조기 실패 처리와 3 seed accepted turn 1000, `audit_report_6.md` 재감사 | R4-1, R4-2 | SC-TEST-01 | Closed |
+| G-TEST-002 | P1 | long-run 반복 hash가 실제 1000 accepted turn을 증명하지 않음 | 3 seed x 1000 accepted turn x 3회 hash, `audit_report_6.md` 재감사 | R4-2 | SC-TEST-02 | Closed |
+| G-ARCH-001 | P2 | core/UI/LLM이 한 package dependency tree 공유 | 7개 crate/app workspace, app core 직접 의존 0건, R4 hash 유지, `audit_report_6.md` 재감사 | R5-1, R5-2 | SC-ARCH-01 | Closed |
 | G-LLM-001 | P0 | 실제 local LLM provider 없음 | trait와 mock만 존재 | R6-1 | SC-LLM-01 | Open |
 | G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | synchronous trait 호출 | R6-1 | SC-LLM-01 | Open |
 | G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | 과거 action_space만 검사 | R6-2 | SC-LLM-02 | Open |
@@ -89,9 +90,9 @@
 
 ```bash
 cargo tree -d
-cargo check --locked --all-targets
-cargo test --locked --all-targets
-cargo build --locked --release
+cargo check --workspace --all-targets --locked
+cargo test --workspace --all-targets --locked
+cargo build --workspace --release --locked
 cargo run --locked -- --seed 42
 ```
 
@@ -156,6 +157,10 @@ crossterm 중복 0건, 마지막 명령이 TUI binary를 선택해야 한다.
 - `cargo tree -p aihack-core`에 ratatui, crossterm, HTTP client 없음
 - TUI/headless binary 이름과 인자 유지
 - workspace all-target test 통과
+
+**2026-07-17 closure:** `audit_report_6.md`가 path dependency version, 실행 가능한 audit 명령, 활성 문서와 source/test 정합성을 재검증해 PASS했으므로 `Closed`다.
+
+**후속 감사 상태:** `audit_report_9.md`가 IMP-F008 시정과 R1~R5 전체 회귀를 PASS로 종결했다. R5 closure는 유지되며 다음 구현 단계는 R6다.
 
 ### 4.7 G-LLM-001..004
 

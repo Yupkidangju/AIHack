@@ -31,14 +31,14 @@ else
 fi
 
 if [ "$RUN_TESTS" = "true" ]; then
-    cargo test --locked --all-targets
+    cargo test --workspace --locked --all-targets
 fi
 
 if [ "$BUILD_TYPE" = "release" ]; then
-    cargo build --locked --release --all-targets
+    cargo build --workspace --locked --release --all-targets
     SOURCE_DIR="target/release"
 else
-    cargo build --locked --all-targets
+    cargo build --workspace --locked --all-targets
     SOURCE_DIR="target/debug"
 fi
 

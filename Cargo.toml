@@ -3,24 +3,32 @@ name = "aihack"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.94"
-default-run = "aihack"
+autobins = false
 license = "UNLICENSED"
 publish = false
 
+[workspace]
+members = [
+    ".",
+    "crates/aihack-core",
+    "crates/aihack-content",
+    "crates/aihack-ai-contract",
+    "crates/aihack-llm",
+    "crates/aihack-runtime",
+    "apps/aihack-tui",
+    "apps/aihack-headless",
+]
+default-members = ["apps/aihack-tui"]
+resolver = "2"
+
 [dependencies]
-serde = { version = "1", features = ["derive"] }
+aihack-core = { path = "crates/aihack-core", version = "0.1.0" }
+aihack-content = { path = "crates/aihack-content", version = "0.1.0" }
+aihack-ai-contract = { path = "crates/aihack-ai-contract", version = "0.1.0" }
+aihack-llm = { path = "crates/aihack-llm", version = "0.1.0" }
+aihack-runtime = { path = "crates/aihack-runtime", version = "0.1.0" }
+aihack-tui = { path = "apps/aihack-tui", version = "0.1.0" }
+aihack-headless = { path = "apps/aihack-headless", version = "0.1.0" }
+
+[dev-dependencies]
 serde_json = "1"
-thiserror = "1"
-rand = "0.8"
-clap = { version = "4", features = ["derive"] }
-ratatui = "0.30"
-crossterm = "0.29"
-toml = "0.8"
-
-[[bin]]
-name = "aihack"
-path = "src/main.rs"
-
-[[bin]]
-name = "aihack-headless"
-path = "src/bin/aihack-headless.rs"

@@ -1,0 +1,13 @@
+level_id="main:2"
+branch="Main"
+depth=2
+width=40
+height=20
+player_start=[5,5]
+stairs_up=[5,5]
+[[wall]]
+x=18
+y_range=[3,10]
+[[door]]
+pos=[8,5]
+state="closed"

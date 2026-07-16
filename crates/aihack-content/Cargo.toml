@@ -1,0 +1,16 @@
+[package]
+name = "aihack-content"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+license = "UNLICENSED"
+publish = false
+
+[dependencies]
+aihack-core = { path = "../aihack-core", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+[lib]
+path = "src/lib.rs"

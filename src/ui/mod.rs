@@ -1,1 +1,1 @@
-pub mod tui;
+pub use aihack_tui::tui;

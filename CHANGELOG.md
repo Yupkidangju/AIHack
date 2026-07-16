@@ -20,10 +20,21 @@
 - `GameSession.world`와 `GameWorld.levels/entities/inventory`를 crate 외부 비공개로 전환하고, 읽기 accessor 및 저장 기반 `SessionBuilder` fixture로 integration test 경계를 정리했다.
 - embedded TOML `ContentRegistry`와 `ContentError` 6종을 추가하고, item/monster factory와 main:1/main:2 map·초기 배치를 registry runtime으로 전환했다.
 - `audit_report_1.md`를 추가하고, R1/R2 local PASS와 R3 bootstrap `ContentError` 경계가 아직 Hold라는 현재 상태를 활성 문서에 동기화했다.
+- `GameSession`/`GameWorld`의 fallible content bootstrap과 registry injection을 추가하고, TUI/headless startup이 `ContentError`를 사용자 오류로 반환하도록 전환했다.
+- R4 accepted-turn runner(`wait-v1`, `survival-v1`, `replay-file`), success/failure JSON report, replay trace 및 runtime-root path guard를 추가했다.
+- 세 필수 seed의 1000 accepted-turn·3회 hash 안정성 테스트와 survival 기반 release candidate gate를 추가했다.
 
 ### Changed
 
-- README와 BUILD_GUIDE의 현재 실행 명령을 두 binary 환경에 맞는 `cargo run --locked --bin ...` 형태로 수정했다.
+- `audit_report_9.md` 재감사에서 IMP-F008과 R5 문서 시정 계보가 PASS되어 다음 구현 단계를 R6-1로 전환했다.
+- `audit_report_8.md`의 IMP-F008을 시정해 R3-2~R4-2 완료 Task의 현재 파일 수를 실제 owner 목록과 맞추고, R1~R5 목록-수량 일치 회귀 검사를 추가했다.
+- `audit_report_7.md`의 문서 재현성 HOLD를 시정해 root integration test에 `-p aihack`, 전체 범위 명령에 `--workspace`를 명시하고 R2~R4 책임 경로와 `/output/` ignore 정책을 현재 workspace에 맞췄다.
+- R5에서 core/content/AI contract/LLM/runtime/TUI/headless를 workspace package로 분리하고, root package를 기존 테스트용 compatibility facade로 축소했다.
+- TUI와 headless가 `GameClient` 경계를 통해 runtime을 사용하도록 전환하고 app package의 root `aihack-core` 직접 의존성을 제거했다.
+- Linux/Windows build script가 전체 workspace를 검사·빌드하고 두 production binary를 artifact로 검증하도록 갱신했다.
+- 내부 workspace path dependency에 현재 package version을 함께 명시해 cargo-deny wildcard 정책을 복구하고, 실행 가능한 R5 audit 명령을 contract test로 고정했다.
+- `audit_report_6.md` 재감사에서 R5 workspace, R4 결정론 회귀, 공급망·문서 gate가 PASS되어 G-TEST-001/002와 G-ARCH-001을 닫았다.
+- README와 BUILD_GUIDE의 현재 실행 명령을 TUI default member와 headless package selector 계약에 맞게 수정했다.
 - `designs.md`를 local LLM CTA, 상태, timeout/stale/error, 접근성, core 무결성 계약 중심의 v0.3.0 target 문서로 재구성했다.
 - 현재 구현과 v0.3.0 target을 분리하고, 과거 Phase 완료 기록은 archive와 기존 changelog 이력으로 이동했다.
 - UI dependency를 RustSec 경고가 없는 ratatui 0.30/crossterm 0.29 단일 계열로 올리고 ADR-0028에 근거를 기록했다.

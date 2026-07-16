@@ -1,0 +1,24 @@
+[package]
+name = "aihack-tui"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+default-run = "aihack"
+license = "UNLICENSED"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "aihack"
+path = "src/main.rs"
+
+[dependencies]
+aihack-ai-contract = { path = "../../crates/aihack-ai-contract", version = "0.1.0" }
+aihack-llm = { path = "../../crates/aihack-llm", version = "0.1.0" }
+aihack-runtime = { path = "../../crates/aihack-runtime", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+ratatui = "0.30"
+crossterm = "0.29"
+clap = { version = "4", features = ["derive"] }

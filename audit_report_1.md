@@ -93,17 +93,17 @@ git diff --check
 - Pattern: IMP-002
 - Area: `spec.md`, `src/data/schema.rs`, `src/domain/item.rs`, `src/domain/level.rs`, `src/core/world.rs`
 - Severity: Major
-- Status: Needs Fix
-- Summary: spec은 typed `LevelId` error와 다섯 read-only query만 공개하고 content 오류는 시작 실패로 반환한다고 정의하지만, 구현은 String ID와 추가 public constructor/iterator를 노출하며 production bootstrap 경로에서 `expect`로 panic한다.
+- Status: Fixed (Re-audit #2, 2026-07-16)
+- Summary: R3-4가 fallible session/world bootstrap과 injected-registry regression을 추가했고, spec은 실제 String ID 및 test/import public boundary를 명시했다.
 - Evidence:
   - `spec.md:279-298`은 `BTreeMap<...Id, ...Definition>`, `InvalidCoordinate { level: LevelId }`, `MissingStairsPair { level: LevelId }`, 그리고 다섯 query만 public이라고 정의한다.
   - `src/data/schema.rs:100-177`은 `BTreeMap<String, ...>`, public `from_toml_sources`, `items`, `monsters`, `levels` iterator를 노출한다.
   - `src/core/world.rs:62-81`, `src/domain/level.rs:26-30`, `src/domain/item.rs:74-75`는 registry/변환 오류를 `expect`로 panic 처리한다.
 - Expected: (a) spec을 실제 의도된 public testing/import boundary에 맞춰 갱신하거나, (b) 구현을 spec의 typed read-only boundary와 fallible session/world bootstrap으로 맞춘다. 어느 쪽이든 invalid embedded content가 process panic이 아닌 typed startup error가 되어야 한다.
-- Actual: R3 테스트는 `ContentRegistry::from_toml_sources`에서 typed validation을 증명하지만, 실제 `GameSession::new_for_playing` 경로의 registry failure는 typed result가 아니다.
-- Impact: SC-DATA-01과 G-DATA-002의 "panic fallback 없음" 완료 주장을 완전히 뒷받침하지 못하며, public API authority가 불명확하다.
+- Actual: `GameSession::try_new`/`try_new_for_playing`과 injected variants는 `ContentError`를 반환한다. TUI/headless production entrypoint는 이 경로를 사용하며, missing main level과 missing starting item regression이 이를 검증한다. 기존 infallible constructors는 test fixture 호환 adapter로 명시됐다.
+- Impact: SC-DATA-01의 production startup error contract와 public API authority가 문서·구현에서 일치한다.
 - Suggested Fix: `try_new_for_playing`/`try_fixture_phase5` 같은 fallible bootstrap을 도입하고 CLI가 `ContentError`를 사용자 오류로 표시하게 한다. test-only source injection은 `#[cfg(test)]` 또는 명시적인 test-support API로 축소한다. ID newtype 전환을 지금 하지 않을 경우에는 spec에 String ID 선택과 공개 iterator 이유를 기록한다.
-- Re-audit Method: malformed embedded-source startup regression이 `Err(ContentError)`를 반환하고 `catch_unwind` 없이 통과하는지 테스트한다. public API snapshot 또는 compile-fail test로 permitted methods를 고정한다.
+- Re-audit Method: `cargo test --locked --test content_validation --test content_runtime`와 TUI/headless call-site scan으로 fallible bootstrap 및 injected registry 경계를 재확인한다.
 - Owner: Coder / Architect
 
 ## 4. Pass 2: Debug / Engineering Quality Findings
@@ -114,12 +114,12 @@ git diff --check
 - Pattern: TEST-001
 - Area: `audit_roadmap.md`, R3 runtime construction
 - Severity: Minor
-- Status: Needs Fix
+- Status: Fixed (Re-audit #2, 2026-07-16)
 - Summary: R3 checkpoint는 invalid content test에서 panic 0건을 요구하지만, 현재 검증 명령은 data constructor만 exercise한다.
 - Evidence: `audit_roadmap.md:217-223`의 R3 PASS 조건과 `src/core/world.rs:62-81`의 panic adapter가 공존한다.
 - Expected: checkpoint test는 registry validation뿐 아니라 game bootstrap boundary도 cover해야 한다.
-- Actual: `tests/content_validation.rs`는 injected TOML validation을 검사하나, session creation의 fallible error contract가 없다.
-- Impact: malformed future embedded content가 startup panic으로 바뀌어도 현재 R3 test suite가 잡지 못한다.
+- Actual: `tests/content_validation.rs`는 missing main level과 missing starting item registry로 `GameSession::try_new_for_playing_with_registry`의 typed error contract를 검사한다.
+- Impact: future bootstrap이 injected content를 우회하거나 panic으로 회귀하면 R3 gate가 실패한다.
 - Suggested Fix: IMP-F003의 fallible bootstrap과 malformed-content fixture test를 R3 gate에 추가한다.
 - Re-audit Method: R3 gate에 bootstrap error test를 포함해 실행한다.
 - Owner: Coder
@@ -150,7 +150,7 @@ Critical 또는 Major security finding은 확인되지 않았다.
 
 ## 7. Required Fixes Before PASS
 
-1. IMP-F003: ContentRegistry의 API/typed-ID 문서를 구현과 맞추거나 구현을 spec에 맞추고, bootstrap의 panic fallback을 제거한다.
+R3 관련 required fix는 Re-audit #2에서 해소됐다. 전체 프로그램의 다음 required work는 R4~R8 roadmap checkpoint다.
 
 ## 8. Accepted Risks
 
@@ -175,10 +175,10 @@ git diff --check
 
 - README와 audit index가 이 리포트를 최신 결과로 링크하는지 확인한다.
 - malformed embedded content가 `GameSession` bootstrap에서 `ContentError`가 되는 regression test를 확인한다.
-- `ContentRegistry` public API와 `spec.md` 9.3 계약이 type/signature 단위로 같은지 확인한다.
+- `ContentRegistry` public API와 `spec.md` 9.3의 String ID/test-import boundary 계약이 같은지 확인한다.
 
 ## 11. Final Decision
 
-**HOLD (Re-audit #1: documentation synchronization complete)**
+**R3 LOCAL PASS (Re-audit #2: fallible bootstrap complete)**
 
-R1~R3의 build·test·supply-chain 로컬 증거는 강하다. IMP-F001과 IMP-F002의 문서 동기화는 Re-audit #1에서 해소됐다. 그러나 ContentRegistry startup/public-contract 불일치(IMP-F003)가 남아 있어 전체 PASS는 아니다. 다음 구현은 `IMPLEMENTATION_SUMMARY.md`의 R3-4이며, 완료 후 이 리포트의 finding ID를 유지하여 재감사한다.
+R1~R3의 build·test·supply-chain 로컬 증거는 강하다. IMP-F001과 IMP-F002는 Re-audit #1, IMP-F003과 DBG-F001은 Re-audit #2에서 해소됐다. 이 리포트는 R3 checkpoint를 local PASS로 판정한다. 전체 R0~R8 program은 R4~R8이 아직 NOT RUN이므로 완료 PASS가 아니며, 다음 구현은 `IMPLEMENTATION_SUMMARY.md`의 R4-1이다.

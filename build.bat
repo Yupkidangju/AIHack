@@ -32,15 +32,15 @@ if /i "!test_ans!"=="y" set "RUN_TESTS=true"
 
 :execute
 if "!RUN_TESTS!"=="true" (
-    cargo test --locked --all-targets
+    cargo test --workspace --locked --all-targets
     if errorlevel 1 exit /b 1
 )
 
 if "!BUILD_TYPE!"=="release" (
-    cargo build --locked --release --all-targets
+    cargo build --workspace --locked --release --all-targets
     set "SOURCE_DIR=target\release"
 ) else (
-    cargo build --locked --all-targets
+    cargo build --workspace --locked --all-targets
     set "SOURCE_DIR=target\debug"
 )
 if errorlevel 1 exit /b 1

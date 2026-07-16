@@ -122,7 +122,7 @@ fn hover_inspect_is_non_turn() {
         aihack::ui::tui::UiRuntimeConfig::default(),
     );
     let before_turn = app.observation().turn;
-    let before_hash = app.session.snapshot().stable_hash();
+    let before_hash = app.revision().snapshot_hash;
     app.handle_candidate(
         UiCommandCandidate::Inspect(Pos { x: 6, y: 5 }),
         std::path::Path::new("/tmp/unused-save.json"),
@@ -130,7 +130,7 @@ fn hover_inspect_is_non_turn() {
     )
     .unwrap();
     assert_eq!(app.observation().turn, before_turn);
-    assert_eq!(app.session.snapshot().stable_hash(), before_hash);
+    assert_eq!(app.revision().snapshot_hash, before_hash);
     assert_eq!(app.hovered_pos(), Some(Pos { x: 6, y: 5 }));
 }
 

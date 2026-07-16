@@ -27,9 +27,10 @@ fn viewport_roundtrip_matches_render_hit_contract() {
     let app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
     let layout = compute_layout(100, 32);
     let viewport = app.viewport_for_observation(layout);
+    let observation = app.observation();
     let world = aihack::core::Pos {
-        x: app.session.world().player_pos().x + 1,
-        y: app.session.world().player_pos().y,
+        x: observation.player_pos.x + 1,
+        y: observation.player_pos.y,
     };
     let term = viewport.world_to_terminal(world, layout.map).unwrap();
     let roundtrip = viewport

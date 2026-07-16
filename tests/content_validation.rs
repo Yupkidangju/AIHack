@@ -1,5 +1,5 @@
 use aihack::{
-    core::ContentError,
+    core::{ContentError, GameSession},
     data::{ContentRegistry, CONTENT_SCHEMA_VERSION},
 };
 
@@ -44,6 +44,16 @@ height = 10
 player_start = [1, 1]
 stairs_up = [1, 1]
 "#;
+const LEVEL_1_WITHOUT_CONTENT: &str = r#"
+level_id = "main:1"
+branch = "Main"
+depth = 1
+width = 10
+height = 10
+player_start = [1, 1]
+stairs_down = [8, 8]
+"#;
+const EMPTY_MONSTERS: &str = "monster = []";
 
 fn registry(
     items: &str,
@@ -132,5 +142,36 @@ fn unsupported_schema_and_unpaired_stairs_are_typed_errors() {
     assert!(matches!(
         registry(ITEMS, MONSTERS, &[("one", LEVEL_1)]),
         Err(ContentError::MissingStairsPair { .. })
+    ));
+}
+
+#[test]
+fn session_bootstrap_returns_content_error_when_main_level_is_missing() {
+    let registry = registry(ITEMS, MONSTERS, &[]).unwrap();
+
+    let result = GameSession::try_new_for_playing_with_registry(42, &registry);
+
+    assert!(matches!(
+        result,
+        Err(ContentError::UnknownReference { owner, target })
+            if owner == "world bootstrap" && target == "main:1"
+    ));
+}
+
+#[test]
+fn session_bootstrap_uses_the_injected_registry_for_starting_items() {
+    let registry = registry(
+        ITEMS,
+        EMPTY_MONSTERS,
+        &[("one", LEVEL_1_WITHOUT_CONTENT), ("two", LEVEL_2)],
+    )
+    .unwrap();
+
+    let result = GameSession::try_new_for_playing_with_registry(42, &registry);
+
+    assert!(matches!(
+        result,
+        Err(ContentError::UnknownReference { owner, target })
+            if owner == "item factory" && target == "item.food.ration"
     ));
 }

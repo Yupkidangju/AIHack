@@ -4,6 +4,7 @@ pub mod event;
 pub mod ids;
 pub mod invariant;
 pub mod observation;
+pub mod policy;
 pub mod position;
 pub mod rng;
 pub mod save;

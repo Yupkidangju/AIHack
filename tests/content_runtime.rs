@@ -31,7 +31,7 @@ fn item_and_monster_factories_use_embedded_registry_values() {
 
 #[test]
 fn levels_and_initial_entities_are_created_from_embedded_definitions() {
-    let session = GameSession::new_for_playing(42);
+    let session = GameSession::try_new_for_playing(42).unwrap();
     assert_eq!(
         session
             .world()

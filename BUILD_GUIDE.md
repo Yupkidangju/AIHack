@@ -15,10 +15,10 @@
 | 항목 | 현재 working tree | v0.3.0 target |
 | --- | --- | --- |
 | Rust | `rust-toolchain.toml` 1.94.1 고정 | `rust-toolchain.toml` 1.94.1 |
-| package | `aihack 0.1.0` 단일 package | workspace, release 0.3.0 |
+| package | 7개 library/app package와 root compatibility facade | workspace, release 0.3.0 |
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
-| binary 선택 | TUI default-run `aihack`, headless는 `--bin` | 같은 이름 + default-run aihack |
+| binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
 | CI | Linux/Windows workflow 구성, 원격 green 대기 | Linux/Windows green |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | wait-only, 조기 사망도 exit 0 | survival-v1, accepted turn 1000 |
@@ -65,22 +65,22 @@ TUI:
 cargo run --locked -- --seed 42
 ```
 
-Headless 현재 진단:
+Headless:
 
 ```bash
-cargo run --locked --bin aihack-headless -- --seed 42 --turns 100
+cargo run --locked -p aihack-headless --bin aihack-headless -- --seed 42 --turns 100
 ```
 
-현재 headless의 `--turns`는 accepted turn 보장이 아니라 최대 loop 요청값이다. 조기 GameOver가 발생할 수 있으므로 long-run 품질 증거로 쓰지 않는다.
+headless의 `--turns`는 absolute accepted-turn target이다. long-run 품질 증거에는 `survival-v1`과 report의 `accepted_turns`, `final_hash`를 함께 사용한다.
 
 현재 기본 검증:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo test --all-targets --locked
-cargo build --all-targets --locked
-cargo build --release --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --all-targets --locked
+cargo build --workspace --all-targets --locked
+cargo build --workspace --release --locked
 ```
 
 ## 4. R1 toolchain과 dependency 고정 결과
@@ -126,7 +126,7 @@ crossterm = "0.29"
 cargo update -p ratatui --precise 0.30.2
 cargo metadata --locked --no-deps --format-version 1
 cargo tree -d
-cargo check --locked --all-targets
+cargo check --workspace --all-targets --locked
 ```
 
 첫 번째 명령은 이미 R1 구현에서 lockfile을 의도적으로 갱신할 때 사용했다. 이후 감사 세션에서는 실행하지 않는다.
@@ -138,9 +138,9 @@ cargo check --locked --all-targets
 `./build.sh [--release] [--test]`:
 
 1. `set -euo pipefail`
-2. `--test`이면 `cargo test --locked --all-targets`
-3. debug면 `cargo build --locked --all-targets`
-4. release면 `cargo build --locked --release --all-targets`
+2. `--test`이면 `cargo test --workspace --all-targets --locked`
+3. debug면 `cargo build --workspace --all-targets --locked`
+4. release면 `cargo build --workspace --release --locked`
 5. host suffix를 계산해 두 binary를 `output/`에 복사
 6. 두 artifact를 `test -x`로 확인
 7. 하나라도 없으면 exit code 1
@@ -209,7 +209,7 @@ CI tool 설치는 `cargo install --locked cargo-audit --version 0.22.1`과 `carg
 target 명령:
 
 ```bash
-cargo run --locked --release --bin aihack-headless -- \
+cargo run --locked --release -p aihack-headless --bin aihack-headless -- \
   --seed 42 \
   --turns 1000 \
   --policy survival-v1 \
@@ -236,33 +236,30 @@ path flag는 repository `runtime/`을 canonical root로 사용한다. absolute p
 필수 stdout 한 줄:
 
 ```text
-seed=42 policy=survival-v1 requested=1000 accepted=1000 submitted=1017 final_state=Playing final_hash=0123456789abcdef
+seed=42 policy=survival-v1 requested_turns=1000 accepted_turns=1000 submitted_commands=1000 final_state=Playing final_hash=0123456789abcdef
 ```
 
 필수 report schema:
 
 ```json
 {
-  "schema_version": 1,
   "seed": 42,
   "policy": "survival-v1",
   "requested_turns": 1000,
   "accepted_turns": 1000,
   "submitted_commands": 1017,
   "final_state": "Playing",
-  "final_hash": "0123456789abcdef",
-  "error": null
+  "final_hash": "0123456789abcdef"
 }
 ```
+
+`policy` 값은 CLI ID와 같은 `wait-v1`, `survival-v1`, `replay-file`이다. runner 실패 report는 위 공통 필드에 `error`를 추가하며, error에는 실패 turn과 `submitted_commands`가 포함된다.
 
 exit code:
 
 - 0: accepted_turns가 requested_turns와 같음
-- 2: CLI 또는 policy 이름 오류
-- 3: accepted action 16회 탐색 실패
-- 4: 조기 GameOver
-- 5: invariant 실패
-- 6: save/replay/report read-write 실패
+- 1: accepted action 탐색 실패, replay 부족 또는 조기 GameOver
+- 2: CLI/policy/path/save/replay/report 입출력 오류
 
 `accepted_turns <= submitted_commands <= accepted_turns * 16`이어야 한다. reject 후 다음 legal candidate를 시도하므로 submitted 값은 accepted보다 클 수 있다.
 
@@ -277,11 +274,12 @@ crates/aihack-core
 crates/aihack-content
 crates/aihack-ai-contract
 crates/aihack-llm
+crates/aihack-runtime
 apps/aihack-tui
 apps/aihack-headless
 ```
 
-root `aihack` package는 `publish = false` compatibility facade와 `tests/**` host로 남는다. workspace `default-members`는 `apps/aihack-tui`이고 `default-run = "aihack"`은 R5에서 TUI app manifest로 이동한다. 따라서 root의 `cargo run --locked -- --seed 42`와 명시적 `cargo run --locked --bin aihack -- --seed 42`가 같은 binary를 선택해야 한다.
+root `aihack` package는 `publish = false` compatibility facade와 `tests/**` host로 남는다. workspace `default-members`는 `apps/aihack-tui`이고 `default-run = "aihack"`은 TUI app manifest가 소유한다. 따라서 root의 `cargo run --locked -- --seed 42`와 명시적 `cargo run --locked --bin aihack -- --seed 42`는 같은 binary를 선택한다. Headless는 default member가 아니므로 package selector `-p aihack-headless`를 함께 지정한다.
 
 root 명령:
 
@@ -290,7 +288,7 @@ cargo check --workspace --all-targets --locked
 cargo test --workspace --all-targets --locked
 cargo build --workspace --release --locked
 cargo run --locked --bin aihack -- --seed 42
-cargo run --locked --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
+cargo run --locked -p aihack-headless --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
 ```
 
 dependency 경계:
@@ -338,7 +336,7 @@ CARGO_TARGET_DIR=/tmp/aihack-audit-target cargo test --workspace --all-targets -
 CARGO_TARGET_DIR=/tmp/aihack-audit-target cargo build --workspace --release --locked
 ```
 
-이 명령은 R5 구현 전에는 `--workspace`가 현재 단일 package를 가리킨다.
+이 명령은 기존 `target/`과 분리된 clean-room target에서 현재 전체 workspace를 검사한다.
 
 ## 11. 런타임 산출물
 

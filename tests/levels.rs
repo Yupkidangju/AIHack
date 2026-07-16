@@ -104,7 +104,7 @@ fn actor_and_item_locations_are_level_aware() {
         Some(EntityId(2))
     );
 
-    let entity_source = include_str!("../src/domain/entity.rs");
+    let entity_source = include_str!("../crates/aihack-core/src/domain/entity.rs");
     assert!(entity_source.contains("location: EntityLocation"));
     assert!(!entity_source.contains(
         "Actor {\n        kind: ActorKind,\n        faction: Faction,\n        pos: Pos"

@@ -1,0 +1,10 @@
+[package]
+name = "aihack-llm"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+license = "UNLICENSED"
+publish = false
+
+[dependencies]
+aihack-ai-contract = { path = "../aihack-ai-contract", version = "0.1.0" }

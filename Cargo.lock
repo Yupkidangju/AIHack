@@ -15,14 +15,84 @@ dependencies = [
 name = "aihack"
 version = "0.1.0"
 dependencies = [
- "clap",
- "crossterm",
+ "aihack-ai-contract",
+ "aihack-content",
+ "aihack-core",
+ "aihack-headless",
+ "aihack-llm",
+ "aihack-runtime",
+ "aihack-tui",
+ "serde_json",
+]
+
+[[package]]
+name = "aihack-ai-contract"
+version = "0.1.0"
+dependencies = [
+ "aihack-core",
+ "serde",
+]
+
+[[package]]
+name = "aihack-content"
+version = "0.1.0"
+dependencies = [
+ "aihack-core",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "aihack-core"
+version = "0.1.0"
+dependencies = [
  "rand",
- "ratatui",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "aihack-headless"
+version = "0.1.0"
+dependencies = [
+ "aihack-ai-contract",
+ "aihack-runtime",
+ "clap",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "toml",
+]
+
+[[package]]
+name = "aihack-llm"
+version = "0.1.0"
+dependencies = [
+ "aihack-ai-contract",
+]
+
+[[package]]
+name = "aihack-runtime"
+version = "0.1.0"
+dependencies = [
+ "aihack-ai-contract",
+ "aihack-content",
+ "aihack-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "aihack-tui"
+version = "0.1.0"
+dependencies = [
+ "aihack-ai-contract",
+ "aihack-llm",
+ "aihack-runtime",
+ "clap",
+ "crossterm",
+ "ratatui",
+ "serde",
 ]
 
 [[package]]

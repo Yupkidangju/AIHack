@@ -1,19 +1,14 @@
-use aihack::core::{CommandIntent, GameSession};
-
-fn run_seed(seed: u64, turns: u64) -> (u64, String) {
-    let mut session = GameSession::new_for_playing(seed);
-    while session.turn() < turns {
-        let _ = session.submit(CommandIntent::Wait);
-        if matches!(session.run_state(), aihack::core::RunState::GameOver { .. }) {
-            break;
-        }
-    }
-    (session.turn(), session.snapshot().stable_hash().0)
-}
+use aihack::core::{
+    policy::{run_to_turn, HeadlessPolicy},
+    GameSession, RunState,
+};
 
 #[test]
-fn release_candidate_multiseed_headless_baselines_are_stable() {
-    assert_eq!(run_seed(42, 1000), (20, "569bc36895258349".to_string()));
-    assert_eq!(run_seed(7, 1000), (28, "f1ee87dc33c32533".to_string()));
-    assert_eq!(run_seed(1234, 1000), (18, "58762b2adea01615".to_string()));
+fn release_candidate_multiseed_survival_runs_reach_target_turn() {
+    for seed in [42, 7, 1234] {
+        let mut session = GameSession::new_for_playing(seed);
+        let report = run_to_turn(&mut session, 1000, HeadlessPolicy::survival_v1()).unwrap();
+        assert_eq!(report.accepted_turns, 1000, "seed {seed}");
+        assert_eq!(report.final_state, RunState::Playing, "seed {seed}");
+    }
 }

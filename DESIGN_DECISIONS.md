@@ -103,7 +103,7 @@ Context:
 
 Decision:
 
-`GameSession`을 유일한 mutable owner로 유지하되 모든 field를 private으로 만든다. 외부 read는 `GameClient`, `Observation`, `ActionSpace`, snapshot query로 제한한다. accepted command는 `TurnTransaction`의 prepare → apply → 6 invariant validate → atomic commit 순서를 따른다. 실패 시 world, event log, turn, RNG draw를 모두 보존한다.
+`GameSession`을 유일한 mutable owner로 유지하되 모든 field를 private으로 만든다. 외부 read는 session getter, `Observation`, snapshot query로 제한한다. accepted command는 `TurnTransaction`의 prepare → apply → 6 invariant validate → atomic commit 순서를 따른다. 거절과 invariant failure는 `accepted=false` outcome으로 표현하며 world, event log, turn, RNG draw를 모두 보존한다.
 
 Alternatives Considered:
 
@@ -115,12 +115,12 @@ Consequences:
 
 - integration test는 `tests/support/session_builder.rs`를 사용한다.
 - R2에서는 hash field order와 게임 공식 변경을 허용하지 않는다.
-- invariant 오류는 typed error와 no-commit 결과가 된다.
-- API 변경은 workspace 추출 전 완료한다.
+- invariant 오류는 no-commit `accepted=false` result가 된다.
+- `GameClient`, revision, typed submit error는 R5 workspace boundary와 R6 stale-response gate에서 함께 도입한다.
 
 ## ADR-0024: embedded TOML ContentRegistry가 runtime 데이터 원천
 
-Status: Partially implemented; R3-4 bootstrap error boundary pending
+Status: Implemented (Re-audit #2, 2026-07-16)
 Date: 2026-07-15
 Decision ID: DEC-CONTENT-01
 
@@ -141,12 +141,12 @@ Alternatives Considered:
 Consequences:
 
 - content schema/version과 hash가 save/replay compatibility metadata가 된다.
-- invalid embedded data는 게임 시작 실패이며 fallback hardcoded data를 쓰지 않는다. 현재 bootstrap의 `expect` 경로는 이 결과와 불일치하므로 R3-4에서 fallible `ContentError` 경계로 교체한다.
+- invalid embedded data는 게임 시작 실패이며 fallback hardcoded data를 쓰지 않는다. TUI/headless production bootstrap은 R3-4에서 fallible `ContentError` 경계로 전환됐고, injected missing level/item regression test가 이를 고정한다. legacy infallible fixture adapter는 production startup 경계가 아니다.
 - R3에서 현재 TOML 값의 provenance도 함께 조사한다.
 
 ## ADR-0025: core/content/AI/adapter workspace 경계
 
-Status: Accepted for v0.3.0 plan; implementation pending
+Status: Implemented and verified by `audit_report_6.md`
 Date: 2026-07-15
 Decision ID: DEC-WORKSPACE-01
 
@@ -156,7 +156,7 @@ Context:
 
 Decision:
 
-R1~R4 behavior gate가 통과한 뒤 `aihack-core`, `aihack-content`, `aihack-ai-contract`, `aihack-llm`, `aihack-tui`, `aihack-headless` workspace로 분리한다. core는 serde, thiserror, rand만 허용하며 UI와 HTTP dependency를 갖지 않는다. binary 이름과 CLI는 유지한다.
+R1~R4 behavior gate가 통과한 뒤 `aihack-core`, `aihack-content`, `aihack-ai-contract`, `aihack-llm`, `aihack-runtime`, `aihack-tui`, `aihack-headless` workspace로 분리한다. runtime은 core와 content의 조합, content bootstrap, command 실행 및 저장 경계를 소유하고 `GameClient`만 adapter에 노출한다. core는 serde, thiserror, rand만 허용하며 UI와 HTTP dependency를 갖지 않는다. binary 이름과 CLI는 유지한다.
 
 Alternatives Considered:
 
@@ -167,7 +167,7 @@ Alternatives Considered:
 Consequences:
 
 - R5는 mechanical move만 수행하며 hash 변경을 허용하지 않는다.
-- crate public API는 `GameClient`, DTO, registry constructor 중심으로 최소화한다.
+- crate public API는 `GameClient`, DTO, registry constructor 중심으로 최소화한다. runtime을 두어 adapter가 core/session 구현에 직접 의존하지 않게 한다.
 - file move는 Task당 5개 이하로 나눈다.
 
 ## ADR-0026: local LLM은 loopback presentation adapter

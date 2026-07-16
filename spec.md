@@ -48,7 +48,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오별로 재구�
 
 | ID | 기준 |
 | --- | --- |
-| SC-BUILD-01 | `cargo build --locked --all-targets`가 새 target 디렉터리에서 통과 |
+| SC-BUILD-01 | `cargo build --workspace --all-targets --locked`가 새 target 디렉터리에서 통과 |
 | SC-BUILD-02 | Linux와 Windows CI가 fmt, clippy, test, release build를 통과 |
 | SC-CORE-01 | `src/ui`, `src/llm`, integration test에서 session/world 필드 직접 대입 0건 |
 | SC-CORE-02 | 모든 accepted turn 뒤 invariant 검사 오류 0건 |
@@ -106,6 +106,7 @@ crates/
   aihack-content/
   aihack-ai-contract/
   aihack-llm/
+  aihack-runtime/
 apps/
   aihack-tui/
   aihack-headless/
@@ -128,8 +129,9 @@ root package `aihack`은 `publish = false`인 compatibility facade와 기존 `te
 aihack-content ------> aihack-core
 aihack-ai-contract --> aihack-core read-only DTO
 aihack-llm ----------> aihack-ai-contract
-aihack-tui ----------> core + content + AI contract + LLM
-aihack-headless -----> core + content + AI contract
+aihack-runtime ------> core + content + AI contract
+aihack-tui ----------> runtime + AI contract + LLM
+aihack-headless -----> runtime + AI contract
 root aihack facade --> all public workspace libraries, tests only
 ```
 
@@ -138,6 +140,7 @@ root aihack facade --> all public workspace libraries, tests only
 - `aihack-core -> aihack-llm`
 - `aihack-core -> ratatui/crossterm/http client`
 - `aihack-content -> UI`
+- `aihack-tui/headless -> aihack-core` 직접 접근
 - adapter에서 core 내부 필드 접근
 
 워크스페이스 이동은 R5에서 수행한다. R1~R4 동안 현재 `src/` 구조를 유지하여 기능 변경과 파일 이동을 분리한다.
@@ -153,7 +156,7 @@ cargo test --workspace --all-targets --locked
 cargo build --workspace --all-targets --locked
 cargo build --workspace --release --locked
 cargo run --locked --bin aihack -- --seed 42
-cargo run --locked --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
+cargo run --locked -p aihack-headless --bin aihack-headless -- --seed 42 --turns 1000 --policy survival-v1
 ```
 
 R5 이전에는 `--workspace`를 제거하고 같은 명령을 사용한다.
@@ -200,7 +203,7 @@ accepted turn 순서:
 11. snapshot hash 생성
 12. observation 생성
 
-검증 실패 시 transaction은 commit하지 않고 `Err(SubmitError)`를 반환한다. UI-only command의 `Ok(TurnOutcome { turn_advanced: false, .. })`와 실패를 같은 상태로 취급하지 않는다.
+검증 실패 시 transaction은 commit하지 않고 `TurnOutcome { accepted: false, turn_advanced: false, .. }`를 반환한다. UI-only command의 `accepted=true, turn_advanced=false`와 거절을 같은 상태로 취급하지 않는다. `Result<..., SubmitError>`와 revision 기반 public boundary는 R5/R6에서 도입할 후속 계약이다.
 
 ## 9. 경계 타입 계약
 
@@ -216,57 +219,33 @@ pub struct GameSession {
     event_log: Vec<GameEvent>,
 }
 
-pub trait GameClient {
-    fn snapshot(&self) -> GameSnapshot;
-    fn observation(&self) -> Observation;
-    fn action_space(&self) -> ActionSpace;
-    fn submit(&mut self, intent: CommandIntent) -> Result<TurnOutcome, SubmitError>;
-}
-
-pub struct SessionRevision {
-    pub turn: u64,
-    pub snapshot_hash: SnapshotHash,
-}
-
 pub struct TurnOutcome {
-    pub revision_before: SessionRevision,
-    pub revision_after: SessionRevision,
+    pub accepted: bool,
     pub turn_advanced: bool,
     pub events: Vec<GameEvent>,
-}
-
-pub enum SubmitError {
-    InvalidRunState { state: RunStateSummary },
-    IllegalAction { action: ActionIntent },
-    MissingDirection,
-    MissingInventorySelection,
-    InvariantViolation { errors: Vec<WorldInvariantError> },
+    pub snapshot_hash: SnapshotHash,
+    pub next_state: RunState,
 }
 ```
 
-공개 getter는 `seed()`, `turn()`, `run_state()`, `snapshot()`, `observation()`, `action_space()`로 제한한다. 테스트 상태 설정은 `tests/support/SessionFixtureBuilder`만 사용한다. `Ok(TurnOutcome)`은 command accepted를 뜻하며, `turn_advanced=true`인 결과만 headless accepted turn에 합산한다. `Err(SubmitError)`는 world, RNG, turn, event log를 바꾸지 않는다.
+현재 공개 getter는 `seed()`, `turn()`, `run_state()`, `event_log()`, `world()`, `snapshot()`, `observation()`이며 `action_space`는 observation의 read-only field다. `submit(&mut self, CommandIntent) -> TurnOutcome`의 `accepted`가 command acceptance를 나타내고, `turn_advanced=true`인 결과만 headless accepted turn에 합산한다. 거절과 invariant failure는 world, RNG, turn, event log를 바꾸지 않는다. 테스트 상태 설정은 `aihack::testing::SessionBuilder`만 사용한다.
+
+`GameClient`, `SessionRevision`, typed `SubmitError`, `ReplayTurnOutcomeV1` projection은 현재 R2 완료 범위가 아니다. R5-2에서 `aihack-runtime`은 content bootstrap·명령 실행·저장 경계를 조합하고, TUI/headless에는 `GameClient` trait만 노출한다. 이 trait의 최소 읽기 계약은 `observation()`, `revision()`, `run_state()`이며 mutation entry는 `submit(CommandIntent) -> TurnOutcome`이다. 저장 I/O와 실제 session 구현은 runtime 내부에 남긴다. R6-2에서 stale-response 판정을 이 revision 계약에 연결한다.
 
 ### 9.2 Turn transaction과 invariant
 
 ```rust
-pub struct TurnTransaction {
-    pub revision_before: SessionRevision,
-    pub command: CommandIntent,
-    pub events: Vec<GameEvent>,
-    pub rng_draws_before: u64,
-}
-
 pub enum WorldInvariantError {
-    MissingPlayer,
-    PlayerLevelMismatch,
-    DuplicateInventoryLetter { letter: char },
-    InvalidEntityId { id: EntityId },
-    MissingLevel { level: LevelId },
-    ItemLocationMismatch { item: EntityId },
+    CurrentLevelMissing { level: LevelId },
+    PlayerMissing { player: EntityId },
+    PlayerIsNotPlayer { player: EntityId },
+    PlayerLevelMismatch { current_level: LevelId, player_level: LevelId },
+    PlayerOutOfBounds { level: LevelId, pos: Pos },
+    InventoryOwnerMismatch { player: EntityId, owner: EntityId },
 }
 
 pub struct InvariantReport {
-    pub checked: u16,
+    pub checked: u8,
     pub errors: Vec<WorldInvariantError>,
 }
 ```
@@ -294,14 +273,23 @@ pub enum ContentError {
 }
 ```
 
-`schema_version = 1`. 동일 ID 중복, 존재하지 않는 참조, 맵 밖 좌표는 시작 실패다. panic fallback은 허용하지 않는다.
-`schema_version()`, `content_hash()`, `item(id)`, `monster(id)`, `level(id)` read-only query만 공개한다.
+`schema_version = 1`. 동일 ID 중복, 존재하지 않는 참조, 맵 밖 좌표는 시작 실패다. production bootstrap에는 panic fallback을 허용하지 않는다.
+현재 ID 저장·조회는 콘텐츠 파일과의 호환성을 위해 `String`/`&str`를 사용한다. read-only query는 `schema_version()`, `content_hash()`, `item(id)`, `monster(id)`, `level(id)`이며, 검증·diagnostic/import 지원을 위해 `items()`, `monsters()`, `levels()` iterator와 `from_toml_sources(...)` source constructor도 공개한다. 후자는 runtime mutation API가 아니며 동일 validation path를 테스트와 content import에 제공한다.
 
 ### 9.3.1 현재 구현 상태와 R3-4 정렬 조건
 
-R3-1..R3-3은 TOML validation과 runtime factory 연결까지 구현됐다. 그러나 현재 구현은 `String` ID와 test/import를 위한 추가 public iterator·source constructor를 사용하며, session bootstrap에는 `expect` 경로가 남아 있다. 이는 위 target 계약의 완료 상태가 아니다. `R3-4`는 fallible bootstrap, 공개 surface, typed ID/error를 이 절과 정렬한 뒤에만 `SC-DATA-01`을 PASS로 변경한다. 근거와 재감사 방법은 `audit_report_1.md`의 `IMP-F003`을 따른다.
+R3-4에서 `GameSession::try_new`, `try_new_for_playing` 및 registry-injected variants가 `Result<_, ContentError>`로 bootstrap 오류를 반환하도록 전환했다. TUI와 headless binary는 이 fallible production 경로를 사용한다. 기존 `new`/`new_for_playing` 및 phase fixture는 기존 test fixture 호환을 위해 남아 있는 infallible adapter이며, production startup contract의 근거가 아니다. `from_toml_sources(...)`는 injected-source validation과 import 지원의 명시적 public 경계다. typed ID newtype은 콘텐츠 형식/API를 넓게 바꾸는 후속 호환성 작업으로 분리하며, 현재 SC-DATA-01의 범위는 String ID 계약과 fallible bootstrap을 문서·구현 모두에서 일치시키는 것이다.
 
 ### 9.4 LLM 설정과 요청
+
+R6-2에서 stale response를 판정하기 위해 아래 revision type을 도입한다. 이는 현재 R2 `GameSession` public API가 아니라 LLM contract target이다.
+
+```rust
+pub struct SessionRevision {
+    pub turn: u64,
+    pub snapshot_hash: SnapshotHash,
+}
+```
 
 ```rust
 pub struct LocalLlmConfig {
@@ -630,7 +618,7 @@ pos = [6, 5]
 ## 12. Headless policy
 
 ```rust
-pub enum HeadlessPolicyId {
+pub enum HeadlessPolicy {
     WaitV1,
     SurvivalV1,
     ReplayFile,
@@ -638,23 +626,22 @@ pub enum HeadlessPolicyId {
 
 pub struct HeadlessRunReport {
     pub seed: u64,
-    pub policy: HeadlessPolicyId,
+    pub policy: HeadlessPolicy,
     pub requested_turns: u64,
     pub accepted_turns: u64,
     pub submitted_commands: u64,
-    pub final_state: RunStateSummary,
+    pub final_state: RunState,
     pub final_hash: SnapshotHash,
-    pub error: Option<HeadlessRunError>,
 }
 
 pub enum HeadlessRunError {
-    InvalidCli,
-    NoAcceptedAction { turn: u64, attempts: u8 },
-    GameOver { turn: u64, cause: DeathCauseSummary },
-    Submit { turn: u64, error: SubmitError },
-    ReportWrite { path: String },
+    NoAcceptedAction { turn: u64, attempts: u8, submitted_commands: u64 },
+    GameOver { turn: u64, submitted_commands: u64 },
+    ReplayExhausted { turn: u64, submitted_commands: u64 },
 }
 ```
+
+성공 report는 `HeadlessRunReport`만 serialize한다. runner 실패 시 CLI는 같은 경로에 현재 session의 seed, accepted/submitted command 수, final state/hash와 `HeadlessRunError`를 포함한 failure report를 기록한 뒤 성공 exit로 처리하지 않는다.
 
 `survival-v1` 규칙:
 
@@ -697,26 +684,7 @@ v0.3.0 신규 10개:
 - content_hash는 save metadata에 추가하지 않고 v0.3.0 load 시 현재 registry와 fixture test로 검증
 - schema 필드 추가가 필요하면 v0.4.0 spec에서 SaveDataV2를 정의
 
-R2의 internal `Result<TurnOutcome, SubmitError>`는 replay wire shape를 바꾸지 않는다.
-
-```rust
-pub struct ReplayTurnOutcomeV1 {
-    pub accepted: bool,
-    pub turn_advanced: bool,
-    pub events: Vec<GameEvent>,
-    pub snapshot_hash: SnapshotHash,
-    pub next_state: RunState,
-}
-
-pub struct ReplayLineV1 {
-    pub turn_before: u64,
-    pub command: CommandIntent,
-    pub outcome: ReplayTurnOutcomeV1,
-    pub snapshot_hash_after: SnapshotHash,
-}
-```
-
-`Ok(TurnOutcome)`은 `accepted=true`로, `Err(SubmitError)`는 현재 revision의 hash/state와 빈 event를 가진 `accepted=false`로 projection한다. 이 projection test가 기존 replay fixture와 field/tag 단위로 같아야 한다.
+현재 replay wire는 `TurnOutcome`을 직접 직렬화한다. `ReplayLineV1`은 turn_before, command, outcome, snapshot_hash_after를 보유하며, `outcome.accepted=false`는 거절/no-commit 결과를 나타낸다. canonical JSON fixture의 추가와 `Result<TurnOutcome, SubmitError>` projection은 R5/R6 public boundary 도입 시 함께 정의한다.
 
 ## 15. 구현 단계
 
