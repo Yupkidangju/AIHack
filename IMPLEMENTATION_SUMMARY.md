@@ -13,18 +13,13 @@
 
 ## 1. 현재 기준과 목표
 
-현재 코드는 fmt, clippy, 전체 245개 test, release build를 통과한다. 그러나 다음은 완료되지 않았다.
+현재 코드는 R1~R5와 R6 local automated integration gate까지 fmt, clippy, test를 통과한다. 다음 release 범위는 아직 완료되지 않았다.
 
-- 고정 toolchain과 CI
-- 단일 crossterm dependency
-- private session/world state
-- runtime에 연결된 TOML registry
-- 실제 1000 accepted-turn 검증
-- 실제 local LLM transport와 강제 timeout
-- stale LLM response 차단
+- Linux/Windows 원격 CI evidence
+- local LLM 실 provider·terminal 수동 matrix와 독립 감사
 - NetHack 출처·호환성 trace
 
-v0.3.0은 새 기능 추가보다 이 8개 기반을 먼저 닫는다.
+v0.3.0은 새 기능 추가보다 이 release evidence와 provenance 기반을 먼저 닫는다.
 
 ## 2. 전체 런타임 흐름
 
@@ -62,7 +57,7 @@ LLM은 마지막 presentation branch에서만 호출한다. core turn은 LLM 응
 | `crates/aihack-core/src/*` | 순수 domain, 결정론 규칙, generic state/save/transaction primitive |
 | `crates/aihack-content/src/*` | embedded schema, TOML asset, registry 검증 |
 | `crates/aihack-ai-contract/src/*` | read-only Observation/ActionSpace/ClientRevision 계약 |
-| `crates/aihack-llm/src/*` | R6 전까지 provider-independent contract scaffold |
+| `crates/aihack-llm/src/*` | loopback transport, strict response validation, bounded worker, provider fallback와 R6 decision scaffold |
 | `crates/aihack-runtime/src/*` | content-aware world/session/system, projection, save/replay I/O |
 | `apps/aihack-tui/src/*` | Observation render, CommandIntent 생성, `aihack` binary |
 | `apps/aihack-headless/src/*` | policy 실행, report/replay CLI, `aihack-headless` binary |
@@ -603,16 +598,18 @@ cargo run --locked -p aihack-headless --bin aihack-headless -- --seed 42 --turns
 
 **설명:** loopback OpenAI-compatible endpoint를 reqwest blocking worker 1개로 호출하고 강제 timeout/fallback을 구현한다.
 
+**진행 상태 (2026-07-17):** 구현 및 local gate 완료. endpoint·resolve 결과를 loopback으로 제한하고 연결 주소를 client에 고정했으며 redirect/system proxy를 비활성화했다. narrative 요청은 전용 worker 1개와 capacity 16 request/response channel을 사용한다. request/response 크기, timeout, strict JSON, Unicode scalar 길이, C0/C1/ANSI control, soft user text 경계를 검증하고 실패 시 결정론적 fallback을 반환한다. R6 전체 checkpoint는 R6-2와 R6-3 완료 전까지 진행 중이다.
+
 **수용 기준:**
 
-- [ ] disabled, success, connect failure, timeout, invalid JSON, empty text 처리
-- [ ] connect 500ms, narrative 2000ms
-- [ ] output 1..=240 chars
-- [ ] bounded request/response channel capacity 16, queue full은 즉시 typed error
-- [ ] redirect/proxy 비활성, response body 최대 65,536 bytes
-- [ ] endpoint resolve 결과 loopback 재검사, request JSON 최대 32,768 bytes
-- [ ] user text/control character/unknown JSON field boundary validation
-- [ ] provider 결과가 snapshot/save/replay를 변경하지 않음
+- [x] disabled, success, connect failure, timeout, invalid JSON, empty text 처리
+- [x] connect 500ms, narrative 2000ms
+- [x] output 1..=240 Unicode scalar
+- [x] bounded request/response channel capacity 16, queue full은 즉시 typed error
+- [x] redirect/proxy 비활성, response body 최대 65,536 bytes
+- [x] endpoint resolve 결과 loopback 재검사 및 연결 주소 고정, request JSON 최대 32,768 bytes
+- [x] user text/control character/unknown JSON field boundary validation
+- [x] provider 결과가 snapshot/save/replay를 변경하지 않음
 
 **검증:**
 
@@ -622,19 +619,24 @@ cargo test -p aihack --locked --test llm_narrative
 ```
 
 **선행:** R5 checkpoint
-**파일:** `crates/aihack-llm/src/config.rs`, `transport.rs`, `worker.rs`, `narrative.rs`, `tests/llm_transport.rs`
-**범위:** M, 5개
+**파일:** `crates/aihack-llm/Cargo.toml`, `Cargo.lock`, `crates/aihack-llm/src/config.rs`, `crates/aihack-llm/src/transport.rs`, `tests/llm_transport.rs`
+**범위:** R6-1A S, 5개
+
+**파일:** `crates/aihack-llm/src/lib.rs`, `crates/aihack-llm/src/worker.rs`, `crates/aihack-llm/src/narrative.rs`, `tests/llm_narrative.rs`, `tests/ui_runtime_smoke.rs`
+**범위:** R6-1B S, 5개
 
 ### Task R6-2: Decision revision gate
 
 **설명:** action proposal에 request/revision correlation을 적용한다.
 
+**진행 상태 (2026-07-17):** 구현 및 local gate 완료. `DecisionGate`가 kind별 outstanding 1개를 opaque UUID와 request revision으로 추적한다. unknown ID는 정상 outstanding을 소비하지 않으며 matching response만 소진한다. strict decision JSON은 현재 request ActionSpace의 canonical wire action으로만 변환되고, transport와 TUI에서 current revision·current ActionSpace·confidence·rationale를 검증한 뒤 private `ValidatedDecision`을 만든다. submit 직전 revision도 다시 확인하므로 validation과 실행 사이의 stale 응답은 core를 변경하지 않는다.
+
 **수용 기준:**
 
-- [ ] stale turn/hash는 `LlmResponseError::Stale`
-- [ ] unknown request_id는 `InvalidSchema { code: UnknownRequestId }`
-- [ ] current action space에 없는 action은 `InvalidSchema { code: InvalidAction }`
-- [ ] valid action만 normal submit path 사용
+- [x] stale turn/hash는 `LlmResponseError::Stale`
+- [x] unknown request_id는 `InvalidSchema { code: UnknownRequestId }`
+- [x] current action space에 없는 action은 `InvalidSchema { code: InvalidAction }`
+- [x] valid action만 normal submit path 사용
 
 **검증:**
 
@@ -644,20 +646,25 @@ cargo test -p aihack --locked --test llm_revision_gate
 ```
 
 **선행:** R6-1
-**파일:** `crates/aihack-llm/src/decision.rs`, `crates/aihack-ai-contract/src/llm.rs`, `tests/llm_revision_gate.rs`
-**범위:** M, 3개
+**파일:** `crates/aihack-ai-contract/src/llm.rs`, `crates/aihack-ai-contract/src/lib.rs`, `crates/aihack-llm/src/decision.rs`, `crates/aihack-llm/src/transport.rs`, `crates/aihack-llm/src/worker.rs`
+**범위:** R6-2A S, 5개
+
+**파일:** `src/llm/decision.rs`, `tests/llm_revision_gate.rs`, `tests/llm_decision_support.rs`, `tests/ui_runtime_smoke.rs`
+**범위:** R6-2B S, 4개
 
 ### Task R6-3: Soft adjudication UI
 
 **설명:** LLM 판정을 Favorable/Neutral/Unfavorable presentation으로 표시한다.
 
+**진행 상태 (2026-07-17):** 구현 및 local gate 완료. strict `SOFT_ADJUDICATION` JSON은 UPPER_SNAKE verdict와 camelCase field만 허용하고 reason code·message·control 경계를 render 전에 검증한다. provider 실패는 `Neutral / LLM_UNAVAILABLE`로 표시하며 활성 결과는 인벤토리보다 우선해 INSPECT 패널에 나타난다. 결과 설정과 N/Esc dismiss는 core revision·save/replay truth를 바꾸지 않는다. TUI 종료 경로는 terminal 복원 뒤 sender를 닫고 worker를 최대 250ms 기다린 후 detach한다.
+
 **수용 기준:**
 
-- [ ] reason_code와 message 표시
-- [ ] core effect 생성 0건
-- [ ] save/replay 포함 0건
-- [ ] reduced-motion/high-contrast에서도 텍스트 판독 가능
-- [ ] TUI exit에서 terminal restore 후 worker shutdown grace 250ms
+- [x] reason_code와 message 표시
+- [x] core effect 생성 0건
+- [x] save/replay 포함 0건
+- [x] reduced-motion/high-contrast에서도 텍스트 판독 가능
+- [x] TUI exit에서 terminal restore 후 worker shutdown grace 250ms
 
 **검증:**
 
@@ -667,8 +674,44 @@ cargo test -p aihack --locked --test ui_runtime_smoke
 ```
 
 **선행:** R6-2
-**파일:** `crates/aihack-ai-contract/src/llm.rs`, `apps/aihack-tui/src/render_panels.rs`, `apps/aihack-tui/src/app.rs`, `tests/llm_soft_adjudication.rs`
-**범위:** M, 4개
+**파일:** `crates/aihack-ai-contract/src/llm.rs`, `crates/aihack-llm/src/lib.rs`, `crates/aihack-llm/src/soft_adjudication.rs`, `crates/aihack-llm/src/transport.rs`, `src/llm/soft_adjudication.rs`
+**범위:** R6-3A S, 5개
+
+**파일:** `apps/aihack-tui/src/lib.rs`, `apps/aihack-tui/src/tui/input.rs`, `apps/aihack-tui/src/tui/mod.rs`, `apps/aihack-tui/src/tui/render_panels.rs`, `tests/llm_soft_adjudication.rs`
+**범위:** R6-3B S, 5개
+
+**파일:** `crates/aihack-llm/src/worker.rs`, `tests/llm_transport.rs`
+**범위:** R6-3C S, 2개
+
+### Task R6-4: Integrated TUI CTA and failure matrix
+
+**설명:** local provider worker를 실제 TUI input/render loop에 연결하고 모든 결과를 core 권한 경계 안에서 처리한다.
+
+**진행 상태 (2026-07-17):** local automated gate 완료. G/A/J가 narrative/decision/soft request를 enqueue하고 textual status와 Judge 240자 modal을 표시한다. suggestion은 current revision과 ActionSpace를 재검증한 뒤 Y 승인에서만 normal submit을 사용한다. N/Esc는 UI-only 결과를 제거하고 R은 새 request ID로 마지막 실패를 재시도한다. 동일 종류 outstanding 1개, 250ms cooldown, capacity 16 response oldest-drop, keyboard/mouse 동일 CTA candidate가 자동 테스트로 고정됐다. 실 provider·terminal 수동 matrix와 독립 감사는 미실행이다.
+
+**수용 기준:**
+
+- [x] G/A/J enqueue와 Disabled/Ready/Pending/Busy/Timeout/Unavailable/Invalid/Stale 텍스트 상태
+- [x] Judge input trim·control 거부·Unicode 240자 경계
+- [x] Y만 decision submit, N/Esc와 soft/narrative는 core effect 0건
+- [x] stale/invalid/unavailable fallback에서 snapshot hash 불변
+- [x] 표시 footer의 keyboard/mouse CTA candidate 일치
+- [ ] 실 provider·terminal 수동 matrix
+- [ ] 독립 R6 감사
+
+**검증:**
+
+```bash
+cargo test -p aihack --locked --test llm_transport
+cargo test -p aihack --locked --test llm_tui_integration
+cargo test -p aihack --locked --test llm_revision_gate --test llm_soft_adjudication
+```
+
+**파일:** `crates/aihack-llm/src/service.rs`, `crates/aihack-llm/src/transport.rs`, `apps/aihack-tui/src/tui/mod.rs`, `apps/aihack-tui/src/tui/render_panels.rs`, `tests/llm_tui_integration.rs`
+**범위:** R6-4A S, 5개
+
+**파일:** `apps/aihack-tui/src/tui/input.rs`, `tests/llm_transport.rs`
+**범위:** R6-4B S, 2개
 
 ### Checkpoint R6
 
@@ -785,4 +828,4 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 구현 단계는 `Task R6-1`이다. `audit_report_9.md`가 R5 문서 시정과 전체 회귀를 PASS했고 G-TEST-001/002와 G-ARCH-001의 closure도 유지된다. 전체 program PASS와 R8 release gate는 아직 열려 있다.
+다음 단계는 R6 실 provider·terminal 수동 matrix와 독립 감사다. R6-1~4의 transport·bounded worker·fallback·revision gate·soft presentation·TUI G/A/J/Y/N/R 통합과 자동 failure matrix는 local 검증을 통과했다. R6 전체 checkpoint, 전체 program PASS, R8 release gate는 수동 evidence와 독립 감사 전까지 열려 있다.

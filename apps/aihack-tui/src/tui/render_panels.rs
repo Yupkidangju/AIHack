@@ -3,7 +3,10 @@ use crate::{
     domain::{entity::EntityKind, item::ItemKind, tile::TileKind},
     ui::tui::UiPanel,
 };
+use aihack_llm::config::LlmRequestKind;
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+
+use super::LlmUiStatus;
 
 pub struct TextPanel<'a> {
     pub title: &'a str,
@@ -84,6 +87,78 @@ pub fn command_lines(observation: &Observation, focused_panel: UiPanel) -> Vec<S
     ]
 }
 
+pub fn llm_status_lines(status: &LlmUiStatus) -> Vec<String> {
+    let (badge, body) = match status {
+        LlmUiStatus::Disabled => ("LLM: OFF", "Local LLM disabled; core play is available."),
+        LlmUiStatus::Connecting => ("LLM: ...", "Connecting to loopback provider."),
+        LlmUiStatus::Ready => ("LLM: READY", "[G] Narrative [A] Suggest [J] Judge"),
+        LlmUiStatus::Pending { kind, request_id } => {
+            return vec![
+                "LLM: WAIT".to_string(),
+                format!(
+                    "{} request {} [N] Dismiss",
+                    request_kind_label(kind),
+                    request_id.chars().take(8).collect::<String>()
+                ),
+            ];
+        }
+        LlmUiStatus::Busy => (
+            "LLM: BUSY",
+            "Queue capacity 16 reached. [R] Retry [N] Dismiss",
+        ),
+        LlmUiStatus::Timeout { kind } => {
+            return vec![
+                "LLM: TIMEOUT".to_string(),
+                format!(
+                    "{} request timed out. [R] Retry [N] Dismiss",
+                    request_kind_label(kind)
+                ),
+            ];
+        }
+        LlmUiStatus::Unavailable => (
+            "LLM: DOWN",
+            "Loopback provider unavailable. [R] Retry [N] Dismiss",
+        ),
+        LlmUiStatus::Invalid => ("LLM: INVALID", "Response or input rejected. [N] Dismiss"),
+        LlmUiStatus::Stale => (
+            "LLM: STALE",
+            "Session changed; response discarded. [N] Dismiss",
+        ),
+    };
+    vec![badge.to_string(), body.to_string()]
+}
+
+pub fn llm_footer_line(
+    status: &LlmUiStatus,
+    has_valid_suggestion: bool,
+    has_result: bool,
+) -> String {
+    if has_valid_suggestion {
+        "[Y] Apply [N] Dismiss".to_string()
+    } else if has_result {
+        "[N] Dismiss".to_string()
+    } else {
+        llm_status_lines(status).get(1).cloned().unwrap_or_default()
+    }
+}
+
+pub fn soft_input_lines(input: &str) -> Vec<String> {
+    vec![
+        "Describe an attempted action for a presentation-only judgment.".to_string(),
+        input.to_string(),
+        format!("{}/240 Unicode characters", input.chars().count()),
+        "[Enter] Submit  [Esc] Cancel".to_string(),
+    ]
+}
+
+fn request_kind_label(kind: &LlmRequestKind) -> &'static str {
+    match kind {
+        LlmRequestKind::Narrative => "Narrative",
+        LlmRequestKind::Decision => "Suggestion",
+        LlmRequestKind::SoftAdjudication { .. } => "Judgment",
+    }
+}
+
 pub fn log_lines(observation: &Observation, narrative_lines: &[String]) -> Vec<String> {
     let mut out = recent_priority_messages(observation);
     if out.len() < 4 {
@@ -102,10 +177,13 @@ pub fn inspect_lines(
         return hovered_inspect_lines(observation, pos);
     }
 
-    let mut lines = inventory_lines(observation);
-    if lines.len() < 4 {
-        lines.extend(decision_lines.iter().take(4 - lines.len()).cloned());
+    if !decision_lines.is_empty() {
+        let mut lines = decision_lines.iter().take(4).cloned().collect::<Vec<_>>();
+        lines.push(format!("focus {:?}", focused_panel));
+        return lines;
     }
+
+    let mut lines = inventory_lines(observation);
     lines.push(format!("focus {:?}", focused_panel));
     lines
 }

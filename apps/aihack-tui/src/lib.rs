@@ -49,7 +49,7 @@ mod domain {
 }
 
 mod llm {
-    pub use aihack_llm::{decision, narrative};
+    pub use aihack_llm::{config, decision, narrative, service, soft_adjudication, transport};
 }
 
 mod ui {

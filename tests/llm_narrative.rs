@@ -7,6 +7,7 @@ use aihack::{
         NarrativeRequest, NarrativeSource,
     },
 };
+use aihack_llm::ClientRevision;
 
 struct SuccessProvider;
 impl NarrativeProvider for SuccessProvider {
@@ -52,10 +53,27 @@ impl NarrativeProvider for SlowProvider {
     }
 }
 
+struct TextProvider(String);
+
+impl NarrativeProvider for TextProvider {
+    fn generate(
+        &self,
+        _request: &NarrativeRequest,
+        _timeout: Duration,
+    ) -> Result<String, NarrativeError> {
+        Ok(self.0.clone())
+    }
+}
+
 fn request() -> NarrativeRequest {
+    let session = GameSession::new_for_playing(42);
     NarrativeRequest {
+        revision: ClientRevision {
+            turn: session.turn(),
+            snapshot_hash: session.snapshot().stable_hash(),
+        },
         topic: NarrativeTopic::SituationSummary,
-        observation: GameSession::new_for_playing(42).observation(),
+        observation: session.observation(),
     }
 }
 
@@ -112,6 +130,10 @@ fn narrative_does_not_affect_snapshot_hash() {
     let response = request_narrative_with_timeout(
         Some(Arc::new(SuccessProvider)),
         NarrativeRequest {
+            revision: ClientRevision {
+                turn: session.turn(),
+                snapshot_hash: session.snapshot().stable_hash(),
+            },
             topic: NarrativeTopic::SituationSummary,
             observation: session.observation(),
         },
@@ -121,4 +143,33 @@ fn narrative_does_not_affect_snapshot_hash() {
     assert_eq!(before, after);
     let lines = narrative_log_lines(&response);
     assert_eq!(lines.len(), 2);
+}
+
+#[test]
+fn narrative_limit_counts_unicode_scalars_instead_of_bytes() {
+    let accepted = request_narrative_with_timeout(
+        Some(Arc::new(TextProvider("가".repeat(240)))),
+        request(),
+        Duration::from_millis(10),
+    );
+    let rejected = request_narrative_with_timeout(
+        Some(Arc::new(TextProvider("가".repeat(241)))),
+        request(),
+        Duration::from_millis(10),
+    );
+
+    assert_eq!(accepted.source, NarrativeSource::Provider);
+    assert_eq!(rejected.source, NarrativeSource::Fallback);
+}
+
+#[test]
+fn narrative_rejects_c0_c1_and_ansi_controls() {
+    for text in ["line\nfeed", "tab\ttext", "ansi\u{1b}[31m", "c1\u{85}text"] {
+        let response = request_narrative_with_timeout(
+            Some(Arc::new(TextProvider(text.to_string()))),
+            request(),
+            Duration::from_millis(10),
+        );
+        assert_eq!(response.source, NarrativeSource::Fallback);
+    }
 }

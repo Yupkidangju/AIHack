@@ -172,13 +172,13 @@ Consequences:
 
 ## ADR-0026: local LLM은 loopback presentation adapter
 
-Status: Accepted for v0.3.0 plan; implementation pending
+Status: Accepted; R6 automated local integration verified, manual provider/terminal audit pending
 Date: 2026-07-15
 Decision IDs: DEC-AI-01, DEC-LLM-01, DEC-LLM-02
 
 Context:
 
-현재 narrative/decision module은 provider trait와 mock만 있고 실제 transport, 강제 timeout, request와 current session의 correlation이 없다. 사용자는 local LLM을 메시지 생성과 판정에 쓰려 하지만 core 결정론을 잃으면 빌드·재현 문제를 더 악화시킨다.
+R6 시작 시 narrative/decision module은 provider trait와 mock만 있었고 실제 transport, 강제 timeout, request와 current session의 correlation이 없었다. 사용자는 local LLM을 메시지 생성과 판정에 쓰려 하지만 core 결정론을 잃으면 빌드·재현 문제를 더 악화시킨다.
 
 Decision:
 
@@ -197,6 +197,9 @@ Consequences:
 - timeout/invalid/stale response는 hash를 바꾸지 않는다.
 - prompt와 response body를 save/replay에 기록하지 않는다.
 - remote provider는 v0.3.0 비목표다.
+- R6-1은 연결 직전 resolve 결과를 재검사하고 검증된 loopback 주소를 client에 고정한다. R6-2는 opaque request ID, current revision/ActionSpace, submit 직전 revision을 연속 검증해 response-validation 사이의 stale gap도 막는다.
+- R6-3은 strict soft payload와 `Neutral / LLM_UNAVAILABLE` fallback을 UI-only state로 보관하고, terminal 복원 뒤 worker를 최대 250ms만 정리한다.
+- R6 통합은 G/A/J 요청과 Y/N/R 안전 경로, 상태·modal, 동일 종류 outstanding·250ms cooldown, capacity 16 oldest-drop 표시 큐를 실제 TUI loop에 연결한다. 자동 failure matrix는 통과했으며 실 provider·terminal 수동 검증과 독립 감사는 checkpoint 전 남는다.
 
 ## ADR-0027: provenance approval이 runtime 포함의 선행 조건
 

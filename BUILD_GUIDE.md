@@ -303,7 +303,7 @@ cargo tree -p aihack-llm
 
 ## 9. Local LLM 개발 실행
 
-v0.3.0의 기본값은 disabled다. enabled 예시:
+local LLM transport의 기본값은 disabled다. 아래처럼 provider를 활성화하면 TUI에서 `G` narrative, `A` suggestion, `J` soft judgment를 요청하고, suggestion은 `Y`로만 적용하며 `N` dismiss와 `R` retry를 사용할 수 있다.
 
 ```bash
 AIHACK_LLM_ENABLED=true \

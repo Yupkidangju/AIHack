@@ -1,11 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
-use aihack_ai_contract::{NarrativeTopic, Observation};
+use aihack_ai_contract::{ClientRevision, NarrativeTopic, Observation};
+
+use crate::is_forbidden_control;
 
 pub const NARRATIVE_TIMEOUT_MS: u64 = 2_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NarrativeRequest {
+    pub revision: ClientRevision,
     pub topic: NarrativeTopic,
     pub observation: Observation,
 }
@@ -75,13 +78,10 @@ pub fn request_narrative_with_timeout(
 
 fn sanitize_text(text: &str) -> Option<String> {
     let trimmed = text.trim();
-    if trimmed.is_empty() || trimmed.len() > 240 {
+    if trimmed.is_empty() || trimmed.chars().count() > 240 {
         return None;
     }
-    if trimmed
-        .chars()
-        .any(|ch| ch.is_control() && ch != '\n' && ch != '\t')
-    {
+    if trimmed.chars().any(is_forbidden_control) {
         return None;
     }
     Some(trimmed.to_string())

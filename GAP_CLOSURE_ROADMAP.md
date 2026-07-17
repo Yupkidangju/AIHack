@@ -47,10 +47,10 @@
 | G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | policy runner 조기 실패 처리와 3 seed accepted turn 1000, `audit_report_6.md` 재감사 | R4-1, R4-2 | SC-TEST-01 | Closed |
 | G-TEST-002 | P1 | long-run 반복 hash가 실제 1000 accepted turn을 증명하지 않음 | 3 seed x 1000 accepted turn x 3회 hash, `audit_report_6.md` 재감사 | R4-2 | SC-TEST-02 | Closed |
 | G-ARCH-001 | P2 | core/UI/LLM이 한 package dependency tree 공유 | 7개 crate/app workspace, app core 직접 의존 0건, R4 hash 유지, `audit_report_6.md` 재감사 | R5-1, R5-2 | SC-ARCH-01 | Closed |
-| G-LLM-001 | P0 | 실제 local LLM provider 없음 | trait와 mock만 존재 | R6-1 | SC-LLM-01 | Open |
-| G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | synchronous trait 호출 | R6-1 | SC-LLM-01 | Open |
-| G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | 과거 action_space만 검사 | R6-2 | SC-LLM-02 | Open |
-| G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | narrative와 suggestion만 문서상 완료 | R6-3 | SC-LLM-03 | Open |
+| G-LLM-001 | P0 | 실제 local LLM provider 없음 | loopback transport·strict response validation·bounded worker 구현, local test 통과; 독립 재감사 대기 | R6-1 | SC-LLM-01 | Implemented |
+| G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | transport deadline과 deterministic fallback 구현, local test 통과; 독립 재감사 대기 | R6-1 | SC-LLM-01 | Implemented |
+| G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증 구현; local test 통과, 독립 재감사 대기 | R6-2 | SC-LLM-02 | Implemented |
+| G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0 local test 통과; 독립 재감사 대기 | R6-3 | SC-LLM-03 | Implemented |
 | G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | P8 golden ID에 source record 없음 | R7-2 | SC-COMPAT-01 | Open |
 | G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | manifest/doc version drift | R8-1 | SC-DOC-01 | Open |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
@@ -185,6 +185,8 @@ crossterm 중복 0건, 마지막 명령이 TUI binary를 선택해야 한다.
 | stale revision | `LlmResponseError::Stale` | 0 | 없음 |
 | valid legal action | `LlmPayload::Decision` | 사용자 승인 시 1 | 정상 command 영향만 |
 | soft adjudication | `LlmPayload::SoftAdjudication` 또는 Neutral UI fallback | 0 | 없음 |
+
+**2026-07-17 local closure:** transport·revision/action gate·G/A/J 상태/modal·Y/N/R 안전 경로와 disabled/connect failure/invalid/stale/success 자동 matrix가 통과했다. G-LLM-001..004 구현은 local automated 기준 `Closed`이며, R6 checkpoint의 실 provider·terminal 수동 matrix와 독립 감사는 별도 남는다.
 
 ### 4.8 G-LICENSE-001과 G-COMPAT-001
 

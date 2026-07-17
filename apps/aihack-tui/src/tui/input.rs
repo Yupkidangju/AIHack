@@ -38,6 +38,17 @@ pub enum UiCommandCandidate {
     Quit,
     /// [v0.2.0] Phase 17: Game Over에서 새 게임 시작
     NewRun,
+    /// 표시 전용 LLM 결과를 제거하며 core command는 생성하지 않는다.
+    DismissLlmResult,
+    LlmNarrative,
+    LlmSuggest,
+    LlmJudge,
+    LlmApply,
+    LlmRetry,
+    LlmInput(char),
+    LlmBackspace,
+    LlmSubmitInput,
+    LlmCancelInput,
 }
 
 pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
@@ -87,6 +98,19 @@ pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
 }
 
 pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiCommandCandidate> {
+    let llm_candidate = match key {
+        'G' => Some(UiCommandCandidate::LlmNarrative),
+        'A' => Some(UiCommandCandidate::LlmSuggest),
+        'J' => Some(UiCommandCandidate::LlmJudge),
+        'Y' => Some(UiCommandCandidate::LlmApply),
+        'N' => Some(UiCommandCandidate::DismissLlmResult),
+        'R' => Some(UiCommandCandidate::LlmRetry),
+        _ => None,
+    };
+    if llm_candidate.is_some() {
+        return llm_candidate;
+    }
+
     let command_candidate = |intent: CommandIntent| {
         observation
             .action_space
@@ -196,6 +220,32 @@ pub fn map_mouse_event(
         UiInputEvent::Quit => Some(UiCommandCandidate::Quit),
         UiInputEvent::Key(intent) => Some(UiCommandCandidate::Command(intent)),
     }
+}
+
+pub fn llm_footer_click_candidate(
+    command: Rect,
+    column: u16,
+    row: u16,
+    footer: &str,
+) -> Option<UiCommandCandidate> {
+    if row != command.y.saturating_add(2) || column < command.x {
+        return None;
+    }
+    let offset = column.saturating_sub(command.x) as usize;
+    [
+        ("[G] Narrative", UiCommandCandidate::LlmNarrative),
+        ("[A] Suggest", UiCommandCandidate::LlmSuggest),
+        ("[J] Judge", UiCommandCandidate::LlmJudge),
+        ("[Y] Apply", UiCommandCandidate::LlmApply),
+        ("[N] Dismiss", UiCommandCandidate::DismissLlmResult),
+        ("[R] Retry", UiCommandCandidate::LlmRetry),
+    ]
+    .into_iter()
+    .find_map(|(label, candidate)| {
+        footer.match_indices(label).find_map(|(start, _)| {
+            (offset >= start && offset < start + label.len()).then_some(candidate)
+        })
+    })
 }
 
 fn contains(rect: Rect, column: u16, row: u16) -> bool {

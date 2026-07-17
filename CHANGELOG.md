@@ -23,6 +23,11 @@
 - `GameSession`/`GameWorld`의 fallible content bootstrap과 registry injection을 추가하고, TUI/headless startup이 `ContentError`를 사용자 오류로 반환하도록 전환했다.
 - R4 accepted-turn runner(`wait-v1`, `survival-v1`, `replay-file`), success/failure JSON report, replay trace 및 runtime-root path guard를 추가했다.
 - 세 필수 seed의 1000 accepted-turn·3회 hash 안정성 테스트와 survival 기반 release candidate gate를 추가했다.
+- R6-1 loopback OpenAI-compatible narrative transport, strict config/JSON 경계, 전용 worker 1개와 capacity 16 bounded channel, timeout/fallback 회귀 테스트를 추가했다.
+- R6-2 decision payload 계약, opaque request correlation, strict action wire parser, current revision/ActionSpace gate와 submit 직전 stale 재검증을 추가했다.
+- R6-3 strict soft-adjudication payload, `Neutral / LLM_UNAVAILABLE` fallback, presentation-only TUI 표시·dismiss와 250ms bounded worker shutdown을 추가했다.
+- R6 통합으로 `LocalLlmService`, G/A/J CTA·Judge modal·LLM 상태 badge, Y 승인/N dismiss/R retry, 동일 종류 outstanding·250ms cooldown 및 표시 응답 oldest-drop queue를 실제 TUI loop에 연결했다.
+- 표시된 LLM footer CTA가 동일한 keyboard/mouse candidate를 사용하도록 연결하고 decision metadata를 transport와 TUI 경계에서 이중 검증했다.
 
 ### Changed
 
@@ -46,12 +51,17 @@
 ### Security
 
 - LLM은 loopback endpoint와 presentation-only 권한을 기본으로 하며, stale/invalid response와 자유 텍스트 state mutation을 차단하는 계획을 명시했다.
+- local LLM endpoint의 scheme/credential/query/fragment와 resolve 결과를 검증하고, client 연결 주소를 loopback으로 고정했으며 redirect와 system proxy를 비활성화했다.
 - 출처 상태가 `Approved`가 아닌 legacy 코드·데이터·문자열은 runtime 포함 및 배포를 금지하는 gate를 명시했다.
 
 ### Verification
 
 - R0 문서 gate는 PASS다.
 - R1의 로컬 fmt, clippy, test, release build, cargo audit, cargo deny gate는 통과했다. Linux/Windows 원격 CI는 workflow push 후에만 PASS로 기록한다.
+- R6-1의 `llm_transport` 12개와 `llm_narrative` 7개 계약 테스트 및 대상 crate clippy가 통과했다.
+- R6-2의 `llm_revision_gate` 9개와 기존 decision/TUI 회귀 테스트가 통과했다. R6 전체 checkpoint는 R6-3 뒤에 판정한다.
+- R6-3의 `llm_soft_adjudication` 5개와 worker shutdown·TUI 회귀 테스트가 통과했다.
+- R6 통합의 `llm_transport` 17개, `llm_tui_integration` 9개 및 LLM response queue 단위 테스트가 통과했다. 자동 local failure matrix는 닫혔고 실 provider·terminal 수동 matrix와 독립 감사가 남아 있어 R6 checkpoint는 진행 중이다.
 
 ## 2026-05-18
 

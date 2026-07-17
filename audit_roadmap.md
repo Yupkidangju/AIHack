@@ -397,5 +397,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R5 PASS, R6~R8 NOT RUN
+현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R5 PASS, R6 local automated integration PASS, R7~R8 NOT RUN. 실 provider·terminal 수동 failure matrix와 독립 재감사가 남아 있으므로 R6 checkpoint는 IN PROGRESS
 현재 문서 감사 판정: `audit_report_9.md`가 보고서 8의 IMP-F008과 이전 문서 시정 계보를 PASS로 종결했다. 전체 program PASS는 R6~R8 및 SC-BUILD-02 원격 CI evidence가 완료된 뒤에만 선언한다.

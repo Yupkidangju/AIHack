@@ -7,6 +7,7 @@ use aihack::{
         DecisionProvider, DecisionRequest, DecisionSource, SuggestedAction,
     },
 };
+use aihack_llm::ClientRevision;
 
 struct LegalProvider;
 impl DecisionProvider for LegalProvider {
@@ -61,8 +62,13 @@ impl DecisionProvider for FailingProvider {
 }
 
 fn request() -> DecisionRequest {
-    let observation = GameSession::new_for_playing(42).observation();
+    let session = GameSession::new_for_playing(42);
+    let observation = session.observation();
     DecisionRequest {
+        revision: ClientRevision {
+            turn: session.turn(),
+            snapshot_hash: session.snapshot().stable_hash(),
+        },
         observation: observation.clone(),
         action_space: observation.action_space,
     }
@@ -129,6 +135,10 @@ fn approved_suggestion_executes_via_submit() {
     });
     let observation = session.observation();
     let request = DecisionRequest {
+        revision: ClientRevision {
+            turn: session.turn(),
+            snapshot_hash: session.snapshot().stable_hash(),
+        },
         observation: observation.clone(),
         action_space: observation.action_space,
     };

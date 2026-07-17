@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod llm;
 pub mod observation;
 pub use aihack_core::{
     action::{ActionIntent, CommandIntent, DirectionalAction, InventoryAction, NarrativeTopic},

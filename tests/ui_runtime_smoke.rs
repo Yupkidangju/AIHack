@@ -56,6 +56,7 @@ fn narrative_consumer_smoke() {
     let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
     let response = aihack::llm::narrative::fallback_response(
         &aihack::llm::narrative::NarrativeRequest {
+            revision: app.revision(),
             topic: aihack::core::NarrativeTopic::SituationSummary,
             observation: app.observation(),
         },
@@ -70,10 +71,12 @@ fn narrative_consumer_smoke() {
 #[test]
 fn decision_support_consumer_smoke() {
     let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    let observation = app.observation();
     let suggestion = aihack::llm::decision::fallback_suggestion(
         &aihack::llm::decision::DecisionRequest {
-            observation: GameSession::new_for_playing(42).observation(),
-            action_space: GameSession::new_for_playing(42).observation().action_space,
+            revision: app.revision(),
+            action_space: observation.action_space.clone(),
+            observation,
         },
         aihack::llm::decision::DecisionSource::Fallback,
     );
