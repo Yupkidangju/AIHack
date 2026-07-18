@@ -793,12 +793,15 @@ scripts/r6_pending_exit_smoke.sh
 
 **설명:** 레거시 자산과 새 구현의 출처 상태를 파일 단위로 기록한다.
 
+**진행 상태 (2026-07-18):** engineering inventory와 자동 차단 검증 완료. 공식 archive와 `dat/license` checksum을 임시 다운로드로 확인했고, legacy code/data/license는 runtime 밖 `Blocked/Reviewed`로 격리했다. `audit_report_12.md`의 SEC-F002 시정으로 validator는 runtime file의 최구체 coverage, Approved reviewer/date/license/scope/notice/modification-notice/evidence, content full checksum, scenario schema/ID/function과 Blocked reference를 검사한다. `audit_report_13.md`의 IMP-F013/SEC-F003 시정으로 R7/R8 책임을 분리하고 검사 root를 script-relative repository로 고정했다. 2026-07-18 사용자 결정에 따라 미승인 content/scenario provenance는 R8 런칭 전 최종 검토로 이관하며 R7 개발 단계는 `PASS WITH KNOWN RISKS`다. 외부 배포는 계속 차단한다.
+
 **수용 기준:**
 
-- [ ] `PROVENANCE.md`에 상태 enum과 초기 inventory
-- [ ] 손상된 NGPL 33..35행과 local checksum 기록
-- [ ] Apache/NGPL 적용 범위 미확정 항목 격리
-- [ ] Unknown/Blocked 자산의 runtime import 0건
+- [x] `PROVENANCE.md`에 상태 enum과 초기 inventory
+- [x] 손상된 NGPL 33..35행과 local checksum 기록
+- [x] Apache/NGPL 적용 범위 미확정 항목 격리
+- [x] Unknown/Blocked 자산의 runtime import 0건
+- [x] status-only·필수 field 누락·checksum drift·coverage ambiguity 우회 차단
 
 **검증:**
 
@@ -806,19 +809,22 @@ scripts/r6_pending_exit_smoke.sh
 - 공식 3.6.7 source checksum과 기록 일치
 
 **선행:** R0-3
-**파일:** `PROVENANCE.md`, `docs/compatibility/README.md`
-**범위:** S, 2개
+**파일:** `PROVENANCE.md`, `docs/compatibility/README.md`, `tests/provenance_manifest.rs`
+**범위:** M, 3개
 
 ### Task R7-2: Compatibility scenario trace
 
 **설명:** NH367-C001..C010의 출처와 기대 결과를 고정한다.
 
+**진행 상태 (2026-07-18):** 10개 record와 10개 integration test 구현 완료. 각 record는 공식 archive checksum, C file/symbol locator, 관찰 규칙, typed command, expected event/state/hash field를 연결한다. C008 hunger drift를 수정했고, `audit_report_12.md`의 DBG-F005 시정으로 C003 hit/damage/HP/death/RNG와 C007 turn/item/charge/map/RNG를 직접 assert한다. schema gate는 ID 유일성, non-empty locator/command/event/hash/module과 실제 test function 연결을 검증한다. engineering tests는 PASS지만 provenance는 `Reviewed`이므로 승인 전 release compatibility count에는 포함하지 않는다.
+
 **수용 기준:**
 
-- [ ] 10개 scenario 문서
-- [ ] 각 문서에 source, observation, command, expected event/hash fields
-- [ ] 각 scenario에 integration test
-- [ ] P8-G01..G20 regression 유지
+- [x] 10개 scenario 문서
+- [x] 각 문서에 source, observation, command, expected event/hash fields
+- [x] 각 scenario에 integration test
+- [x] P8-G01..G20 regression 유지
+- [x] record schema와 C003/C007 expected outcome 직접 assertion
 
 **검증:**
 
@@ -842,11 +848,14 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ### Checkpoint R7
 
-- [ ] SC-COMPAT-01 PASS
-- [ ] SC-LICENSE-01 PASS
-- [ ] runtime included provenance Unknown 0건
-- [ ] compatibility report 생성
-- [ ] source 직접 import 0건
+- [x] SC-COMPAT-01 engineering evidence PASS
+- [x] provenance inventory/checksum/legacy 격리/fail-closed validator PASS
+- [ ] SC-LICENSE-01 — R8/실제 런칭 전 최종 검토로 defer
+- [x] runtime included provenance Unknown/Blocked 0건
+- [x] compatibility report 생성
+- [x] source 직접 import 0건
+
+**현재 판정:** `PASS WITH KNOWN RISKS — LICENSE REVIEW DEFERRED TO R8`. 표적 42개와 전체 322개, build/security gate는 `audit_report_14.md`까지 검증됐다. `IMP-F012`는 사용자 승인에 따라 R7 blocker가 아닌 R8 런칭 blocker로 이관됐다. 이는 actual approval 완료나 외부 배포 허가를 뜻하지 않는다.
 
 ### Task R8-1: 통합 릴리즈 감사
 
@@ -855,6 +864,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 **수용 기준:**
 
 - [ ] R1~R7 checkpoint 전부 PASS
+- [ ] 승인된 root distribution license와 notice를 `Cargo.toml` 및 release 문서에 반영
 - [ ] Cargo/README/CHANGELOG 버전 0.3.0
 - [ ] archive chain 무결성 PASS
 - [ ] AI 구현 문서 표준 12개 checklist PASS
@@ -896,4 +906,4 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `audit_report_11.md`가 R6 checkpoint를 PASS로 종결했으므로 R7 provenance/compatibility다. SC-BUILD-02 원격 CI와 R8 release gate는 계속 pending이며, 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 R8 비배포 준비와 실제 런칭 전 project owner/적격 검토자의 license approval 통합이다. R7 개발 단계는 진행할 수 있지만 SC-LICENSE-01, root distribution license와 외부 배포는 R8 최종 게이트까지 HOLD다. SC-BUILD-02 원격 CI도 pending이며 실제 model provider smoke는 비차단 고려 대상이다.

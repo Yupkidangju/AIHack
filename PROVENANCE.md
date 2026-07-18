@@ -27,30 +27,40 @@
 | archive | `nethack-367-src.tgz` |
 | official SHA-256 | `98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2` |
 | release date | 2023-02-16 |
-| local verified archive | 없음 |
-| current status | Reviewed as metadata only |
+| local verified archive | 2026-07-18 임시 다운로드 후 SHA-256 대조, repository 반입 없이 삭제 |
+| archive 내부 license | `dat/license` |
+| archive 내부 license SHA-256 | `93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747` |
+| current status | Reviewed; locator evidence only |
 | runtime inclusion | no |
 
-공식 배포 페이지가 source archive와 SHA-256을 게시한다. AIHack repository에는 그 archive를 추가하지 않는다. R7 검토 시 사용자가 별도 확보한 archive의 checksum을 확인하고, 필요한 source locator만 문서에 기록한다.
+공식 배포 페이지가 source archive와 SHA-256을 게시한다. 2026-07-18 R7 engineering review에서 archive를 프로젝트 임시 디렉터리에 내려받아 게시 checksum과 일치함을 확인하고 `dat/license` checksum 및 source symbol locator만 기록한 뒤 임시 복사본을 제거했다. AIHack repository에는 archive나 NetHack source를 추가하지 않는다.
 
-## 3. 초기 inventory
+## 3. R7-1 inventory
 
-| 자산 | source/origin | local SHA-256 | 현재 상태 | runtime 포함 | 다음 조치 |
-| --- | --- | --- | --- | --- | --- |
-| `src/**`, `tests/**` | AIHack root 구현 이력 | per-file manifest 없음 | Reviewed | yes, current | R7 reviewer와 root license 결정 |
-| `src/data/**` | AIHack 작성인지 legacy 변환인지 기록 불충분 | per-file manifest 없음 | Unknown | yes, current | 각 TOML field의 author/source 조사; 미확인 값 교체 |
-| Cargo dependencies | crates.io + `Cargo.lock` | lockfile checksum | Reviewed | yes | `cargo deny check licenses` 정책과 exception 기록 |
-| `legacy_nethack_port_reference/LICENSE` | Apache-2.0 text로 보이는 local file | `db09a0cfbc9276c576b3f7f45e1639ed0c5d121360e71c1c52b6bf1a4a4e886a` | Reviewed | no | 어떤 파일에 적용되는지 copyright notice와 함께 확인 |
-| `legacy_nethack_port_reference/LICENSE.NGPL` | NGPL text로 보이는 local file | `5e3e7c0cd3be7f65f4d9b59b49820c303abfa92c95497c5eb8cff2b64e456bdf` | Blocked | no | lines 33..35 손상; 공식 3.6.7 license와 대조 후 별도 교정 계획 |
-| `legacy_nethack_port_reference/src/**` | 이전 Rust port | manifest 없음 | Blocked | no | 직접 import/copy 금지; 규칙은 compatibility record로 독립 재구현 |
-| `legacy_nethack_port_reference/assets/data/**` | 이전 port data | manifest 없음 | Blocked | no | item별 source/license 승인 전 사용 금지 |
-| `legacy_nethack_port_reference/assets/dat/**` | NetHack text 자산 가능성 | manifest 없음 | Blocked | no | 문자열 복사 금지; 배포 권리 별도 검토 |
-| `legacy_nethack_port_reference/tests/**` | 이전 port test knowledge | manifest 없음 | Blocked | no | 입력·기대값도 source locator를 갖춘 새 scenario로 작성 |
-| `legacy_nethack_port_reference/REFERENCE_INDEX.md` | AIHack 내부 설명 | `242b66ba134db2a7e25b166aa60ae6be433d140dbccc29a642e436d2da1b3183` | Reviewed | no | 문서 주장만으로 재사용 승인하지 않음 |
-| `.archive/**` | AIHack 문서 snapshot | archive별 checksum 미기록 | Reviewed | no | immutable chain 유지 |
-| 새 NH367 scenario | 공식 Guidebook/source 관찰에서 독립 작성 | record별 source hash | Unknown | no | R7-2 template 완료 뒤 승인 |
+더 구체적인 `path/scope` record가 넓은 glob보다 우선한다. `Approved`는 이 표에 적힌 범위에서의 engineering inclusion 승인만 뜻하며 외부 배포 허가로 확장되지 않는다.
 
-현재 runtime에는 `Reviewed` 또는 `Unknown` 자산이 있어 R7 gate는 PASS가 아니다. 이 문서 작성만으로 배포 승인이 생기지 않는다.
+<!-- runtime-inventory:start -->
+| ID | path/scope | source/origin | checksum | status | runtime | reviewer | reviewed_at | license_id | license_scope | notice_required | modification_notice_required | evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PROV-0001 | `src/**` | AIHack repository implementation history | Git object history | Approved | yes | Codex engineering review | 2026-07-18 | `LicenseRef-AIHack-UNLICENSED` | internal build/test only | false | false | Git history; external distribution blocked |
+| PROV-0002 | `crates/**` | AIHack workspace extraction and implementation history | Git object history | Approved | yes | Codex engineering review | 2026-07-18 | `LicenseRef-AIHack-UNLICENSED` | internal build/test only; PROV-0004 override | false | false | Git history and workspace boundary tests |
+| PROV-0003 | `apps/**` | AIHack TUI/headless implementation history | Git object history | Approved | yes | Codex engineering review | 2026-07-18 | `LicenseRef-AIHack-UNLICENSED` | internal build/test only | false | false | Git history and headless/TUI tests |
+| PROV-0004 | `crates/aihack-content/src/data/**` | AIHack reduced deterministic fixture informed by observable roguelike behavior | `docs/provenance/r7-content.sha256` | Reviewed | yes | Codex engineering trace | 2026-07-18 | pending | distribution scope unresolved | pending | pending | project owner or qualified reviewer approval required |
+| PROV-0005 | `Cargo.lock` | crates.io packages locked by checksum | Cargo.lock registry checksums | Approved | yes | Codex engineering review | 2026-07-18 | SPDX allowlist | private workspace dependency graph | false | false | `cargo deny check licenses bans sources`; no exception |
+| PROV-0006 | `legacy_nethack_port_reference/src/**` | previous Rust port | not trusted for inclusion | Blocked | no | Codex engineering review | 2026-07-18 | pending | mixed or unclear legacy scope | pending | pending | direct import and copy prohibited |
+| PROV-0007 | `legacy_nethack_port_reference/assets/**` | previous port and possible NetHack-derived data/text | not trusted for inclusion | Blocked | no | Codex engineering review | 2026-07-18 | pending | mixed or unclear legacy scope | pending | pending | strings tables and data copy prohibited |
+| PROV-0008 | `legacy_nethack_port_reference/LICENSE.NGPL` | damaged local NGPL-looking text | `5e3e7c0cd3be7f65f4d9b59b49820c303abfa92c95497c5eb8cff2b64e456bdf` | Blocked | no | Codex engineering review | 2026-07-18 | pending | not valid notice evidence | pending | pending | lines 33..35 corruption preserved; do not ship |
+| PROV-0009 | `legacy_nethack_port_reference/LICENSE` | Apache-2.0 text without reliable tree scope notice | `db09a0cfbc9276c576b3f7f45e1639ed0c5d121360e71c1c52b6bf1a4a4e886a` | Reviewed | no | Codex engineering review | 2026-07-18 | pending | application scope unresolved | pending | pending | do not infer whole-tree Apache coverage |
+| PROV-0010 | NetHack 3.6.7 official archive | official source locator evidence | `98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2` | Reviewed | no | Codex engineering trace | 2026-07-18 | NGPL metadata | locator evidence only | pending | pending | source archive and code remain outside repository/runtime |
+| PROV-0011 | `docs/compatibility/NH367-C*.md` | AIHack-authored observation records | record-local archive checksum | Reviewed | no | Codex engineering trace | 2026-07-18 | pending | documentation evidence only | pending | pending | R7-2 test and owner review required before release count |
+| PROV-0012 | `.archive/**` | immutable AIHack document snapshots | Git object history | Reviewed | no | Codex engineering trace | 2026-07-18 | pending | repository history only | pending | pending | preserve chain; runtime import prohibited |
+<!-- runtime-inventory:end -->
+
+현재 runtime에는 `Unknown` 또는 `Blocked` 자산이 직접 포함되지 않는다. PROV-0004가 `Reviewed`이므로 SC-LICENSE-01의 모든-runtime-`Approved` 조건과 외부 배포 허가는 아직 충족되지 않는다. 2026-07-18 사용자 결정에 따라 이 미충족 항목은 R7 개발 blocker가 아닌 R8 실제 런칭 전 최종 검토사항으로 이관했다.
+
+**외부 배포 판정: BLOCKED — R7 provenance와 R8 distribution license approval pending**
+
+이 차단은 개발·테스트와 R7 engineering 완료를 막지 않지만 release artifact 외부 게시를 막는다. R8 실제 런칭 전에 프로젝트 소유자 또는 적격 검토자가 content/scenario의 저작권·파생물 범위, 프로젝트 배포 라이선스와 notice를 결정하기 전 `Cargo.toml`의 `UNLICENSED`를 변경하지 않는다.
 
 ## 4. 손상된 NGPL 사본 기록
 
@@ -123,11 +133,14 @@ cargo test --workspace --locked --test provenance_manifest
 
 `tests/provenance_manifest.rs` 검증:
 
-- runtime path를 덮는 record가 정확히 1개
-- runtime included record는 Approved
-- Approved 필수 field 누락 0건
-- official archive checksum format은 64 lowercase hex
-- Blocked/Unknown path가 Cargo include 또는 `include_str!`에 없음
+- runtime file마다 가장 구체적인 record가 정확히 하나 선택됨
+- runtime included record는 Approved여야 SC-LICENSE-01과 R8 런칭 PASS 가능
+- Approved의 reviewer/date/license/scope/notice/evidence 누락 0건
+- content data의 full SHA-256 manifest가 실제 파일과 일치
+- official archive 및 scenario checksum은 64 lowercase hex
+- Blocked/Unknown path가 Cargo path/import/`include_str!`에 없음
+- scenario ID 10개가 유일하고 필수 field 및 실제 test function과 연결됨
+- R7 checkpoint는 asset/scenario provenance를 판정하고 root distribution license는 R8 release gate가 판정
 
 tool version은 cargo-audit 0.22.1, cargo-deny 0.19.4로 고정한다. `deny.toml` exception은 crate/version/이유/owner/만료일을 기록하며 만료일은 승인일 이후 최대 90일이다.
 
@@ -142,4 +155,4 @@ tool version은 cargo-audit 0.22.1, cargo-deny 0.19.4로 고정한다. `deny.tom
 - NetHack source/data/string을 source locator 없이 포함
 - third-party dependency license exception 미승인
 
-배포 재개에는 R7 PASS와 R8 release audit PASS가 모두 필요하다.
+배포 재개에는 SC-LICENSE-01을 포함한 R8 release audit PASS가 필요하다. R7 `PASS WITH KNOWN RISKS`만으로 배포하지 않는다.

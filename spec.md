@@ -60,8 +60,10 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오별로 재구�
 | SC-LLM-02 | stale turn 또는 stale snapshot hash 응답 실행 0건 |
 | SC-LLM-03 | narrative/soft verdict core effect 0건, suggestion은 명시 승인 전 submit 0건 |
 | SC-COMPAT-01 | 기존 P8-G01..P8-G20과 신규 NH367-C001..C010 모두 통과 |
-| SC-LICENSE-01 | runtime 포함 자산 provenance가 모두 `Approved`이고 legacy direct import 0건 |
+| SC-LICENSE-01 | runtime 포함 자산 provenance가 모두 machine-validated `Approved`이고, reviewer/date/license/scope/notice/evidence와 checksum이 유효하며 legacy direct import 0건 |
 | SC-DOC-01 | AI 문서 표준 체크리스트 12개 항목 전부 PASS |
+
+SC-LICENSE-01은 외부 배포를 시작하기 전 R8 최종 런칭 게이트다. 2026-07-18 사용자 결정에 따라 R7에서는 inventory, checksum, legacy 격리, fail-closed validator의 구현 증거를 확인하고 미승인 provenance를 명시적 known risk로 이관할 수 있다. 이 이관은 라이선스 승인이나 외부 배포 허가가 아니다.
 
 ## 4. v0.3.0 비목표
 
@@ -678,6 +680,8 @@ v0.3.0 신규 10개:
 
 각 시나리오는 `docs/compatibility/NH367-Cnnn.md`에 출처 파일/함수, 관찰 규칙, AIHack 입력, 기대 이벤트, 저작권 상태를 기록한다.
 
+NH367-C008 hunger projection은 3.6.7 `newuhs` 경계를 따른다: nutrition `<= 0`은 Fainting, `1..=50`은 Weak, `51..=150`은 Hungry, `151..=1000`은 NotHungry, `> 1000`은 Satiated다. FAINTED/STARVED와 메시지 전이는 v0.3.0 범위 밖이다.
+
 ## 14. 저장·replay 정책
 
 - `SaveDataV1` schema_version은 1 유지
@@ -700,10 +704,12 @@ v0.3.0 신규 10개:
 | R4 | 장기 실행·테스트 정당성 | R3 | SC-TEST-01..02 |
 | R5 | 워크스페이스 경계 분리 | R4 | SC-ARCH-01 |
 | R6 | 실제 로컬 LLM adapter | R5 | SC-LLM-01..03 |
-| R7 | NetHack 호환성·출처 추적 | R3 | SC-COMPAT-01, SC-LICENSE-01 |
-| R8 | v0.3.0 통합 감사 | R6, R7 | 전체 SC와 문서 gate PASS |
+| R7 | NetHack 호환성·출처 추적 | R3 | SC-COMPAT-01, provenance inventory/checksum/legacy 격리 evidence; SC-LICENSE-01은 R8로 defer 가능 |
+| R8 | v0.3.0 통합 감사·런칭 승인 | R6, R7 | SC-LICENSE-01을 포함한 전체 SC와 문서 gate PASS |
 
 세부 Task와 파일 단위는 `IMPLEMENTATION_SUMMARY.md`가 정의한다.
+
+R7 provenance validator는 runtime asset과 NH367 scenario의 승인 준비 상태를 판정하며 root `Cargo.toml`의 배포 라이선스 변경을 요구하지 않는다. 승인된 asset/scenario provenance, root license, version, packaging과 외부 배포 가능 판정은 R8 release gate가 최종 소유한다. R7은 미승인 항목을 명시한 `PASS WITH KNOWN RISKS`로 개발 진행을 허용할 수 있지만, R8 PASS 전에는 `UNLICENSED`와 release 문서의 차단 상태를 유지한다.
 
 ## 16. 보안 및 구현 경계
 

@@ -34,6 +34,9 @@
 
 ### Changed
 
+- 사용자 결정에 따라 R7을 `PASS WITH KNOWN RISKS`로 종결하고, PROV-0004/NH367 actual approval와 SC-LICENSE-01을 R8 실제 런칭 전 필수 검토사항으로 이관했다. 이 변경은 외부 배포 허가가 아니며 `UNLICENSED`, `publish = false`와 배포 차단을 유지한다.
+- R7 공식 source 대조에 따라 hunger projection을 NetHack 3.6.7 `newuhs` 경계(Fainting/Weak/Hungry/NotHungry/Satiated)로 정렬하고 C008 경계값 회귀 테스트를 추가했다. 기존 `Oversatiated` variant는 직렬화/API 호환을 위해 보존하되 새 projection에서는 생성하지 않는다.
+
 - `audit_report_9.md` 재감사에서 IMP-F008과 R5 문서 시정 계보가 PASS되어 다음 구현 단계를 R6-1로 전환했다.
 - `audit_report_8.md`의 IMP-F008을 시정해 R3-2~R4-2 완료 Task의 현재 파일 수를 실제 owner 목록과 맞추고, R1~R5 목록-수량 일치 회귀 검사를 추가했다.
 - `audit_report_7.md`의 문서 재현성 HOLD를 시정해 root integration test에 `-p aihack`, 전체 범위 명령에 `--workspace`를 명시하고 R2~R4 책임 경로와 `/output/` ignore 정책을 현재 workspace에 맞췄다.
@@ -69,6 +72,12 @@
 - R6 통합과 시정의 `llm_transport` 22개, `llm_tui_integration` 10개 및 LLM response queue 단위 테스트가 통과했다. public/observation schema 0/2, action/payload bound와 TUI response rejection을 포함한다.
 - 120x36/80x24/60x24/59x23 PTY에서 disabled, success fixture, timeout, stale, connection-refused 흐름을 수동 PASS했다. 실제 model provider smoke는 최종 통합에서 필요성이 확인될 때만 localhost 호환 adapter로 수행하는 비차단 고려 대상으로 분리했다.
 - 저장소 보존 PTY matrix가 success/timeout/stale/down을 PASS했고 pending-exit smoke가 restore-before-worker-wait와 291ms 종료를 PASS했다. `audit_report_11.md`가 보고서 10의 시정을 Verified하고 R6 checkpoint를 PASS로 종결했다.
+- R7 provenance inventory에 공식 NetHack 3.6.7 archive/`dat/license` checksum, 손상된 legacy NGPL 증거, runtime inclusion과 external-distribution fail-closed 경계를 기록하고 `provenance_manifest` 회귀 테스트를 추가했다.
+- NH367-C001..C010 source locator record 10개와 실제 `GameSession` 호환 integration test 10개를 추가했다. engineering 구현은 완료됐지만 content/scenario provenance와 배포 라이선스는 owner/qualified approval 전까지 HOLD다.
+- R7 approval checkpoint가 상태 문자열만으로 우회되지 않도록 승인 필드, runtime coverage, content SHA-256, scenario schema/function과 Blocked reference를 검증하고 negative fixture를 추가했다.
+- NH367-C003과 C007 연결 테스트가 문서화한 combat HP/RNG 및 projectile item/charge/map/RNG 결과를 직접 검증하도록 보강했다.
+- R7 asset provenance와 R8 root distribution license의 단계 책임을 분리해 checkpoint 순환 의존을 제거했다.
+- R7 checkpoint가 inherited `AIHACK_R7_ROOT`로 다른 tree를 검사하지 못하도록 script-relative repository root로 고정했다.
 
 ## 2026-05-18
 

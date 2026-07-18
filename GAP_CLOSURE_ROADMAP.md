@@ -33,7 +33,7 @@
 | Gap ID | 등급 | 문제 | 현재 증거 | Task | 성공 기준 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- |
 | G-PRODUCT-001 | P0 | inspired game와 3.6.7 변환 목표 충돌 | 과거 spec은 1:1 포트 비목표 | R0-1, R0-2 | SC-DOC-01 | Closed |
-| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | legacy에 두 license, NGPL prose 손상 | R7-1 | SC-LICENSE-01 | Open |
+| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | checksum inventory와 fail-closed runtime/배포 경계 구현; actual approval은 런칭 전 필수 | R8-1 | SC-LICENSE-01 | Deferred / Final Launch Gate |
 | G-BUILD-001 | P1 | toolchain/MSRV 미고정 | rust-toolchain과 locked local build/audit evidence; `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | locked dependency/security policy와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-003 | P1 | build script가 copy 실패를 무시 | fail-fast script와 `audit_report_3.md` independent verification | R1-2 | SC-BUILD-01 | Closed |
@@ -51,7 +51,7 @@
 | G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | transport deadline·deterministic fallback·재현 fixture 구현, `audit_report_11.md` 독립 재감사 | R6-1, R6-6 | SC-LLM-01 | Closed |
 | G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | versioned request/response, opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증; `audit_report_11.md` 독립 재감사 | R6-2, R6-6 | SC-LLM-02 | Closed |
 | G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0; `audit_report_11.md` 독립 재감사 | R6-3, R6-6 | SC-LLM-03 | Closed |
-| G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | P8 golden ID에 source record 없음 | R7-2 | SC-COMPAT-01 | Open |
+| G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests | R7-2 | SC-COMPAT-01 | Closed / License risk tracked separately |
 | G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | manifest/doc version drift | R8-1 | SC-DOC-01 | Open |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
@@ -203,6 +203,8 @@ crossterm 중복 0건, 마지막 명령이 TUI binary를 선택해야 한다.
 - Unknown/Blocked runtime asset 0건
 - NH367-C001..C010 test 통과
 
+**2026-07-18 implementation status:** 공식 archive/license checksum, runtime inventory, legacy 격리 자동 검증과 NH367-C001..C010 record/test를 구현했다. 보고서 13의 단계 순환과 audit-root 지적은 시정됐고 보고서 14에서 Verified됐다. 사용자 결정에 따라 PROV-0004와 scenario의 actual approval는 R8 런칭 전 최종 검토로 이관했다. G-COMPAT-001은 engineering 범위에서 Closed이며 G-LICENSE-001은 외부 배포를 차단하는 final launch gate다.
+
 ### 4.9 G-DOC-001..003
 
 **수정:**
@@ -243,4 +245,4 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0 문서화와 R1~R6의 G-BUILD(local), G-CORE, G-DATA, G-TEST, G-ARCH, G-LLM은 해당 독립 감사 범위에서 PASS/Closed다. R6는 `audit_report_11.md`가 종결 권한이다. SC-BUILD-02 원격 CI, G-LICENSE, G-COMPAT 및 R8 release gap은 아직 Open/pending이다.
+R0 문서화와 R1~R6의 G-BUILD(local), G-CORE, G-DATA, G-TEST, G-ARCH, G-LLM은 해당 독립 감사 범위에서 PASS/Closed다. R6는 `audit_report_11.md`가 종결 권한이다. R7은 engineering 범위에서 `PASS WITH KNOWN RISKS`이며, G-LICENSE-001과 SC-LICENSE-01은 R8 실제 런칭 전 필수 검토다. SC-BUILD-02 원격 CI와 R8 release gap도 pending이다.

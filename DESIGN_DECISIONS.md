@@ -38,6 +38,7 @@ Consequences:
 - compatibility ID 없는 NetHack 규칙 변경은 release에 포함하지 않는다.
 - full parity는 이후 milestone로 남으며 v0.3.0 완료 조건이 아니다.
 - R7 provenance와 compatibility gate가 필수가 된다.
+- R7 source 대조에서 기존 hunger 상태 경계가 3.6.7과 다름을 발견해 C008 RED test 후 `newuhs`의 다섯 상태 경계로 수정했다. 기존 `Oversatiated` enum variant는 호환 목적으로 남지만 새 projection에서는 생성하지 않는다.
 
 ## ADR-0022: Rust 1.94.1과 단일 UI dependency 계열 고정
 
@@ -206,7 +207,7 @@ Consequences:
 
 ## ADR-0027: provenance approval이 runtime 포함의 선행 조건
 
-Status: Accepted for v0.3.0 plan; implementation pending
+Status: Implemented engineering gate; owner license approval pending
 Date: 2026-07-15
 Decision ID: DEC-LICENSE-01
 
@@ -230,3 +231,35 @@ Consequences:
 - 공식 source metadata 확인은 재사용 승인과 동일하지 않다.
 - compatibility record마다 source locator와 provenance status가 필요하다.
 - 이 ADR과 inventory는 법률 자문을 대체하지 않는다.
+- R7 engineering review는 공식 archive와 `dat/license` checksum을 검증하고 legacy direct import 0건을 자동화한다. 내부 build/test inclusion approval은 외부 배포 승인과 분리하며, content data와 scenario는 project owner 또는 적격 검토자가 범위를 승인할 때까지 `Reviewed`다.
+- `audit_report_12.md` 이후 approval gate는 상태 문자열을 신뢰하지 않는다. runtime coverage, reviewer/date/license/scope/notice/evidence, content checksum, scenario schema/function과 Blocked reference를 모두 machine validation한 경우에만 PASS한다.
+- `audit_report_13.md`의 phase-cycle 시정에 따라 R7은 asset/scenario provenance를, R8은 root distribution license/version/packaging을 소유한다. R7 PASS만으로 외부 배포를 허용하지 않는다.
+- release checkpoint는 caller environment가 지정한 root를 신뢰하지 않고 script-relative canonical repository만 검사한다.
+
+## ADR-0029: 미승인 provenance를 R8 실제 런칭 게이트로 이관
+
+Status: Accepted by user; R7 pass with known risks
+Date: 2026-07-18
+Decision ID: DEC-LICENSE-02
+
+Context:
+
+`audit_report_14.md`까지 R7의 checksum inventory, legacy 격리, compatibility trace, fail-closed validator와 전체 회귀는 검증됐지만 PROV-0004와 NH367 scenario 10개의 actual license approval는 남아 있다. 사용자는 실제 런칭이 개시될 때 이 범위를 명확히 검토하고, 현재 개발 단계에서는 최종 검토사항으로만 유지하기로 결정했다.
+
+Decision:
+
+R7 engineering 단계는 `PASS WITH KNOWN RISKS`로 종결한다. SC-LICENSE-01, content/scenario actual approval, root distribution license와 notice는 R8 실제 런칭 전 필수 게이트로 이관한다. 현재 `Reviewed`, `UNLICENSED`, `publish = false`와 외부 배포 차단은 유지한다.
+
+Alternatives Considered:
+
+- actual approval 없이 `Approved`로 변경: 근거를 조작하므로 기각
+- R7 전체를 계속 HOLD: 구현·테스트 진행과 외부 배포 위험을 불필요하게 같은 gate로 묶어 기각
+- 라이선스 검토를 완전히 면제: 런칭 시 법적·배포 위험이 남아 기각
+
+Consequences:
+
+- R8 비배포 준비와 후속 개발은 진행할 수 있다.
+- R7 PASS는 라이선스 적합성 보장이나 외부 배포 허가가 아니다.
+- `scripts/r7_checkpoint.sh`의 현재 HOLD는 실패가 아니라 R8에 남은 승인 evidence를 표시한다.
+- 외부 배포 전 project owner 또는 적격 검토자가 approval authority/evidence를 기록해야 한다.
+- 승인 불가 자산은 Blocked 처리하고 독립 작성 자산으로 교체한다.

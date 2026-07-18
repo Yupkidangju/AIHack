@@ -84,19 +84,19 @@ fn status_hunger_state_calculation() {
     use aihack::domain::status::{HungerState, Status};
 
     let fainting = Status {
-        nutrition: 100,
+        nutrition: 0,
         ..Status::default_adventurer()
     };
     assert!(matches!(fainting.hunger_state(), HungerState::Fainting));
 
     let hungry = Status {
-        nutrition: 400,
+        nutrition: 100,
         ..Status::default_adventurer()
     };
     assert!(matches!(hungry.hunger_state(), HungerState::Hungry));
 
     let satiated = Status {
-        nutrition: 1000,
+        nutrition: 1001,
         ..Status::default_adventurer()
     };
     assert!(matches!(satiated.hunger_state(), HungerState::Satiated));
@@ -109,7 +109,7 @@ fn game_world_hunger_state_delegates_to_status() {
     let hunger = session.world().hunger_state();
     assert!(matches!(
         hunger,
-        aihack::domain::status::HungerState::Satiated
+        aihack::domain::status::HungerState::NotHungry
     ));
 }
 

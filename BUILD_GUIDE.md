@@ -52,6 +52,7 @@ cargo 1.94.1 (...)
 - `rg`: 문서·경계 audit
 - `cargo-audit 0.22.1`: RustSec dependency advisory gate
 - `cargo-deny 0.19.4`: license, source, duplicate dependency gate
+- `sha256sum`, `rg`: R7 runtime content integrity와 Blocked reference gate
 
 local LLM은 core build와 test의 필수 조건이 아니다. LLM integration test는 loopback mock server를 사용하고 외부 네트워크를 사용하지 않는다.
 
@@ -117,8 +118,8 @@ crossterm = "0.29"
 
 - 다른 dependency version은 R1에서 기능 변경 없이 lockfile 결과를 검증했다.
 - crossterm duplicate 0건을 local gate로 확인했다.
-- `license = "UNLICENSED"`는 R7 법적 검토 전 유지한다.
-- R8 release gate 직전 승인된 라이선스 값과 0.3.0 version을 동기화한다.
+- `license = "UNLICENSED"`는 R7 provenance 승인 여부와 별개로 R8 release 통합 전까지 유지한다.
+- R7 PASS 뒤 R8 작업에서 승인된 라이선스 값과 0.3.0 version을 같은 변경 단위로 동기화한다.
 
 검증:
 
@@ -385,7 +386,23 @@ runtime/
 
 ## 13. 릴리즈 체크리스트
 
-- [ ] R1~R7 checkpoint PASS
+R7 engineering gate:
+
+```bash
+cargo test -p aihack --locked --test provenance_manifest
+cargo test -p aihack --locked --test nethack_367_compat
+cargo test -p aihack --locked --test golden_phase8_rules
+scripts/r7_checkpoint.sh
+! rg -n "legacy_nethack_port_reference" Cargo.toml crates apps src \
+  --glob '*.toml' --glob '*.rs'
+```
+
+앞의 세 Cargo test PASS는 R7 engineering evidence다. `scripts/r7_checkpoint.sh`는 `PROVENANCE.md`의 모든 runtime record와 NH367 record 10개가 승인 근거를 갖춘 `Approved`가 될 때까지 의도적으로 HOLD(exit 1)를 반환한다. 2026-07-18 사용자 결정에 따라 이 HOLD는 R7 개발 진행을 막지 않으며 R8 실제 런칭 전 필수 검토사항을 가시화한다.
+
+R7 validator는 script가 위치한 repository만 검사하며 inherited environment로 root를 바꿀 수 없다. R7은 `PASS WITH KNOWN RISKS`이고 actual asset/scenario approval와 root distribution license는 R8 소유이므로 R7 결과만으로 외부 배포할 수 없다.
+
+- [x] R1~R7 engineering 단계 완료, R7은 license review가 이관된 `PASS WITH KNOWN RISKS`
+- [ ] R8 런칭 전 SC-LICENSE-01과 distribution license PASS
 - [ ] `cargo fmt --all -- --check`
 - [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
 - [ ] `cargo test --workspace --all-targets --locked`

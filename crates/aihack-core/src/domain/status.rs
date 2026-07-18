@@ -21,20 +21,23 @@ impl Status {
     }
     pub fn hunger_state(&self) -> HungerState {
         match self.nutrition {
-            0..=150 => HungerState::Fainting,
-            151..=300 => HungerState::Weak,
-            301..=500 => HungerState::Hungry,
-            501..=2000 => HungerState::Satiated,
-            _ => HungerState::Oversatiated,
+            i16::MIN..=0 => HungerState::Fainting,
+            1..=50 => HungerState::Weak,
+            51..=150 => HungerState::Hungry,
+            151..=1000 => HungerState::NotHungry,
+            1001..=i16::MAX => HungerState::Satiated,
         }
     }
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HungerState {
     Fainting,
     Weak,
     Hungry,
+    NotHungry,
     Satiated,
+    /// v0.2 직렬화/API 호환용 legacy variant. 3.6.7 projection에서는 생성하지 않는다.
     Oversatiated,
 }

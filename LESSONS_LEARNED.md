@@ -203,6 +203,45 @@ deterministic fixture source, exact command와 semantic assertion을 저장소�
 - fixture는 loopback과 표준 라이브러리에 한정하고 외부 provider나 secret을 요구하지 않는다.
 - coder의 local 시정 PASS와 독립 감사의 Verified/PASS authority를 문서 상태에서 분리한다.
 
+### 7.4 Provenance 구현 완료와 배포 승인은 다른 상태다
+
+**상황:**
+공식 archive checksum과 source locator를 검증해도 파생물 배포 권리가 자동 승인되지는 않는다.
+
+**결과:**
+내부 build/test inclusion은 engineering review로 fail-closed하게 관리하고, project license와 notice 의무는 소유자 또는 적격 검토자의 승인 항목으로 분리했다.
+
+**회귀 방지:**
+- R7 record/test GREEN과 `Reviewed -> Approved` 전환을 별도 gate로 유지한다.
+- 자동화 결과를 법률 판단이나 외부 배포 허가로 표현하지 않는다.
+- `UNLICENSED` 변경은 승인 근거와 R8 release 문서가 같은 작업 단위에서 동기화될 때만 수행한다.
+
+### 7.5 승인 상태는 evidence 검증 없이 권한이 아니다
+
+**상황:**
+`Reviewed`를 `Approved`로 바꾼 개수만 세면 reviewer, 적용 license, scope, notice, checksum이 없는 상태도 통과할 수 있었다.
+
+**결과:**
+정상 승인 fixture와 status-only·필드 누락·checksum 변조·ID 중복·coverage 누락/중복·Blocked include negative fixture를 같은 checkpoint에 연결했다.
+
+**회귀 방지:**
+- 승인 gate는 상태와 evidence를 하나의 원자적 계약으로 검증한다.
+- 문서 expected field는 해당 scenario test가 직접 assert하거나 명시된 보조 test에 연결한다.
+- 인간 승인 부재와 자동화 결함을 별도 finding으로 유지한다.
+
+### 7.6 단계 gate는 후속 단계의 mutation을 선행조건으로 요구하지 않는다
+
+**상황:**
+R7이 root license 변경을 요구하면서 그 변경을 R8에서만 허용해 승인 이후에도 순환 의존이 생겼다.
+
+**결과:**
+R7은 asset/scenario provenance, R8은 root distribution license/version/packaging을 소유하도록 분리했다. release script의 검사 root도 caller environment가 아닌 script 위치로 고정했다.
+
+**회귀 방지:**
+- 각 checkpoint는 자신이 소유한 변경만으로 PASS 가능해야 한다.
+- 이전 단계 PASS와 외부 배포 허가는 별도 상태로 표현한다.
+- release hard gate의 repository identity는 inherited 환경변수로 교체하지 않는다.
+
 ---
 
 ## 8. 마이그레이션 교훈

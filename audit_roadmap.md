@@ -330,7 +330,7 @@ Checkpoint R6 현재 상태: **PASS / CLOSED**. `audit_report_10.md`의 IMP-F009
 ## 10. R7 출처·호환성 게이트
 
 연결 gap: G-LICENSE-001, G-COMPAT-001
-성공 기준: SC-COMPAT-01, SC-LICENSE-01
+성공 기준: SC-COMPAT-01과 provenance inventory/checksum/legacy 격리/fail-closed validator. SC-LICENSE-01은 사용자 결정에 따라 R8 실제 런칭 전 최종 게이트로 defer한다.
 
 ```bash
 test -s PROVENANCE.md
@@ -339,6 +339,7 @@ rg -q "98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2" PROVENA
 ! rg -n "legacy_nethack_port_reference" Cargo.toml crates apps src --glob '*.toml' --glob '*.rs'
 cargo test -p aihack --locked --test nethack_367_compat
 cargo test -p aihack --locked --test golden_phase8_rules
+scripts/r7_checkpoint.sh
 ```
 
 PASS 조건:
@@ -349,12 +350,16 @@ PASS 조건:
 - 레거시 경로 직접 import와 path dependency가 0건이다.
 - 라이선스 적용 범위는 담당자 검토 결과와 배포 결정을 기록한다. 본 감사는 법률 자문을 대체하지 않는다.
 
-Checkpoint R7 현재 상태: NOT RUN.
+Checkpoint R7 현재 상태: **PASS WITH KNOWN RISKS — LICENSE REVIEW DEFERRED TO R8**. `audit_report_14.md`까지 기술 finding과 표적 42개·전체 322개 검증은 완료됐다. PROV-0004와 scenario가 `Reviewed`라 validator는 의도적으로 HOLD를 반환하지만, 2026-07-18 사용자 결정으로 이 상태를 R8 최종 런칭 blocker로 이관했다. R7 통과는 license approval 또는 외부 배포 가능 선언이 아니다.
 
 ## 11. R8 통합 릴리즈 게이트
 
 연결 gap: G-DOC-001
 선행: R1~R7 모두 PASS
+
+R8은 승인된 root distribution license, version 0.3.0, packaging/notice와 외부 배포 가능 여부를 함께 판정한다. root가 `UNLICENSED`이거나 R7/R8 중 하나라도 HOLD면 release artifact 외부 게시를 중단한다.
+
+R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C010의 actual approval authority/evidence를 확인한다. 승인 불가 항목은 Blocked 처리하고 독립 자산으로 교체한다. R7의 accepted risk는 이 검토를 면제하지 않는다.
 
 ```bash
 cargo fmt --all -- --check
@@ -397,5 +402,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R6 PASS, R7~R8 NOT RUN. R6는 `audit_report_11.md` 독립 재감사로 종결됐으며 실제 model provider smoke는 비차단 고려 대상이다.
+현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R6 PASS, R7 `PASS WITH KNOWN RISKS`, R8 NOT RUN. R6는 `audit_report_11.md` 독립 재감사로 종결됐으며 실제 model provider smoke는 비차단 고려 대상이다.
 현재 문서 감사 판정: `audit_report_9.md`가 IMP-F008과 R1~R5를, `audit_report_11.md`가 보고서 10 시정과 R6 checkpoint를 PASS로 종결했다. 전체 program PASS는 R7~R8 및 SC-BUILD-02 원격 CI evidence가 완료된 뒤에만 선언한다.
