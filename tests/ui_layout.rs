@@ -1,6 +1,6 @@
 use aihack::{
     core::GameSession,
-    ui::tui::{compute_layout, render_panels, LayoutTier, UiPanel},
+    ui::tui::{compute_layout, render_panels, terminal_size_supported, LayoutTier, UiPanel},
 };
 
 #[test]
@@ -10,6 +10,18 @@ fn layout_80x28_has_no_overlap() {
     layout.validate().unwrap();
     assert_eq!(layout.map.width, 40);
     assert_eq!(layout.map.height, 20);
+}
+
+#[test]
+fn manual_matrix_sizes_follow_the_60x24_runtime_contract() {
+    for (width, height) in [(120, 36), (80, 24), (60, 24)] {
+        assert!(terminal_size_supported(width, height));
+        compute_layout(width, height).validate().unwrap();
+    }
+
+    for (width, height) in [(59, 24), (60, 23), (59, 23)] {
+        assert!(!terminal_size_supported(width, height));
+    }
 }
 
 #[test]

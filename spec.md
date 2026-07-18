@@ -356,6 +356,7 @@ pub enum LlmEnqueueError {
     Busy { capacity: u16 },
     InvalidEndpoint,
     InvalidModel,
+    UnsupportedSchema { expected: u16, actual: u16 },
     InvalidInput { code: LlmInputCode },
     WorkerStopped,
 }
@@ -388,6 +389,8 @@ max_output_chars = 240
 `enabled=true`이면 model은 1..=128자다. Narrative는 2000ms, Decision과 SoftAdjudication은 1500ms deadline을 사용한다. URL은 `http` scheme, userinfo 없음, query/fragment 없음, host가 `127.0.0.1`, `localhost`, `[::1]` 중 하나, port 1..=65535여야 한다. 연결 직전에 resolve한 모든 IP가 loopback인지 다시 검사한다.
 
 transport는 `reqwest 0.13.4`의 `blocking`, `json` feature만 사용하고 default feature, redirect, system proxy를 끈다. TUI thread에서 직접 호출하지 않고 capacity 16의 bounded request/response channel과 LLM worker thread 1개를 사용한다. queue가 가득 차면 `Busy { capacity: 16 }`을 즉시 반환한다. 같은 request kind의 outstanding 요청은 1개이며 CTA cooldown은 250ms다.
+
+실제 모델 추론 smoke는 SC-LLM-01..03 또는 R6 완료의 필수 조건이 아니다. 자동 failure matrix와 실제 PTY/loopback fixture가 wire, timeout, stale, 승인 및 core effect 경계를 충족하면 R6 구현 증거로 인정한다. 최종 통합 단계에서 추가 호환성 증거가 반드시 필요하다고 판단될 때만, AIHack의 loopback 제한을 유지한 채 localhost OpenAI-compatible 임시 adapter가 Google AI Studio Gemini 같은 원격 API를 대리 호출할 수 있다. 이 adapter는 재사용 가능하게 분리하고 API key는 adapter process의 환경변수로만 주입하며, 실제 model ID는 실행 시점의 제공 목록을 확인해 선택한다. 이 선택 검증은 기본 release gate를 차단하지 않는다.
 
 HTTP contract:
 

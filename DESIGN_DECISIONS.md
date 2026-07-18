@@ -172,7 +172,7 @@ Consequences:
 
 ## ADR-0026: local LLM은 loopback presentation adapter
 
-Status: Accepted; R6 automated local integration verified, manual provider/terminal audit pending
+Status: Accepted; audit report 11 independent R6 PASS
 Date: 2026-07-15
 Decision IDs: DEC-AI-01, DEC-LLM-01, DEC-LLM-02
 
@@ -199,7 +199,10 @@ Consequences:
 - remote provider는 v0.3.0 비목표다.
 - R6-1은 연결 직전 resolve 결과를 재검사하고 검증된 loopback 주소를 client에 고정한다. R6-2는 opaque request ID, current revision/ActionSpace, submit 직전 revision을 연속 검증해 response-validation 사이의 stale gap도 막는다.
 - R6-3은 strict soft payload와 `Neutral / LLM_UNAVAILABLE` fallback을 UI-only state로 보관하고, terminal 복원 뒤 worker를 최대 250ms만 정리한다.
-- R6 통합은 G/A/J 요청과 Y/N/R 안전 경로, 상태·modal, 동일 종류 outstanding·250ms cooldown, capacity 16 oldest-drop 표시 큐를 실제 TUI loop에 연결한다. 자동 failure matrix는 통과했으며 실 provider·terminal 수동 검증과 독립 감사는 checkpoint 전 남는다.
+- R6 통합은 G/A/J 요청과 Y/N/R 안전 경로, 상태·modal, 동일 종류 outstanding·250ms cooldown, capacity 16 oldest-drop 표시 큐를 실제 TUI loop에 연결한다. 자동 failure matrix와 live PTY/loopback fixture matrix를 통과했고 `audit_report_11.md`가 checkpoint를 PASS로 종결했다.
+- public request는 `schema_version = 1`, `SessionRevision`, `LlmObservationView`, 독립 `ActionSpace`, `LlmRequestKind`를 소유하고 enqueue 전에 version·bounds·canonical size를 검증한다. response envelope도 TUI payload 수용 전에 version을 거부한다.
+- deterministic loopback fixture와 PTY script는 success/timeout/stale/down 및 pending-exit 복원 순서를 저장소에서 재현한다. `audit_report_11.md` 독립 재감사에서도 같은 evidence가 통과했다.
+- 실제 모델 smoke는 R6 필수 gate가 아니다. 최종 통합에서 별도 호환성 증거가 필요할 때만 localhost OpenAI-compatible 임시 adapter가 Google AI Studio Gemini 같은 원격 API를 대리 호출한다. AIHack은 계속 loopback만 호출하며 API key는 adapter 환경변수에만 주입하고 model ID는 실행 시점에 확인한다.
 
 ## ADR-0027: provenance approval이 runtime 포함의 선행 조건
 

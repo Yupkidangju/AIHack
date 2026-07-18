@@ -79,6 +79,7 @@ pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
             'n',
             UiInputEvent::Key(CommandIntent::Move(crate::core::Direction::SouthEast)),
         ),
+        ('.', UiInputEvent::Key(CommandIntent::Wait)),
         ('s', UiInputEvent::Key(CommandIntent::Search)),
         ('o', UiInputEvent::Key(CommandIntent::Open(Direction::East))),
         (

@@ -176,6 +176,35 @@ AGENTS.md의 Required Files(`IMPLEMENTATION_SUMMARY.md`, `LESSONS_LEARNED.md`)�
 
 ---
 
+### 7.2 실제 PTY 검증은 후보 단위 테스트가 놓치는 event/render 경계를 찾는다
+
+**상황:**
+R6의 input candidate와 LLM state 테스트는 통과했지만 실제 PTY에서는 Enter가 상태 매퍼에 도달하지 않았고, footer의 `.` Wait 안내와 실제 키 매핑이 달랐다. failure fallback은 Retry를 가렸으며 modal 빈 행에는 기존 panel 내용이 남았다.
+
+**결과:**
+60x24/59x23 크기 계약, `KeyCode` 변환, footer 상태 우선순위와 overlay clear를 별도 회귀 테스트로 고정했다.
+
+**회귀 방지:**
+- TUI milestone은 순수 candidate 테스트뿐 아니라 실제 `KeyCode`→state mapping을 검증한다.
+- 화면에 표시한 키와 CTA는 실제 mapping 목록과 같은 테스트에서 비교한다.
+- overlay widget은 빈 문자열도 기존 buffer를 지우는지 검증한다.
+- 최소 지원 크기와 바로 아래 크기를 모두 실제 PTY로 실행한다.
+
+### 7.3 감사 증거는 결과표가 아니라 재실행 자산이어야 한다
+
+**상황:**
+일회성 loopback fixture의 PASS 기록만으로는 다음 감사자가 timing·wire·terminal 복원을 재현할 수 없었다.
+
+**결과:**
+deterministic fixture source, exact command와 semantic assertion을 저장소에 보존하고 success/timeout/stale/down 및 pending-exit를 자동 재실행하도록 전환했다.
+
+**회귀 방지:**
+- raw screen snapshot보다 `LLM: WAIT/TIMEOUT/STALE/DOWN`, CTA, restore order처럼 안정된 의미를 검사한다.
+- fixture는 loopback과 표준 라이브러리에 한정하고 외부 provider나 secret을 요구하지 않는다.
+- coder의 local 시정 PASS와 독립 감사의 Verified/PASS authority를 문서 상태에서 분리한다.
+
+---
+
 ## 8. 마이그레이션 교훈
 
 ### 8.1 레거시는 삭제하지 말고 격리하라

@@ -27,6 +27,7 @@ fn keyboard_baseline_maps_commands() {
         UiInputEvent::Key(CommandIntent::Move(Direction::SouthEast))
     )));
     assert!(baseline.contains(&('s', UiInputEvent::Key(CommandIntent::Search))));
+    assert!(baseline.contains(&('.', UiInputEvent::Key(CommandIntent::Wait))));
     assert!(baseline.contains(&('K', UiInputEvent::Key(CommandIntent::Kick(Direction::East)))));
     assert!(baseline.contains(&('p', UiInputEvent::Key(CommandIntent::Pray))));
     assert!(baseline.contains(&('S', UiInputEvent::SaveRequest)));

@@ -325,7 +325,7 @@ transport test는 redirect 0회, system proxy 미사용, response body 65,536 by
 
 exit smoke는 pending request 중 terminal restore가 먼저 수행되고 worker 종료 대기가 250ms를 넘지 않는지 검증한다.
 
-Checkpoint R6 현재 상태: NOT RUN.
+Checkpoint R6 현재 상태: **PASS / CLOSED**. `audit_report_10.md`의 IMP-F009/010/011과 DBG-F004를 시정해 versioned public boundary, synchronous input error, response schema gate, non-exhaustive enum, 저장소 fixture와 pending-exit smoke를 추가했다. `audit_report_11.md`가 모든 연결 finding과 XPF-F007을 Verified하고 R6 checkpoint를 종결했다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 ## 10. R7 출처·호환성 게이트
 
@@ -397,5 +397,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R5 PASS, R6 local automated integration PASS, R7~R8 NOT RUN. 실 provider·terminal 수동 failure matrix와 독립 재감사가 남아 있으므로 R6 checkpoint는 IN PROGRESS
-현재 문서 감사 판정: `audit_report_9.md`가 보고서 8의 IMP-F008과 이전 문서 시정 계보를 PASS로 종결했다. 전체 program PASS는 R6~R8 및 SC-BUILD-02 원격 CI evidence가 완료된 뒤에만 선언한다.
+현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R6 PASS, R7~R8 NOT RUN. R6는 `audit_report_11.md` 독립 재감사로 종결됐으며 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 IMP-F008과 R1~R5를, `audit_report_11.md`가 보고서 10 시정과 R6 checkpoint를 PASS로 종결했다. 전체 program PASS는 R7~R8 및 SC-BUILD-02 원격 CI evidence가 완료된 뒤에만 선언한다.

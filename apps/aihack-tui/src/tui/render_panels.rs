@@ -18,6 +18,11 @@ impl Widget for TextPanel<'_> {
         if area.width == 0 || area.height == 0 {
             return;
         }
+        for y in area.y..area.y + area.height {
+            for x in area.x..area.x + area.width {
+                buf[(x, y)].reset();
+            }
+        }
         for x in area.x..area.x + area.width {
             buf[(x, area.y)].set_char('-');
         }
@@ -135,6 +140,8 @@ pub fn llm_footer_line(
 ) -> String {
     if has_valid_suggestion {
         "[Y] Apply [N] Dismiss".to_string()
+    } else if !matches!(status, LlmUiStatus::Ready | LlmUiStatus::Disabled) {
+        llm_status_lines(status).get(1).cloned().unwrap_or_default()
     } else if has_result {
         "[N] Dismiss".to_string()
     } else {
@@ -156,6 +163,7 @@ fn request_kind_label(kind: &LlmRequestKind) -> &'static str {
         LlmRequestKind::Narrative => "Narrative",
         LlmRequestKind::Decision => "Suggestion",
         LlmRequestKind::SoftAdjudication { .. } => "Judgment",
+        _ => "Request",
     }
 }
 

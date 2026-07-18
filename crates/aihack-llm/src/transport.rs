@@ -4,10 +4,6 @@ use std::{
     time::Duration,
 };
 
-use aihack_ai_contract::{
-    ActionSpace, ClientRevision, EntityObservation, GameEvent, ItemObservation, Observation,
-    PlayerObservation, RunStateSummary, TileObservation,
-};
 use reqwest::{blocking::Client, redirect::Policy, Url};
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +14,7 @@ use crate::{
     },
     is_forbidden_control,
     narrative::{NarrativeError, NarrativeProvider, NarrativeRequest},
+    service::{canonical_request_json, prepare_request_input, LlmRequestInput},
     soft_adjudication::{parse_soft_adjudication_payload_json, SoftAdjudicationRequest},
 };
 use aihack_ai_contract::llm::SoftAdjudicationPayload;
@@ -38,6 +35,7 @@ pub enum LlmResponseError {
     HttpStatus { code: u16 },
     BodyTooLarge { limit_bytes: usize },
     InvalidSchema { code: LlmValidationCode },
+    UnsupportedSchema { expected: u16, actual: u16 },
     Stale,
 }
 
@@ -93,58 +91,51 @@ impl OpenAiNarrativeTransport {
     }
 
     pub fn complete(&self, request: &NarrativeRequest) -> Result<String, LlmResponseError> {
-        let timeout =
-            Duration::from_millis(self.config.request_timeout_ms(&LlmRequestKind::Narrative));
-        self.complete_with_timeout(request, timeout)
+        let mut input = LlmRequestInput::from_observation(
+            request.revision.clone(),
+            &request.observation,
+            LlmRequestKind::Narrative,
+        );
+        prepare_request_input(&mut input).map_err(map_enqueue_error)?;
+        match self.complete_input(&input)? {
+            aihack_ai_contract::llm::LlmPayload::Narrative(payload) => Ok(payload.text),
+            _ => Err(invalid(LlmValidationCode::WrongKind)),
+        }
     }
 
     pub fn complete_decision(
         &self,
         request: &DecisionRequest,
     ) -> Result<DecisionPayload, LlmResponseError> {
-        validate_observation_bounds(&request.observation)?;
-        let content = self.complete_request(
-            &request.revision,
-            &request.observation,
-            &request.action_space,
-            WireRequestKind::Decision,
-            None,
-            Duration::from_millis(self.config.request_timeout_ms(&LlmRequestKind::Decision)),
-        )?;
-        let payload = parse_decision_payload_json(&content, &request.action_space)?;
-        let validated = validate_decision_payload(
+        let mut input = LlmRequestInput::from_observation(
             request.revision.clone(),
-            payload,
-            &request.revision,
-            &request.action_space,
-        )?;
-        Ok(DecisionPayload {
-            action: validated.action(),
-            rationale: validated.rationale().to_string(),
-            confidence: validated.confidence(),
-        })
+            &request.observation,
+            LlmRequestKind::Decision,
+        );
+        input.action_space = request.action_space.clone();
+        prepare_request_input(&mut input).map_err(map_enqueue_error)?;
+        match self.complete_input(&input)? {
+            aihack_ai_contract::llm::LlmPayload::Decision(payload) => Ok(payload),
+            _ => Err(invalid(LlmValidationCode::WrongKind)),
+        }
     }
 
     pub fn complete_soft_adjudication(
         &self,
         request: &SoftAdjudicationRequest,
     ) -> Result<SoftAdjudicationPayload, LlmResponseError> {
-        validate_observation_bounds(&request.observation)?;
-        let user_text = crate::config::validate_user_text(&request.user_text)
-            .map_err(|code| invalid(map_input_code(code)))?;
-        let content = self.complete_request(
-            &request.revision,
+        let mut input = LlmRequestInput::from_observation(
+            request.revision.clone(),
             &request.observation,
-            &request.observation.action_space,
-            WireRequestKind::SoftAdjudication,
-            Some(&user_text),
-            Duration::from_millis(self.config.request_timeout_ms(
-                &LlmRequestKind::SoftAdjudication {
-                    user_text: user_text.clone(),
-                },
-            )),
-        )?;
-        parse_soft_adjudication_payload_json(&content)
+            LlmRequestKind::SoftAdjudication {
+                user_text: request.user_text.clone(),
+            },
+        );
+        prepare_request_input(&mut input).map_err(map_enqueue_error)?;
+        match self.complete_input(&input)? {
+            aihack_ai_contract::llm::LlmPayload::SoftAdjudication(payload) => Ok(payload),
+            _ => Err(invalid(LlmValidationCode::WrongKind)),
+        }
     }
 
     fn complete_with_timeout(
@@ -152,40 +143,64 @@ impl OpenAiNarrativeTransport {
         request: &NarrativeRequest,
         timeout: Duration,
     ) -> Result<String, LlmResponseError> {
-        validate_observation_bounds(&request.observation)?;
-        let content = self.complete_request(
-            &request.revision,
+        let mut input = LlmRequestInput::from_observation(
+            request.revision.clone(),
             &request.observation,
-            &request.observation.action_space,
-            WireRequestKind::Narrative,
-            None,
-            timeout,
-        )?;
+            LlmRequestKind::Narrative,
+        );
+        prepare_request_input(&mut input).map_err(map_enqueue_error)?;
+        let content = self.complete_request(&input, timeout)?;
         parse_narrative_content(&content, self.config.max_output_chars())
+    }
+
+    pub(crate) fn complete_input(
+        &self,
+        input: &LlmRequestInput,
+    ) -> Result<aihack_ai_contract::llm::LlmPayload, LlmResponseError> {
+        let timeout = Duration::from_millis(self.config.request_timeout_ms(&input.kind));
+        let content = self.complete_request(input, timeout)?;
+        match &input.kind {
+            LlmRequestKind::Narrative => {
+                parse_narrative_content(&content, self.config.max_output_chars()).map(|text| {
+                    aihack_ai_contract::llm::LlmPayload::Narrative(
+                        aihack_ai_contract::llm::NarrativePayload { text },
+                    )
+                })
+            }
+            LlmRequestKind::Decision => {
+                let payload = parse_decision_payload_json(&content, &input.action_space)?;
+                let validated = validate_decision_payload(
+                    input.revision.clone(),
+                    payload,
+                    &input.revision,
+                    &input.action_space,
+                )?;
+                Ok(aihack_ai_contract::llm::LlmPayload::Decision(
+                    DecisionPayload {
+                        action: validated.action(),
+                        rationale: validated.rationale().to_string(),
+                        confidence: validated.confidence(),
+                    },
+                ))
+            }
+            LlmRequestKind::SoftAdjudication { .. } => {
+                parse_soft_adjudication_payload_json(&content)
+                    .map(aihack_ai_contract::llm::LlmPayload::SoftAdjudication)
+            }
+        }
     }
 
     fn complete_request(
         &self,
-        revision: &ClientRevision,
-        observation: &Observation,
-        action_space: &ActionSpace,
-        kind: WireRequestKind,
-        user_text: Option<&str>,
+        input: &LlmRequestInput,
         timeout: Duration,
     ) -> Result<String, LlmResponseError> {
         if !self.config.enabled() {
             return Err(LlmResponseError::Disabled);
         }
         validate_resolved_loopback(&self.chat_completions_url)?;
-        let canonical_input = serde_json::to_string(&LlmWireInput {
-            schema_version: 1,
-            revision,
-            kind,
-            observation: LlmObservationView::from(observation),
-            action_space,
-            user_text,
-        })
-        .map_err(|_| invalid(LlmValidationCode::InvalidJson))?;
+        let canonical_input =
+            canonical_request_json(input).map_err(|_| invalid(LlmValidationCode::InvalidJson))?;
         if canonical_input.len() > REQUEST_BODY_LIMIT {
             return Err(invalid(LlmValidationCode::PayloadTooLarge));
         }
@@ -264,6 +279,7 @@ impl NarrativeProvider for OpenAiNarrativeTransport {
             .map_err(|error| match error {
                 LlmResponseError::Timeout => NarrativeError::Timeout,
                 LlmResponseError::InvalidSchema { .. }
+                | LlmResponseError::UnsupportedSchema { .. }
                 | LlmResponseError::BodyTooLarge { .. }
                 | LlmResponseError::HttpStatus { .. }
                 | LlmResponseError::InvalidEndpoint => {
@@ -292,18 +308,6 @@ fn resolve_loopback(url: &Url) -> Result<Vec<std::net::SocketAddr>, LlmResponseE
         return Err(LlmResponseError::InvalidEndpoint);
     }
     Ok(addresses)
-}
-
-fn validate_observation_bounds(observation: &Observation) -> Result<(), LlmResponseError> {
-    if observation.visible_tiles.len() > 800
-        || observation.visible_entities.len() > 128
-        || observation.inventory.len() > 52
-        || observation.last_events.len() > 20
-        || observation.action_space.commands.len() > 64
-    {
-        return Err(invalid(LlmValidationCode::PayloadTooLarge));
-    }
-    Ok(())
 }
 
 fn extract_response_content(body: &[u8]) -> Result<String, LlmResponseError> {
@@ -339,6 +343,7 @@ fn map_input_code(code: crate::config::LlmInputCode) -> LlmValidationCode {
         crate::config::LlmInputCode::EmptyUserText => LlmValidationCode::EmptyText,
         crate::config::LlmInputCode::TextTooLong => LlmValidationCode::TextTooLong,
         crate::config::LlmInputCode::ControlCharacter => LlmValidationCode::ControlCharacter,
+        crate::config::LlmInputCode::PayloadTooLarge => LlmValidationCode::PayloadTooLarge,
     }
 }
 
@@ -371,52 +376,22 @@ fn map_config_error(error: LlmConfigError) -> LlmResponseError {
     }
 }
 
-fn invalid(code: LlmValidationCode) -> LlmResponseError {
-    LlmResponseError::InvalidSchema { code }
-}
-
-#[derive(Serialize)]
-struct LlmWireInput<'a> {
-    schema_version: u16,
-    revision: &'a ClientRevision,
-    kind: WireRequestKind,
-    observation: LlmObservationView<'a>,
-    action_space: &'a ActionSpace,
-    #[serde(rename = "userText", skip_serializing_if = "Option::is_none")]
-    user_text: Option<&'a str>,
-}
-
-#[derive(Serialize)]
-struct LlmObservationView<'a> {
-    turn: u64,
-    run_state: &'a RunStateSummary,
-    player: &'a PlayerObservation,
-    visible_tiles: &'a [TileObservation],
-    visible_entities: &'a [EntityObservation],
-    inventory: &'a [ItemObservation],
-    last_events: &'a [GameEvent],
-}
-
-impl<'a> From<&'a Observation> for LlmObservationView<'a> {
-    fn from(observation: &'a Observation) -> Self {
-        Self {
-            turn: observation.turn,
-            run_state: &observation.run_state,
-            player: &observation.player,
-            visible_tiles: &observation.visible_tiles,
-            visible_entities: &observation.visible_entities,
-            inventory: &observation.inventory,
-            last_events: &observation.last_events,
+fn map_enqueue_error(error: crate::worker::LlmEnqueueError) -> LlmResponseError {
+    match error {
+        crate::worker::LlmEnqueueError::UnsupportedSchema { expected, actual } => {
+            LlmResponseError::UnsupportedSchema { expected, actual }
         }
+        crate::worker::LlmEnqueueError::InvalidInput { code } => invalid(map_input_code(code)),
+        crate::worker::LlmEnqueueError::Disabled => LlmResponseError::Disabled,
+        crate::worker::LlmEnqueueError::Busy { .. }
+        | crate::worker::LlmEnqueueError::InvalidEndpoint
+        | crate::worker::LlmEnqueueError::InvalidModel
+        | crate::worker::LlmEnqueueError::WorkerStopped => LlmResponseError::Unavailable,
     }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum WireRequestKind {
-    Narrative,
-    Decision,
-    SoftAdjudication,
+fn invalid(code: LlmValidationCode) -> LlmResponseError {
+    LlmResponseError::InvalidSchema { code }
 }
 
 #[derive(Serialize)]

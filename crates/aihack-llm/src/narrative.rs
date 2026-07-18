@@ -26,6 +26,7 @@ pub struct NarrativeResponse {
     pub timed_out: bool,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NarrativeError {
     Provider(String),

@@ -16,10 +16,12 @@
 현재 코드는 R1~R5와 R6 local automated integration gate까지 fmt, clippy, test를 통과한다. 다음 release 범위는 아직 완료되지 않았다.
 
 - Linux/Windows 원격 CI evidence
-- local LLM 실 provider·terminal 수동 matrix와 독립 감사
+- R6 독립 감사
 - NetHack 출처·호환성 trace
 
 v0.3.0은 새 기능 추가보다 이 release evidence와 provenance 기반을 먼저 닫는다.
+
+실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
 ## 2. 전체 런타임 흐름
 
@@ -687,7 +689,7 @@ cargo test -p aihack --locked --test ui_runtime_smoke
 
 **설명:** local provider worker를 실제 TUI input/render loop에 연결하고 모든 결과를 core 권한 경계 안에서 처리한다.
 
-**진행 상태 (2026-07-17):** local automated gate 완료. G/A/J가 narrative/decision/soft request를 enqueue하고 textual status와 Judge 240자 modal을 표시한다. suggestion은 current revision과 ActionSpace를 재검증한 뒤 Y 승인에서만 normal submit을 사용한다. N/Esc는 UI-only 결과를 제거하고 R은 새 request ID로 마지막 실패를 재시도한다. 동일 종류 outstanding 1개, 250ms cooldown, capacity 16 response oldest-drop, keyboard/mouse 동일 CTA candidate가 자동 테스트로 고정됐다. 실 provider·terminal 수동 matrix와 독립 감사는 미실행이다.
+**진행 상태 (2026-07-18):** local automated gate와 live PTY/loopback fixture matrix 완료. G/A/J가 narrative/decision/soft request를 enqueue하고 textual status와 Judge 240자 modal을 표시한다. suggestion은 current revision과 ActionSpace를 재검증한 뒤 Y 승인에서만 normal submit을 사용한다. N/Esc는 UI-only 결과를 제거하고 R은 새 request ID로 마지막 실패를 재시도한다. 동일 종류 outstanding 1개, 250ms cooldown, capacity 16 response oldest-drop, keyboard/mouse 동일 CTA candidate가 테스트로 고정됐다. `audit_report_10.md`의 HOLD 사유는 R6-6에서 시정했고 `audit_report_11.md` 독립 재감사가 R6 checkpoint를 PASS로 종결했다.
 
 **수용 기준:**
 
@@ -696,8 +698,10 @@ cargo test -p aihack --locked --test ui_runtime_smoke
 - [x] Y만 decision submit, N/Esc와 soft/narrative는 core effect 0건
 - [x] stale/invalid/unavailable fallback에서 snapshot hash 불변
 - [x] 표시 footer의 keyboard/mouse CTA candidate 일치
-- [ ] 실 provider·terminal 수동 matrix
-- [ ] 독립 R6 감사
+- [x] live PTY + loopback compatible fixture 수동 matrix
+- [x] `audit_report_11.md` 시정 독립 재감사 PASS
+
+**고려 대상:** 최종 통합에서 실제 provider 호환성 증거가 반드시 필요할 때만 재사용 가능한 localhost OpenAI-compatible 임시 adapter를 만들고 원격 provider smoke를 수행한다. Google AI Studio Gemini는 후보 provider이며 API key는 adapter 환경변수로만 전달한다.
 
 **검증:**
 
@@ -713,13 +717,77 @@ cargo test -p aihack --locked --test llm_revision_gate --test llm_soft_adjudicat
 **파일:** `apps/aihack-tui/src/tui/input.rs`, `tests/llm_transport.rs`
 **범위:** R6-4B S, 2개
 
+### Task R6-5: Live PTY contract closure
+
+**설명:** 승인된 terminal 크기·접근성·failure matrix를 실제 TUI binary에서 실행하고 event/render 경계 회귀를 닫는다.
+
+**진행 상태 (2026-07-18):** 구현 및 live PTY/loopback fixture matrix 완료. 120x36, 80x24, 60x24는 full TUI를 유지하고 59x23은 안내 화면에서 gameplay 입력을 무시한 채 Q/Esc로 clean exit한다. runtime Enter와 `.` Wait가 표시 계약과 일치하며 TIMEOUT/DOWN은 Retry를 보존한다. Judge modal은 빈 입력 행을 포함해 underlying panel을 지운다. `--high-contrast`와 `--reduced-motion`으로 수동 접근성 상태를 선택할 수 있다.
+
+**수용 기준:**
+
+- [x] 120x36 disabled에서 OFF badge와 core play
+- [x] 80x24 success fixture에서 G/A/J/Y/N CTA 판독
+- [x] 60x24 timeout과 connection-refused에서 Retry/Dismiss 판독
+- [x] 59x23 안내와 Q/Esc clean exit
+- [x] delayed suggestion + Wait에서 STALE, Y CTA와 provider submit 0건
+- [x] 실제 KeyCode, footer mapping, modal clear 회귀 테스트
+
+**증거:** `docs/R6_MANUAL_MATRIX.md`
+
+**파일:** `apps/aihack-tui/src/main.rs`, `apps/aihack-tui/src/tui/config.rs`, `apps/aihack-tui/src/tui/mod.rs`, `apps/aihack-tui/src/tui/render_panels.rs`, `apps/aihack-tui/tests/tui_contract.rs`
+**범위:** R6-5A S, 5개
+
+**파일:** `apps/aihack-tui/src/tui/input.rs`, `tests/ui_input_mapping.rs`, `tests/ui_layout.rs`, `tests/llm_tui_integration.rs`
+**범위:** R6-5B S, 4개
+
+### Task R6-6: Audit report 10 public contract and evidence remediation
+
+**설명:** IMP-F009/010/011과 DBG-F004를 연결해 versioned public request/response boundary, enum 안정성, 재현 fixture와 control 문서 상태를 정렬한다.
+
+**진행 상태 (2026-07-18):** 구현 및 local 표적 검증 완료, `audit_report_11.md` 독립 재감사 PASS. public request가 `schema_version`, `SessionRevision`, 소유형 `LlmObservationView`, 독립 `ActionSpace`, `LlmRequestKind`를 포함한다. enqueue는 schema 0/2, projection/action bound, canonical 32,768 bytes를 외부 work 전에 typed error로 거부하고 TUI는 response schema 0/2를 payload 수용 전에 거부한다. public error/command enum은 non-exhaustive이며 저장소 fixture와 PTY script가 success/timeout/stale/down 및 pending-exit를 재현한다.
+
+**수용 기준:**
+
+- [x] public DTO shape와 request schema 0/1/2 contract
+- [x] response schema 0/2 TUI acceptance 0건
+- [x] observation/action bound와 canonical oversize synchronous failure
+- [x] public error/command enum non-exhaustive와 downstream wildcard
+- [x] 저장소 fixture로 success/timeout/stale/down 재현
+- [x] pending exit에서 terminal restore 선행, bounded shutdown
+- [x] 감사 전 G-LLM 상태 `Implemented / Audit HOLD` 통일
+- [x] IMP-F009/010/011, DBG-F004 독립 재감사 Verified
+
+**검증:**
+
+```bash
+cargo test -p aihack --locked --test llm_transport --test llm_tui_integration
+cargo clippy -p aihack-llm -p aihack-tui -p aihack --all-targets --locked -- -D warnings
+scripts/r6_pty_matrix.sh
+scripts/r6_pending_exit_smoke.sh
+```
+
+**파일:** `crates/aihack-llm/src/service.rs`, `crates/aihack-llm/src/transport.rs`, `crates/aihack-llm/src/worker.rs`, `crates/aihack-llm/src/config.rs`, `tests/llm_transport.rs`
+**범위:** R6-6A S, 5개
+
+**파일:** `crates/aihack-llm/src/decision.rs`, `crates/aihack-llm/src/narrative.rs`, `apps/aihack-tui/src/tui/mod.rs`, `tests/llm_tui_integration.rs`
+**범위:** R6-6B S, 4개
+
+**파일:** `scripts/r6_loopback_fixture.py`, `scripts/r6_pty_matrix.sh`, `scripts/r6_pending_exit_smoke.sh`, `docs/R6_MANUAL_MATRIX.md`, `BUILD_GUIDE.md`
+**범위:** R6-6C S, 5개
+
+**파일:** `GAP_CLOSURE_ROADMAP.md`, `IMPLEMENTATION_SUMMARY.md`, `audit_roadmap.md`, `README.md`, `CHANGELOG.md`
+**범위:** R6-6D S, 5개
+
+**파일:** `spec.md`, `DESIGN_DECISIONS.md`, `LESSONS_LEARNED.md`
+**범위:** R6-6E S, 3개
+
 ### Checkpoint R6
 
-- [ ] SC-LLM-01 PASS
-- [ ] SC-LLM-02 PASS
-- [ ] SC-LLM-03 PASS
-- [ ] provider 없는 실행 PASS
-- [ ] stale/invalid response submit 호출 0건
+- [x] SC-LLM-01 local evidence PASS
+- [x] SC-LLM-02 local evidence PASS
+- [x] SC-LLM-03 local evidence PASS
+- [x] provider 없는 실행 PASS
+- [x] stale/invalid response submit 호출 0건
 
 ### Task R7-1: Provenance inventory와 license scope
 
@@ -828,4 +896,4 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 R6 실 provider·terminal 수동 matrix와 독립 감사다. R6-1~4의 transport·bounded worker·fallback·revision gate·soft presentation·TUI G/A/J/Y/N/R 통합과 자동 failure matrix는 local 검증을 통과했다. R6 전체 checkpoint, 전체 program PASS, R8 release gate는 수동 evidence와 독립 감사 전까지 열려 있다.
+다음 단계는 `audit_report_11.md`가 R6 checkpoint를 PASS로 종결했으므로 R7 provenance/compatibility다. SC-BUILD-02 원격 CI와 R8 release gate는 계속 pending이며, 실제 model provider smoke는 비차단 고려 대상이다.

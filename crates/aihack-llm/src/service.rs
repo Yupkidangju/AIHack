@@ -8,24 +8,75 @@ use std::{
     time::Duration,
 };
 
-use aihack_ai_contract::{llm::NarrativePayload, ClientRevision, NarrativeTopic, Observation};
+use aihack_ai_contract::{
+    ActionSpace, ClientRevision, EntityObservation, GameEvent, ItemObservation, Observation,
+    PlayerObservation, RunStateSummary, TileObservation,
+};
+use serde::Serialize;
 
 use crate::{
     config::{validate_user_text, LlmRequestKind, LocalLlmConfig},
-    decision::DecisionRequest,
-    narrative::NarrativeRequest,
-    soft_adjudication::SoftAdjudicationRequest,
-    transport::{LlmResponseError, OpenAiNarrativeTransport},
+    transport::{LlmResponseError, OpenAiNarrativeTransport, REQUEST_BODY_LIMIT},
     worker::{LlmEnqueueError, RequestId, WORKER_CAPACITY},
 };
 
 pub use aihack_ai_contract::llm::LlmPayload;
 
+pub const LLM_SCHEMA_VERSION: u16 = 1;
+pub type SessionRevision = ClientRevision;
+pub type VisibleTile = TileObservation;
+pub type VisibleEntity = EntityObservation;
+pub type InventoryObservation = ItemObservation;
+pub type GameEventSummary = GameEvent;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LlmObservationView {
+    pub turn: u64,
+    pub run_state: RunStateSummary,
+    pub player: PlayerObservation,
+    pub visible_tiles: Vec<VisibleTile>,
+    pub visible_entities: Vec<VisibleEntity>,
+    pub inventory: Vec<InventoryObservation>,
+    pub last_events: Vec<GameEventSummary>,
+}
+
+impl From<&Observation> for LlmObservationView {
+    fn from(observation: &Observation) -> Self {
+        Self {
+            turn: observation.turn,
+            run_state: observation.run_state,
+            player: observation.player.clone(),
+            visible_tiles: observation.visible_tiles.clone(),
+            visible_entities: observation.visible_entities.clone(),
+            inventory: observation.inventory.clone(),
+            last_events: observation.last_events.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LlmRequestInput {
-    pub revision: ClientRevision,
-    pub observation: Observation,
+    pub schema_version: u16,
+    pub revision: SessionRevision,
+    pub observation: LlmObservationView,
+    pub action_space: ActionSpace,
     pub kind: LlmRequestKind,
+}
+
+impl LlmRequestInput {
+    pub fn from_observation(
+        revision: ClientRevision,
+        observation: &Observation,
+        kind: LlmRequestKind,
+    ) -> Self {
+        Self {
+            schema_version: observation.schema_version,
+            revision,
+            observation: LlmObservationView::from(observation),
+            action_space: observation.action_space.clone(),
+            kind,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -117,10 +168,7 @@ impl LocalLlmService {
 impl LocalLlmPort for LocalLlmService {
     fn enqueue(&self, mut input: LlmRequestInput) -> Result<RequestId, LlmEnqueueError> {
         let request_tx = self.request_tx.as_ref().ok_or(LlmEnqueueError::Disabled)?;
-        if let LlmRequestKind::SoftAdjudication { user_text } = &mut input.kind {
-            *user_text = validate_user_text(user_text)
-                .map_err(|code| LlmEnqueueError::InvalidInput { code })?;
-        }
+        prepare_request_input(&mut input)?;
         let kind_index = request_kind_index(&input.kind);
         {
             let mut outstanding = self
@@ -172,32 +220,7 @@ fn run_worker(
     while let Ok(request) = request_rx.recv() {
         let kind_index = request_kind_index(&request.input.kind);
         let revision = request.input.revision.clone();
-        let result = match request.input.kind {
-            LlmRequestKind::Narrative => transport
-                .complete(&NarrativeRequest {
-                    revision: revision.clone(),
-                    topic: NarrativeTopic::SituationSummary,
-                    observation: request.input.observation,
-                })
-                .map(|text| LlmPayload::Narrative(NarrativePayload { text })),
-            LlmRequestKind::Decision => {
-                let action_space = request.input.observation.action_space.clone();
-                transport
-                    .complete_decision(&DecisionRequest {
-                        revision: revision.clone(),
-                        observation: request.input.observation,
-                        action_space,
-                    })
-                    .map(LlmPayload::Decision)
-            }
-            LlmRequestKind::SoftAdjudication { user_text } => transport
-                .complete_soft_adjudication(&SoftAdjudicationRequest {
-                    revision: revision.clone(),
-                    observation: request.input.observation,
-                    user_text,
-                })
-                .map(LlmPayload::SoftAdjudication),
-        };
+        let result = transport.complete_input(&request.input);
         if let Ok(mut outstanding) = outstanding.lock() {
             outstanding[kind_index] = false;
         }
@@ -211,6 +234,89 @@ fn run_worker(
             },
         );
     }
+}
+
+pub fn validate_response_schema(schema_version: u16) -> Result<(), LlmResponseError> {
+    if schema_version == LLM_SCHEMA_VERSION {
+        Ok(())
+    } else {
+        Err(LlmResponseError::UnsupportedSchema {
+            expected: LLM_SCHEMA_VERSION,
+            actual: schema_version,
+        })
+    }
+}
+
+pub(crate) fn prepare_request_input(input: &mut LlmRequestInput) -> Result<(), LlmEnqueueError> {
+    if input.schema_version != LLM_SCHEMA_VERSION {
+        return Err(LlmEnqueueError::UnsupportedSchema {
+            expected: LLM_SCHEMA_VERSION,
+            actual: input.schema_version,
+        });
+    }
+    if input.observation.visible_tiles.len() > 800
+        || input.observation.visible_entities.len() > 128
+        || input.observation.inventory.len() > 52
+        || input.observation.last_events.len() > 20
+        || input.action_space.commands.len() > 64
+    {
+        return Err(LlmEnqueueError::InvalidInput {
+            code: crate::config::LlmInputCode::PayloadTooLarge,
+        });
+    }
+    if let LlmRequestKind::SoftAdjudication { user_text } = &mut input.kind {
+        *user_text =
+            validate_user_text(user_text).map_err(|code| LlmEnqueueError::InvalidInput { code })?;
+    }
+    if canonical_request_json(input)
+        .map_err(|_| LlmEnqueueError::InvalidInput {
+            code: crate::config::LlmInputCode::PayloadTooLarge,
+        })?
+        .len()
+        > REQUEST_BODY_LIMIT
+    {
+        return Err(LlmEnqueueError::InvalidInput {
+            code: crate::config::LlmInputCode::PayloadTooLarge,
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn canonical_request_json(input: &LlmRequestInput) -> serde_json::Result<String> {
+    let (kind, user_text) = match &input.kind {
+        LlmRequestKind::Narrative => (WireRequestKind::Narrative, None),
+        LlmRequestKind::Decision => (WireRequestKind::Decision, None),
+        LlmRequestKind::SoftAdjudication { user_text } => {
+            (WireRequestKind::SoftAdjudication, Some(user_text.as_str()))
+        }
+    };
+    serde_json::to_string(&LlmWireInput {
+        schema_version: input.schema_version,
+        revision: &input.revision,
+        kind,
+        observation: &input.observation,
+        action_space: &input.action_space,
+        user_text,
+    })
+}
+
+#[derive(Serialize)]
+struct LlmWireInput<'a> {
+    schema_version: u16,
+    revision: &'a ClientRevision,
+    kind: WireRequestKind,
+    observation: &'a LlmObservationView,
+    action_space: &'a ActionSpace,
+    #[serde(rename = "userText", skip_serializing_if = "Option::is_none")]
+    user_text: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum WireRequestKind {
+    Narrative,
+    Decision,
+    SoftAdjudication,
 }
 
 fn push_response(
@@ -236,6 +342,7 @@ fn request_kind_index(kind: &LlmRequestKind) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aihack_ai_contract::llm::NarrativePayload;
     use aihack_ai_contract::SnapshotHash;
 
     #[test]

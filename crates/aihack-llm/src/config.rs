@@ -19,6 +19,7 @@ pub struct LocalLlmConfig {
     max_output_chars: usize,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LlmRequestKind {
     Narrative,
@@ -26,6 +27,7 @@ pub enum LlmRequestKind {
     SoftAdjudication { user_text: String },
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LlmConfigError {
     InvalidBoolean { name: String },
@@ -34,11 +36,13 @@ pub enum LlmConfigError {
     InvalidEndpoint,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LlmInputCode {
     EmptyUserText,
     TextTooLong,
     ControlCharacter,
+    PayloadTooLarge,
 }
 
 pub fn validate_user_text(text: &str) -> Result<String, LlmInputCode> {

@@ -12,7 +12,10 @@ use aihack::{
     ui::tui::{key_to_candidate, LlmUiStatus, TuiApp, UiCommandCandidate, UiRuntimeConfig},
 };
 use aihack_llm::config::LlmRequestKind;
-use aihack_llm::{config::LocalLlmConfig, service::LocalLlmService};
+use aihack_llm::{
+    config::LocalLlmConfig,
+    service::{LocalLlmPort, LocalLlmService},
+};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -154,6 +157,11 @@ fn displayed_llm_footer_ctas_have_the_same_mouse_candidates() {
     let result = aihack::ui::tui::render_panels::llm_footer_line(&LlmUiStatus::Ready, true, true);
     assert!(result.contains("[Y] Apply"));
     assert!(result.contains("[N] Dismiss"));
+
+    let failed =
+        aihack::ui::tui::render_panels::llm_footer_line(&LlmUiStatus::Unavailable, false, true);
+    assert!(failed.contains("[R] Retry"));
+    assert!(failed.contains("[N] Dismiss"));
 }
 
 #[test]
@@ -239,6 +247,42 @@ fn response_becomes_stale_when_core_advances_before_tui_acceptance() {
     app.handle_candidate(UiCommandCandidate::LlmApply, unused(), unused())
         .unwrap();
     assert_eq!(app.observation().turn, 1);
+    assert!(service.shutdown_with_grace(Duration::from_millis(250)));
+    server.join().unwrap();
+}
+
+#[test]
+fn unsupported_response_schema_is_rejected_before_tui_payload_acceptance() {
+    let _lock = ENV_LOCK.lock().unwrap();
+    let body = r#"{"choices":[{"message":{"content":"{\"kind\":\"NARRATIVE\",\"text\":\"Must not render.\"}"}}]}"#;
+    let (mut service, server) = service_for_response(body);
+    let mut app = TuiApp::new_with_llm_enabled(
+        GameSession::new_for_playing(42),
+        UiRuntimeConfig::default(),
+        true,
+    );
+    let before = app.revision();
+    app.handle_candidate(UiCommandCandidate::LlmNarrative, unused(), unused())
+        .unwrap();
+    app.dispatch_llm_request(&service);
+
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let mut envelope = loop {
+        if let Some(envelope) = service.try_recv() {
+            break envelope;
+        }
+        assert!(Instant::now() < deadline);
+        thread::yield_now();
+    };
+    envelope.schema_version = 2;
+    app.accept_llm_response(envelope);
+
+    assert_eq!(app.llm_status(), &LlmUiStatus::Invalid);
+    assert_eq!(app.revision(), before);
+    assert!(!app
+        .narrative_lines()
+        .iter()
+        .any(|line| line.contains("Must not render")));
     assert!(service.shutdown_with_grace(Duration::from_millis(250)));
     server.join().unwrap();
 }

@@ -13,7 +13,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트�
 - R1 build 재현성과 R2 private state/transaction은 local gate를 통과했다.
 - R3의 fallible `ContentRegistry` bootstrap과 R4의 policy 기반 headless runner는 local 검증을 통과했다.
 - `survival-v1`은 seed 42, 7, 1234에서 각각 1000 accepted turn과 3회 동일 hash를 검증한다. R5 workspace·문서 시정은 `audit_report_9.md` 재감사를 통과했다.
-- R6 local LLM transport와 TUI G/A/J 요청·상태·modal, Y/N/R 안전 경로 및 failure matrix 자동 검증은 통과했다. 실 provider·실 terminal 수동 matrix와 독립 감사는 남아 있다.
+- `audit_report_11.md`는 보고서 10의 public/schema contract와 evidence 재현성 시정을 모두 Verified하고 R6 checkpoint를 PASS로 종결했다. 실제 model provider smoke는 비차단 고려 대상이다.
 - NetHack 참조 코드·데이터는 provenance와 license scope 검토 전 runtime에 포함하지 않는다.
 
 ### v0.3.0 목표
@@ -37,9 +37,9 @@ TUI는 `default-run = "aihack"`로 선택된다. headless 실행에는 package�
 
 ### 구현 순서
 
-1. R6 실 provider·terminal 수동 matrix와 독립 감사
-2. R7 provenance and compatibility
-3. R8 integrated release audit
+1. R7 provenance and compatibility
+2. R8 integrated release audit
+3. SC-BUILD-02 Linux/Windows 원격 CI evidence
 
 ### 문서
 
@@ -54,7 +54,7 @@ TUI는 `default-run = "aihack"`로 선택된다. headless 실행에는 package�
 9. [Compatibility template](docs/compatibility/README.md)
 10. [Change history](CHANGELOG.md)
 11. [R0 documentation audit](DOCUMENTATION_AUDIT_REPORT.md)
-12. [Latest R5 remediation re-audit](audit_report_9.md)
+12. [Latest R6 remediation re-audit](audit_report_11.md)
 
 과거 Phase 계획은 `.archive/`의 불변 snapshot으로 보존한다.
 
@@ -69,7 +69,7 @@ AIHack is a Rust roguelike that reimplements observable NetHack 3.6.7 behavior t
 - R1 build reproducibility and R2 private-state transaction gates pass locally.
 - R3's fallible `ContentRegistry` bootstrap and R4's policy-driven headless runner pass local verification.
 - `survival-v1` verifies 1,000 accepted turns and three matching hashes for seeds 42, 7, and 1234. The R5 workspace and documentation remediation passed the `audit_report_9.md` re-audit.
-- R6's local transport, live TUI G/A/J request/status/modal flow, Y/N/R safety path, and automated failure matrix pass locally. The real-provider/terminal manual matrix and independent audit remain.
+- `audit_report_11.md` verified the public/schema-contract and reproducibility remediation from report 10 and closed the R6 checkpoint with PASS. A real-provider smoke remains non-blocking.
 - NetHack-derived code or data remains excluded from runtime until provenance and license scope are approved.
 
 ### v0.3.0 target
@@ -99,7 +99,7 @@ AIHack は、NetHack 3.6.7 の観察可能な挙動を、出典付きシナリ�
 
 - 現在の基準では format、clippy、全 test、release build が通過しています。
 - Rust 1.94.1 と ratatui 0.30/crossterm 0.29 は固定済みです。R5 workspace と文書是正は `audit_report_9.md` の再監査を通過しました。
-- R6 の local transport、TUI G/A/J request/status/modal、Y/N/R safety path、failure matrix の自動検証は通過済みです。実 provider・terminal の手動 matrix と独立監査は残っています。
+- `audit_report_11.md` は、report 10 の public/schema contract と証拠再現性の是正をすべて Verified とし、R6 checkpoint を PASS で完了しました。実 provider smoke は非 blocking の検討事項です。
 
 ### 現在の実行
 
@@ -118,7 +118,7 @@ AIHack 是以具來源追蹤的情境與測試，重新實作 NetHack 3.6.7 可�
 
 - 目前基準已通過 format、clippy、全部 test 與 release build。
 - Rust 1.94.1 與 ratatui 0.30/crossterm 0.29 已固定；R5 workspace 與文件修正已通過 `audit_report_9.md` 複審。
-- R6 local transport、TUI G/A/J request/status/modal、Y/N/R 安全路徑與 failure matrix 自動驗證已通過；實 provider／terminal 手動 matrix 與獨立稽核仍待完成。
+- `audit_report_11.md` 已驗證 report 10 的 public/schema contract 與證據可重現性修正，並以 PASS 完成 R6 checkpoint；實際 provider smoke 仍為非阻斷考量。
 
 ### 目前執行
 
@@ -137,7 +137,7 @@ AIHack 是通过带来源追踪的场景和测试，重新实现 NetHack 3.6.7 �
 
 - 当前基线已通过 format、clippy、全部 test 和 release build。
 - Rust 1.94.1 和 ratatui 0.30/crossterm 0.29 已固定；R5 workspace 与文档修正已通过 `audit_report_9.md` 复审。
-- R6 local transport、TUI G/A/J request/status/modal、Y/N/R 安全路径及 failure matrix 自动验证已通过；真实 provider/terminal 手动 matrix 与独立审计仍待完成。
+- `audit_report_11.md` 已验证 report 10 的 public/schema contract 与证据可复现性修正，并以 PASS 完成 R6 checkpoint；实际 provider smoke 仍为非阻断考虑项。
 
 ### 当前运行
 

@@ -5,12 +5,33 @@ use clap::Parser;
 struct Args {
     #[arg(long, default_value_t = 42)]
     seed: u64,
+    #[arg(long)]
+    high_contrast: bool,
+    #[arg(long)]
+    reduced_motion: bool,
 }
 
 fn main() {
     let args = Args::parse();
-    if let Err(error) = aihack_tui::tui::run_tui(args.seed) {
+    let ui_config = aihack_tui::tui::UiRuntimeConfig {
+        high_contrast: args.high_contrast,
+        reduced_motion: args.reduced_motion,
+        ..Default::default()
+    };
+    if let Err(error) = aihack_tui::tui::run_tui_with_config(args.seed, ui_config) {
         eprintln!("{error}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accessibility_flags_are_explicit_and_opt_in() {
+        let args = Args::try_parse_from(["aihack", "--high-contrast", "--reduced-motion"]).unwrap();
+        assert!(args.high_contrast);
+        assert!(args.reduced_motion);
     }
 }

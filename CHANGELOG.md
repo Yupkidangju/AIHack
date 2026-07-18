@@ -28,6 +28,9 @@
 - R6-3 strict soft-adjudication payload, `Neutral / LLM_UNAVAILABLE` fallback, presentation-only TUI 표시·dismiss와 250ms bounded worker shutdown을 추가했다.
 - R6 통합으로 `LocalLlmService`, G/A/J CTA·Judge modal·LLM 상태 badge, Y 승인/N dismiss/R retry, 동일 종류 outstanding·250ms cooldown 및 표시 응답 oldest-drop queue를 실제 TUI loop에 연결했다.
 - 표시된 LLM footer CTA가 동일한 keyboard/mouse candidate를 사용하도록 연결하고 decision metadata를 transport와 TUI 경계에서 이중 검증했다.
+- TUI 접근성 수동 실행을 위한 `--high-contrast`, `--reduced-motion` 플래그와 60x24 최소 terminal 계약을 추가했다.
+- R6 재감사를 위해 versioned `LlmRequestInput`/`LlmObservationView`, request·response schema mismatch gate와 synchronous payload bound를 추가했다.
+- `scripts/r6_loopback_fixture.py`, `scripts/r6_pty_matrix.sh`, `scripts/r6_pending_exit_smoke.sh`를 추가해 success/timeout/stale/down과 pending-exit terminal 복원을 재현 가능하게 했다.
 
 ### Changed
 
@@ -47,6 +50,8 @@
 - headless runner와 TUI가 세션 메타데이터·turn·상태·event log를 공개 field가 아니라 `GameSession` 읽기 API로 소비하도록 전환했다.
 - `GameSession`의 meta/RNG/turn/run-state/event-log 저장 필드를 crate 외부 비공개로 전환했다.
 - invariant 오류는 원본 session을 보존한 reject로 처리하고, AwaitingDirection의 실패 입력 후 Playing 복귀 동작은 유지했다.
+- R6 PTY matrix에서 발견한 Enter runtime mapping, `.` Wait mapping, retry footer 우선순위와 Judge modal 잔상을 보정했다.
+- `audit_report_10.md`의 IMP-F009/010 시정으로 public LLM error/command enum을 non-exhaustive 계약에 맞추고 TUI consumer에 wildcard 처리를 추가했다.
 
 ### Security
 
@@ -61,7 +66,9 @@
 - R6-1의 `llm_transport` 12개와 `llm_narrative` 7개 계약 테스트 및 대상 crate clippy가 통과했다.
 - R6-2의 `llm_revision_gate` 9개와 기존 decision/TUI 회귀 테스트가 통과했다. R6 전체 checkpoint는 R6-3 뒤에 판정한다.
 - R6-3의 `llm_soft_adjudication` 5개와 worker shutdown·TUI 회귀 테스트가 통과했다.
-- R6 통합의 `llm_transport` 17개, `llm_tui_integration` 9개 및 LLM response queue 단위 테스트가 통과했다. 자동 local failure matrix는 닫혔고 실 provider·terminal 수동 matrix와 독립 감사가 남아 있어 R6 checkpoint는 진행 중이다.
+- R6 통합과 시정의 `llm_transport` 22개, `llm_tui_integration` 10개 및 LLM response queue 단위 테스트가 통과했다. public/observation schema 0/2, action/payload bound와 TUI response rejection을 포함한다.
+- 120x36/80x24/60x24/59x23 PTY에서 disabled, success fixture, timeout, stale, connection-refused 흐름을 수동 PASS했다. 실제 model provider smoke는 최종 통합에서 필요성이 확인될 때만 localhost 호환 adapter로 수행하는 비차단 고려 대상으로 분리했다.
+- 저장소 보존 PTY matrix가 success/timeout/stale/down을 PASS했고 pending-exit smoke가 restore-before-worker-wait와 291ms 종료를 PASS했다. `audit_report_11.md`가 보고서 10의 시정을 Verified하고 R6 checkpoint를 PASS로 종결했다.
 
 ## 2026-05-18
 

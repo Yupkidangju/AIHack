@@ -23,6 +23,7 @@ pub struct DecisionRequest {
     pub action_space: ActionSpace,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecisionGateError {
     AlreadyOutstanding,
@@ -284,6 +285,7 @@ pub struct SuggestedAction {
     pub source: DecisionSource,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecisionError {
     Provider(String),

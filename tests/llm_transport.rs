@@ -13,7 +13,10 @@ use aihack::{
 use aihack_llm::{
     config::{validate_user_text, LlmConfigError, LlmInputCode, LlmRequestKind, LocalLlmConfig},
     decision::DecisionRequest,
-    service::{LlmPayload, LlmRequestInput, LocalLlmPort, LocalLlmService},
+    service::{
+        validate_response_schema, LlmObservationView, LlmPayload, LlmRequestInput, LocalLlmPort,
+        LocalLlmService, LLM_SCHEMA_VERSION,
+    },
     soft_adjudication::SoftAdjudicationRequest,
     transport::{
         LlmResponseError, LlmValidationCode, OpenAiNarrativeTransport, RESPONSE_BODY_LIMIT,
@@ -176,6 +179,18 @@ fn narrative_request() -> NarrativeRequest {
         },
         topic: NarrativeTopic::SituationSummary,
         observation: session.observation(),
+    }
+}
+
+fn public_narrative_input() -> LlmRequestInput {
+    let request = narrative_request();
+    let action_space = request.observation.action_space.clone();
+    LlmRequestInput {
+        schema_version: LLM_SCHEMA_VERSION,
+        revision: request.revision,
+        observation: LlmObservationView::from(&request.observation),
+        action_space,
+        kind: LlmRequestKind::Narrative,
     }
 }
 
@@ -348,19 +363,19 @@ fn local_llm_service_round_trips_narrative_on_the_bounded_worker() {
     let mut service = LocalLlmService::from_config(enabled_config(address, 2_000)).unwrap();
     let request = narrative_request();
     let request_id = service
-        .enqueue(LlmRequestInput {
-            revision: request.revision.clone(),
-            observation: request.observation,
-            kind: LlmRequestKind::Narrative,
-        })
+        .enqueue(LlmRequestInput::from_observation(
+            request.revision.clone(),
+            &request.observation,
+            LlmRequestKind::Narrative,
+        ))
         .unwrap();
     let duplicate = narrative_request();
     assert_eq!(
-        service.enqueue(LlmRequestInput {
-            revision: duplicate.revision,
-            observation: duplicate.observation,
-            kind: LlmRequestKind::Narrative,
-        }),
+        service.enqueue(LlmRequestInput::from_observation(
+            duplicate.revision,
+            &duplicate.observation,
+            LlmRequestKind::Narrative,
+        )),
         Err(LlmEnqueueError::Busy {
             capacity: WORKER_CAPACITY as u16,
         })
@@ -384,15 +399,101 @@ fn local_llm_service_round_trips_narrative_on_the_bounded_worker() {
 }
 
 #[test]
+fn public_request_contract_exposes_versioned_projection_and_action_space() {
+    let input = public_narrative_input();
+
+    assert_eq!(input.schema_version, 1);
+    assert_eq!(input.observation.turn, input.revision.turn);
+    assert!(!input.action_space.commands.is_empty());
+}
+
+#[test]
+fn enqueue_rejects_unsupported_request_schema_before_external_work() {
+    for actual in [0, 2] {
+        let mut service =
+            LocalLlmService::from_config(enabled_config("127.0.0.1:9".parse().unwrap(), 500))
+                .unwrap();
+        let mut input = public_narrative_input();
+        input.schema_version = actual;
+
+        assert_eq!(
+            service.enqueue(input),
+            Err(LlmEnqueueError::UnsupportedSchema {
+                expected: LLM_SCHEMA_VERSION,
+                actual,
+            })
+        );
+        assert!(service.shutdown_with_grace(Duration::from_millis(250)));
+    }
+}
+
+#[test]
+fn response_schema_gate_rejects_versions_zero_and_two() {
+    assert!(validate_response_schema(LLM_SCHEMA_VERSION).is_ok());
+    for actual in [0, 2] {
+        assert_eq!(
+            validate_response_schema(actual),
+            Err(LlmResponseError::UnsupportedSchema {
+                expected: LLM_SCHEMA_VERSION,
+                actual,
+            })
+        );
+    }
+}
+
+#[test]
+fn observation_schema_is_not_rewritten_to_version_one_by_the_transport_adapter() {
+    let mut request = narrative_request();
+    request.observation.schema_version = 2;
+    let result = OpenAiNarrativeTransport::new(enabled_config("127.0.0.1:9".parse().unwrap(), 500))
+        .unwrap()
+        .complete(&request);
+
+    assert_eq!(
+        result,
+        Err(LlmResponseError::UnsupportedSchema {
+            expected: LLM_SCHEMA_VERSION,
+            actual: 2,
+        })
+    );
+}
+
+#[test]
+fn enqueue_rejects_action_bounds_and_canonical_payload_size_synchronously() {
+    let mut service =
+        LocalLlmService::from_config(enabled_config("127.0.0.1:9".parse().unwrap(), 500)).unwrap();
+    let mut too_many_actions = public_narrative_input();
+    let action = too_many_actions.action_space.commands[0];
+    too_many_actions.action_space.commands = vec![action; 65];
+    assert_eq!(
+        service.enqueue(too_many_actions),
+        Err(LlmEnqueueError::InvalidInput {
+            code: LlmInputCode::PayloadTooLarge,
+        })
+    );
+
+    let mut oversized = public_narrative_input();
+    let tile = oversized.observation.visible_tiles[0].clone();
+    oversized.observation.visible_tiles = vec![tile; 800];
+    assert_eq!(
+        service.enqueue(oversized),
+        Err(LlmEnqueueError::InvalidInput {
+            code: LlmInputCode::PayloadTooLarge,
+        })
+    );
+    assert!(service.shutdown_with_grace(Duration::from_millis(250)));
+}
+
+#[test]
 fn local_llm_service_disabled_mode_rejects_without_a_request_id() {
     let service = LocalLlmService::disabled();
     let request = narrative_request();
     assert_eq!(
-        service.enqueue(LlmRequestInput {
-            revision: request.revision,
-            observation: request.observation,
-            kind: LlmRequestKind::Narrative,
-        }),
+        service.enqueue(LlmRequestInput::from_observation(
+            request.revision,
+            &request.observation,
+            LlmRequestKind::Narrative,
+        )),
         Err(LlmEnqueueError::Disabled)
     );
 }

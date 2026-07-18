@@ -21,7 +21,10 @@ use crate::llm::{
         ValidatedDecision,
     },
     narrative::{narrative_log_lines, NarrativeResponse, NarrativeSource},
-    service::{LlmPayload, LlmRequestInput, LlmResponseEnvelope, LocalLlmPort, LocalLlmService},
+    service::{
+        validate_response_schema, LlmPayload, LlmRequestInput, LlmResponseEnvelope, LocalLlmPort,
+        LocalLlmService,
+    },
     soft_adjudication::{
         fallback_soft_adjudication, soft_adjudication_lines, SoftAdjudicationResponse,
         SoftAdjudicationSource,
@@ -74,6 +77,13 @@ pub use input::{
 pub use layout::{compute_layout, LayoutTier, TuiLayout};
 pub use theme::UiTheme;
 pub use viewport::Viewport;
+
+pub const MIN_TERMINAL_WIDTH: u16 = 60;
+pub const MIN_TERMINAL_HEIGHT: u16 = 24;
+
+pub fn terminal_size_supported(width: u16, height: u16) -> bool {
+    width >= MIN_TERMINAL_WIDTH && height >= MIN_TERMINAL_HEIGHT
+}
 
 /// [v0.2.0] Phase 18: TUI adapter 런타임 상태에 debug observation 토글 추가.
 pub trait TuiClient: GameClient {
@@ -189,12 +199,17 @@ impl TuiApp {
             return;
         }
         let revision = self.revision();
-        let enqueue_result = port.enqueue(LlmRequestInput {
-            revision: revision.clone(),
-            observation: self.observation(),
-            kind: kind.clone(),
-        });
-        self.last_llm_enqueue[llm_kind_index(&kind)] = Some(Instant::now());
+        let observation = self.observation();
+        let enqueue_result = port.enqueue(LlmRequestInput::from_observation(
+            revision.clone(),
+            &observation,
+            kind.clone(),
+        ));
+        let Some(kind_index) = llm_kind_index(&kind) else {
+            self.llm_status = LlmUiStatus::Invalid;
+            return;
+        };
+        self.last_llm_enqueue[kind_index] = Some(Instant::now());
         self.last_llm_request = Some(kind.clone());
         match enqueue_result {
             Ok(request_id) => {
@@ -224,6 +239,11 @@ impl TuiApp {
     }
 
     pub fn accept_llm_response(&mut self, envelope: LlmResponseEnvelope) {
+        if validate_response_schema(envelope.schema_version).is_err() {
+            self.outstanding_llm_request.take();
+            self.llm_status = LlmUiStatus::Invalid;
+            return;
+        }
         let Some(outstanding) = self.outstanding_llm_request.as_ref() else {
             self.llm_status = LlmUiStatus::Invalid;
             return;
@@ -317,6 +337,7 @@ impl TuiApp {
                 self.set_soft_adjudication(fallback_soft_adjudication())
             }
             LlmRequestKind::Decision => {}
+            _ => {}
         }
     }
 
@@ -325,7 +346,11 @@ impl TuiApp {
             self.llm_status = LlmUiStatus::Disabled;
             return;
         }
-        if self.last_llm_enqueue[llm_kind_index(&kind)]
+        let Some(kind_index) = llm_kind_index(&kind) else {
+            self.llm_status = LlmUiStatus::Invalid;
+            return;
+        };
+        if self.last_llm_enqueue[kind_index]
             .is_some_and(|instant| instant.elapsed() < Duration::from_millis(250))
         {
             return;
@@ -459,6 +484,10 @@ impl TuiApp {
 
     pub fn theme(&self) -> UiTheme {
         UiTheme::from_high_contrast(self.config.high_contrast)
+    }
+
+    pub fn supports_terminal_size(&self, width: u16, height: u16) -> bool {
+        width >= self.config.min_terminal_width && height >= self.config.min_terminal_height
     }
 
     pub fn run_single_frame(&mut self, width: u16, height: u16) -> Result<TuiLayout, String> {
@@ -617,17 +646,25 @@ impl TuiApp {
     }
 }
 
-fn llm_kind_index(kind: &LlmRequestKind) -> usize {
+fn llm_kind_index(kind: &LlmRequestKind) -> Option<usize> {
     match kind {
-        LlmRequestKind::Narrative => 0,
-        LlmRequestKind::Decision => 1,
-        LlmRequestKind::SoftAdjudication { .. } => 2,
+        LlmRequestKind::Narrative => Some(0),
+        LlmRequestKind::Decision => Some(1),
+        LlmRequestKind::SoftAdjudication { .. } => Some(2),
+        _ => None,
     }
 }
 
 /// [v0.2.0] Phase 17: RunState에 따라 화면을 분기한다.
 /// Title -> CharacterCreation -> Playing <-> GameOver 흐름을 지원한다.
 pub fn run_tui(seed: u64) -> Result<(), Box<dyn std::error::Error>> {
+    run_tui_with_config(seed, UiRuntimeConfig::default())
+}
+
+pub fn run_tui_with_config(
+    seed: u64,
+    ui_config: UiRuntimeConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
     let llm_config = LocalLlmConfig::from_env().map_err(|error| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -637,24 +674,21 @@ pub fn run_tui(seed: u64) -> Result<(), Box<dyn std::error::Error>> {
     let llm_enabled = llm_config.enabled();
     let service = LocalLlmService::from_config(llm_config)
         .map_err(|error| std::io::Error::other(format!("local LLM startup failed: {error:?}")))?;
-    run_tui_with_service(seed, service, llm_enabled)
+    run_tui_with_service(seed, service, llm_enabled, ui_config)
 }
 
 fn run_tui_with_service(
     seed: u64,
     mut llm_service: LocalLlmService,
     llm_enabled: bool,
+    ui_config: UiRuntimeConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut stdout = std::io::stdout();
     stdout.execute(EnterAlternateScreen)?;
     terminal::enable_raw_mode()?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    let mut app = TuiApp::new_with_llm_enabled(
-        GameSession::try_new(seed)?,
-        UiRuntimeConfig::default(),
-        llm_enabled,
-    );
+    let mut app = TuiApp::new_with_llm_enabled(GameSession::try_new(seed)?, ui_config, llm_enabled);
     let save_path = std::env::temp_dir().join("aihack-tui-save.json");
     let load_path = save_path.clone();
     let run_result = (|| -> Result<(), Box<dyn std::error::Error>> {
@@ -662,11 +696,12 @@ fn run_tui_with_service(
             app.poll_llm_response(&llm_service);
             terminal.draw(|frame| {
                 let size = frame.area();
-                if size.width < 80 || size.height < 28 {
+                if !app.supports_terminal_size(size.width, size.height) {
                     frame.render_widget(
                         render_panels::TextPanel {
                             title: "TUI",
-                            lines: vec!["terminal too small: need at least 80x28".to_string()],
+                            lines: vec!["terminal requires 60x24; resize or press Q/Esc to exit"
+                                .to_string()],
                         },
                         size,
                     );
@@ -689,54 +724,66 @@ fn run_tui_with_service(
                 }
             })?;
             let size = terminal.size()?;
-            if size.width < 80 || size.height < 28 {
-                break;
-            }
             if event::poll(Duration::from_millis(50))? {
-                let candidate = match event::read()? {
-                    Event::Key(key) if app.soft_input().is_some() => match key.code {
-                        KeyCode::Enter => Some(UiCommandCandidate::LlmSubmitInput),
-                        KeyCode::Backspace => Some(UiCommandCandidate::LlmBackspace),
-                        KeyCode::Esc => Some(UiCommandCandidate::LlmCancelInput),
-                        KeyCode::Char(character) => Some(UiCommandCandidate::LlmInput(character)),
-                        _ => None,
-                    },
-                    Event::Key(key) => match key.code {
-                        KeyCode::Char('N') if app.has_llm_result() => {
-                            Some(UiCommandCandidate::DismissLlmResult)
-                        }
-                        KeyCode::Char(ch) => {
-                            key_to_candidate_for_state(ch, &app.run_state(), &app.observation())
-                        }
-                        KeyCode::Esc if app.has_llm_result() => {
-                            Some(UiCommandCandidate::DismissLlmResult)
-                        }
-                        KeyCode::Esc => Some(UiCommandCandidate::Quit),
-                        // [v0.2.0] Phase 18: F9 키로 debug observation 패널을 토글한다.
-                        // 이 입력은 UI-only이며 core나 snapshot hash에 영향을 주지 않는다.
-                        KeyCode::F(9) => {
-                            app.debug_observation_visible = !app.debug_observation_visible;
-                            None
+                let input_event = event::read()?;
+                let candidate = if !app.supports_terminal_size(size.width, size.height) {
+                    match input_event {
+                        Event::Key(key)
+                            if matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc) =>
+                        {
+                            Some(UiCommandCandidate::Quit)
                         }
                         _ => None,
-                    },
-                    Event::Mouse(mouse) => {
-                        let layout = compute_layout(size.width, size.height);
-                        let viewport = app.viewport_for_observation(layout);
-                        let input = match mouse.kind {
-                            MouseEventKind::Moved => UiInputEvent::MouseHover {
-                                column: mouse.column,
-                                row: mouse.row,
-                            },
-                            MouseEventKind::Down(_) => UiInputEvent::MouseClick {
-                                column: mouse.column,
-                                row: mouse.row,
-                            },
-                            _ => UiInputEvent::FocusPanel(UiPanel::Map),
-                        };
-                        map_mouse_event_for_state(input, layout, viewport, &app)
                     }
-                    _ => None,
+                } else {
+                    match input_event {
+                        Event::Key(key) if app.soft_input().is_some() => match key.code {
+                            KeyCode::Enter => Some(UiCommandCandidate::LlmSubmitInput),
+                            KeyCode::Backspace => Some(UiCommandCandidate::LlmBackspace),
+                            KeyCode::Esc => Some(UiCommandCandidate::LlmCancelInput),
+                            KeyCode::Char(character) => {
+                                Some(UiCommandCandidate::LlmInput(character))
+                            }
+                            _ => None,
+                        },
+                        Event::Key(key) => match key.code {
+                            KeyCode::Char('N') if app.has_llm_result() => {
+                                Some(UiCommandCandidate::DismissLlmResult)
+                            }
+                            KeyCode::Esc if app.has_llm_result() => {
+                                Some(UiCommandCandidate::DismissLlmResult)
+                            }
+                            KeyCode::Esc => Some(UiCommandCandidate::Quit),
+                            // [v0.2.0] Phase 18: F9 키로 debug observation 패널을 토글한다.
+                            // 이 입력은 UI-only이며 core나 snapshot hash에 영향을 주지 않는다.
+                            KeyCode::F(9) => {
+                                app.debug_observation_visible = !app.debug_observation_visible;
+                                None
+                            }
+                            key_code => runtime_key_to_candidate(
+                                key_code,
+                                &app.run_state(),
+                                &app.observation(),
+                            ),
+                        },
+                        Event::Mouse(mouse) => {
+                            let layout = compute_layout(size.width, size.height);
+                            let viewport = app.viewport_for_observation(layout);
+                            let input = match mouse.kind {
+                                MouseEventKind::Moved => UiInputEvent::MouseHover {
+                                    column: mouse.column,
+                                    row: mouse.row,
+                                },
+                                MouseEventKind::Down(_) => UiInputEvent::MouseClick {
+                                    column: mouse.column,
+                                    row: mouse.row,
+                                },
+                                _ => UiInputEvent::FocusPanel(UiPanel::Map),
+                            };
+                            map_mouse_event_for_state(input, layout, viewport, &app)
+                        }
+                        _ => None,
+                    }
                 };
                 if let Some(candidate) = candidate {
                     if app.handle_candidate(candidate, &save_path, &load_path)? {
@@ -996,6 +1043,18 @@ fn key_to_candidate_for_state(
         | RunState::AwaitingInventorySelection { .. }
         | RunState::MorePrompt
         | RunState::Playing => key_to_candidate(ch, observation),
+    }
+}
+
+pub fn runtime_key_to_candidate(
+    key_code: KeyCode,
+    state: &crate::core::session::RunState,
+    observation: &Observation,
+) -> Option<UiCommandCandidate> {
+    match key_code {
+        KeyCode::Enter => key_to_candidate_for_state('\n', state, observation),
+        KeyCode::Char(character) => key_to_candidate_for_state(character, state, observation),
+        _ => None,
     }
 }
 

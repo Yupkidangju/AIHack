@@ -35,6 +35,9 @@ impl RequestId {
 pub enum LlmEnqueueError {
     Disabled,
     Busy { capacity: u16 },
+    InvalidEndpoint,
+    InvalidModel,
+    UnsupportedSchema { expected: u16, actual: u16 },
     InvalidInput { code: crate::config::LlmInputCode },
     WorkerStopped,
 }

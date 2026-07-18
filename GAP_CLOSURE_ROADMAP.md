@@ -47,10 +47,10 @@
 | G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | policy runner 조기 실패 처리와 3 seed accepted turn 1000, `audit_report_6.md` 재감사 | R4-1, R4-2 | SC-TEST-01 | Closed |
 | G-TEST-002 | P1 | long-run 반복 hash가 실제 1000 accepted turn을 증명하지 않음 | 3 seed x 1000 accepted turn x 3회 hash, `audit_report_6.md` 재감사 | R4-2 | SC-TEST-02 | Closed |
 | G-ARCH-001 | P2 | core/UI/LLM이 한 package dependency tree 공유 | 7개 crate/app workspace, app core 직접 의존 0건, R4 hash 유지, `audit_report_6.md` 재감사 | R5-1, R5-2 | SC-ARCH-01 | Closed |
-| G-LLM-001 | P0 | 실제 local LLM provider 없음 | loopback transport·strict response validation·bounded worker 구현, local test 통과; 독립 재감사 대기 | R6-1 | SC-LLM-01 | Implemented |
-| G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | transport deadline과 deterministic fallback 구현, local test 통과; 독립 재감사 대기 | R6-1 | SC-LLM-01 | Implemented |
-| G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증 구현; local test 통과, 독립 재감사 대기 | R6-2 | SC-LLM-02 | Implemented |
-| G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0 local test 통과; 독립 재감사 대기 | R6-3 | SC-LLM-03 | Implemented |
+| G-LLM-001 | P0 | 실제 local LLM provider 없음 | loopback transport·strict response validation·bounded worker 구현, `audit_report_11.md` 독립 재감사 | R6-1, R6-6 | SC-LLM-01 | Closed |
+| G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | transport deadline·deterministic fallback·재현 fixture 구현, `audit_report_11.md` 독립 재감사 | R6-1, R6-6 | SC-LLM-01 | Closed |
+| G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | versioned request/response, opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증; `audit_report_11.md` 독립 재감사 | R6-2, R6-6 | SC-LLM-02 | Closed |
+| G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0; `audit_report_11.md` 독립 재감사 | R6-3, R6-6 | SC-LLM-03 | Closed |
 | G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | P8 golden ID에 source record 없음 | R7-2 | SC-COMPAT-01 | Open |
 | G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | manifest/doc version drift | R8-1 | SC-DOC-01 | Open |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
@@ -186,7 +186,7 @@ crossterm 중복 0건, 마지막 명령이 TUI binary를 선택해야 한다.
 | valid legal action | `LlmPayload::Decision` | 사용자 승인 시 1 | 정상 command 영향만 |
 | soft adjudication | `LlmPayload::SoftAdjudication` 또는 Neutral UI fallback | 0 | 없음 |
 
-**2026-07-17 local closure:** transport·revision/action gate·G/A/J 상태/modal·Y/N/R 안전 경로와 disabled/connect failure/invalid/stale/success 자동 matrix가 통과했다. G-LLM-001..004 구현은 local automated 기준 `Closed`이며, R6 checkpoint의 실 provider·terminal 수동 matrix와 독립 감사는 별도 남는다.
+**2026-07-18 audit closure:** `audit_report_10.md`의 R6 HOLD 이후 public versioned projection·독립 ActionSpace·request/response schema 0/2 rejection·synchronous payload bound·public enum stability를 구현했고, 저장소 fixture로 success/timeout/stale/down 및 pending-exit matrix를 재현했다. `audit_report_11.md`가 IMP-F009/010/011, DBG-F004와 XPF-F007을 Verified하고 R6 checkpoint를 PASS로 종결했으므로 G-LLM-001..004는 `Closed`다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 ### 4.8 G-LICENSE-001과 G-COMPAT-001
 
@@ -243,4 +243,4 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0 문서화는 `DOCUMENTATION_AUDIT_REPORT.md`에서 PASS했다. G-BUILD, G-CORE, G-DATA, G-TEST, G-ARCH, G-LLM, G-LICENSE, G-COMPAT gap은 코드·설정 구현과 실행 검증 전까지 Open이다.
+R0 문서화와 R1~R6의 G-BUILD(local), G-CORE, G-DATA, G-TEST, G-ARCH, G-LLM은 해당 독립 감사 범위에서 PASS/Closed다. R6는 `audit_report_11.md`가 종결 권한이다. SC-BUILD-02 원격 CI, G-LICENSE, G-COMPAT 및 R8 release gap은 아직 Open/pending이다.

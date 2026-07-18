@@ -312,6 +312,23 @@ AIHACK_LLM_MODEL=local-model \
 cargo run --locked --bin aihack -- --seed 42
 ```
 
+접근성 수동 matrix는 다음 실행 플래그를 사용한다. 기본 최소 terminal 계약은 60x24다.
+
+```bash
+cargo run --locked --bin aihack -- --seed 42 --high-contrast --reduced-motion
+```
+
+R6 PTY 실행 증거와 fixture/실제-model 구분은 `docs/R6_MANUAL_MATRIX.md`에 기록한다.
+
+감사 재현용 fixture와 PTY smoke는 외부 provider 없이 다음 명령으로 실행한다.
+
+```bash
+scripts/r6_pty_matrix.sh
+scripts/r6_pending_exit_smoke.sh
+```
+
+첫 명령은 80x24 success, 60x24 timeout/down, 120x36 stale 흐름을 검사한다. 두 번째 명령은 pending request 중 Q 종료에서 alternate/raw terminal 복원이 worker grace wait보다 먼저 수행되고 전체 종료가 bounded인지 검사한다. Python 표준 라이브러리, tmux, 현재 debug TUI binary만 사용한다.
+
 허용 환경변수:
 
 | 이름 | 기본값 | 검사 |
