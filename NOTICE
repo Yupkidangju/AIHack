@@ -1,0 +1,51 @@
+AIHack derivative-work notice
+=============================
+
+AIHack is a derivative reimplementation of NetHack 3.6.7. The project was
+created by studying the original NetHack 3.6.7 source and using AI-assisted semantic rewrite
+techniques to reconstruct its intended observable behavior in a substantially
+different Rust architecture.
+
+NetHack copyright and license
+-----------------------------
+
+NetHack is copyrighted by Stichting Mathematisch Centrum, M. Stephenson, and
+the other NetHack copyright holders. The official NetHack General Public
+License is reproduced without modification in the repository root LICENSE
+file. Its SPDX identifier is NGPL.
+
+AIHack modifications
+--------------------
+
+AIHack contributors rewrote and modified the derivative work during 2025 and
+2026. The rewrite replaces the original implementation architecture with a
+Rust workspace, deterministic state transactions, embedded content, replay,
+headless and TUI adapters, and guarded LLM assistance.
+
+Modification record: all project-owned files under `src/`, `crates/`, `apps/`,
+`tests/`, `scripts/`, and `docs/`, together with the root build and project
+documents, were created or changed for the AIHack rewrite during 2025-2026.
+The distributed `MODIFICATIONS.md` carries the path scopes, change period and
+modification descriptions. `RELEASE-METADATA` identifies the exact source
+commit covered by that manifest. These records do not depend on a distributed
+`.git/` directory. More specific provenance records are maintained in
+`PROVENANCE.md`.
+
+No claim is made that AIHack is an official NetHack release or is endorsed by
+the NetHack copyright holders. Original NetHack notices present in retained
+reference material remain intact.
+
+Distribution and source availability
+------------------------------------
+
+AIHack is distributed under the NGPL terms in LICENSE. Every AIHack binary
+release must be accompanied by LICENSE, this NOTICE, MODIFICATIONS.md,
+PROJECT_OWNER_LICENSE_APPROVAL.md, RELEASE-METADATA, SHA256SUMS, and the
+complete corresponding source used to build that release. The approval and
+modification IDs in RELEASE-METADATA must resolve to the IDs in those bundled
+records. The build scripts create an
+`aihack-0.3.0-source` archive from the release commit for this purpose.
+
+The `legacy_nethack_port_reference/` tree is retained only as historical
+reference and is excluded from AIHack release archives. Its local damaged
+license copy is not used as the operative license for AIHack releases.

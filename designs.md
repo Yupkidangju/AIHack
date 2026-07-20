@@ -6,8 +6,9 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active target design
+문서 상태: active implemented design, independent R8 audit pending
 작성일: 2026-07-15
+최근 동기화: 2026-07-20
 기준: `spec.md`
 관련 Task: R2-1, R5-2, R6-1..R6-3
 
@@ -21,18 +22,18 @@
 
 LLM은 이동, 전투, HP, RNG, inventory, score, save, replay를 직접 변경하지 않는다. suggestion도 사용자가 명시적으로 승인한 뒤 기존 `CommandIntent` 경로로 들어간다.
 
-## 2. 현재와 target
+## 2. 현재 구현과 R8 release contract
 
-| 영역 | 현재 v0.1 코드 | v0.3.0 target |
+| 영역 | 현재 v0.3.0 구현 | R8 release contract |
 | --- | --- | --- |
-| Game flow | Title, character creation, play, game over | 동일 |
-| TUI | ratatui/crossterm, fixed panels | 동일 시각 구조, workspace app으로 이동 |
-| Narrative | trait와 mock 중심 | loopback provider, timeout/status 표시 |
-| Suggestion | validator scaffold | request/revision gate + explicit approval |
-| 판정 | 없음 | presentation-only soft verdict |
-| state read | 일부 내부 구조 접근 | `GameClient`의 Observation/ActionSpace만 사용 |
-| error | log/fallback 중심 | 상태별 텍스트와 재시도 CTA |
-| accessibility | reduced motion/high contrast | LLM 상태도 색 이외 텍스트·기호로 구분 |
+| Game flow | Title, character creation, play, game over | 같은 흐름 수동 확인 |
+| TUI | ratatui/crossterm workspace app, fixed panels | release binary에서 layout·입력 확인 |
+| Narrative | loopback provider, timeout/status 표시 | provider disabled/degraded flow 확인 |
+| Suggestion | request/revision gate + explicit approval | stale/invalid에서 submit 0회 확인 |
+| 판정 | presentation-only soft verdict | core/save/replay 영향 0 확인 |
+| state read | `GameClient`의 Observation/ActionSpace만 사용 | workspace boundary test 유지 |
+| error | 상태별 텍스트와 재시도 CTA | release TUI에서 비색상 상태 구분 |
+| accessibility | reduced motion/high contrast와 텍스트 badge | 수동 matrix 5개 확인 |
 
 ## 3. 구조
 
@@ -302,3 +303,18 @@ cargo test --workspace --locked --test llm_soft_adjudication
 - 다섯 수동 case 전부 PASS
 - 모든 LLM failure case에서 snapshot hash 불변
 - CTA ID, input, 활성 조건, 결과가 코드 test 이름과 일치
+
+## 14. R8 배포 표현 경계
+
+런타임 TUI는 라이선스 승인이나 “공식 NetHack” 상태를 암시하는 badge를 추가하지 않는다. 배포 정체성은 실행 화면이 아니라 release bundle과 문서에서 다음처럼 고정한다.
+
+| 산출물 | 필수 내용 | 생성·검증 경로 |
+| --- | --- | --- |
+| `LICENSE` | 공식 NetHack 3.6.7 `dat/license`와 동일한 NGPL 원문 | `scripts/r8_checkpoint.sh` SHA-256 검증 |
+| `NOTICE` | NetHack 원 저작권, AI-assisted semantic rewrite 파생·수정 사실, 변경 기간 | R8 필수 문구 검증 |
+| `PROJECT_OWNER_LICENSE_APPROVAL.md` | project-owner 승인 ID, 범위와 배포 경계 | metadata owner ID와 archive/output record 대조 |
+| `MODIFICATIONS.md` | modification notice ID, 변경 기간과 path scope | metadata modification ID와 archive/output record 대조 |
+| binary | `aihack`, `aihack-headless` | clean worktree의 release build |
+| complete corresponding source | 해당 binary를 만든 동일 commit의 추적 source | `build.sh`/`build.bat`의 `git archive` |
+
+`legacy_nethack_port_reference/`, `target/`, `output/`은 source archive에서 제외한다. release script는 untracked file을 포함해 worktree가 dirty하면 중단하므로 binary와 source commit의 불일치를 허용하지 않는다. 이 packaging 계약의 로컬 PASS는 독립 R8 감사나 외부 게시 승인을 뜻하지 않는다.

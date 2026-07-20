@@ -97,18 +97,18 @@ profile = "minimal"
 components = ["rustfmt", "clippy"]
 ```
 
-### 4.2 root package baseline
+### 4.2 root package release baseline
 
-workspace 추출 전 R1에서 고정한 baseline:
+R8 라이선스 결정과 version 동기화 후 baseline:
 
 ```toml
 [package]
 name = "aihack"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.94"
 default-run = "aihack"
-license = "UNLICENSED"
+license = "NGPL"
 publish = false
 
 [dependencies]
@@ -118,8 +118,8 @@ crossterm = "0.29"
 
 - 다른 dependency version은 R1에서 기능 변경 없이 lockfile 결과를 검증했다.
 - crossterm duplicate 0건을 local gate로 확인했다.
-- `license = "UNLICENSED"`는 R7 provenance 승인 여부와 별개로 R8 release 통합 전까지 유지한다.
-- R7 PASS 뒤 R8 작업에서 승인된 라이선스 값과 0.3.0 version을 같은 변경 단위로 동기화한다.
+- 2026-07-20 프로젝트 소유자의 파생물 분류에 따라 모든 workspace package에 `license = "NGPL"`과 version 0.3.0을 같은 변경 단위로 적용한다.
+- `publish = false`는 crates.io 개별 배포로 whole-work source/notice 의무가 분산되지 않도록 유지한다.
 
 검증:
 
@@ -140,25 +140,37 @@ cargo check --workspace --all-targets --locked
 
 1. `set -euo pipefail`
 2. `--test`이면 `cargo test --workspace --all-targets --locked`
-3. debug면 `cargo build --workspace --all-targets --locked`
-4. release면 `cargo build --workspace --release --locked`
-5. host suffix를 계산해 두 binary를 `output/`에 복사
-6. 두 artifact를 `test -x`로 확인
-7. 하나라도 없으면 exit code 1
-8. 모두 있으면 마지막 줄에 정확한 artifact 경로 출력
+3. release면 untracked file을 포함한 Git worktree가 clean인지 확인하고 아니면 중단
+4. debug면 `cargo build --workspace --all-targets --locked`
+5. release면 `cargo build --workspace --release --locked`
+6. host suffix를 계산해 두 binary를 `output/`에 복사
+7. `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`를 `output/`에 복사
+8. release commit이 적힌 `RELEASE-METADATA`와 `git archive` source를 생성
+9. binary, notice, source archive의 `SHA256SUMS`를 생성
+10. `scripts/verify_release_bundle.sh`로 archive 필수 파일, commit expansion, owner/modification ID와 실제 record의 일치, checksum과 legacy 제외를 확인
+11. 하나라도 실패하면 exit code 1, 모두 통과하면 정확한 binary 경로 출력
 
 `cp ... || true`와 stderr 폐기는 금지한다.
 
 ### 5.2 Windows
 
-`build.bat [--release] [--test]`은 같은 8단계를 수행한다. 필수 artifact:
+`build.bat [--release] [--test]`은 같은 계약을 수행하며 release source는 ZIP으로 생성한다. 필수 artifact:
 
 ```text
 output\aihack.exe
 output\aihack-headless.exe
+output\LICENSE
+output\NOTICE
+output\MODIFICATIONS.md
+output\PROJECT_OWNER_LICENSE_APPROVAL.md
+output\RELEASE-METADATA
+output\SHA256SUMS
+output\aihack-0.3.0-source.zip
 ```
 
 copy 실패 뒤 성공 메시지를 출력하면 R1 실패다.
+
+CI는 Ubuntu에서 `./build.sh --release`, Windows에서 `cmd /c build.bat --release`를 실행한다. 따라서 두 runner 모두 clean checkout의 동일 commit에서 실제 배포 bundle과 대응 source archive를 생성·검증한다. 양쪽 script는 approval/modification ID가 metadata와 bundled record에서 일치하는지 검사하며, Linux 전용 shell verifier 회귀 테스트는 Unix target에서만 컴파일한다.
 
 ### 5.3 현재와 target artifact
 
@@ -169,6 +181,8 @@ copy 실패 뒤 성공 메시지를 출력하면 R1 실패다.
 | target workspace TUI | `target/debug/aihack[.exe]` | 동일 |
 | target workspace headless | `target/debug/aihack-headless[.exe]` | 동일 |
 | release | `target/release/*` | `output/*` |
+| release source | release commit `HEAD` | `output/aihack-0.3.0-source.tar.gz` 또는 `.zip` |
+| release evidence | commit-bound metadata와 owner/modification scope | `output/RELEASE-METADATA`, `PROJECT_OWNER_LICENSE_APPROVAL.md`, `MODIFICATIONS.md`, `SHA256SUMS` |
 
 사용자 CLI와 artifact 이름은 workspace 추출 뒤에도 바꾸지 않는다.
 
@@ -397,12 +411,22 @@ scripts/r7_checkpoint.sh
   --glob '*.toml' --glob '*.rs'
 ```
 
-앞의 세 Cargo test PASS는 R7 engineering evidence다. `scripts/r7_checkpoint.sh`는 `PROVENANCE.md`의 모든 runtime record와 NH367 record 10개가 승인 근거를 갖춘 `Approved`가 될 때까지 의도적으로 HOLD(exit 1)를 반환한다. 2026-07-18 사용자 결정에 따라 이 HOLD는 R7 개발 진행을 막지 않으며 R8 실제 런칭 전 필수 검토사항을 가시화한다.
+앞의 세 Cargo test PASS는 R7 engineering evidence다. `scripts/r7_checkpoint.sh`는 `PROVENANCE.md`의 모든 runtime record와 NH367 record 10개가 승인 근거를 갖춘 `Approved`인지 확인한다. 2026-07-20 프로젝트 소유자의 approval authority/evidence 반영 후 이 checkpoint는 PASS해야 한다.
 
-R7 validator는 script가 위치한 repository만 검사하며 inherited environment로 root를 바꿀 수 없다. R7은 `PASS WITH KNOWN RISKS`이고 actual asset/scenario approval와 root distribution license는 R8 소유이므로 R7 결과만으로 외부 배포할 수 없다.
+R7 validator는 script가 위치한 repository만 검사하며 inherited environment로 root를 바꿀 수 없다. root distribution license와 packaging은 R8 소유이므로 R7 결과만으로 외부 배포할 수 없다.
+
+R8 fail-closed preflight:
+
+```bash
+cargo test -p aihack --locked --test release_gate
+scripts/r8_checkpoint.sh
+```
+
+R8 checkpoint도 script-relative canonical repository만 검사한다. 승인된 완전 fixture는 PASS(exit 0), R7 approval·0.3.0 version·whole-work NGPL 또는 release metadata가 빠지면 HOLD(exit 1), LICENSE checksum·NOTICE/source packaging 계약·dependency version·archive chain이 손상되면 FAIL(exit 2)다. HOLD/FAIL에서는 release artifact를 게시하지 않는다.
 
 - [x] R1~R7 engineering 단계 완료, R7은 license review가 이관된 `PASS WITH KNOWN RISKS`
-- [ ] R8 런칭 전 SC-LICENSE-01과 distribution license PASS
+- [x] R8 fail-closed preflight와 canonical-root 회귀 테스트
+- [x] R8 런칭 전 SC-LICENSE-01과 distribution license 로컬 gate PASS
 - [ ] `cargo fmt --all -- --check`
 - [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
 - [ ] `cargo test --workspace --all-targets --locked`
@@ -411,7 +435,8 @@ R7 validator는 script가 위치한 repository만 검사하며 inherited environ
 - [ ] save/load/replay v1 hash equality
 - [ ] provider disabled/timeout/stale에서 core hash 불변
 - [ ] provenance Unknown/Blocked runtime 자산 0건
-- [ ] Cargo/README/CHANGELOG 0.3.0 동기화
+- [x] Cargo/README/CHANGELOG 0.3.0 동기화
+- [x] deterministic PTY core flow와 success/timeout/stale/down/pending-exit matrix PASS
 - [ ] Linux/Windows CI green
 - [ ] `cargo audit` vulnerability 0건
 - [ ] `cargo deny check licenses bans sources` PASS

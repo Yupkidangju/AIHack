@@ -1,10 +1,10 @@
 [package]
 name = "aihack-tui"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.94"
 default-run = "aihack"
-license = "UNLICENSED"
+license = "NGPL"
 publish = false
 
 [lib]
@@ -15,9 +15,9 @@ name = "aihack"
 path = "src/main.rs"
 
 [dependencies]
-aihack-ai-contract = { path = "../../crates/aihack-ai-contract", version = "0.1.0" }
-aihack-llm = { path = "../../crates/aihack-llm", version = "0.1.0" }
-aihack-runtime = { path = "../../crates/aihack-runtime", version = "0.1.0" }
+aihack-ai-contract = { path = "../../crates/aihack-ai-contract", version = "0.3.0" }
+aihack-llm = { path = "../../crates/aihack-llm", version = "0.3.0" }
+aihack-runtime = { path = "../../crates/aihack-runtime", version = "0.3.0" }
 serde = { version = "1", features = ["derive"] }
 ratatui = "0.30"
 crossterm = "0.29"

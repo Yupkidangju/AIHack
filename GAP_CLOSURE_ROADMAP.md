@@ -33,7 +33,7 @@
 | Gap ID | 등급 | 문제 | 현재 증거 | Task | 성공 기준 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- |
 | G-PRODUCT-001 | P0 | inspired game와 3.6.7 변환 목표 충돌 | 과거 spec은 1:1 포트 비목표 | R0-1, R0-2 | SC-DOC-01 | Closed |
-| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | checksum inventory와 fail-closed runtime/배포 경계 구현; actual approval은 런칭 전 필수 | R8-1 | SC-LICENSE-01 | Deferred / Final Launch Gate |
+| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | owner approval ID, whole-work NGPL, 공식 LICENSE/NOTICE, modification manifest와 commit-bound source archive 계약 구현 | R8-1 | SC-LICENSE-01 | Verified locally / clean commit and independent R8 re-audit pending |
 | G-BUILD-001 | P1 | toolchain/MSRV 미고정 | rust-toolchain과 locked local build/audit evidence; `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | locked dependency/security policy와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-003 | P1 | build script가 copy 실패를 무시 | fail-fast script와 `audit_report_3.md` independent verification | R1-2 | SC-BUILD-01 | Closed |
@@ -52,7 +52,7 @@
 | G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | versioned request/response, opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증; `audit_report_11.md` 독립 재감사 | R6-2, R6-6 | SC-LLM-02 | Closed |
 | G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0; `audit_report_11.md` 독립 재감사 | R6-3, R6-6 | SC-LLM-03 | Closed |
 | G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests | R7-2 | SC-COMPAT-01 | Closed / License risk tracked separately |
-| G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | manifest/doc version drift | R8-1 | SC-DOC-01 | Open |
+| G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | workspace와 active release 문서를 0.3.0으로 동기화 | R8-1 | SC-DOC-01 | Verified locally / independent R8 audit pending |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -204,6 +204,10 @@ crossterm 중복 0건, 마지막 명령이 TUI binary를 선택해야 한다.
 - NH367-C001..C010 test 통과
 
 **2026-07-18 implementation status:** 공식 archive/license checksum, runtime inventory, legacy 격리 자동 검증과 NH367-C001..C010 record/test를 구현했다. 보고서 13의 단계 순환과 audit-root 지적은 시정됐고 보고서 14에서 Verified됐다. 사용자 결정에 따라 PROV-0004와 scenario의 actual approval는 R8 런칭 전 최종 검토로 이관했다. G-COMPAT-001은 engineering 범위에서 Closed이며 G-LICENSE-001은 외부 배포를 차단하는 final launch gate다.
+
+**2026-07-20 licensing closure:** 프로젝트 소유자가 AIHack 전체를 NetHack 3.6.7 원본 source 기반 AI-assisted semantic rewrite 파생물로 분류하고 NGPL 배포를 승인했다. PROV-0004와 scenario 10개를 근거 포함 `Approved`로 전환했고, workspace 0.3.0/NGPL, 공식 `LICENSE`, `NOTICE`, release source archive와 R8 fail-closed 검증을 구현했다. 로컬 SC-LICENSE-01은 충족했으며 `Closed` 전환은 독립 R8 감사 evidence를 기다린다.
+
+**2026-07-20 report 16 remediation:** 직접 project-owner 지시와 범위를 `AIHACK-OWNER-2026-07-20-NGPL-01`로 기록하고 PROV/scenario에 연결했다. root NOTICE의 배포되지 않는 Git history 주장은 bundle-carried `MODIFICATIONS.md`와 commit-expanded `RELEASE-METADATA`로 교체했다. 임시 clean Git commit으로 실제 tar archive의 required files, commit identity, checksum과 legacy exclusion을 검증하는 회귀 테스트를 추가했다. qualified legal opinion은 주장하지 않으며, 실제 R8 clean commit과 same-commit CI는 아직 final gate다.
 
 ### 4.9 G-DOC-001..003
 

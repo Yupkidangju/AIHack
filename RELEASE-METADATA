@@ -1,0 +1,6 @@
+product=AIHack
+version=0.3.0
+commit=$Format:%H$
+source_license=NGPL
+modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01
+owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01

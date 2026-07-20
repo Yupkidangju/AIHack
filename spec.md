@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.1.0, 문서상 Phase 20 완료 상태
+현재 코드 기준: Cargo package 0.3.0, R8 통합 릴리스 감사 진행 상태
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
@@ -60,10 +60,10 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오별로 재구�
 | SC-LLM-02 | stale turn 또는 stale snapshot hash 응답 실행 0건 |
 | SC-LLM-03 | narrative/soft verdict core effect 0건, suggestion은 명시 승인 전 submit 0건 |
 | SC-COMPAT-01 | 기존 P8-G01..P8-G20과 신규 NH367-C001..C010 모두 통과 |
-| SC-LICENSE-01 | runtime 포함 자산 provenance가 모두 machine-validated `Approved`이고, reviewer/date/license/scope/notice/evidence와 checksum이 유효하며 legacy direct import 0건 |
+| SC-LICENSE-01 | runtime 포함 자산 provenance가 모두 machine-validated `Approved`이고, reviewer/date/license/scope/notice/evidence와 checksum이 유효하며 project-owner approval ID가 추적되고 legacy direct import 0건 |
 | SC-DOC-01 | AI 문서 표준 체크리스트 12개 항목 전부 PASS |
 
-SC-LICENSE-01은 외부 배포를 시작하기 전 R8 최종 런칭 게이트다. 2026-07-18 사용자 결정에 따라 R7에서는 inventory, checksum, legacy 격리, fail-closed validator의 구현 증거를 확인하고 미승인 provenance를 명시적 known risk로 이관할 수 있다. 이 이관은 라이선스 승인이나 외부 배포 허가가 아니다.
+SC-LICENSE-01은 외부 배포를 시작하기 전 R8 최종 런칭 게이트다. 2026-07-20 프로젝트 소유자는 AIHack을 NetHack 3.6.7 원본 소스로 의도를 추론한 AI-assisted semantic rewrite 파생물로 분류하고 whole-work NGPL 적용을 승인했다. 직접 지시, 범위와 경계는 `PROJECT_OWNER_LICENSE_APPROVAL.md`의 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적한다. runtime/scenario provenance, 공식 라이선스 원문, `NOTICE`, `MODIFICATIONS.md`, `RELEASE-METADATA`, `SHA256SUMS`와 complete corresponding source 배포 계약을 함께 검증하며 metadata의 owner/modification ID는 archive와 output의 실제 record ID로 해석 가능해야 한다. 이 project-owner 결정은 qualified legal opinion, R8 기술 감사 `PASS`나 외부 게시 자체를 뜻하지 않는다.
 
 ## 4. v0.3.0 비목표
 
@@ -709,7 +709,7 @@ NH367-C008 hunger projection은 3.6.7 `newuhs` 경계를 따른다: nutrition `<
 
 세부 Task와 파일 단위는 `IMPLEMENTATION_SUMMARY.md`가 정의한다.
 
-R7 provenance validator는 runtime asset과 NH367 scenario의 승인 준비 상태를 판정하며 root `Cargo.toml`의 배포 라이선스 변경을 요구하지 않는다. 승인된 asset/scenario provenance, root license, version, packaging과 외부 배포 가능 판정은 R8 release gate가 최종 소유한다. R7은 미승인 항목을 명시한 `PASS WITH KNOWN RISKS`로 개발 진행을 허용할 수 있지만, R8 PASS 전에는 `UNLICENSED`와 release 문서의 차단 상태를 유지한다.
+R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 판정하며 root `Cargo.toml`의 배포 라이선스는 검사하지 않는다. R8 release gate는 workspace 전체 `NGPL`, version 0.3.0, 공식 `LICENSE` checksum, owner approval ID, `NOTICE`, modification manifest, expanded commit metadata, checksums와 source archive 계약을 최종 검증한다. 라이선스 승인이 완료돼도 R8 기술 감사 PASS 전에는 release artifact를 외부 게시하지 않는다.
 
 ## 16. 보안 및 구현 경계
 
@@ -725,7 +725,7 @@ R7 provenance validator는 runtime asset과 NH367 scenario의 승인 준비 상�
 
 | 리스크 | 영향 | 구현을 막지 않는 완화 |
 | --- | --- | --- |
-| NetHack 라이선스 범위 미확정 | 높음 | R1~R6은 독립 코드만 수정, R7 자산 반입은 Approved provenance만 허용 |
+| NetHack 파생물 배포 의무 누락 | 높음 | whole-work NGPL, 공식 LICENSE, NOTICE, complete corresponding source와 R8 fail-closed gate 적용 |
 | workspace 이동 중 대형 diff | 중간 | R5 이전 behavior gate 고정, crate별 순차 이동 |
 | HTTP dependency 증가 | 중간 | LLM crate에만 격리, core dependency tree 비교 |
 | hash 변경 가능성 | 높음 | R2는 behavior-preserving, 의도된 hash 변경은 ADR과 새 baseline 필요 |

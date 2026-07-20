@@ -23,6 +23,7 @@ fn manifest_pins_the_r1_toolchain_and_default_binary() {
 fn build_scripts_use_locked_commands_and_fail_on_missing_artifacts() {
     let linux = read_project_file("build.sh");
     let windows = read_project_file("build.bat");
+    let attributes = read_project_file(".gitattributes");
 
     for (name, script) in [
         ("build.sh", linux.as_str()),
@@ -39,6 +40,13 @@ fn build_scripts_use_locked_commands_and_fail_on_missing_artifacts() {
         assert!(!script.contains("|| true"), "{name}");
         assert!(script.contains("aihack-headless"), "{name}");
     }
+
+    assert!(
+        attributes
+            .lines()
+            .any(|line| line == "legacy_nethack_port_reference export-ignore"),
+        "legacy reference directory must be recursively excluded from git archive"
+    );
 }
 
 #[test]
@@ -55,7 +63,7 @@ fn workspace_path_dependencies_are_versioned_for_cargo_deny() {
         let manifest = read_project_file(manifest_path);
         for line in manifest.lines().filter(|line| line.contains("{ path =")) {
             assert!(
-                line.contains("version = \"0.1.0\""),
+                line.contains("version = \"0.3.0\""),
                 "{manifest_path}의 내부 path dependency에는 현재 package version이 필요합니다: {line}"
             );
         }
@@ -189,6 +197,18 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
         "git diff --exit-code -- Cargo.lock",
     ] {
         assert!(workflow.contains(command), "CI command: {command}");
+    }
+
+    for release_gate in [
+        "if: runner.os == 'Linux'",
+        "run: ./build.sh --release",
+        "if: runner.os == 'Windows'",
+        "run: cmd /c build.bat --release",
+    ] {
+        assert!(
+            workflow.contains(release_gate),
+            "CI actual release gate: {release_gate}"
+        );
     }
 
     assert!(deny_config.contains("[licenses]"));

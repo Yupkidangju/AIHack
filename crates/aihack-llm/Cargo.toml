@@ -1,13 +1,13 @@
 [package]
 name = "aihack-llm"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.94"
-license = "UNLICENSED"
+license = "NGPL"
 publish = false
 
 [dependencies]
-aihack-ai-contract = { path = "../aihack-ai-contract", version = "0.1.0" }
+aihack-ai-contract = { path = "../aihack-ai-contract", version = "0.3.0" }
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

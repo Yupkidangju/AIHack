@@ -32,6 +32,12 @@ jobs:
         run: cargo test --workspace --all-targets --locked
       - name: Build release artifacts
         run: cargo build --workspace --release --locked
+      - name: Verify Linux release bundle
+        if: runner.os == 'Linux'
+        run: ./build.sh --release
+      - name: Verify Windows release bundle
+        if: runner.os == 'Windows'
+        run: cmd /c build.bat --release
       - name: Install cargo-audit
         run: cargo install --locked cargo-audit --version 0.22.1
       - name: Audit RustSec advisories

@@ -4,6 +4,8 @@
 범위: R7-1, R7-2 engineering implementation
 판정: **PASS WITH KNOWN RISKS — LICENSE REVIEW DEFERRED TO R8**
 
+> 후속 상태 (2026-07-20): 프로젝트 소유자가 AIHack을 NetHack 3.6.7 source 기반 AI-assisted semantic rewrite 파생물로 분류하고 whole-work NGPL을 승인했다. 이 보고서의 당시 HOLD 증거는 보존하며, 현재 승인 상태는 `PROVENANCE.md`, ADR-0030과 R8 checkpoint 결과를 따른다.
+
 ## 결과
 
 - 공식 NetHack 3.6.7 source archive SHA-256을 공식 배포 페이지와 실제 임시 다운로드에서 대조했다.
@@ -57,7 +59,7 @@ R7 `PASS WITH KNOWN RISKS`는 compatibility/provenance engineering evidence와 �
 cargo test -p aihack --locked --test provenance_manifest
 cargo test -p aihack --locked --test nethack_367_compat
 cargo test -p aihack --locked --test golden_phase8_rules
-scripts/r7_checkpoint.sh # 승인 전 예상 결과: HOLD, exit 1
+scripts/r7_checkpoint.sh # ADR-0030 승인 반영 후 예상 결과: PASS, exit 0
 ! rg -n "legacy_nethack_port_reference" Cargo.toml crates apps src \
   --glob '*.toml' --glob '*.rs'
 cargo deny check licenses bans sources

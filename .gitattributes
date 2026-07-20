@@ -1,0 +1,5 @@
+legacy_nethack_port_reference export-ignore
+target export-ignore
+output export-ignore
+*.swp export-ignore
+RELEASE-METADATA export-subst

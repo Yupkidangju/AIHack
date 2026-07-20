@@ -21,7 +21,7 @@ struct CheckpointFixture {
 }
 
 impl CheckpointFixture {
-    fn status_only_approved() -> Self {
+    fn complete_approved() -> Self {
         let root = std::env::temp_dir().join(format!(
             "aihack-r7-checkpoint-{}-{}",
             std::process::id(),
@@ -42,9 +42,7 @@ impl CheckpointFixture {
             fs::create_dir_all(root.join(directory)).unwrap();
         }
 
-        let provenance =
-            project_file("PROVENANCE.md").replace("| Reviewed | yes |", "| Approved | yes |");
-        fs::write(root.join("PROVENANCE.md"), provenance).unwrap();
+        fs::write(root.join("PROVENANCE.md"), project_file("PROVENANCE.md")).unwrap();
         fs::write(root.join("Cargo.toml"), project_file("Cargo.toml")).unwrap();
         fs::write(root.join("Cargo.lock"), project_file("Cargo.lock")).unwrap();
         fs::write(
@@ -75,9 +73,7 @@ impl CheckpointFixture {
             if !name.starts_with("NH367-C") || !name.ends_with(".md") {
                 continue;
             }
-            let record = fs::read_to_string(&path)
-                .unwrap()
-                .replace("provenance_status: Reviewed", "provenance_status: Approved");
+            let record = fs::read_to_string(&path).unwrap();
             fs::write(root.join("docs/compatibility").join(name), record).unwrap();
         }
 
@@ -87,53 +83,53 @@ impl CheckpointFixture {
         Self { root }
     }
 
-    fn approved_with_evidence() -> Self {
-        let fixture = Self::status_only_approved();
+    fn status_only_approved() -> Self {
+        let fixture = Self::complete_approved();
         fixture.replace(
             "PROVENANCE.md",
+            "| `NGPL` | whole AIHack derivative distribution | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; AI-assisted semantic rewrite from NetHack 3.6.7 source |",
             "| pending | distribution scope unresolved | pending | pending | project owner or qualified reviewer approval required |",
-            "| LicenseRef-R7-Test | external distribution fixture | false | false | owner approval fixture |",
         );
         for entry in fs::read_dir(fixture.root.join("docs/compatibility")).unwrap() {
             let path = entry.unwrap().path();
             let relative = path.strip_prefix(&fixture.root).unwrap().to_str().unwrap();
             fixture.replace(
                 relative,
+                "approval_reviewer: Project owner",
                 "approval_reviewer: \"\"",
-                "approval_reviewer: R7 owner",
             );
             fixture.replace(
                 relative,
+                "approval_reviewed_at: 2026-07-20",
                 "approval_reviewed_at: \"\"",
-                "approval_reviewed_at: 2026-07-18",
             );
+            fixture.replace(relative, "license_id: NGPL", "license_id: pending");
             fixture.replace(
                 relative,
-                "license_id: pending",
-                "license_id: LicenseRef-R7-Test",
-            );
-            fixture.replace(
-                relative,
+                "license_scope: whole AIHack derivative distribution",
                 "license_scope: pending",
-                "license_scope: external distribution fixture",
             );
             fixture.replace(
                 relative,
+                "\n  notice_required: true\n",
                 "\n  notice_required: pending\n",
-                "\n  notice_required: false\n",
             );
             fixture.replace(
                 relative,
+                "\n  modification_notice_required: true\n",
                 "\n  modification_notice_required: pending\n",
-                "\n  modification_notice_required: false\n",
             );
             fixture.replace(
                 relative,
+                "evidence: Project owner derivative classification; AIHACK-OWNER-2026-07-20-NGPL-01; AI-assisted semantic rewrite from NetHack 3.6.7 source",
                 "evidence: \"\"",
-                "evidence: owner approval fixture",
             );
         }
         fixture
+    }
+
+    fn approved_with_evidence() -> Self {
+        Self::complete_approved()
     }
 
     fn replace(&self, path: &str, from: &str, to: &str) {
@@ -257,14 +253,14 @@ fn r7_runtime_sources_do_not_import_the_blocked_legacy_tree() {
 }
 
 #[test]
-fn r8_external_distribution_remains_fail_closed_until_release_license_approval() {
+fn r8_external_distribution_uses_ngpl_but_remains_subject_to_technical_audit() {
     let provenance = project_file("PROVENANCE.md");
     let manifest = project_file("Cargo.toml");
 
-    assert!(manifest.contains("license = \"UNLICENSED\""));
+    assert!(manifest.contains("license = \"NGPL\""));
     assert!(manifest.contains("publish = false"));
     assert!(provenance.contains(
-        "외부 배포 판정: BLOCKED — R7 provenance와 R8 distribution license approval pending"
+        "외부 배포 판정: APPROVED FOR NGPL-COMPLIANT PACKAGING — R8 technical audit pending"
     ));
 }
 
@@ -287,6 +283,11 @@ fn r7_checkpoint_rejects_status_only_approval_without_required_evidence() {
 #[test]
 fn r7_checkpoint_accepts_complete_approval_fixture_with_unlicensed_root() {
     let fixture = CheckpointFixture::approved_with_evidence();
+    fixture.replace(
+        "Cargo.toml",
+        "license = \"NGPL\"",
+        "license = \"UNLICENSED\"",
+    );
 
     let output = fixture.run();
 
@@ -317,43 +318,43 @@ fn r7_checkpoint_rejects_each_missing_scenario_approval_field() {
     for (field, valid, invalid, expected) in [
         (
             "reviewer",
-            "approval_reviewer: R7 owner",
+            "approval_reviewer: Project owner",
             "approval_reviewer: \"\"",
             "Approved reviewer missing",
         ),
         (
             "reviewed_at",
-            "approval_reviewed_at: 2026-07-18",
+            "approval_reviewed_at: 2026-07-20",
             "approval_reviewed_at: \"\"",
             "Approved reviewed_at invalid",
         ),
         (
             "license_id",
-            "license_id: LicenseRef-R7-Test",
+            "license_id: NGPL",
             "license_id: pending",
             "Approved license_id missing",
         ),
         (
             "license_scope",
-            "license_scope: external distribution fixture",
+            "license_scope: whole AIHack derivative distribution",
             "license_scope: pending",
             "Approved license_scope missing",
         ),
         (
             "notice",
-            "\n  notice_required: false\n",
+            "\n  notice_required: true\n",
             "\n  notice_required: pending\n",
             "Approved notice_required invalid",
         ),
         (
             "modification_notice",
-            "\n  modification_notice_required: false\n",
+            "\n  modification_notice_required: true\n",
             "\n  modification_notice_required: pending\n",
             "Approved modification_notice_required invalid",
         ),
         (
             "evidence",
-            "evidence: owner approval fixture",
+            "evidence: Project owner derivative classification; AIHACK-OWNER-2026-07-20-NGPL-01; AI-assisted semantic rewrite from NetHack 3.6.7 source",
             "evidence: \"\"",
             "Approved evidence missing",
         ),

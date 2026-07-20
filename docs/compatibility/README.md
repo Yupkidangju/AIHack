@@ -1,6 +1,6 @@
 # NetHack 3.6.7 Compatibility Records
 
-문서 상태: R7 engineering PASS WITH KNOWN RISKS, R8 launch license review pending
+문서 상태: R7 engineering PASS WITH KNOWN RISKS, project-owner NGPL approval recorded, independent R8 audit pending
 작성일: 2026-07-15 (2026-07-18 R7 구현 갱신)
 관련 Task: R7-2
 기준: `../../spec.md` 13절, `../../PROVENANCE.md`
@@ -13,18 +13,18 @@
 
 | ID | 범위 | record | engineering test | provenance |
 | --- | --- | --- | --- | --- |
-| NH367-C001 | 벽 이동 | `NH367-C001-wall-movement.md` | PASS | Reviewed |
-| NH367-C002 | 닫힌 문 | `NH367-C002-closed-door.md` | PASS | Reviewed |
-| NH367-C003 | bump attack | `NH367-C003-bump-attack.md` | PASS | Reviewed |
-| NH367-C004 | pickup/wield/quaff | `NH367-C004-item-actions.md` | PASS | Reviewed |
-| NH367-C005 | stairs 왕복 | `NH367-C005-stairs.md` | PASS | Reviewed |
-| NH367-C006 | search hidden door/trap | `NH367-C006-search.md` | PASS | Reviewed |
-| NH367-C007 | throw/zap/read | `NH367-C007-projectiles.md` | PASS | Reviewed |
-| NH367-C008 | hunger/status | `NH367-C008-hunger-status.md` | PASS | Reviewed |
-| NH367-C009 | save/load continuation | `NH367-C009-save-continuation.md` | PASS | Reviewed |
-| NH367-C010 | death/game over | `NH367-C010-game-over.md` | PASS | Reviewed |
+| NH367-C001 | 벽 이동 | `NH367-C001-wall-movement.md` | PASS | Approved |
+| NH367-C002 | 닫힌 문 | `NH367-C002-closed-door.md` | PASS | Approved |
+| NH367-C003 | bump attack | `NH367-C003-bump-attack.md` | PASS | Approved |
+| NH367-C004 | pickup/wield/quaff | `NH367-C004-item-actions.md` | PASS | Approved |
+| NH367-C005 | stairs 왕복 | `NH367-C005-stairs.md` | PASS | Approved |
+| NH367-C006 | search hidden door/trap | `NH367-C006-search.md` | PASS | Approved |
+| NH367-C007 | throw/zap/read | `NH367-C007-projectiles.md` | PASS | Approved |
+| NH367-C008 | hunger/status | `NH367-C008-hunger-status.md` | PASS | Approved |
+| NH367-C009 | save/load continuation | `NH367-C009-save-continuation.md` | PASS | Approved |
+| NH367-C010 | death/game over | `NH367-C010-game-over.md` | PASS | Approved |
 
-10개 record와 integration test는 구현돼 R7 engineering 범위에서 통과했다. 다만 `Reviewed`는 `Approved`가 아니므로 release compatibility count와 SC-LICENSE-01에는 아직 포함하지 않는다. actual approval는 R8 실제 런칭 전 필수 검토이며 전환 권한과 차단 사유는 `../../PROVENANCE.md`를 따른다.
+10개 record와 integration test는 구현돼 R7 engineering 범위에서 통과했다. 2026-07-20 프로젝트 소유자는 원본 NetHack 3.6.7 source를 사용한 AI-assisted semantic rewrite라는 실제 생성 과정을 근거로 10개 record와 AIHack 전체의 NGPL 파생물 배포를 승인했다. 각 record의 `Approved` authority/evidence는 `../../PROVENANCE.md`와 함께 SC-LICENSE-01에서 machine validation한다. 독립 R8 기술 감사 전에는 외부 게시하지 않는다.
 
 ## 3. record schema
 
@@ -39,16 +39,16 @@ source:
   archive_sha256: 98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2
   url: https://www.nethack.org/v367/download-src.html
   locator: "archive/path.c:symbol or Guidebook section"
-  reference_seen: false
+  reference_seen: true
 provenance_status: Unknown | Reviewed | Approved | Blocked
 approval:
-  approval_reviewer: ""
-  approval_reviewed_at: ""
-  license_id: pending
-  license_scope: pending
-  notice_required: pending
-  modification_notice_required: pending
-  evidence: ""
+  approval_reviewer: Project owner
+  approval_reviewed_at: 2026-07-20
+  license_id: NGPL
+  license_scope: whole AIHack derivative distribution
+  notice_required: true
+  modification_notice_required: true
+  evidence: Project owner derivative classification; AI-assisted semantic rewrite from NetHack 3.6.7 source
 preconditions:
   seed: 42
   level: main:1
@@ -93,4 +93,4 @@ cargo test --workspace --locked --test nethack_367_compat
 cargo test --workspace --locked --test golden_phase8_rules
 ```
 
-R7 engineering 완료에는 NH367-C001..C010 record 10개와 test 10개가 필요하다. Approved provenance 10개와 runtime content approval는 SC-LICENSE-01 및 R8 실제 런칭 PASS에 추가로 필요하다.
+R7 engineering 완료에는 NH367-C001..C010 record 10개와 test 10개가 필요하다. Approved provenance 10개와 runtime content approval는 완료됐으며, R8은 workspace NGPL·공식 LICENSE·NOTICE·source archive 계약과 전체 기술 gate를 추가로 검증한다.

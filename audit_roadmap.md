@@ -330,7 +330,7 @@ Checkpoint R6 현재 상태: **PASS / CLOSED**. `audit_report_10.md`의 IMP-F009
 ## 10. R7 출처·호환성 게이트
 
 연결 gap: G-LICENSE-001, G-COMPAT-001
-성공 기준: SC-COMPAT-01과 provenance inventory/checksum/legacy 격리/fail-closed validator. SC-LICENSE-01은 사용자 결정에 따라 R8 실제 런칭 전 최종 게이트로 defer한다.
+성공 기준: SC-COMPAT-01과 provenance inventory/checksum/legacy 격리/fail-closed validator. SC-LICENSE-01의 owner approval와 whole-work NGPL 결정은 2026-07-20 R8 준비에서 반영했다.
 
 ```bash
 test -s PROVENANCE.md
@@ -350,18 +350,29 @@ PASS 조건:
 - 레거시 경로 직접 import와 path dependency가 0건이다.
 - 라이선스 적용 범위는 담당자 검토 결과와 배포 결정을 기록한다. 본 감사는 법률 자문을 대체하지 않는다.
 
-Checkpoint R7 현재 상태: **PASS WITH KNOWN RISKS — LICENSE REVIEW DEFERRED TO R8**. `audit_report_14.md`까지 기술 finding과 표적 42개·전체 322개 검증은 완료됐다. PROV-0004와 scenario가 `Reviewed`라 validator는 의도적으로 HOLD를 반환하지만, 2026-07-18 사용자 결정으로 이 상태를 R8 최종 런칭 blocker로 이관했다. R7 통과는 license approval 또는 외부 배포 가능 선언이 아니다.
+Checkpoint R7 현재 상태: **PASS WITH KNOWN RISKS**. `audit_report_14.md`까지 기술 finding과 표적 42개·전체 322개 검증은 완료됐다. 2026-07-20 프로젝트 소유자의 파생물 분류·NGPL 승인 evidence를 PROV-0004와 scenario 10개에 기록해 validator는 PASS한다. R7 통과만으로 외부 배포할 수 없으며 R8 기술 감사가 남아 있다.
 
 ## 11. R8 통합 릴리즈 게이트
 
 연결 gap: G-DOC-001
 선행: R1~R7 모두 PASS
 
-R8은 승인된 root distribution license, version 0.3.0, packaging/notice와 외부 배포 가능 여부를 함께 판정한다. root가 `UNLICENSED`이거나 R7/R8 중 하나라도 HOLD면 release artifact 외부 게시를 중단한다.
+R8은 승인된 whole-work NGPL, version 0.3.0, 공식 LICENSE checksum, packaging/notice/source archive와 외부 배포 가능 여부를 함께 판정한다. workspace package가 NGPL이 아니거나 R7/R8 중 하나라도 HOLD면 release artifact 외부 게시를 중단한다.
 
-R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C010의 actual approval authority/evidence를 확인한다. 승인 불가 항목은 Blocked 처리하고 독립 자산으로 교체한다. R7의 accepted risk는 이 검토를 면제하지 않는다.
+R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C010의 project-owner approval authority/evidence를 확인한다. 공식 LICENSE, NOTICE와 complete corresponding source packaging도 함께 검증한다.
+
+2026-07-20 R8-0에서 `scripts/r8_checkpoint.sh`와 fixture 회귀 테스트 5개를 추가했다. 이어 프로젝트 소유자의 파생물 분류에 따라 workspace 0.3.0/NGPL, 공식 `LICENSE`, `NOTICE`, release source archive 계약과 provenance approval를 반영하고 licensing 회귀 테스트 4개를 추가했다. checkpoint의 로컬 PASS는 R8 독립 감사 또는 외부 게시 승인이 아니다.
+
+같은 날 R8-1C에서 `designs.md`의 current v0.3.0/R8 release contract를 동기화하고, 역사적 R0 문서 감사 판정을 보존한 별도 R8 12항목 self-check와 `tests/r8_documentation.rs` 회귀 계약을 추가했다. 문서 self-check와 R8 checkpoint는 로컬 PASS이며, 수동 TUI matrix·SC-BUILD-02 원격 CI·독립 R8 감사는 계속 pending이다.
+
+`audit_report_16.md` HOLD 시정에서 compatibility index를 Approved record와 동기화하고, project-owner 직접 지시를 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적했다. 배포되지 않는 Git history 주장은 `MODIFICATIONS.md`와 commit-expanded `RELEASE-METADATA`로 대체했고 `scripts/verify_release_bundle.sh` 및 실제 임시 Git archive 회귀 테스트가 필수 문서, commit, checksum과 legacy 제외를 검증한다. 이는 qualified legal opinion을 주장하지 않으며 clean R8 commit/same-commit CI gate를 면제하지 않는다.
+
+동일 commit이 push되면 CI는 Ubuntu의 `./build.sh --release`와 Windows의 `cmd /c build.bat --release`를 각각 실행해 실제 platform bundle을 검증한다. 로컬 dirty worktree에서는 release script가 의도대로 중단되므로, 이 원격 결과가 DBG-F006의 clean-tree evidence가 된다.
+
+`audit_report_17.md`의 `DBG-F007` 시정은 approval record를 output/source archive와 checksum의 필수 항목으로 추가하고, archive/output metadata의 owner/modification ID를 각 bundled record ID와 대조한다. positive actual-archive fixture와 문서 누락·metadata 누락·record ID 불일치 negative cases가 이 reference-integrity boundary를 검증한다. 이 로컬 시정도 clean commit/same-commit CI evidence를 대체하지 않는다.
 
 ```bash
+scripts/r8_checkpoint.sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --all-targets --locked
@@ -370,9 +381,18 @@ cargo metadata --locked --no-deps --format-version 1
 cargo audit
 cargo deny check licenses bans sources
 git diff --check
+cargo test -p aihack --locked --test release_bundle
 ```
 
+`scripts/r8_checkpoint.sh` exit code는 PASS 0, 승인·release 준비 대기 HOLD 1, version dependency drift·archive 손상 등 구조적 FAIL 2다. R8 최종 감사에서는 먼저 checkpoint PASS를 확인한 뒤 나머지 전체 명령을 실행한다.
+
 최종 수동 확인:
+
+```bash
+scripts/r8_tui_core_flow.sh
+scripts/r6_pty_matrix.sh
+scripts/r6_pending_exit_smoke.sh
+```
 
 - Cargo, README, CHANGELOG의 release version이 0.3.0이다.
 - Title → character creation → play → inventory → game over → new run 흐름이 동작한다.
@@ -380,6 +400,8 @@ git diff --check
 - provider disabled/timeout/stale flow에서 core hash가 변하지 않는다.
 - archive chain의 모든 경로가 존재하며 이전 파일을 덮어쓰지 않았다.
 - `AI_IMPLEMENTATION_DOC_STANDARD.md` 12항목을 다시 PASS한다.
+
+2026-07-20 로컬 PTY 결과: core flow는 high contrast/reduced motion에서 Title → Character Creation → Playing → Inventory → Game Over → New Run과 59x23 최소 크기 clean exit를 PASS했다. deterministic loopback degraded matrix는 success/timeout/stale/down을, pending-exit smoke는 terminal restore-before-worker-wait를 PASS했다. 실제 LLM/API는 호출하지 않았다.
 
 ## 12. 최종 판정 템플릿
 
@@ -402,5 +424,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R6 PASS, R7 `PASS WITH KNOWN RISKS`, R8 NOT RUN. R6는 `audit_report_11.md` 독립 재감사로 종결됐으며 실제 model provider smoke는 비차단 고려 대상이다.
+현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R6 PASS, R7 `PASS WITH KNOWN RISKS`, R8 implementation/local verification 진행 중이며 independent audit NOT RUN. R6는 `audit_report_11.md` 독립 재감사로 종결됐으며 실제 model provider smoke는 비차단 고려 대상이다.
 현재 문서 감사 판정: `audit_report_9.md`가 IMP-F008과 R1~R5를, `audit_report_11.md`가 보고서 10 시정과 R6 checkpoint를 PASS로 종결했다. 전체 program PASS는 R7~R8 및 SC-BUILD-02 원격 CI evidence가 완료된 뒤에만 선언한다.

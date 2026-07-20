@@ -207,7 +207,7 @@ Consequences:
 
 ## ADR-0027: provenance approval이 runtime 포함의 선행 조건
 
-Status: Implemented engineering gate; owner license approval pending
+Status: Implemented; owner license decision superseded by ADR-0030
 Date: 2026-07-15
 Decision ID: DEC-LICENSE-01
 
@@ -238,7 +238,7 @@ Consequences:
 
 ## ADR-0029: 미승인 provenance를 R8 실제 런칭 게이트로 이관
 
-Status: Accepted by user; R7 pass with known risks
+Status: Superseded for licensing by ADR-0030; R7 pass with known risks remains historical
 Date: 2026-07-18
 Decision ID: DEC-LICENSE-02
 
@@ -248,7 +248,7 @@ Context:
 
 Decision:
 
-R7 engineering 단계는 `PASS WITH KNOWN RISKS`로 종결한다. SC-LICENSE-01, content/scenario actual approval, root distribution license와 notice는 R8 실제 런칭 전 필수 게이트로 이관한다. 현재 `Reviewed`, `UNLICENSED`, `publish = false`와 외부 배포 차단은 유지한다.
+R7 engineering 단계는 `PASS WITH KNOWN RISKS`로 종결한다. SC-LICENSE-01, content/scenario actual approval, root distribution license와 notice는 R8 실제 런칭 전 필수 게이트로 이관한다. 이 결정 당시에는 `Reviewed`, `UNLICENSED`, `publish = false`와 외부 배포 차단을 유지했다. 이후 상태는 ADR-0030이 대체한다.
 
 Alternatives Considered:
 
@@ -260,6 +260,36 @@ Consequences:
 
 - R8 비배포 준비와 후속 개발은 진행할 수 있다.
 - R7 PASS는 라이선스 적합성 보장이나 외부 배포 허가가 아니다.
-- `scripts/r7_checkpoint.sh`의 현재 HOLD는 실패가 아니라 R8에 남은 승인 evidence를 표시한다.
+- 당시 `scripts/r7_checkpoint.sh`의 HOLD는 실패가 아니라 R8에 남은 승인 evidence를 표시했다. ADR-0030 반영 후에는 PASS한다.
 - 외부 배포 전 project owner 또는 적격 검토자가 approval authority/evidence를 기록해야 한다.
 - 승인 불가 자산은 Blocked 처리하고 독립 작성 자산으로 교체한다.
+
+## ADR-0030: NetHack 3.6.7 파생물 분류와 whole-work NGPL 배포
+
+Status: Accepted by project owner; implementation pending independent R8 audit
+Date: 2026-07-20
+Decision ID: DEC-LICENSE-03
+
+Context:
+
+AIHack은 NetHack 3.6.7 원본 소스를 AI 추론에 제공해 의도와 관찰 가능한 규칙을 추출한 뒤 Rust 구조로 재작성했다. 결과 소스의 표현과 아키텍처가 크게 다르더라도 프로젝트 소유자는 원 저작권을 존중해야 하는 파생물로 취급하기로 명시했다. 따라서 clean-room 독립 저작물 전제를 유지하거나 permissive license를 선택하는 것은 실제 생성 과정과 소유자의 위험 판단에 맞지 않는다.
+
+Decision:
+
+AIHack 전체를 NetHack 3.6.7의 AI-assisted semantic rewrite 파생물로 분류하고 SPDX `NGPL`을 workspace 전체에 적용한다. 이 project-owner 결정의 범위와 직접 지시는 `AIHACK-OWNER-2026-07-20-NGPL-01`로 기록한다. root `LICENSE`는 공식 3.6.7 archive의 `dat/license`와 byte-for-byte 동일한 원문을 사용하고 SHA-256 `93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747`로 고정한다. `NOTICE`에는 원 저작권, 파생·수정 사실과 AIHack 기여를 명시한다. 바이너리 배포에는 `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`, commit이 확장된 `RELEASE-METADATA`, `SHA256SUMS`와 해당 바이너리를 만든 커밋의 complete corresponding source archive를 동반한다. metadata의 owner/modification ID는 함께 배포되는 record ID와 일치해야 한다. 검증되지 않은 `legacy_nethack_port_reference/`는 release archive에서 제외한다.
+
+Alternatives Considered:
+
+- MIT/Apache-2.0 등 permissive license 적용: 소유자의 파생물 분류와 NGPL whole-work 조건에 맞지 않아 기각
+- 코드 표현이 다르다는 이유로 독립 저작물로 선언: 원본 소스 기반 의도 추론이라는 실제 생성 과정을 축소하므로 기각
+- 손상된 legacy `LICENSE.NGPL` 복구본 사용: 공식 원문이 아니며 보존 증거를 훼손하므로 기각
+- 라이선스 결정을 외부 게시 직전까지 다시 연기: 이미 소유자 판단이 확정되어 문서·manifest 불일치를 지속할 이유가 없어 기각
+
+Consequences:
+
+- 모든 workspace package는 version 0.3.0, `license = "NGPL"`, `publish = false`를 유지한다.
+- PROV-0001..0012와 NH367-C001..C010은 소유자 승인 authority, 날짜, scope, notice와 `AIHACK-OWNER-2026-07-20-NGPL-01` evidence를 기록한다.
+- R8 checkpoint는 NGPL 정확성, 공식 LICENSE checksum, NOTICE, modification manifest, release commit metadata와 source archive 계약을 fail-closed로 검사한다.
+- source archive는 `.git/` history에 의존하지 않고 `MODIFICATIONS.md`의 scope/date와 `RELEASE-METADATA`의 commit을 수신자에게 전달한다.
+- 라이선스 정비 완료는 독립 R8 기술 감사 `PASS`나 외부 게시 실행을 자동 승인하지 않는다.
+- 이 결정과 프로젝트 기록은 qualified legal opinion이나 법률 자문을 대체하지 않는다.

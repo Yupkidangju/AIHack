@@ -1,6 +1,8 @@
 # AIHack Changelog
 
-## [Unreleased] - 2026-07-15
+## [Unreleased]
+
+## [0.3.0] - 2026-07-20
 
 ### Added
 
@@ -34,7 +36,11 @@
 
 ### Changed
 
-- 사용자 결정에 따라 R7을 `PASS WITH KNOWN RISKS`로 종결하고, PROV-0004/NH367 actual approval와 SC-LICENSE-01을 R8 실제 런칭 전 필수 검토사항으로 이관했다. 이 변경은 외부 배포 허가가 아니며 `UNLICENSED`, `publish = false`와 배포 차단을 유지한다.
+- 사용자 결정에 따라 R7을 `PASS WITH KNOWN RISKS`로 종결하고, PROV-0004/NH367 actual approval와 SC-LICENSE-01을 R8 실제 런칭 전 필수 검토사항으로 이관했다.
+- 프로젝트 소유자가 AIHack을 NetHack 3.6.7 원본 소스의 AI-assisted semantic rewrite 파생물로 분류함에 따라 workspace 전체를 NGPL 0.3.0으로 동기화하고 공식 `LICENSE`, 파생·변경 `NOTICE`, complete corresponding source 배포 계약을 추가했다. crates.io publish는 계속 비활성화했다.
+- `audit_report_16.md` HOLD 시정으로 project-owner 직접 결정 record `AIHACK-OWNER-2026-07-20-NGPL-01`, `MODIFICATIONS.md`, commit-expanded `RELEASE-METADATA`, `SHA256SUMS`와 실제 source archive verifier를 추가했다. 배포되지 않는 Git history 의존은 제거했다.
+- `audit_report_17.md`의 `DBG-F007` 시정으로 approval record를 output/source archive 필수 항목에 포함하고 metadata owner/modification ID와 실제 record ID 일치 검증 및 누락·불일치 negative fixture를 추가했다.
+- compatibility index의 NH367-C001..C010 provenance를 개별 record와 동일한 `Approved`로 동기화하고 1:1 회귀 테스트를 추가했다.
 - R7 공식 source 대조에 따라 hunger projection을 NetHack 3.6.7 `newuhs` 경계(Fainting/Weak/Hungry/NotHungry/Satiated)로 정렬하고 C008 경계값 회귀 테스트를 추가했다. 기존 `Oversatiated` variant는 직렬화/API 호환을 위해 보존하되 새 projection에서는 생성하지 않는다.
 
 - `audit_report_9.md` 재감사에서 IMP-F008과 R5 문서 시정 계보가 PASS되어 다음 구현 단계를 R6-1로 전환했다.

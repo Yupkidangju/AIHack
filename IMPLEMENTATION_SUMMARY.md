@@ -247,6 +247,7 @@ Windows는 `build.bat --test` 후 두 exe 존재를 확인한다.
 
 - [x] push와 pull request에서 실행하도록 구성
 - [x] fmt, clippy -D warnings, all-target tests, release build 포함
+- [x] Ubuntu/Windows에서 각 플랫폼 release packaging script를 실제 실행
 - [x] lockfile 변경 여부를 job 종료 시 확인
 - [x] cargo-audit 0.22.1, cargo-deny 0.19.4를 pinned install
 - [x] vulnerability, license, source, crossterm duplicate gate 포함
@@ -793,7 +794,7 @@ scripts/r6_pending_exit_smoke.sh
 
 **설명:** 레거시 자산과 새 구현의 출처 상태를 파일 단위로 기록한다.
 
-**진행 상태 (2026-07-18):** engineering inventory와 자동 차단 검증 완료. 공식 archive와 `dat/license` checksum을 임시 다운로드로 확인했고, legacy code/data/license는 runtime 밖 `Blocked/Reviewed`로 격리했다. `audit_report_12.md`의 SEC-F002 시정으로 validator는 runtime file의 최구체 coverage, Approved reviewer/date/license/scope/notice/modification-notice/evidence, content full checksum, scenario schema/ID/function과 Blocked reference를 검사한다. `audit_report_13.md`의 IMP-F013/SEC-F003 시정으로 R7/R8 책임을 분리하고 검사 root를 script-relative repository로 고정했다. 2026-07-18 사용자 결정에 따라 미승인 content/scenario provenance는 R8 런칭 전 최종 검토로 이관하며 R7 개발 단계는 `PASS WITH KNOWN RISKS`다. 외부 배포는 계속 차단한다.
+**진행 상태 (2026-07-20):** engineering inventory와 자동 차단 검증 완료. 공식 archive와 `dat/license` checksum을 확인했고, legacy code/data/license는 runtime 밖 `Blocked/Reviewed`로 격리했다. `audit_report_12.md`의 SEC-F002 시정으로 validator는 runtime file의 최구체 coverage, Approved reviewer/date/license/scope/notice/modification-notice/evidence, content full checksum, scenario schema/ID/function과 Blocked reference를 검사한다. `audit_report_13.md`의 IMP-F013/SEC-F003 시정으로 R7/R8 책임을 분리하고 검사 root를 script-relative repository로 고정했다. 프로젝트 소유자의 파생물 분류와 NGPL 승인 후 content/scenario provenance를 근거 포함 `Approved`로 전환했으며 R7 checkpoint는 PASS한다. R8 독립 기술 감사 전 외부 게시는 계속 보류한다.
 
 **수용 기준:**
 
@@ -850,24 +851,26 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 - [x] SC-COMPAT-01 engineering evidence PASS
 - [x] provenance inventory/checksum/legacy 격리/fail-closed validator PASS
-- [ ] SC-LICENSE-01 — R8/실제 런칭 전 최종 검토로 defer
+- [x] SC-LICENSE-01 — project-owner NGPL approval와 machine validation 완료; 독립 R8 audit pending
 - [x] runtime included provenance Unknown/Blocked 0건
 - [x] compatibility report 생성
 - [x] source 직접 import 0건
 
-**현재 판정:** `PASS WITH KNOWN RISKS — LICENSE REVIEW DEFERRED TO R8`. 표적 42개와 전체 322개, build/security gate는 `audit_report_14.md`까지 검증됐다. `IMP-F012`는 사용자 승인에 따라 R7 blocker가 아닌 R8 런칭 blocker로 이관됐다. 이는 actual approval 완료나 외부 배포 허가를 뜻하지 않는다.
+**현재 판정:** `PASS WITH KNOWN RISKS`. 표적 42개와 전체 322개, build/security gate는 `audit_report_14.md`까지 검증됐다. 이후 2026-07-20 project-owner NGPL approval를 기록해 R7 checkpoint의 actual approval 조건도 로컬 PASS했다. 독립 R8 기술 감사와 외부 게시 승인은 별개다.
 
 ### Task R8-1: 통합 릴리즈 감사
 
 **설명:** 모든 성공 기준과 문서 동기화를 검증한다.
 
+**진행 상태 (2026-07-20):** R8-0 fail-closed preflight와 R8-1A/B/C를 구현했다. `scripts/r8_checkpoint.sh`는 script-relative canonical root에서 R7 승인 상태, workspace 0.3.0/NGPL, 공식 LICENSE checksum, NOTICE 필수 문구, binary와 complete corresponding source packaging 계약, README/CHANGELOG, provenance 외부 배포 판정과 7개 active document archive target을 검사한다. HOLD/FAIL fixture와 canonical-root 격리를 유지하며 licensing·documentation 회귀 테스트를 추가했다. `designs.md`는 current v0.3.0과 R8 release contract를 분리하고 `DOCUMENTATION_AUDIT_REPORT.md`는 역사적 R0 판정을 보존한 채 12항목 R8 self-check를 별도 기록한다. 로컬 checkpoint PASS는 독립 R8 감사 PASS가 아니다.
+
 **수용 기준:**
 
-- [ ] R1~R7 checkpoint 전부 PASS
-- [ ] 승인된 root distribution license와 notice를 `Cargo.toml` 및 release 문서에 반영
-- [ ] Cargo/README/CHANGELOG 버전 0.3.0
-- [ ] archive chain 무결성 PASS
-- [ ] AI 구현 문서 표준 12개 checklist PASS
+- [x] R1~R7 로컬 checkpoint/evidence PASS; SC-BUILD-02 remote CI pending
+- [x] 승인된 whole-work NGPL과 notice를 workspace manifest 및 release 문서에 반영
+- [x] Cargo/README/CHANGELOG 버전 0.3.0
+- [x] archive chain 무결성 PASS
+- [x] AI 구현 문서 표준 12개 local self-check PASS; independent audit pending
 
 **검증:**
 
@@ -875,15 +878,23 @@ cargo test -p aihack --locked --test golden_phase8_rules
 - Linux/Windows CI green
 - 수동 TUI/LLM degraded flow 확인
 
+**수동 로컬 상태 (2026-07-20):** `scripts/r8_tui_core_flow.sh`가 high contrast/reduced motion의 Title → Character Creation → Playing → Inventory → Game Over → New Run과 59x23 clean exit를 PASS했다. 기존 deterministic loopback PTY matrix와 pending-exit smoke도 success/timeout/stale/down 및 terminal restore를 PASS했다. 실제 LLM/API 호출은 없었다.
+
+**보고서 16 HOLD 시정 (2026-07-20):** `IMP-F015`는 compatibility index 10행과 개별 Approved record를 동기화하고 파싱 회귀 테스트로 고정했다. `IMP-F012`는 프로젝트 소유자의 기존 직접 지시와 승인 범위를 `AIHACK-OWNER-2026-07-20-NGPL-01` record로 전사해 PROV/scenario evidence에 연결했으며 qualified legal opinion은 주장하지 않는다. `IMP-F014`의 배포되지 않는 Git history 의존은 제거하고 `MODIFICATIONS.md`, export-substitution `RELEASE-METADATA`, `SHA256SUMS`와 실제 tar archive verifier로 대체했다. `DBG-F006`의 clean R8 commit, 실제 release bundle 및 same-commit 양 OS CI는 commit/push 전까지 계속 HOLD다.
+
+**보고서 17 HOLD 시정 (2026-07-20):** `DBG-F007`은 `PROJECT_OWNER_LICENSE_APPROVAL.md`를 output/source archive와 checksum의 필수 항목으로 승격하고, archive/output metadata의 owner/modification ID가 실제 Approval ID/Notice ID와 일치하도록 Linux verifier와 Windows release script를 강화했다. 완전 bundle은 PASS하고 문서 누락, metadata ID 누락, owner/modification record ID 불일치와 legacy 포함은 각각 FAIL하는 실제 Git archive fixture로 회귀를 고정했다. clean commit과 same-commit 양 OS CI는 여전히 별도 release gate다.
+
 **선행:** R6 checkpoint, R7 checkpoint
 
 | Slice | 파일, 최대 5개 |
 | --- | --- |
+| R8-0 | `scripts/r8_checkpoint.sh`, `tests/release_gate.rs`, `IMPLEMENTATION_SUMMARY.md`, `audit_roadmap.md`, `BUILD_GUIDE.md` |
 | R8-1A | `Cargo.toml`, `Cargo.lock`, `README.md`, `CHANGELOG.md`, `spec.md` |
 | R8-1B | `IMPLEMENTATION_SUMMARY.md`, `GAP_CLOSURE_ROADMAP.md`, `BUILD_GUIDE.md`, `audit_roadmap.md`, `PROVENANCE.md` |
 | R8-1C | `designs.md`, `DESIGN_DECISIONS.md`, `docs/compatibility/README.md`, `DOCUMENTATION_AUDIT_REPORT.md` |
+| R8-1D | owner approval record, modification manifest/metadata, release bundle verifier와 report 16 회귀 시정 |
 
-**범위:** 3개 sequential slice, 각 S 또는 M, slice당 5개 이하
+**범위:** R8-0 완료 후 3개 sequential slice, 각 S 또는 M, slice당 5개 이하
 
 ## 8. 병렬화와 순서
 
@@ -906,4 +917,4 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 R8 비배포 준비와 실제 런칭 전 project owner/적격 검토자의 license approval 통합이다. R7 개발 단계는 진행할 수 있지만 SC-LICENSE-01, root distribution license와 외부 배포는 R8 최종 게이트까지 HOLD다. SC-BUILD-02 원격 CI도 pending이며 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 R8 전체 로컬 검증과 독립 감사다. project-owner NGPL approval, SC-LICENSE-01, root distribution license와 source packaging 계약은 반영됐지만 외부 게시는 R8 독립 감사 PASS와 SC-BUILD-02 원격 CI evidence까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.

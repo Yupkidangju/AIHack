@@ -2,7 +2,8 @@
 
 문서 상태: active
 작성일: 2026-05-20
-버전: v0.1.0
+최근 갱신: 2026-07-20
+버전: v0.3.0
 
 ---
 
@@ -11,6 +12,8 @@
 AIHack은 NetHack 3.6.7의 결정론적 Rust 재구현을 목표로 한 프로젝트다.
 기존 C-to-Rust 직접 포트(`legacy_nethack_port_reference/`)에서 새로운 `GameSession` 중심 아키텍처로 전환하면서
 다음 교훈을 얻었다.
+
+원본 source를 AI에 제공해 의도와 규칙을 추론한 semantic rewrite는 표현이 크게 달라도 생성 과정을 숨기지 않고 파생물로 분류하는 편이 provenance와 배포 의무를 가장 정직하게 보존한다. 이 프로젝트는 whole-work NGPL, 공식 LICENSE checksum, 파생·변경 NOTICE와 complete corresponding source gate로 그 결정을 기계 검증한다.
 
 ---
 

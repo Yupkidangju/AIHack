@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "aihack"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aihack-ai-contract",
  "aihack-content",
@@ -27,7 +27,7 @@ dependencies = [
 
 [[package]]
 name = "aihack-ai-contract"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aihack-core",
  "serde",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "aihack-content"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aihack-core",
  "serde",
@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "aihack-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "rand",
  "serde",
@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "aihack-headless"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aihack-ai-contract",
  "aihack-runtime",
@@ -66,7 +66,7 @@ dependencies = [
 
 [[package]]
 name = "aihack-llm"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aihack-ai-contract",
  "reqwest",
@@ -77,7 +77,7 @@ dependencies = [
 
 [[package]]
 name = "aihack-runtime"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aihack-ai-contract",
  "aihack-content",
@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "aihack-tui"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aihack-ai-contract",
  "aihack-llm",

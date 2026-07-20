@@ -9,16 +9,16 @@ source:
   archive_sha256: 98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2
   url: https://www.nethack.org/v367/download-src.html
   locator: src/save.c:dosave@78,savegamestate@279; src/restore.c:dorecover@801
-  reference_seen: false
-provenance_status: Reviewed
+  reference_seen: true
+provenance_status: Approved
 approval:
-  approval_reviewer: ""
-  approval_reviewed_at: ""
-  license_id: pending
-  license_scope: pending
-  notice_required: pending
-  modification_notice_required: pending
-  evidence: ""
+  approval_reviewer: Project owner
+  approval_reviewed_at: 2026-07-20
+  license_id: NGPL
+  license_scope: whole AIHack derivative distribution
+  notice_required: true
+  modification_notice_required: true
+  evidence: Project owner derivative classification; AIHACK-OWNER-2026-07-20-NGPL-01; AI-assisted semantic rewrite from NetHack 3.6.7 source
 preconditions:
   seed: 42
   level: main:1

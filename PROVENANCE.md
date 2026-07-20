@@ -1,9 +1,10 @@
 # AIHack Provenance and License Gate
 
-문서 상태: active inventory, legal review pending
+문서 상태: active inventory, project-owner derivative classification approved
 작성일: 2026-07-15
 관련 결정: DEC-LICENSE-01, ADR-0027
 관련 Task: R7-1, R7-2
+project-owner approval reference: `AIHACK-OWNER-2026-07-20-NGPL-01` (`PROJECT_OWNER_LICENSE_APPROVAL.md`)
 
 > 이 문서는 출처·포함 상태를 관리하는 엔지니어링 게이트이며 법률 자문이 아니다. 배포 라이선스와 파생물 판단은 프로젝트 소유자 또는 적격 검토자의 승인이 필요하다.
 
@@ -30,37 +31,37 @@
 | local verified archive | 2026-07-18 임시 다운로드 후 SHA-256 대조, repository 반입 없이 삭제 |
 | archive 내부 license | `dat/license` |
 | archive 내부 license SHA-256 | `93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747` |
-| current status | Reviewed; locator evidence only |
+| current status | Approved as the licensing basis for AIHack's derivative distribution |
 | runtime inclusion | no |
 
 공식 배포 페이지가 source archive와 SHA-256을 게시한다. 2026-07-18 R7 engineering review에서 archive를 프로젝트 임시 디렉터리에 내려받아 게시 checksum과 일치함을 확인하고 `dat/license` checksum 및 source symbol locator만 기록한 뒤 임시 복사본을 제거했다. AIHack repository에는 archive나 NetHack source를 추가하지 않는다.
 
 ## 3. R7-1 inventory
 
-더 구체적인 `path/scope` record가 넓은 glob보다 우선한다. `Approved`는 이 표에 적힌 범위에서의 engineering inclusion 승인만 뜻하며 외부 배포 허가로 확장되지 않는다.
+더 구체적인 `path/scope` record가 넓은 glob보다 우선한다. 2026-07-20 프로젝트 소유자는 NetHack 3.6.7 원본 소스로 의도를 추론해 AI-assisted semantic rewrite한 AIHack 전체를 파생물로 분류하고 NGPL 배포를 승인했다. 이 라이선스 승인은 R8 기술·릴리스 감사 `PASS`를 대신하지 않는다.
 
 <!-- runtime-inventory:start -->
 | ID | path/scope | source/origin | checksum | status | runtime | reviewer | reviewed_at | license_id | license_scope | notice_required | modification_notice_required | evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| PROV-0001 | `src/**` | AIHack repository implementation history | Git object history | Approved | yes | Codex engineering review | 2026-07-18 | `LicenseRef-AIHack-UNLICENSED` | internal build/test only | false | false | Git history; external distribution blocked |
-| PROV-0002 | `crates/**` | AIHack workspace extraction and implementation history | Git object history | Approved | yes | Codex engineering review | 2026-07-18 | `LicenseRef-AIHack-UNLICENSED` | internal build/test only; PROV-0004 override | false | false | Git history and workspace boundary tests |
-| PROV-0003 | `apps/**` | AIHack TUI/headless implementation history | Git object history | Approved | yes | Codex engineering review | 2026-07-18 | `LicenseRef-AIHack-UNLICENSED` | internal build/test only | false | false | Git history and headless/TUI tests |
-| PROV-0004 | `crates/aihack-content/src/data/**` | AIHack reduced deterministic fixture informed by observable roguelike behavior | `docs/provenance/r7-content.sha256` | Reviewed | yes | Codex engineering trace | 2026-07-18 | pending | distribution scope unresolved | pending | pending | project owner or qualified reviewer approval required |
+| PROV-0001 | `src/**` | AI-assisted semantic rewrite from NetHack 3.6.7 source and AIHack repository history | Git object history | Approved | yes | Project owner | 2026-07-20 | `NGPL` | whole AIHack derivative distribution | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; Git history records modifications |
+| PROV-0002 | `crates/**` | AI-assisted semantic rewrite and AIHack workspace extraction history | Git object history | Approved | yes | Project owner | 2026-07-20 | `NGPL` | whole AIHack derivative distribution; PROV-0004 is the specific content record | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; workspace boundary tests |
+| PROV-0003 | `apps/**` | AIHack-authored TUI/headless adapters for the derivative work | Git object history | Approved | yes | Project owner | 2026-07-20 | `NGPL` | whole AIHack derivative distribution | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; headless/TUI tests |
+| PROV-0004 | `crates/aihack-content/src/data/**` | AI-assisted semantic rewrite from NetHack 3.6.7 source into reduced deterministic fixtures | `docs/provenance/r7-content.sha256` | Approved | yes | Project owner | 2026-07-20 | `NGPL` | whole AIHack derivative distribution | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; AI-assisted semantic rewrite from NetHack 3.6.7 source |
 | PROV-0005 | `Cargo.lock` | crates.io packages locked by checksum | Cargo.lock registry checksums | Approved | yes | Codex engineering review | 2026-07-18 | SPDX allowlist | private workspace dependency graph | false | false | `cargo deny check licenses bans sources`; no exception |
 | PROV-0006 | `legacy_nethack_port_reference/src/**` | previous Rust port | not trusted for inclusion | Blocked | no | Codex engineering review | 2026-07-18 | pending | mixed or unclear legacy scope | pending | pending | direct import and copy prohibited |
 | PROV-0007 | `legacy_nethack_port_reference/assets/**` | previous port and possible NetHack-derived data/text | not trusted for inclusion | Blocked | no | Codex engineering review | 2026-07-18 | pending | mixed or unclear legacy scope | pending | pending | strings tables and data copy prohibited |
 | PROV-0008 | `legacy_nethack_port_reference/LICENSE.NGPL` | damaged local NGPL-looking text | `5e3e7c0cd3be7f65f4d9b59b49820c303abfa92c95497c5eb8cff2b64e456bdf` | Blocked | no | Codex engineering review | 2026-07-18 | pending | not valid notice evidence | pending | pending | lines 33..35 corruption preserved; do not ship |
 | PROV-0009 | `legacy_nethack_port_reference/LICENSE` | Apache-2.0 text without reliable tree scope notice | `db09a0cfbc9276c576b3f7f45e1639ed0c5d121360e71c1c52b6bf1a4a4e886a` | Reviewed | no | Codex engineering review | 2026-07-18 | pending | application scope unresolved | pending | pending | do not infer whole-tree Apache coverage |
-| PROV-0010 | NetHack 3.6.7 official archive | official source locator evidence | `98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2` | Reviewed | no | Codex engineering trace | 2026-07-18 | NGPL metadata | locator evidence only | pending | pending | source archive and code remain outside repository/runtime |
-| PROV-0011 | `docs/compatibility/NH367-C*.md` | AIHack-authored observation records | record-local archive checksum | Reviewed | no | Codex engineering trace | 2026-07-18 | pending | documentation evidence only | pending | pending | R7-2 test and owner review required before release count |
-| PROV-0012 | `.archive/**` | immutable AIHack document snapshots | Git object history | Reviewed | no | Codex engineering trace | 2026-07-18 | pending | repository history only | pending | pending | preserve chain; runtime import prohibited |
+| PROV-0010 | NetHack 3.6.7 official archive | official source and license basis | `98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2` | Approved | no | Project owner | 2026-07-20 | `NGPL` | source and license reference for the whole derivative work | true | true | `AIHACK-OWNER-2026-07-20-NGPL-01`; official archive and `dat/license` checksums verified; source archive remains outside repository/runtime |
+| PROV-0011 | `docs/compatibility/NH367-C*.md` | AIHack-authored source review and semantic rewrite records | record-local archive checksum | Approved | no | Project owner | 2026-07-20 | `NGPL` | derivative-work documentation distributed with source | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; ten scenario approval records |
+| PROV-0012 | `.archive/**` | immutable AIHack document snapshots | Git object history | Approved | no | Project owner | 2026-07-20 | `NGPL` | AIHack project documentation distributed with source | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; immutable archive chain |
 <!-- runtime-inventory:end -->
 
-현재 runtime에는 `Unknown` 또는 `Blocked` 자산이 직접 포함되지 않는다. PROV-0004가 `Reviewed`이므로 SC-LICENSE-01의 모든-runtime-`Approved` 조건과 외부 배포 허가는 아직 충족되지 않는다. 2026-07-18 사용자 결정에 따라 이 미충족 항목은 R7 개발 blocker가 아닌 R8 실제 런칭 전 최종 검토사항으로 이관했다.
+현재 runtime에는 `Unknown` 또는 `Blocked` 자산이 직접 포함되지 않는다. 모든 runtime record와 NH367 compatibility record는 프로젝트 소유자의 파생물 분류에 따라 `Approved`이며, AIHack 전체에는 NGPL을 적용한다. `legacy_nethack_port_reference/`는 검증되지 않은 역사 자료로 계속 격리하고 release source archive에서 제외한다.
 
-**외부 배포 판정: BLOCKED — R7 provenance와 R8 distribution license approval pending**
+**외부 배포 판정: APPROVED FOR NGPL-COMPLIANT PACKAGING — R8 technical audit pending**
 
-이 차단은 개발·테스트와 R7 engineering 완료를 막지 않지만 release artifact 외부 게시를 막는다. R8 실제 런칭 전에 프로젝트 소유자 또는 적격 검토자가 content/scenario의 저작권·파생물 범위, 프로젝트 배포 라이선스와 notice를 결정하기 전 `Cargo.toml`의 `UNLICENSED`를 변경하지 않는다.
+이 판정은 라이선스와 출처 기록 측면의 승인이다. 실제 외부 게시에는 R8 release audit `PASS`, `LICENSE`와 `NOTICE`, 그리고 해당 바이너리를 만든 커밋의 complete corresponding source archive가 모두 필요하다.
 
 ## 4. 손상된 NGPL 사본 기록
 
@@ -111,11 +112,11 @@ notes: ""
 ## 6. 규칙 재구현 절차
 
 1. NH367 compatibility ID를 만든다.
-2. 공식 Guidebook 또는 checksum이 확인된 source archive의 파일·symbol·행 범위를 locator로 기록한다.
+2. checksum이 확인된 공식 source archive의 파일·symbol·행 범위를 locator로 기록한다.
 3. 관찰 가능한 precondition, command sequence, expected outcome만 한국어로 재서술한다.
-4. legacy Rust 구현을 열어본 경우 `reference_seen: true`를 기록한다.
+4. NetHack 원본 source 또는 legacy Rust 구현을 열어본 경우 `reference_seen: true`를 기록한다.
 5. 새 implementation은 root/workspace module에서 독립 작성한다.
-6. 코드·상수·문자열을 복사하지 않는다.
+6. 직접 복사 대신 프로젝트 소유자가 승인한 AI-assisted semantic rewrite 절차로 재작성하고 변경 이력을 남긴다.
 7. test가 expected outcome을 검증한다.
 8. reviewer가 scenario와 diff를 확인한 뒤 Approved로 전환한다.
 
@@ -148,7 +149,7 @@ tool version은 cargo-audit 0.22.1, cargo-deny 0.19.4로 고정한다. `deny.tom
 
 다음 중 하나면 release artifact 생성·게시를 중단한다.
 
-- root license가 `UNLICENSED`이면서 외부 배포를 시도
+- root 또는 workspace package license가 `NGPL`이 아닌 상태에서 외부 배포를 시도
 - runtime asset status가 Unknown, Reviewed, Blocked
 - legacy path direct import 또는 path dependency
 - 손상된 license를 정식 notice로 사용
