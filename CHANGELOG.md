@@ -62,7 +62,7 @@
 - `GameSession`의 meta/RNG/turn/run-state/event-log 저장 필드를 crate 외부 비공개로 전환했다.
 - invariant 오류는 원본 session을 보존한 reject로 처리하고, AwaitingDirection의 실패 입력 후 Playing 복귀 동작은 유지했다.
 - R6 PTY matrix에서 발견한 Enter runtime mapping, `.` Wait mapping, retry footer 우선순위와 Judge modal 잔상을 보정했다.
-- Windows 병렬 테스트에서 해제된 ephemeral port가 재사용되던 경합을 제거하고, 연결 직후 종료하는 loopback fixture로 LLM `Unavailable` 분류를 결정론적으로 검증한다.
+- Windows 병렬 테스트에서 해제된 ephemeral port가 재사용되던 경합을 transport/TUI 통합 테스트에서 제거하고, 연결 직후 종료하는 loopback fixture로 LLM `Unavailable` 분류를 결정론적으로 검증한다. 환경 잠금 poison은 후속 독립 테스트로 전파하지 않는다.
 - `audit_report_10.md`의 IMP-F009/010 시정으로 public LLM error/command enum을 non-exhaustive 계약에 맞추고 TUI consumer에 wildcard 처리를 추가했다.
 
 ### Security

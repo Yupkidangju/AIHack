@@ -166,7 +166,9 @@ fn displayed_llm_footer_ctas_have_the_same_mouse_candidates() {
 
 #[test]
 fn live_decision_waits_for_explicit_apply_and_soft_verdict_never_submits() {
-    let _lock = ENV_LOCK.lock().unwrap();
+    let _lock = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let decision_body = r#"{"choices":[{"message":{"content":"{\"kind\":\"DECISION\",\"action\":{\"type\":\"WAIT\"},\"rationale\":\"Hold position.\",\"confidence\":0.75}"}}]}"#;
     let (mut decision_service, decision_server) = service_for_response(decision_body);
@@ -219,7 +221,9 @@ fn live_decision_waits_for_explicit_apply_and_soft_verdict_never_submits() {
 
 #[test]
 fn response_becomes_stale_when_core_advances_before_tui_acceptance() {
-    let _lock = ENV_LOCK.lock().unwrap();
+    let _lock = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let body = r#"{"choices":[{"message":{"content":"{\"kind\":\"DECISION\",\"action\":{\"type\":\"WAIT\"},\"rationale\":\"Hold.\",\"confidence\":0.5}"}}]}"#;
     let (mut service, server) = service_for_response(body);
     let mut app = TuiApp::new_with_llm_enabled(
@@ -253,7 +257,9 @@ fn response_becomes_stale_when_core_advances_before_tui_acceptance() {
 
 #[test]
 fn unsupported_response_schema_is_rejected_before_tui_payload_acceptance() {
-    let _lock = ENV_LOCK.lock().unwrap();
+    let _lock = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let body = r#"{"choices":[{"message":{"content":"{\"kind\":\"NARRATIVE\",\"text\":\"Must not render.\"}"}}]}"#;
     let (mut service, server) = service_for_response(body);
     let mut app = TuiApp::new_with_llm_enabled(
@@ -289,10 +295,10 @@ fn unsupported_response_schema_is_rejected_before_tui_payload_acceptance() {
 
 #[test]
 fn connection_failure_shows_down_and_fallback_without_core_effect() {
-    let _lock = ENV_LOCK.lock().unwrap();
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    drop(listener);
+    let _lock = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let (address, unavailable_server) = spawn_disconnect_server();
     let mut service = LocalLlmService::from_config(config_for_address(address)).unwrap();
     let mut app = TuiApp::new_with_llm_enabled(
         GameSession::new_for_playing(42),
@@ -324,6 +330,7 @@ fn connection_failure_shows_down_and_fallback_without_core_effect() {
         Some(LlmRequestKind::Narrative)
     ));
     assert!(service.shutdown_with_grace(Duration::from_millis(250)));
+    unavailable_server.join().unwrap();
 }
 
 fn poll_until_ready(app: &mut TuiApp, service: &LocalLlmService) {
@@ -379,6 +386,16 @@ fn service_for_response(body: &str) -> (LocalLlmService, thread::JoinHandle<()>)
         LocalLlmService::from_config(config_for_address(address)).unwrap(),
         server,
     )
+}
+
+fn spawn_disconnect_server() -> (std::net::SocketAddr, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        drop(stream);
+    });
+    (address, server)
 }
 
 fn config_for_address(address: std::net::SocketAddr) -> LocalLlmConfig {
