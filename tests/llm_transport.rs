@@ -257,6 +257,16 @@ fn spawn_http_server(
     (address, request_rx, handle)
 }
 
+fn spawn_disconnect_server() -> (SocketAddr, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let handle = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        drop(stream);
+    });
+    (address, handle)
+}
+
 #[test]
 fn transport_posts_canonical_request_and_returns_valid_narrative() {
     let body = r#"{"choices":[{"index":0,"message":{"role":"assistant","content":"{\"kind\":\"NARRATIVE\",\"text\":\"A quiet corridor.\"}"},"finish_reason":"stop"}]}"#;
@@ -500,13 +510,12 @@ fn local_llm_service_disabled_mode_rejects_without_a_request_id() {
 
 #[test]
 fn transport_classifies_unavailable_timeout_and_redirect_without_following() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let unavailable_address = listener.local_addr().unwrap();
-    drop(listener);
+    let (unavailable_address, unavailable_server) = spawn_disconnect_server();
     let unavailable = OpenAiNarrativeTransport::new(enabled_config(unavailable_address, 500))
         .unwrap()
         .complete(&narrative_request());
     assert_eq!(unavailable, Err(LlmResponseError::Unavailable));
+    unavailable_server.join().unwrap();
 
     let timeout_body = r#"{"choices":[]}"#.to_string();
     let (timeout_address, _, timeout_server) =
