@@ -13,7 +13,32 @@ static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 
 fn project_file(path: &str) -> String {
     fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path))
+        .map(|content| content.replace("\r\n", "\n"))
         .unwrap_or_else(|error| panic!("{path} 읽기 실패: {error}"))
+}
+
+fn bash_program() -> PathBuf {
+    #[cfg(windows)]
+    {
+        let output = Command::new("git")
+            .arg("--exec-path")
+            .output()
+            .expect("Git exec path 조회 실패");
+        assert!(output.status.success(), "Git exec path 조회 실패");
+        let exec_path = String::from_utf8(output.stdout).expect("Git exec path UTF-8 변환 실패");
+        for ancestor in Path::new(exec_path.trim()).ancestors() {
+            let candidate = ancestor.join("bin/bash.exe");
+            if candidate.is_file() {
+                return candidate;
+            }
+        }
+        panic!("Git Bash 실행 파일을 찾지 못했다: {}", exec_path.trim());
+    }
+
+    #[cfg(not(windows))]
+    {
+        PathBuf::from("bash")
+    }
 }
 
 struct CheckpointFixture {
@@ -143,7 +168,7 @@ impl CheckpointFixture {
     }
 
     fn run(&self) -> std::process::Output {
-        Command::new("bash")
+        Command::new(bash_program())
             .arg(self.root.join("scripts/r7_checkpoint.sh"))
             .env_remove("AIHACK_R7_ROOT")
             .output()
@@ -151,7 +176,7 @@ impl CheckpointFixture {
     }
 
     fn run_with_root_override(&self, root_override: &str) -> std::process::Output {
-        Command::new("bash")
+        Command::new(bash_program())
             .arg(self.root.join("scripts/r7_checkpoint.sh"))
             .env("AIHACK_R7_ROOT", root_override)
             .output()
