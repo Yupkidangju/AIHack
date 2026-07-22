@@ -41,6 +41,7 @@
 - `audit_report_16.md` HOLD 시정으로 project-owner 직접 결정 record `AIHACK-OWNER-2026-07-20-NGPL-01`, `MODIFICATIONS.md`, commit-expanded `RELEASE-METADATA`, `SHA256SUMS`와 실제 source archive verifier를 추가했다. 배포되지 않는 Git history 의존은 제거했다.
 - `audit_report_17.md`의 `DBG-F007` 시정으로 approval record를 output/source archive 필수 항목에 포함하고 metadata owner/modification ID와 실제 record ID 일치 검증 및 누락·불일치 negative fixture를 추가했다.
 - `audit_report_18.md`의 `DBG-F007` 재지적에 따라 Linux/Windows metadata 검증을 단일 key·완전 값 비교로 강화하고 archive/output의 wrong, suffix, duplicate owner/modification fixture를 추가했다.
+- GitHub Actions clean checkout에서 R7/R8 checkpoint가 runner별 도구 설치 여부에 좌우되지 않도록 `rg` 의존을 기본 `grep`으로 교체하고, Windows에서도 공식 NGPL 원문 checksum을 보존하도록 `LICENSE`와 Bash script의 LF checkout을 고정했다.
 - compatibility index의 NH367-C001..C010 provenance를 개별 record와 동일한 `Approved`로 동기화하고 1:1 회귀 테스트를 추가했다.
 - R7 공식 source 대조에 따라 hunger projection을 NetHack 3.6.7 `newuhs` 경계(Fainting/Weak/Hungry/NotHungry/Satiated)로 정렬하고 C008 경계값 회귀 테스트를 추가했다. 기존 `Oversatiated` variant는 직렬화/API 호환을 위해 보존하되 새 projection에서는 생성하지 않는다.
 
@@ -85,6 +86,7 @@
 - NH367-C003과 C007 연결 테스트가 문서화한 combat HP/RNG 및 projectile item/charge/map/RNG 결과를 직접 검증하도록 보강했다.
 - R7 asset provenance와 R8 root distribution license의 단계 책임을 분리해 checkpoint 순환 의존을 제거했다.
 - R7 checkpoint가 inherited `AIHACK_R7_ROOT`로 다른 tree를 검사하지 못하도록 script-relative repository root로 고정했다.
+- R7/R8 checkpoint portable-search 회귀와 Windows LF checkout 계약을 추가하고 양 checkpoint의 로컬 PASS를 확인했다.
 
 ## 2026-05-18
 

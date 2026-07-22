@@ -223,6 +223,17 @@ fn r7_records_verified_official_and_damaged_local_license_checksums() {
     assert!(provenance.contains("33..35"));
 }
 
+#[test]
+fn release_checkpoints_use_ci_portable_text_search_tools() {
+    for script in ["scripts/r7_checkpoint.sh", "scripts/r8_checkpoint.sh"] {
+        let content = project_file(script);
+        assert!(
+            !content.contains("rg "),
+            "{script}가 GitHub runner 기본 이미지에 없는 rg에 의존한다"
+        );
+    }
+}
+
 fn assert_no_legacy_reference(path: &Path) {
     if path.is_dir() {
         for entry in fs::read_dir(path).unwrap() {

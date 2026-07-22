@@ -3,3 +3,5 @@ target export-ignore
 output export-ignore
 *.swp export-ignore
 RELEASE-METADATA export-subst
+LICENSE text eol=lf
+*.sh text eol=lf

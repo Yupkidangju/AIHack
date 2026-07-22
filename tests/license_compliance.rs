@@ -175,6 +175,14 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     assert!(attributes.contains("target export-ignore"));
     assert!(attributes.contains("output export-ignore"));
     assert!(attributes.contains("RELEASE-METADATA export-subst"));
+    assert!(
+        attributes.lines().any(|line| line == "LICENSE text eol=lf"),
+        "Windows checkout에서도 공식 LICENSE 바이트를 보존해야 한다"
+    );
+    assert!(
+        attributes.lines().any(|line| line == "*.sh text eol=lf"),
+        "Windows checkout에서도 Bash 검증 스크립트의 LF를 보존해야 한다"
+    );
     assert!(linux.contains("verify_release_bundle.sh"));
     for reference in [
         "owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01",

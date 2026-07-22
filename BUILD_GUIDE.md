@@ -52,7 +52,7 @@ cargo 1.94.1 (...)
 - `rg`: 문서·경계 audit
 - `cargo-audit 0.22.1`: RustSec dependency advisory gate
 - `cargo-deny 0.19.4`: license, source, duplicate dependency gate
-- `sha256sum`, `rg`: R7 runtime content integrity와 Blocked reference gate
+- `sha256sum`, `grep`: R7 runtime content integrity와 Blocked reference gate
 
 local LLM은 core build와 test의 필수 조건이 아니다. LLM integration test는 loopback mock server를 사용하고 외부 네트워크를 사용하지 않는다.
 

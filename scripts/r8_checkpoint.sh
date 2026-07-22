@@ -123,20 +123,20 @@ if ((${#ERRORS[@]} == 0)); then
         'PROJECT_OWNER_LICENSE_APPROVAL.md' \
         'RELEASE-METADATA' \
         'AIHack contributors'; do
-        rg -q --fixed-strings "$phrase" "$ROOT/NOTICE" \
+        grep -Fq -- "$phrase" "$ROOT/NOTICE" \
             || error "NOTICE required phrase missing: $phrase"
     done
     for script in build.sh build.bat; do
         for phrase in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA SHA256SUMS 'git status --porcelain' 'git archive' 'aihack-0.3.0-source' 'owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01' 'modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01'; do
-            rg -q --fixed-strings "$phrase" "$ROOT/$script" \
+            grep -Fq -- "$phrase" "$ROOT/$script" \
                 || error "$script release packaging contract missing: $phrase"
         done
     done
     for path in legacy_nethack_port_reference target output; do
-        rg -q --fixed-strings "$path export-ignore" "$ROOT/.gitattributes" \
+        grep -Fq -- "$path export-ignore" "$ROOT/.gitattributes" \
             || error ".gitattributes release exclusion missing: $path"
     done
-    rg -q --fixed-strings 'RELEASE-METADATA export-subst' "$ROOT/.gitattributes" \
+    grep -Fq -- 'RELEASE-METADATA export-subst' "$ROOT/.gitattributes" \
         || error '.gitattributes release metadata substitution missing'
     for phrase in \
         'PROJECT_OWNER_LICENSE_APPROVAL.md' \
@@ -146,7 +146,7 @@ if ((${#ERRORS[@]} == 0)); then
         'modification_notice "$MODIFICATION_NOTICE_ID"' \
         'Approval ID:' \
         'Notice ID:'; do
-        rg -q --fixed-strings "$phrase" "$ROOT/scripts/verify_release_bundle.sh" \
+        grep -Fq -- "$phrase" "$ROOT/scripts/verify_release_bundle.sh" \
             || error "release verifier reference-integrity missing: $phrase"
     done
     for phrase in \
@@ -154,22 +154,22 @@ if ((${#ERRORS[@]} == 0)); then
         'PROV-0001..PROV-0012' \
         'NH367-C001..NH367-C010' \
         'qualified legal opinion: not claimed'; do
-        rg -q --fixed-strings "$phrase" "$ROOT/PROJECT_OWNER_LICENSE_APPROVAL.md" \
+        grep -Fq -- "$phrase" "$ROOT/PROJECT_OWNER_LICENSE_APPROVAL.md" \
             || error "project-owner approval record missing: $phrase"
     done
     for phrase in \
         '2025-05-20..2026-07-20' \
         'does not depend on distributed Git history'; do
-        rg -q --fixed-strings "$phrase" "$ROOT/MODIFICATIONS.md" \
+        grep -Fq -- "$phrase" "$ROOT/MODIFICATIONS.md" \
             || error "modification manifest missing: $phrase"
     done
-    rg -q --fixed-strings 'commit=$Format:%H$' "$ROOT/RELEASE-METADATA" \
+    grep -Fq -- 'commit=$Format:%H$' "$ROOT/RELEASE-METADATA" \
         || error 'RELEASE-METADATA commit export placeholder missing'
-    rg -q 'Current code: Cargo 0\.3\.0' "$ROOT/README.md" \
+    grep -Eq 'Current code: Cargo 0\.3\.0' "$ROOT/README.md" \
         || hold "README release version pending"
-    rg -q '^## \[0\.3\.0\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$ROOT/CHANGELOG.md" \
+    grep -Eq '^## \[0\.3\.0\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$ROOT/CHANGELOG.md" \
         || hold "CHANGELOG 0.3.0 release entry pending"
-    rg -q '외부 배포 판정: APPROVED' "$ROOT/PROVENANCE.md" \
+    grep -Eq '외부 배포 판정: APPROVED' "$ROOT/PROVENANCE.md" \
         || hold "external distribution approval pending"
 
     for document in "${ARCHIVED_DOCUMENTS[@]}"; do

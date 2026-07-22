@@ -147,8 +147,8 @@ if ((${#ERRORS[@]} == 0)); then
         base=${pattern%%\**}
         base=${base%/}
         [[ -n "$base" ]] || continue
-        if rg -n --fixed-strings "$base" "$ROOT/Cargo.toml" "$ROOT/src" "$ROOT/crates" "$ROOT/apps" \
-            --glob '*.toml' --glob '*.rs' >/dev/null 2>&1; then
+        if grep -R -n -F --include='*.toml' --include='*.rs' -- "$base" \
+            "$ROOT/Cargo.toml" "$ROOT/src" "$ROOT/crates" "$ROOT/apps" >/dev/null 2>&1; then
             error "Blocked/Unknown runtime reference found: $base"
         fi
     done
@@ -190,7 +190,7 @@ for file in "${SCENARIO_FILES[@]}"; do
     [[ -n "$module" ]] || error "$id module missing"
     [[ "$test_file" == "tests/nethack_367_compat.rs" ]] || error "$id test file invalid"
     [[ -n "$function" ]] || error "$id test function missing"
-    function_count=$(rg -c "^fn ${function}\(" "$ROOT/tests/nethack_367_compat.rs" 2>/dev/null || true)
+    function_count=$(grep -E -c "^fn ${function}\(" "$ROOT/tests/nethack_367_compat.rs" 2>/dev/null || true)
     [[ "$function_count" == 1 ]] || error "$id test function link invalid: $function"
 
     if [[ "$provenance_status" == Approved ]]; then
