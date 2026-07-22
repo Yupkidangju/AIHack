@@ -98,7 +98,7 @@ impl CheckpointFixture {
             if !name.starts_with("NH367-C") || !name.ends_with(".md") {
                 continue;
             }
-            let record = fs::read_to_string(&path).unwrap();
+            let record = fs::read_to_string(&path).unwrap().replace("\r\n", "\n");
             fs::write(root.join("docs/compatibility").join(name), record).unwrap();
         }
 
