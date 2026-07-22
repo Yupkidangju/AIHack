@@ -88,7 +88,7 @@
 - R7 asset provenance와 R8 root distribution license의 단계 책임을 분리해 checkpoint 순환 의존을 제거했다.
 - R7 checkpoint가 inherited `AIHACK_R7_ROOT`로 다른 tree를 검사하지 못하도록 script-relative repository root로 고정했다.
 - R7/R8 checkpoint portable-search 회귀와 Windows LF checkout 계약을 추가하고 양 checkpoint의 로컬 PASS를 확인했다.
-- Windows provenance fixture는 WSL alias가 아닌 설치된 Git Bash를 명시적으로 찾아 R7 checkpoint를 실행하고, checkout CRLF를 LF fixture로 정규화한다.
+- Windows provenance/release-gate fixture는 WSL alias가 아닌 설치된 Git Bash를 명시적으로 찾아 R7/R8 checkpoint를 실행하고, checkout CRLF를 LF fixture로 정규화한다.
 
 ## 2026-05-18
 

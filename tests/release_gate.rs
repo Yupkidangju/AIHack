@@ -12,6 +12,30 @@ fn project_file(path: &str) -> String {
         .unwrap_or_else(|error| panic!("{path} 읽기 실패: {error}"))
 }
 
+fn bash_program() -> PathBuf {
+    #[cfg(windows)]
+    {
+        let output = Command::new("git")
+            .arg("--exec-path")
+            .output()
+            .expect("Git exec path 조회 실패");
+        assert!(output.status.success(), "Git exec path 조회 실패");
+        let exec_path = String::from_utf8(output.stdout).expect("Git exec path UTF-8 변환 실패");
+        for ancestor in Path::new(exec_path.trim()).ancestors() {
+            let candidate = ancestor.join("bin/bash.exe");
+            if candidate.is_file() {
+                return candidate;
+            }
+        }
+        panic!("Git Bash 실행 파일을 찾지 못했다: {}", exec_path.trim());
+    }
+
+    #[cfg(not(windows))]
+    {
+        PathBuf::from("bash")
+    }
+}
+
 struct ReleaseFixture {
     root: PathBuf,
 }
@@ -147,7 +171,7 @@ impl ReleaseFixture {
     }
 
     fn run(&self) -> std::process::Output {
-        Command::new("bash")
+        Command::new(bash_program())
             .arg(self.root.join("scripts/r8_checkpoint.sh"))
             .env_remove("AIHACK_R8_ROOT")
             .output()
@@ -155,7 +179,7 @@ impl ReleaseFixture {
     }
 
     fn run_with_root_override(&self, root_override: &str) -> std::process::Output {
-        Command::new("bash")
+        Command::new(bash_program())
             .arg(self.root.join("scripts/r8_checkpoint.sh"))
             .env("AIHACK_R8_ROOT", root_override)
             .output()
