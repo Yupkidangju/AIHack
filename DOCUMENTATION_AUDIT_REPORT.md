@@ -187,6 +187,13 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - `IMP-F014`, `IMP-F015`: 독립 재감사에서 Verified
 - `DBG-F007`: approval record를 output/source archive 필수 항목으로 추가하고 metadata owner/modification ID와 실제 bundled record ID를 대조하도록 시정
 - 누락·불일치 actual archive fixture와 양 플랫폼 packaging 계약을 회귀 테스트로 고정
-- `IMP-F012`, `DBG-F006`: clean R8 commit과 same-commit Ubuntu/Windows CI 전까지 HOLD 유지
+- `IMP-F012`, `DBG-F006`: 이 tree를 포함하는 release commit과 same-commit Ubuntu/Windows CI가 확인될 때까지 HOLD 유지
 
 이 항목은 coder remediation 기록이며 report 17 또는 후속 독립 감사 판정을 덮어쓰지 않는다.
+
+### 10.6 `audit_report_18.md` HOLD 후속 상태
+
+- `DBG-F007`: Linux 부분 문자열 검증을 단일 key·완전 값 parser로 교체
+- archive/output 각각의 wrong, suffix, duplicate owner/modification metadata를 actual archive fixture로 거부
+- Windows release gate도 같은 key 단일성·완전 값 계약으로 동기화
+- 이 coder 시정은 same-commit 양 OS CI와 후속 독립 감사 판정을 대신하지 않음

@@ -31,8 +31,32 @@ enum BundleCase {
     IncludedLegacy,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum MetadataTarget {
+    Archive,
+    Output,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum MetadataFault {
+    WrongOwner,
+    SuffixedOwner,
+    DuplicateOwner,
+    WrongModification,
+    SuffixedModification,
+    DuplicateModification,
+}
+
 impl BundleFixture {
     fn new(case: BundleCase) -> Self {
+        Self::build(case, None)
+    }
+
+    fn with_metadata_fault(target: MetadataTarget, fault: MetadataFault) -> Self {
+        Self::build(BundleCase::Complete, Some((target, fault)))
+    }
+
+    fn build(case: BundleCase, metadata_fault: Option<(MetadataTarget, MetadataFault)>) -> Self {
         let root = std::env::temp_dir().join(format!(
             "aihack-release-bundle-{}-{}",
             std::process::id(),
@@ -72,6 +96,9 @@ impl BundleFixture {
         }
         if matches!(case, BundleCase::MissingModificationMetadata) {
             remove_line_containing(&root.join("RELEASE-METADATA"), "modification_notice=");
+        }
+        if let Some((MetadataTarget::Archive, fault)) = metadata_fault {
+            mutate_metadata_file(&root.join("RELEASE-METADATA"), fault);
         }
 
         let attributes = if !matches!(case, BundleCase::IncludedLegacy) {
@@ -131,9 +158,15 @@ impl BundleFixture {
             )
             .unwrap();
         }
-        let output_metadata = fs::read_to_string(root.join("RELEASE-METADATA"))
-            .unwrap()
-            .replace("$Format:%H$", &commit);
+        let mut output_metadata = if matches!(metadata_fault, Some((MetadataTarget::Archive, _))) {
+            fs::read_to_string(project_path("RELEASE-METADATA")).unwrap()
+        } else {
+            fs::read_to_string(root.join("RELEASE-METADATA")).unwrap()
+        };
+        if let Some((MetadataTarget::Output, fault)) = metadata_fault {
+            output_metadata = mutate_metadata(&output_metadata, fault);
+        }
+        output_metadata = output_metadata.replace("$Format:%H$", &commit);
         fs::write(output.join("RELEASE-METADATA"), output_metadata).unwrap();
         let archive = output.join("aihack-0.3.0-source.tar.gz");
         let status = Command::new("git")
@@ -179,6 +212,45 @@ impl BundleFixture {
             .output()
             .unwrap()
     }
+}
+
+fn mutate_metadata_file(path: &Path, fault: MetadataFault) {
+    let content = fs::read_to_string(path).unwrap();
+    fs::write(path, mutate_metadata(&content, fault)).unwrap();
+}
+
+fn mutate_metadata(content: &str, fault: MetadataFault) -> String {
+    let (key, expected, replacement) = match fault {
+        MetadataFault::WrongOwner => ("owner_approval", OWNER_APPROVAL_ID, "WRONG-OWNER".into()),
+        MetadataFault::SuffixedOwner => (
+            "owner_approval",
+            OWNER_APPROVAL_ID,
+            format!("{OWNER_APPROVAL_ID}-TAMPERED"),
+        ),
+        MetadataFault::DuplicateOwner => (
+            "owner_approval",
+            OWNER_APPROVAL_ID,
+            format!("{OWNER_APPROVAL_ID}\nowner_approval={OWNER_APPROVAL_ID}"),
+        ),
+        MetadataFault::WrongModification => (
+            "modification_notice",
+            MODIFICATION_NOTICE_ID,
+            "WRONG-MODIFICATION".into(),
+        ),
+        MetadataFault::SuffixedModification => (
+            "modification_notice",
+            MODIFICATION_NOTICE_ID,
+            format!("{MODIFICATION_NOTICE_ID}-TAMPERED"),
+        ),
+        MetadataFault::DuplicateModification => (
+            "modification_notice",
+            MODIFICATION_NOTICE_ID,
+            format!("{MODIFICATION_NOTICE_ID}\nmodification_notice={MODIFICATION_NOTICE_ID}"),
+        ),
+    };
+    let expected_line = format!("{key}={expected}");
+    assert!(content.lines().any(|line| line == expected_line));
+    content.replacen(&expected_line, &format!("{key}={replacement}"), 1)
 }
 
 fn replace_in_file(path: &Path, from: &str, to: &str) {
@@ -254,4 +326,25 @@ fn verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree() {
     let output = fixture.verify();
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("excluded path"));
+}
+
+#[test]
+fn verifier_rejects_wrong_suffixed_or_duplicate_metadata_values_in_archive_and_output() {
+    for target in [MetadataTarget::Archive, MetadataTarget::Output] {
+        for fault in [
+            MetadataFault::WrongOwner,
+            MetadataFault::SuffixedOwner,
+            MetadataFault::DuplicateOwner,
+            MetadataFault::WrongModification,
+            MetadataFault::SuffixedModification,
+            MetadataFault::DuplicateModification,
+        ] {
+            let fixture = BundleFixture::with_metadata_fault(target, fault);
+            let output = fixture.verify();
+            assert!(
+                !output.status.success(),
+                "metadata exactness 우회를 허용하면 안 됩니다: {target:?} {fault:?}"
+            );
+        }
+    }
 }

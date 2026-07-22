@@ -1,7 +1,7 @@
 # AIHack Modification Manifest
 
-Notice ID: `AIHACK-MODIFICATIONS-2026-07-20-01`  
-Covered change period: `2025-05-20..2026-07-20`  
+Notice ID: `AIHACK-MODIFICATIONS-2026-07-20-01`
+Covered change period: `2025-05-20..2026-07-20`
 Release version: `0.3.0`
 
 AIHack is an AI-assisted semantic rewrite derivative of NetHack 3.6.7. The following path scopes were newly created or changed for the AIHack Rust rewrite during the covered change period.

@@ -882,7 +882,9 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 **보고서 16 HOLD 시정 (2026-07-20):** `IMP-F015`는 compatibility index 10행과 개별 Approved record를 동기화하고 파싱 회귀 테스트로 고정했다. `IMP-F012`는 프로젝트 소유자의 기존 직접 지시와 승인 범위를 `AIHACK-OWNER-2026-07-20-NGPL-01` record로 전사해 PROV/scenario evidence에 연결했으며 qualified legal opinion은 주장하지 않는다. `IMP-F014`의 배포되지 않는 Git history 의존은 제거하고 `MODIFICATIONS.md`, export-substitution `RELEASE-METADATA`, `SHA256SUMS`와 실제 tar archive verifier로 대체했다. `DBG-F006`의 clean R8 commit, 실제 release bundle 및 same-commit 양 OS CI는 commit/push 전까지 계속 HOLD다.
 
-**보고서 17 HOLD 시정 (2026-07-20):** `DBG-F007`은 `PROJECT_OWNER_LICENSE_APPROVAL.md`를 output/source archive와 checksum의 필수 항목으로 승격하고, archive/output metadata의 owner/modification ID가 실제 Approval ID/Notice ID와 일치하도록 Linux verifier와 Windows release script를 강화했다. 완전 bundle은 PASS하고 문서 누락, metadata ID 누락, owner/modification record ID 불일치와 legacy 포함은 각각 FAIL하는 실제 Git archive fixture로 회귀를 고정했다. clean commit과 same-commit 양 OS CI는 여전히 별도 release gate다.
+**보고서 17 HOLD 시정 (2026-07-20):** `DBG-F007`은 `PROJECT_OWNER_LICENSE_APPROVAL.md`를 output/source archive와 checksum의 필수 항목으로 승격하고, archive/output metadata의 owner/modification ID가 실제 Approval ID/Notice ID와 일치하도록 Linux verifier와 Windows release script를 강화했다. 완전 bundle은 PASS하고 문서 누락, metadata ID 누락, owner/modification record ID 불일치와 legacy 포함은 각각 FAIL하는 실제 Git archive fixture로 회귀를 고정했다. 이 tree를 포함하는 release commit과 해당 SHA의 양 OS CI는 별도 release gate다.
+
+**보고서 18 HOLD 시정 (2026-07-22):** Linux verifier의 부분 문자열 비교를 key/value parser로 교체해 product, version, commit, source license, owner approval와 modification notice가 archive/output에 각각 정확히 한 번 존재하고 전체 값이 일치하도록 했다. Windows PowerShell gate도 동일한 단일-key·완전 값 계약을 사용한다. owner/modification 각각 wrong, suffix, duplicate를 archive와 output에 주입하는 12개 actual-archive case가 모두 fail-closed한다.
 
 **선행:** R6 checkpoint, R7 checkpoint
 

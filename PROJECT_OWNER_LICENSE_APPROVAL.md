@@ -1,9 +1,9 @@
 # AIHack Project-Owner License Decision Record
 
-Approval ID: `AIHACK-OWNER-2026-07-20-NGPL-01`  
-Decision date: 2026-07-20 (Asia/Seoul)  
-Decision authority: Project owner  
-Record status: direct user instruction recorded; immutable Git reference pending commit  
+Approval ID: `AIHACK-OWNER-2026-07-20-NGPL-01`
+Decision date: 2026-07-20 (Asia/Seoul)
+Decision authority: Project owner
+Record status: direct user instruction recorded; immutable reference is the Git commit containing this record
 qualified legal opinion: not claimed
 
 ## 1. Direct decision source
@@ -16,7 +16,7 @@ qualified legal opinion: not claimed
 
 > 네 지금 방향이 좋습니다. 이렇게 가죠.
 
-Evidence channel: direct user instruction in the AIHack implementation session. 이 문서의 Git object와 commit SHA가 생성되면 해당 commit이 저장소 내 immutable approval reference가 된다.
+Evidence channel: direct user instruction in the AIHack implementation session. 이 문서를 포함하는 release commit의 SHA가 저장소와 source archive 안에서 immutable approval reference가 된다.
 
 ## 2. Approved scope
 
@@ -41,7 +41,7 @@ Evidence channel: direct user instruction in the AIHack implementation session. 
 - 해당 binary를 만든 clean commit의 complete corresponding source archive
 - binary와 문서, source archive를 묶는 `SHA256SUMS`
 
-archive와 output의 `RELEASE-METADATA`는 `owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01`과 `modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01`을 포함하며, 두 값은 함께 배포되는 각 record의 ID와 일치해야 한다.
+archive와 output의 `RELEASE-METADATA`는 `owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01`과 `modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01`을 각각 정확히 한 번 포함하며, 두 값 전체는 함께 배포되는 각 record의 ID와 일치해야 한다.
 
 이 방식은 저장소가 채택한 보수적 engineering distribution contract다. 본 승인 기록은 변호사 또는 별도 qualified license reviewer의 법률 의견이라고 주장하지 않는다.
 

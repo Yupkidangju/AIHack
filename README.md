@@ -16,7 +16,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트�
 - `audit_report_11.md`는 보고서 10의 public/schema contract와 evidence 재현성 시정을 모두 Verified하고 R6 checkpoint를 PASS로 종결했다. 실제 model provider smoke는 비차단 고려 대상이다.
 - R7의 공식 checksum inventory, legacy 격리 gate, NH367-C001..C010 record/test와 독립 재감사는 완료되어 `PASS WITH KNOWN RISKS`다. 2026-07-20 프로젝트 소유자는 AIHack을 NetHack 3.6.7의 AI-assisted semantic rewrite 파생물로 분류하고 전체 배포에 NGPL을 승인했다.
 - 실제 외부 게시에는 R8 기술 감사 `PASS`, `LICENSE`, `NOTICE`, 해당 바이너리를 만든 커밋의 complete corresponding source archive가 필요하다.
-- project-owner 결정은 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적하며, release bundle은 `PROJECT_OWNER_LICENSE_APPROVAL.md`, `MODIFICATIONS.md`, commit-bound `RELEASE-METADATA`와 `SHA256SUMS`를 포함한다. metadata의 owner/modification ID는 bundled record와 일치해야 하며 qualified legal opinion은 별도로 주장하지 않는다.
+- project-owner 결정은 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적하며, release bundle은 `PROJECT_OWNER_LICENSE_APPROVAL.md`, `MODIFICATIONS.md`, commit-bound `RELEASE-METADATA`와 `SHA256SUMS`를 포함한다. metadata key는 정확히 한 번 존재하고 owner/modification ID의 전체 값이 bundled record와 일치해야 하며 qualified legal opinion은 별도로 주장하지 않는다.
 
 ### v0.3.0 목표
 

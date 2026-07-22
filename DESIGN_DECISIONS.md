@@ -276,7 +276,7 @@ AIHack은 NetHack 3.6.7 원본 소스를 AI 추론에 제공해 의도와 관찰
 
 Decision:
 
-AIHack 전체를 NetHack 3.6.7의 AI-assisted semantic rewrite 파생물로 분류하고 SPDX `NGPL`을 workspace 전체에 적용한다. 이 project-owner 결정의 범위와 직접 지시는 `AIHACK-OWNER-2026-07-20-NGPL-01`로 기록한다. root `LICENSE`는 공식 3.6.7 archive의 `dat/license`와 byte-for-byte 동일한 원문을 사용하고 SHA-256 `93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747`로 고정한다. `NOTICE`에는 원 저작권, 파생·수정 사실과 AIHack 기여를 명시한다. 바이너리 배포에는 `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`, commit이 확장된 `RELEASE-METADATA`, `SHA256SUMS`와 해당 바이너리를 만든 커밋의 complete corresponding source archive를 동반한다. metadata의 owner/modification ID는 함께 배포되는 record ID와 일치해야 한다. 검증되지 않은 `legacy_nethack_port_reference/`는 release archive에서 제외한다.
+AIHack 전체를 NetHack 3.6.7의 AI-assisted semantic rewrite 파생물로 분류하고 SPDX `NGPL`을 workspace 전체에 적용한다. 이 project-owner 결정의 범위와 직접 지시는 `AIHACK-OWNER-2026-07-20-NGPL-01`로 기록한다. root `LICENSE`는 공식 3.6.7 archive의 `dat/license`와 byte-for-byte 동일한 원문을 사용하고 SHA-256 `93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747`로 고정한다. `NOTICE`에는 원 저작권, 파생·수정 사실과 AIHack 기여를 명시한다. 바이너리 배포에는 `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`, commit이 확장된 `RELEASE-METADATA`, `SHA256SUMS`와 해당 바이너리를 만든 커밋의 complete corresponding source archive를 동반한다. metadata의 필수 key는 각각 정확히 한 번 존재하고 owner/modification ID 전체 값은 함께 배포되는 record ID와 일치해야 한다. 검증되지 않은 `legacy_nethack_port_reference/`는 release archive에서 제외한다.
 
 Alternatives Considered:
 

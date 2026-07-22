@@ -93,14 +93,8 @@ if "!BUILD_TYPE!"=="release" (
     )
     tar -tf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA Cargo.toml >nul
     if errorlevel 1 exit /b 1
-    tar -xOf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" RELEASE-METADATA | findstr /x /c:"commit=!RELEASE_COMMIT!" >nul
+    powershell -NoProfile -Command "$archiveMetadata=@(& tar -xOf '%OUTPUT_DIR%\aihack-0.3.0-source.zip' RELEASE-METADATA); if($LASTEXITCODE -ne 0){exit 1}; $expected=[ordered]@{product='AIHack';version='0.3.0';commit='!RELEASE_COMMIT!';source_license='NGPL';modification_notice='AIHACK-MODIFICATIONS-2026-07-20-01';owner_approval='AIHACK-OWNER-2026-07-20-NGPL-01'}; function Assert-Metadata([string[]]$lines){foreach($key in $expected.Keys){$prefix=$key+'='; $matches=@($lines | Where-Object {$_.StartsWith($prefix,[System.StringComparison]::Ordinal)}); if($matches.Count -ne 1 -or $matches[0] -cne ($prefix+$expected[$key])){Write-Error ('invalid release metadata key: '+$key); exit 1}}}; Assert-Metadata (Get-Content -LiteralPath '%OUTPUT_DIR%\RELEASE-METADATA'); Assert-Metadata $archiveMetadata"
     if errorlevel 1 exit /b 1
-    for %%R in ("owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01" "modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01") do (
-        findstr /x /c:%%~R "%OUTPUT_DIR%\RELEASE-METADATA" >nul
-        if errorlevel 1 exit /b 1
-        tar -xOf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" RELEASE-METADATA | findstr /x /c:%%~R >nul
-        if errorlevel 1 exit /b 1
-    )
     findstr /c:"Approval ID: `AIHACK-OWNER-2026-07-20-NGPL-01`" "%OUTPUT_DIR%\PROJECT_OWNER_LICENSE_APPROVAL.md" >nul
     if errorlevel 1 exit /b 1
     tar -xOf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" PROJECT_OWNER_LICENSE_APPROVAL.md | findstr /c:"Approval ID: `AIHACK-OWNER-2026-07-20-NGPL-01`" >nul

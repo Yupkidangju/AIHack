@@ -147,7 +147,7 @@ cargo check --workspace --all-targets --locked
 7. `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`를 `output/`에 복사
 8. release commit이 적힌 `RELEASE-METADATA`와 `git archive` source를 생성
 9. binary, notice, source archive의 `SHA256SUMS`를 생성
-10. `scripts/verify_release_bundle.sh`로 archive 필수 파일, commit expansion, owner/modification ID와 실제 record의 일치, checksum과 legacy 제외를 확인
+10. `scripts/verify_release_bundle.sh`로 archive 필수 파일, commit expansion, metadata key의 단일성·완전 값, owner/modification ID와 실제 record의 일치, checksum과 legacy 제외를 확인
 11. 하나라도 실패하면 exit code 1, 모두 통과하면 정확한 binary 경로 출력
 
 `cp ... || true`와 stderr 폐기는 금지한다.

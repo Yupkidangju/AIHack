@@ -277,8 +277,8 @@ fn r8_checkpoint_rejects_a_verifier_without_authority_integrity_checks() {
     let fixture = ReleaseFixture::approved();
     fixture.replace(
         "scripts/verify_release_bundle.sh",
-        "owner_approval=$OWNER_APPROVAL_ID",
-        "owner_reference_removed",
+        "require_metadata_value",
+        "metadata_validation_removed",
     );
 
     let output = fixture.run();

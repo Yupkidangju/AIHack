@@ -63,7 +63,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오별로 재구�
 | SC-LICENSE-01 | runtime 포함 자산 provenance가 모두 machine-validated `Approved`이고, reviewer/date/license/scope/notice/evidence와 checksum이 유효하며 project-owner approval ID가 추적되고 legacy direct import 0건 |
 | SC-DOC-01 | AI 문서 표준 체크리스트 12개 항목 전부 PASS |
 
-SC-LICENSE-01은 외부 배포를 시작하기 전 R8 최종 런칭 게이트다. 2026-07-20 프로젝트 소유자는 AIHack을 NetHack 3.6.7 원본 소스로 의도를 추론한 AI-assisted semantic rewrite 파생물로 분류하고 whole-work NGPL 적용을 승인했다. 직접 지시, 범위와 경계는 `PROJECT_OWNER_LICENSE_APPROVAL.md`의 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적한다. runtime/scenario provenance, 공식 라이선스 원문, `NOTICE`, `MODIFICATIONS.md`, `RELEASE-METADATA`, `SHA256SUMS`와 complete corresponding source 배포 계약을 함께 검증하며 metadata의 owner/modification ID는 archive와 output의 실제 record ID로 해석 가능해야 한다. 이 project-owner 결정은 qualified legal opinion, R8 기술 감사 `PASS`나 외부 게시 자체를 뜻하지 않는다.
+SC-LICENSE-01은 외부 배포를 시작하기 전 R8 최종 런칭 게이트다. 2026-07-20 프로젝트 소유자는 AIHack을 NetHack 3.6.7 원본 소스로 의도를 추론한 AI-assisted semantic rewrite 파생물로 분류하고 whole-work NGPL 적용을 승인했다. 직접 지시, 범위와 경계는 `PROJECT_OWNER_LICENSE_APPROVAL.md`의 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적한다. runtime/scenario provenance, 공식 라이선스 원문, `NOTICE`, `MODIFICATIONS.md`, `RELEASE-METADATA`, `SHA256SUMS`와 complete corresponding source 배포 계약을 함께 검증하며 metadata의 필수 key는 archive와 output에 정확히 한 번 존재하고 owner/modification 값 전체가 실제 record ID와 일치해야 한다. 이 project-owner 결정은 qualified legal opinion, R8 기술 감사 `PASS`나 외부 게시 자체를 뜻하지 않는다.
 
 ## 4. v0.3.0 비목표
 

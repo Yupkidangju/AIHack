@@ -42,8 +42,8 @@ AIHack is distributed under the NGPL terms in LICENSE. Every AIHack binary
 release must be accompanied by LICENSE, this NOTICE, MODIFICATIONS.md,
 PROJECT_OWNER_LICENSE_APPROVAL.md, RELEASE-METADATA, SHA256SUMS, and the
 complete corresponding source used to build that release. The approval and
-modification IDs in RELEASE-METADATA must resolve to the IDs in those bundled
-records. The build scripts create an
+modification IDs in RELEASE-METADATA must each occur exactly once and resolve
+by complete-value equality to the IDs in those bundled records. The build scripts create an
 `aihack-0.3.0-source` archive from the release commit for this purpose.
 
 The `legacy_nethack_port_reference/` tree is retained only as historical

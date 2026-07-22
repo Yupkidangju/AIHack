@@ -140,8 +140,10 @@ if ((${#ERRORS[@]} == 0)); then
         || error '.gitattributes release metadata substitution missing'
     for phrase in \
         'PROJECT_OWNER_LICENSE_APPROVAL.md' \
-        'owner_approval=$OWNER_APPROVAL_ID' \
-        'modification_notice=$MODIFICATION_NOTICE_ID' \
+        'require_metadata_value' \
+        'count != 1' \
+        'owner_approval "$OWNER_APPROVAL_ID"' \
+        'modification_notice "$MODIFICATION_NOTICE_ID"' \
         'Approval ID:' \
         'Notice ID:'; do
         rg -q --fixed-strings "$phrase" "$ROOT/scripts/verify_release_bundle.sh" \

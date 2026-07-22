@@ -371,6 +371,8 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `audit_report_17.md`의 `DBG-F007` 시정은 approval record를 output/source archive와 checksum의 필수 항목으로 추가하고, archive/output metadata의 owner/modification ID를 각 bundled record ID와 대조한다. positive actual-archive fixture와 문서 누락·metadata 누락·record ID 불일치 negative cases가 이 reference-integrity boundary를 검증한다. 이 로컬 시정도 clean commit/same-commit CI evidence를 대체하지 않는다.
 
+`audit_report_18.md`의 exactness 시정은 metadata를 부분 문자열로 찾지 않고 key/value로 파싱해 필수 key가 정확히 한 번만 존재하며 전체 값이 expected와 같은지 검사한다. archive/output 양쪽의 wrong, suffixed, duplicate owner/modification values를 actual archive fixture로 거부하고 Windows release gate에도 같은 단일-key 계약을 적용한다.
+
 ```bash
 scripts/r8_checkpoint.sh
 cargo fmt --all -- --check

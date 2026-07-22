@@ -18,6 +18,24 @@ require_text() {
     grep -Fq "$needle" <<<"$content" || fail "$label missing or mismatched: $needle"
 }
 
+require_metadata_value() {
+    local content=$1 key=$2 expected=$3 label=$4 value
+    if ! value=$(awk -v key="$key" '
+        index($0, key "=") == 1 {
+            count += 1
+            value = substr($0, length(key) + 2)
+        }
+        END {
+            if (count != 1) exit 2
+            print value
+        }
+    ' <<<"$content"); then
+        fail "$label $key must appear exactly once"
+    fi
+    [[ "$value" == "$expected" ]] \
+        || fail "$label $key mismatched: expected $expected, got $value"
+}
+
 for file in \
     aihack \
     aihack-headless \
@@ -50,13 +68,19 @@ output_metadata=$(<"$OUTPUT_DIR/RELEASE-METADATA")
 output_approval=$(<"$OUTPUT_DIR/PROJECT_OWNER_LICENSE_APPROVAL.md")
 output_modifications=$(<"$OUTPUT_DIR/MODIFICATIONS.md")
 
-require_text "$archive_metadata" "version=0.3.0" "archive RELEASE-METADATA version"
-require_text "$archive_metadata" "commit=$EXPECTED_COMMIT" "archive RELEASE-METADATA commit"
-require_text "$archive_metadata" "owner_approval=$OWNER_APPROVAL_ID" "archive RELEASE-METADATA owner_approval"
-require_text "$archive_metadata" "modification_notice=$MODIFICATION_NOTICE_ID" "archive RELEASE-METADATA modification_notice"
-require_text "$output_metadata" "commit=$EXPECTED_COMMIT" "output RELEASE-METADATA commit"
-require_text "$output_metadata" "owner_approval=$OWNER_APPROVAL_ID" "output RELEASE-METADATA owner_approval"
-require_text "$output_metadata" "modification_notice=$MODIFICATION_NOTICE_ID" "output RELEASE-METADATA modification_notice"
+for metadata_label in archive output; do
+    if [[ "$metadata_label" == archive ]]; then
+        metadata=$archive_metadata
+    else
+        metadata=$output_metadata
+    fi
+    require_metadata_value "$metadata" product AIHack "$metadata_label RELEASE-METADATA"
+    require_metadata_value "$metadata" version 0.3.0 "$metadata_label RELEASE-METADATA"
+    require_metadata_value "$metadata" commit "$EXPECTED_COMMIT" "$metadata_label RELEASE-METADATA"
+    require_metadata_value "$metadata" source_license NGPL "$metadata_label RELEASE-METADATA"
+    require_metadata_value "$metadata" owner_approval "$OWNER_APPROVAL_ID" "$metadata_label RELEASE-METADATA"
+    require_metadata_value "$metadata" modification_notice "$MODIFICATION_NOTICE_ID" "$metadata_label RELEASE-METADATA"
+done
 require_text "$archive_approval" "Approval ID: \`$OWNER_APPROVAL_ID\`" "archive Approval ID"
 require_text "$output_approval" "Approval ID: \`$OWNER_APPROVAL_ID\`" "output Approval ID"
 require_text "$archive_modifications" "Notice ID: \`$MODIFICATION_NOTICE_ID\`" "archive Notice ID"

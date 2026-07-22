@@ -193,4 +193,8 @@ fn release_packaging_includes_license_notice_and_complete_source() {
             "build.bat 누락: {document_id}"
         );
     }
+    assert!(
+        windows.contains("$matches.Count -ne 1"),
+        "build.bat은 metadata key가 정확히 한 번만 나타나는지 검사해야 합니다"
+    );
 }
