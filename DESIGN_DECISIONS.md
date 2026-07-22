@@ -68,7 +68,7 @@ Consequences:
 
 ## ADR-0028: RustSec 경고 없는 ratatui 0.30/crossterm 0.29 계열
 
-Status: Accepted; R1 local verification complete, remote CI pending
+Status: Accepted; R1 and SC-BUILD-02 verified by `audit_report_19.md`
 Date: 2026-07-15
 Decision ID: DEC-UI-DEP-01
 
@@ -266,7 +266,7 @@ Consequences:
 
 ## ADR-0030: NetHack 3.6.7 파생물 분류와 whole-work NGPL 배포
 
-Status: Accepted by project owner; implementation pending independent R8 audit
+Status: Implemented; report 19 technical evidence verified, report 20 documentation remediation pending re-audit
 Date: 2026-07-20
 Decision ID: DEC-LICENSE-03
 
@@ -293,3 +293,4 @@ Consequences:
 - source archive는 `.git/` history에 의존하지 않고 `MODIFICATIONS.md`의 scope/date와 `RELEASE-METADATA`의 commit을 수신자에게 전달한다.
 - 라이선스 정비 완료는 독립 R8 기술 감사 `PASS`나 외부 게시 실행을 자동 승인하지 않는다.
 - 이 결정과 프로젝트 기록은 qualified legal opinion이나 법률 자문을 대체하지 않는다.
+- Release verification update (2026-07-22): commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)에서 `ubuntu-latest quality gate`와 `windows-latest quality gate` 및 bundle이 PASS했고 `audit_report_19.md`가 기술 evidence를 Verified했다. `audit_report_20.md`가 남긴 active-state/false-green 문서 HOLD 시정의 독립 재감사 전까지 R8 전체는 HOLD다.

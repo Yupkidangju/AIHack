@@ -13,13 +13,9 @@
 
 ## 1. 현재 기준과 목표
 
-현재 코드는 R1~R5와 R6 local automated integration gate까지 fmt, clippy, test를 통과한다. 다음 release 범위는 아직 완료되지 않았다.
+현재 코드는 R1~R7 engineering gate와 SC-BUILD-02를 완료했다. R6 독립 감사와 NetHack 3.6.7 출처·호환성 trace도 종결됐고, `audit_report_19.md`는 clean `b9bd680200d82b20d7c9ba961a2758caa3d49e16` bundle 및 Actions run `29886410221`의 same-SHA Linux/Windows CI를 Verified했다.
 
-- Linux/Windows 원격 CI evidence
-- R6 독립 감사
-- NetHack 출처·호환성 trace
-
-v0.3.0은 새 기능 추가보다 이 release evidence와 provenance 기반을 먼저 닫는다.
+v0.3.0의 현재 남은 release gate는 `audit_report_20.md`가 지적한 active-state 정합성과 false-green 회귀 계약을 시정한 뒤 받는 report 20 문서 HOLD 시정의 독립 재감사다. 외부 게시는 최종 독립 PASS와 별도 사용자 승인 전까지 수행하지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -251,7 +247,7 @@ Windows는 `build.bat --test` 후 두 exe 존재를 확인한다.
 - [x] lockfile 변경 여부를 job 종료 시 확인
 - [x] cargo-audit 0.22.1, cargo-deny 0.19.4를 pinned install
 - [x] vulnerability, license, source, crossterm duplicate gate 포함
-- [ ] Linux/Windows 원격 CI green 및 실패 단계 로그 확인
+- [x] Linux/Windows 원격 CI green 및 실패 단계 로그 확인 — `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, Actions run `29886410221`
 
 **검증:**
 
@@ -265,7 +261,7 @@ Windows는 `build.bat --test` 후 두 exe 존재를 확인한다.
 ### Checkpoint R1
 
 - [x] SC-BUILD-01 PASS (R1 local audit 통과)
-- [ ] SC-BUILD-02 PASS (원격 CI 실행 대기)
+- [x] SC-BUILD-02 PASS — 동일 SHA Linux/Windows quality gate와 release bundle PASS (`29886410221`)
 - [x] README quick start를 default-run 계약에 맞춤
 - [x] package/version 상태가 문서와 일치
 
@@ -851,7 +847,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 - [x] SC-COMPAT-01 engineering evidence PASS
 - [x] provenance inventory/checksum/legacy 격리/fail-closed validator PASS
-- [x] SC-LICENSE-01 — project-owner NGPL approval와 machine validation 완료; 독립 R8 audit pending
+- [x] SC-LICENSE-01 — project-owner NGPL approval와 machine validation 완료; `audit_report_19.md` 기술 evidence Verified
 - [x] runtime included provenance Unknown/Blocked 0건
 - [x] compatibility report 생성
 - [x] source 직접 import 0건
@@ -862,15 +858,15 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 **설명:** 모든 성공 기준과 문서 동기화를 검증한다.
 
-**진행 상태 (2026-07-20):** R8-0 fail-closed preflight와 R8-1A/B/C를 구현했다. `scripts/r8_checkpoint.sh`는 script-relative canonical root에서 R7 승인 상태, workspace 0.3.0/NGPL, 공식 LICENSE checksum, NOTICE 필수 문구, binary와 complete corresponding source packaging 계약, README/CHANGELOG, provenance 외부 배포 판정과 7개 active document archive target을 검사한다. HOLD/FAIL fixture와 canonical-root 격리를 유지하며 licensing·documentation 회귀 테스트를 추가했다. `designs.md`는 current v0.3.0과 R8 release contract를 분리하고 `DOCUMENTATION_AUDIT_REPORT.md`는 역사적 R0 판정을 보존한 채 12항목 R8 self-check를 별도 기록한다. 로컬 checkpoint PASS는 독립 R8 감사 PASS가 아니다.
+**진행 상태 (2026-07-22):** R8-0 fail-closed preflight와 R8-1A/B/C를 구현했다. `scripts/r8_checkpoint.sh`는 script-relative canonical root에서 R7 승인 상태, workspace 0.3.0/NGPL, 공식 LICENSE checksum, NOTICE 필수 문구, binary와 complete corresponding source packaging 계약, README/CHANGELOG, provenance 외부 배포 판정과 7개 active document archive target을 검사한다. HOLD/FAIL fixture와 canonical-root 격리를 유지하며 licensing·documentation 회귀 테스트를 추가했다. commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 Actions run `29886410221`에서 Linux/Windows test·release bundle·audit·deny가 모두 PASS했다. `audit_report_19.md`는 기술 evidence를 Verified했고, 현재 상태는 `audit_report_20.md` active-state/false-green HOLD 시정 후 독립 재감사 대기다.
 
 **수용 기준:**
 
-- [x] R1~R7 로컬 checkpoint/evidence PASS; SC-BUILD-02 remote CI pending
+- [x] R1~R7 checkpoint/evidence 및 SC-BUILD-02 same-SHA Linux/Windows CI PASS
 - [x] 승인된 whole-work NGPL과 notice를 workspace manifest 및 release 문서에 반영
 - [x] Cargo/README/CHANGELOG 버전 0.3.0
 - [x] archive chain 무결성 PASS
-- [x] AI 구현 문서 표준 12개 local self-check PASS; independent audit pending
+- [x] AI 구현 문서 표준 12개 self-check PASS; report 20 active-state/false-green HOLD 시정 후 독립 재감사 대기
 
 **검증:**
 
@@ -885,6 +881,10 @@ cargo test -p aihack --locked --test golden_phase8_rules
 **보고서 17 HOLD 시정 (2026-07-20):** `DBG-F007`은 `PROJECT_OWNER_LICENSE_APPROVAL.md`를 output/source archive와 checksum의 필수 항목으로 승격하고, archive/output metadata의 owner/modification ID가 실제 Approval ID/Notice ID와 일치하도록 Linux verifier와 Windows release script를 강화했다. 완전 bundle은 PASS하고 문서 누락, metadata ID 누락, owner/modification record ID 불일치와 legacy 포함은 각각 FAIL하는 실제 Git archive fixture로 회귀를 고정했다. 이 tree를 포함하는 release commit과 해당 SHA의 양 OS CI는 별도 release gate다.
 
 **보고서 18 HOLD 시정 (2026-07-22):** Linux verifier의 부분 문자열 비교를 key/value parser로 교체해 product, version, commit, source license, owner approval와 modification notice가 archive/output에 각각 정확히 한 번 존재하고 전체 값이 일치하도록 했다. Windows PowerShell gate도 동일한 단일-key·완전 값 계약을 사용한다. owner/modification 각각 wrong, suffix, duplicate를 archive와 output에 주입하는 12개 actual-archive case가 모두 fail-closed한다.
+
+**보고서 19 HOLD 시정 (2026-07-22):** `audit_report_19.md`는 보고서 18의 기술 시정, clean bundle과 same-SHA CI를 모두 Verified하고 활성 문서 상태만 `IMP-F016`/`XPF-F011`로 HOLD했다. 2026-07-22 기준 evidence는 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)이며 `ubuntu-latest quality gate`와 `windows-latest quality gate`가 success다. 활성 문서는 SC-BUILD-02 PASS와 report 19의 documentation-sync HOLD를 구분해 기록하며, 최종 R8 PASS는 이 문서 diff의 독립 재감사 전까지 선언하지 않는다.
+
+**보고서 20 HOLD 시정 (2026-07-22):** 최상단 current baseline, `G-LICENSE-001`, BUILD_GUIDE 전체 테스트 표현을 현재 evidence와 정렬했다. 문서 회귀는 implementation summary 절, gap별 행과 checklist 행을 직접 식별하고 알려진 stale 상태의 부재까지 검사한다. `IMP-F016`/`DBG-F008` 시정의 독립 재감사 전까지 R8 전체와 외부 게시는 HOLD다.
 
 **선행:** R6 checkpoint, R7 checkpoint
 
@@ -919,4 +919,4 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 R8 전체 로컬 검증과 독립 감사다. project-owner NGPL approval, SC-LICENSE-01, root distribution license와 source packaging 계약은 반영됐지만 외부 게시는 R8 독립 감사 PASS와 SC-BUILD-02 원격 CI evidence까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `audit_report_20.md` active-state/false-green 문서 시정의 독립 재감사다. project-owner NGPL approval, SC-LICENSE-01, root distribution license, source packaging과 SC-BUILD-02 evidence는 검증됐지만 외부 게시는 최종 R8 독립 PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.

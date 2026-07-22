@@ -19,7 +19,7 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | Linux/Windows workflow 구성, 원격 green 대기 | Linux/Windows green |
+| CI | 2026-07-22: `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, [run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221), `ubuntu-latest quality gate`/`windows-latest quality gate` success | Linux/Windows green |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | wait-only, 조기 사망도 exit 0 | survival-v1, accepted turn 1000 |
 
@@ -427,17 +427,19 @@ R8 checkpoint도 script-relative canonical repository만 검사한다. 승인된
 - [x] R1~R7 engineering 단계 완료, R7은 license review가 이관된 `PASS WITH KNOWN RISKS`
 - [x] R8 fail-closed preflight와 canonical-root 회귀 테스트
 - [x] R8 런칭 전 SC-LICENSE-01과 distribution license 로컬 gate PASS
-- [ ] `cargo fmt --all -- --check`
-- [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
-- [ ] `cargo test --workspace --all-targets --locked`
-- [ ] `cargo build --workspace --release --locked`
-- [ ] seed 42, 7, 1234 accepted turn 1000
-- [ ] save/load/replay v1 hash equality
-- [ ] provider disabled/timeout/stale에서 core hash 불변
-- [ ] provenance Unknown/Blocked runtime 자산 0건
+- [x] `cargo fmt --all -- --check`
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`
+- [x] `cargo test --workspace --all-targets --locked` — 전체 PASS (테스트 수는 회귀 추가에 따라 변동)
+- [x] `cargo build --workspace --release --locked`
+- [x] seed 42, 7, 1234 accepted turn 1000
+- [x] save/load/replay v1 hash equality
+- [x] provider disabled/timeout/stale에서 core hash 불변
+- [x] provenance Unknown/Blocked runtime 자산 0건
 - [x] Cargo/README/CHANGELOG 0.3.0 동기화
 - [x] deterministic PTY core flow와 success/timeout/stale/down/pending-exit matrix PASS
-- [ ] Linux/Windows CI green
-- [ ] `cargo audit` vulnerability 0건
-- [ ] `cargo deny check licenses bans sources` PASS
-- [ ] `audit_roadmap.md` R8 PASS
+- [x] Linux/Windows CI green — Actions run `29886410221`, commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`
+- [x] `cargo audit` vulnerability 0건
+- [x] `cargo deny check licenses bans sources` PASS
+- [ ] 독립 R8 최종 PASS — `audit_report_19.md`의 technical evidence는 Verified, `audit_report_20.md`의 잔여 active-state/false-green HOLD 시정 후 재감사 대기
+
+위 완료 항목은 `audit_report_19.md`의 독립 검증과 동일 SHA CI evidence에 근거한다. 외부 게시는 마지막 미완료 항목과 별도 사용자 승인이 모두 충족되기 전까지 수행하지 않는다.

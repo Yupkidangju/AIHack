@@ -130,7 +130,7 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 
 **R8 Documentation Self-check: PASS**
 
-이 판정은 구현 세션의 로컬 정합성 검사다. 1절의 역사적 R0 판정을 바꾸지 않으며, 독립 R8 감사 pending 상태와 SC-BUILD-02 원격 CI 미확정을 해제하지 않는다.
+이 판정은 2026-07-20 구현 세션의 로컬 정합성 검사다. 1절의 역사적 R0 판정을 바꾸지 않는다. 당시 독립 R8 감사와 SC-BUILD-02는 pending이었으며, 2026-07-22 후속 상태는 10.7절이 대체한다.
 
 ### 10.1 변경 기준
 
@@ -168,8 +168,8 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 | R6 deterministic PTY degraded matrix | PASS; success/timeout/stale/down, pending-exit restore |
 | fmt / clippy / full workspace test / release build | PASS |
 | cargo-audit / cargo-deny | PASS; cargo-audit는 local advisory DB 사용 |
-| 독립 R8 감사 | PENDING |
-| Linux/Windows remote CI evidence | PENDING |
+| 독립 R8 감사 | HOLD — report 20: report 19 evidence verified, residual active-state/false-green documentation HOLD |
+| Linux/Windows remote CI evidence | PASS — `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, Actions `29886410221` |
 
 따라서 R8 문서 구현은 독립 감사에 전달 가능한 상태지만, 전체 프로그램 또는 외부 배포 `PASS`는 아직 선언하지 않는다.
 
@@ -197,3 +197,16 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - archive/output 각각의 wrong, suffix, duplicate owner/modification metadata를 actual archive fixture로 거부
 - Windows release gate도 같은 key 단일성·완전 값 계약으로 동기화
 - 이 coder 시정은 same-commit 양 OS CI와 후속 독립 감사 판정을 대신하지 않음
+
+### 10.7 `audit_report_19.md` HOLD 후속 상태 (2026-07-22)
+
+- `IMP-F012`, `IMP-F014`, `IMP-F015`, `DBG-F006`, `DBG-F007`: 기술·release evidence Verified
+- SC-BUILD-02: 2026-07-22 기준 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)의 `ubuntu-latest quality gate`와 `windows-latest quality gate` 및 release bundle PASS
+- `IMP-F016`/`XPF-F011`: 활성 문서의 pending/NOT RUN 상태를 위 evidence와 report 19 documentation-sync HOLD로 동기화
+- 당시 권한 상태: 문서 시정 완료 후 독립 재감사 대기. 이 self-check는 최종 R8 PASS를 대신하지 않으며 외부 게시를 승인하지 않는다.
+
+### 10.8 `audit_report_20.md` HOLD 후속 상태 (2026-07-22)
+
+- `IMP-F016`: 최상단 current baseline, `G-LICENSE-001`과 BUILD_GUIDE의 고정 테스트 수를 현재 evidence와 정렬
+- `DBG-F008`: document-wide token 검사에 section/row별 positive·negative assertion을 추가
+- 현재 권한 상태: report 20 시정 완료 후 독립 재감사 대기. 기술 evidence는 다시 pending으로 되돌리지 않으며 최종 R8 PASS나 외부 게시를 선언하지 않는다.

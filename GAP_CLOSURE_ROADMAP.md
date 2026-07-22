@@ -33,11 +33,11 @@
 | Gap ID | 등급 | 문제 | 현재 증거 | Task | 성공 기준 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- |
 | G-PRODUCT-001 | P0 | inspired game와 3.6.7 변환 목표 충돌 | 과거 spec은 1:1 포트 비목표 | R0-1, R0-2 | SC-DOC-01 | Closed |
-| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | owner approval ID, whole-work NGPL, 공식 LICENSE/NOTICE, modification manifest와 commit-bound source archive 계약 구현 | R8-1 | SC-LICENSE-01 | Verified locally / release commit, same-commit CI와 independent R8 re-audit required |
+| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | owner approval ID, whole-work NGPL, 공식 LICENSE/NOTICE와 modification manifest; clean `b9bd680200d82b20d7c9ba961a2758caa3d49e16` bundle 및 Actions `29886410221` same-SHA CI를 `audit_report_19.md`가 Verified | R8-1 | SC-LICENSE-01 | Closed |
 | G-BUILD-001 | P1 | toolchain/MSRV 미고정 | rust-toolchain과 locked local build/audit evidence; `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | locked dependency/security policy와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-003 | P1 | build script가 copy 실패를 무시 | fail-fast script와 `audit_report_3.md` independent verification | R1-2 | SC-BUILD-01 | Closed |
-| G-BUILD-004 | P1 | CI 부재 | workflow 추가, 원격 실행 대기 | R1-3 | SC-BUILD-02 | Implemented |
+| G-BUILD-004 | P1 | CI 부재 | 2026-07-22: `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, [Actions `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221) `ubuntu-latest quality gate`/`windows-latest quality gate` success; `audit_report_19.md` Verified | R1-3 | SC-BUILD-02 | Closed |
 | G-RUN-001 | P1 | README 기본 실행 명령 실패 | default binary/run command와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-CORE-001 | P0 | session/world mutable field 공개 | private state, read accessor, fixture boundary와 `audit_report_3.md` independent verification | R2-1, R2-2 | SC-CORE-01 | Closed |
 | G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy transaction과 no-commit regression, `audit_report_3.md` independent verification | R2-3 | SC-CORE-02 | Closed |
@@ -52,7 +52,7 @@
 | G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | versioned request/response, opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증; `audit_report_11.md` 독립 재감사 | R6-2, R6-6 | SC-LLM-02 | Closed |
 | G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0; `audit_report_11.md` 독립 재감사 | R6-3, R6-6 | SC-LLM-03 | Closed |
 | G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests | R7-2 | SC-COMPAT-01 | Closed / License risk tracked separately |
-| G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | workspace와 active release 문서를 0.3.0으로 동기화 | R8-1 | SC-DOC-01 | Verified locally / independent R8 audit pending |
+| G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | 0.3.0 동기화 뒤 `audit_report_20.md`의 `IMP-F016`/`DBG-F008` 잔여 active-status drift와 false-green gate 시정 | R8-1 | SC-DOC-01 | Implemented / report 20 re-audit pending |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -249,4 +249,4 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0 문서화와 R1~R6의 G-BUILD(local), G-CORE, G-DATA, G-TEST, G-ARCH, G-LLM은 해당 독립 감사 범위에서 PASS/Closed다. R6는 `audit_report_11.md`가 종결 권한이다. R7은 engineering 범위에서 `PASS WITH KNOWN RISKS`이며, G-LICENSE-001과 SC-LICENSE-01은 R8 실제 런칭 전 필수 검토다. SC-BUILD-02 원격 CI와 R8 release gap도 pending이다.
+R0 문서화와 R1~R6의 G-BUILD, G-CORE, G-DATA, G-TEST, G-ARCH, G-LLM은 해당 독립 감사 범위에서 PASS/Closed다. R6는 `audit_report_11.md`가 종결 권한이다. SC-BUILD-02는 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 Actions run `29886410221`에서 양 OS PASS했고 `audit_report_19.md`가 Verified했다. R7은 engineering 범위에서 `PASS WITH KNOWN RISKS`이며 R8 기술·release evidence도 Verified됐지만, R8 전체는 `audit_report_20.md` active-state/false-green HOLD 시정의 독립 재감사 전까지 HOLD다.

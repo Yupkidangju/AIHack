@@ -36,6 +36,8 @@
 
 ### Changed
 
+- `audit_report_20.md`의 `IMP-F016`/`DBG-F008` 후속 시정으로 구현 요약 최상단, `G-LICENSE-001`, R8 전체 테스트 표현을 실제 evidence와 정렬하고 section/row별 positive·negative 문서 회귀 gate를 추가했다.
+- `audit_report_19.md`의 `IMP-F016`/`XPF-F011` 시정으로 활성 README, 구현 요약, gap/audit roadmap, build guide, ADR와 문서 감사표를 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16` 및 Actions run `29886410221`의 same-SHA 양 OS success와 동기화했다. 기술 gate PASS와 문서 시정 재감사 HOLD를 분리해 기록한다.
 - 사용자 결정에 따라 R7을 `PASS WITH KNOWN RISKS`로 종결하고, PROV-0004/NH367 actual approval와 SC-LICENSE-01을 R8 실제 런칭 전 필수 검토사항으로 이관했다.
 - 프로젝트 소유자가 AIHack을 NetHack 3.6.7 원본 소스의 AI-assisted semantic rewrite 파생물로 분류함에 따라 workspace 전체를 NGPL 0.3.0으로 동기화하고 공식 `LICENSE`, 파생·변경 `NOTICE`, complete corresponding source 배포 계약을 추가했다. crates.io publish는 계속 비활성화했다.
 - `audit_report_16.md` HOLD 시정으로 project-owner 직접 결정 record `AIHACK-OWNER-2026-07-20-NGPL-01`, `MODIFICATIONS.md`, commit-expanded `RELEASE-METADATA`, `SHA256SUMS`와 실제 source archive verifier를 추가했다. 배포되지 않는 Git history 의존은 제거했다.

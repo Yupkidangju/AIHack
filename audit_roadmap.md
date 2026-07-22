@@ -176,7 +176,7 @@ test -x output/aihack-headless
 - Linux와 Windows CI가 동일 commit에서 green이다.
 - `build.sh`와 `build.bat`은 artifact 누락을 exit code 0으로 숨기지 않는다.
 
-Checkpoint R1 현재 상태: SC-BUILD-01 local PASS; SC-BUILD-02 remote CI pending.
+Checkpoint R1 현재 상태: SC-BUILD-01 PASS; SC-BUILD-02는 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 Actions run `29886410221`에서 Linux/Windows PASS.
 
 ## 5. R2 상태 무결성 게이트
 
@@ -363,7 +363,7 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 2026-07-20 R8-0에서 `scripts/r8_checkpoint.sh`와 fixture 회귀 테스트 5개를 추가했다. 이어 프로젝트 소유자의 파생물 분류에 따라 workspace 0.3.0/NGPL, 공식 `LICENSE`, `NOTICE`, release source archive 계약과 provenance approval를 반영하고 licensing 회귀 테스트 4개를 추가했다. checkpoint의 로컬 PASS는 R8 독립 감사 또는 외부 게시 승인이 아니다.
 
-같은 날 R8-1C에서 `designs.md`의 current v0.3.0/R8 release contract를 동기화하고, 역사적 R0 문서 감사 판정을 보존한 별도 R8 12항목 self-check와 `tests/r8_documentation.rs` 회귀 계약을 추가했다. 문서 self-check와 R8 checkpoint는 로컬 PASS이며, 수동 TUI matrix·SC-BUILD-02 원격 CI·독립 R8 감사는 계속 pending이다.
+같은 날 R8-1C에서 `designs.md`의 current v0.3.0/R8 release contract를 동기화하고, 역사적 R0 문서 감사 판정을 보존한 별도 R8 12항목 self-check와 `tests/r8_documentation.rs` 회귀 계약을 추가했다. 2026-07-20 당시 문서 self-check와 R8 checkpoint는 로컬 PASS였고 수동 TUI matrix·SC-BUILD-02 원격 CI·독립 R8 감사는 pending이었다. 후속 상태는 아래 보고서 19 closure가 대체한다.
 
 `audit_report_16.md` HOLD 시정에서 compatibility index를 Approved record와 동기화하고, project-owner 직접 지시를 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적했다. 배포되지 않는 Git history 주장은 `MODIFICATIONS.md`와 commit-expanded `RELEASE-METADATA`로 대체했고 `scripts/verify_release_bundle.sh` 및 실제 임시 Git archive 회귀 테스트가 필수 문서, commit, checksum과 legacy 제외를 검증한다. 이는 qualified legal opinion을 주장하지 않으며 clean R8 commit/same-commit CI gate를 면제하지 않는다.
 
@@ -372,6 +372,10 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 `audit_report_17.md`의 `DBG-F007` 시정은 approval record를 output/source archive와 checksum의 필수 항목으로 추가하고, archive/output metadata의 owner/modification ID를 각 bundled record ID와 대조한다. positive actual-archive fixture와 문서 누락·metadata 누락·record ID 불일치 negative cases가 이 reference-integrity boundary를 검증한다. 이 로컬 시정도 clean commit/same-commit CI evidence를 대체하지 않는다.
 
 `audit_report_18.md`의 exactness 시정은 metadata를 부분 문자열로 찾지 않고 key/value로 파싱해 필수 key가 정확히 한 번만 존재하며 전체 값이 expected와 같은지 검사한다. archive/output 양쪽의 wrong, suffixed, duplicate owner/modification values를 actual archive fixture로 거부하고 Windows release gate에도 같은 단일-key 계약을 적용한다.
+
+`audit_report_19.md`는 2026-07-22 기준 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)에서 `ubuntu-latest quality gate`와 `windows-latest quality gate`가 success였고, clean release bundle 및 보고서 18 exactness 시정도 Verified했다고 판정했다. 당시 최종 판정은 활성 문서 불일치 때문에 HOLD였고 남은 gate는 `IMP-F016`/`XPF-F011` 문서 동기화 시정의 독립 재감사였다. 기술 gate와 SC-BUILD-02를 다시 pending으로 되돌리지 않는다.
+
+`audit_report_20.md`는 report 19의 핵심 동기화를 부분 Verified했지만 implementation summary 최상단, `G-LICENSE-001`, BUILD_GUIDE 테스트 수와 document-wide false-green gate를 `IMP-F016`/`DBG-F008`로 HOLD했다. 해당 active-state를 교정하고 section/row별 positive·negative 회귀 계약으로 강화했으며, 현재 남은 gate는 이 report 20 시정의 독립 재감사다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -426,5 +430,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1 local PASS (SC-BUILD-02 remote CI pending), R2~R6 PASS, R7 `PASS WITH KNOWN RISKS`, R8 implementation/local verification 진행 중이며 independent audit NOT RUN. R6는 `audit_report_11.md` 독립 재감사로 종결됐으며 실제 model provider smoke는 비차단 고려 대상이다.
-현재 문서 감사 판정: `audit_report_9.md`가 IMP-F008과 R1~R5를, `audit_report_11.md`가 보고서 10 시정과 R6 checkpoint를 PASS로 종결했다. 전체 program PASS는 R7~R8 및 SC-BUILD-02 원격 CI evidence가 완료된 뒤에만 선언한다.
+현재 구현 판정: R1~R6 PASS, R7 `PASS WITH KNOWN RISKS`, SC-BUILD-02와 R8 기술·release evidence는 `audit_report_19.md`에서 Verified. R8 전체는 `audit_report_20.md` active-state/false-green HOLD 시정의 독립 재감사 전까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 IMP-F008과 R1~R5를, `audit_report_11.md`가 보고서 10 시정과 R6 checkpoint를 PASS로 종결했다. `audit_report_20.md`는 `IMP-F016`을 Partially Verified하고 `DBG-F008`을 신규 HOLD했다. 전체 program PASS는 이 시정의 독립 재감사 뒤에만 선언한다.
