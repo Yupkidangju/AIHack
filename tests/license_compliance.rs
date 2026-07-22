@@ -1,4 +1,9 @@
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs,
+    io::Write,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 const OFFICIAL_LICENSE_SHA256: &str =
     "93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747";
@@ -37,10 +42,23 @@ fn workspace_declares_ngpl_v030_without_crates_io_publication() {
 #[test]
 fn root_uses_the_verified_official_ngpl_text_and_derivative_notice() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let output = Command::new("sha256sum")
-        .arg(root.join("LICENSE"))
-        .output()
+    let license = fs::read(root.join("LICENSE")).expect("LICENSE 읽기 실패");
+    let normalized = license
+        .into_iter()
+        .filter(|byte| *byte != b'\r')
+        .collect::<Vec<_>>();
+    let mut child = Command::new("sha256sum")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
         .expect("sha256sum 실행 실패");
+    child
+        .stdin
+        .take()
+        .expect("sha256sum stdin 확보 실패")
+        .write_all(&normalized)
+        .expect("LICENSE checksum 입력 실패");
+    let output = child.wait_with_output().expect("sha256sum 종료 실패");
     assert!(output.status.success(), "LICENSE checksum 계산 실패");
     assert!(
         String::from_utf8_lossy(&output.stdout).starts_with(OFFICIAL_LICENSE_SHA256),
@@ -184,6 +202,10 @@ fn release_packaging_includes_license_notice_and_complete_source() {
         "Windows checkout에서도 Bash 검증 스크립트의 LF를 보존해야 한다"
     );
     assert!(linux.contains("verify_release_bundle.sh"));
+    assert!(
+        windows.contains("git show HEAD:LICENSE"),
+        "Windows binary bundle도 Git blob의 공식 LICENSE 바이트를 포함해야 한다"
+    );
     for reference in [
         "owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01",
         "modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01",

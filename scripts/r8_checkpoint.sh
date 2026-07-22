@@ -109,9 +109,9 @@ if ((${#ERRORS[@]} == 0)); then
     [[ "$workspace_version" == "0.3.0" ]] || hold "workspace release version must be 0.3.0"
     [[ "$license_pending" == false ]] || hold "workspace distribution license must be NGPL"
 
-    if ! printf '%s  %s\n' \
-        '93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747' \
-        "$ROOT/LICENSE" | sha256sum --check --status; then
+    license_sha256=$(tr -d '\r' <"$ROOT/LICENSE" | sha256sum | awk '{print $1}')
+    if [[ "$license_sha256" != \
+        '93a3ae2cb8dee482daddfaebe53bcffe5b114b603def19b4dca21621cbc5a747' ]]; then
         error "LICENSE must match the verified NetHack 3.6.7 dat/license text"
     fi
     for phrase in \

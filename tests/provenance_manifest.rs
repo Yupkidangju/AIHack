@@ -232,6 +232,10 @@ fn release_checkpoints_use_ci_portable_text_search_tools() {
             "{script}가 GitHub runner 기본 이미지에 없는 rg에 의존한다"
         );
     }
+    assert!(
+        project_file("scripts/r8_checkpoint.sh").contains("tr -d '\\r'"),
+        "R8 LICENSE checksum은 Windows CRLF checkout을 정규화해야 한다"
+    );
 }
 
 fn assert_no_legacy_reference(path: &Path) {

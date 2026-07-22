@@ -55,7 +55,7 @@ if errorlevel 1 exit /b 1
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 if errorlevel 1 exit /b 1
 
-copy /y "LICENSE" "%OUTPUT_DIR%\LICENSE" >nul
+git show HEAD:LICENSE > "%OUTPUT_DIR%\LICENSE"
 if errorlevel 1 exit /b 1
 copy /y "NOTICE" "%OUTPUT_DIR%\NOTICE" >nul
 if errorlevel 1 exit /b 1
