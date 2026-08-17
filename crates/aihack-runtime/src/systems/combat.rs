@@ -19,7 +19,10 @@ pub fn resolve_attack(
     defender_id: EntityId,
 ) -> Option<AttackResolution> {
     let attacker = world.entities.get(attacker_id)?.clone();
-    let profile = attack_profile_for(world, attacker_id, &attacker);
+    let mut profile = attack_profile_for(world, attacker_id, &attacker);
+    if attacker_id == world.player_id {
+        profile.hit_bonus = profile.hit_bonus.saturating_add(world.luck);
+    }
     resolve_attack_with_profile(world, rng, attacker_id, defender_id, profile)
 }
 

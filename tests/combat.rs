@@ -111,6 +111,10 @@ fn hit_formula_uses_d20_bonuses_and_defense() {
             damage_reduction: 0,
             damage: DamageRoll { dice: 1, sides: 4 },
             weapon_hit_bonus: 1,
+            speed: 12,
+            ai_kind: None,
+            passive: None,
+            difficulty: 0,
         },
     );
     let defender = store.spawn(
@@ -126,6 +130,10 @@ fn hit_formula_uses_d20_bonuses_and_defense() {
             damage_reduction: 0,
             damage: DamageRoll { dice: 1, sides: 2 },
             weapon_hit_bonus: 0,
+            speed: 12,
+            ai_kind: None,
+            passive: None,
+            difficulty: 0,
         },
     );
     let a = store.get(attacker).unwrap();

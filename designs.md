@@ -238,6 +238,25 @@ The attempt is plausible, but no core rule effect is applied.
 
 UI가 `GameWorld`의 field를 직접 읽으면 R2/R5 실패다.
 
+### 9.1 R9 콘텐츠 인과 구조
+
+```text
+embedded TOML
+    |
+    v
+ContentRegistry --validate/project--> typed runtime data
+    |                                      |
+    v                                      v
+world bootstrap ----player/monster action----> semantic state delta
+    ^                                      |
+    |                                      v
+spawn/drop/corpse <----combat/death---- downstream legality/status/score
+```
+
+주요 콘텐츠는 위 구조에서 producer와 consumer를 모두 가져야 한다. 단순 표시용 projection은 world mutation 권한을 갖지 않지만, simulation content로 선언된 값은 명령 전후 snapshot의 위치, HP, AC, nutrition, gold, score, run state, entity lifecycle 중 하나를 바꿔야 한다. turn, event count, last event만 바뀐 경우는 인과 연결로 인정하지 않는다.
+
+음식과 시체는 inventory selection을 거쳐 Eat 명령으로 소비되고 nutrition과 hunger state를 바꾼다. armor bonus와 monster behavior 값은 content registry에서 typed entity data로 전달되어야 한다. 가격은 후속 score/economy 계산에 사용한다. 상세 orphan register는 `docs/audit/audit_report_22.md`를 따른다.
+
 ## 10. 상태와 오류 처리
 
 - terminal resize: 다음 frame에서 layout 재계산; core turn 불변

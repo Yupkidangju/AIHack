@@ -859,6 +859,7 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
                 crate::core::action::InventoryAction::Wield => "wield",
                 crate::core::action::InventoryAction::Wear => "wear",
                 crate::core::action::InventoryAction::Quaff => "quaff",
+                crate::core::action::InventoryAction::Eat => "eat",
                 crate::core::action::InventoryAction::Read => "read",
             };
             Some(render_panels::awaiting_inventory_lines(action_name))

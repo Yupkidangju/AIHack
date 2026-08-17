@@ -129,6 +129,37 @@ fn invalid_dice_and_coordinate_are_typed_errors_without_panicking() {
 }
 
 #[test]
+fn causal_numeric_content_rejects_invalid_ranges() {
+    let negative_price = format!("{ITEMS}\nbase_price = -1");
+    assert!(matches!(
+        registry(
+            &negative_price,
+            MONSTERS,
+            &[("one", LEVEL_1), ("two", LEVEL_2)]
+        ),
+        Err(ContentError::Parse { .. })
+    ));
+    let excessive_speed = MONSTERS.replace("speed = 12", "speed = 13");
+    assert!(matches!(
+        registry(
+            ITEMS,
+            &excessive_speed,
+            &[("one", LEVEL_1), ("two", LEVEL_2)]
+        ),
+        Err(ContentError::Parse { .. })
+    ));
+    let zero_difficulty = MONSTERS.replace("difficulty = 1", "difficulty = 0");
+    assert!(matches!(
+        registry(
+            ITEMS,
+            &zero_difficulty,
+            &[("one", LEVEL_1), ("two", LEVEL_2)]
+        ),
+        Err(ContentError::Parse { .. })
+    ));
+}
+
+#[test]
 fn unsupported_schema_and_unpaired_stairs_are_typed_errors() {
     assert!(matches!(
         ContentRegistry::from_toml_sources(

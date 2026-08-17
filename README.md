@@ -1,6 +1,6 @@
 # AIHack
 
-> Current code: Cargo 0.3.0 · Release audit target: 0.3.0 · Updated: 2026-07-22
+> Current code: Cargo 0.3.0 · Release audit target: 0.3.0 · Updated: 2026-08-17
 
 ## 한국어
 
@@ -18,6 +18,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트�
 - 실제 외부 게시에는 R8 기술 감사 `PASS`, `LICENSE`, `NOTICE`, 해당 바이너리를 만든 커밋의 complete corresponding source archive가 필요하다.
 - project-owner 결정은 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적하며, release bundle은 `PROJECT_OWNER_LICENSE_APPROVAL.md`, `MODIFICATIONS.md`, commit-bound `RELEASE-METADATA`와 `SHA256SUMS`를 포함한다. metadata key는 정확히 한 번 존재하고 owner/modification ID의 전체 값이 bundled record와 일치해야 하며 qualified legal opinion은 별도로 주장하지 않는다.
 - `audit_report_19.md`는 위 same-SHA release evidence와 보고서 18 기술 시정을 Verified했다. `audit_report_20.md`는 잔여 active-state 불일치와 false-green 문서 gate로 R8 HOLD를 유지했으며, 현재 단계는 해당 시정 후 독립 재감사 대기다. 외부 게시는 최종 독립 PASS와 별도 사용자 승인 전까지 HOLD다.
+- R9 콘텐츠 인과 폐쇄는 음식·시체 섭취, 콘텐츠 기반 armor/monster behavior, 가격·난이도·gold·score, 기도·luck 전이를 실제 월드 상태에 연결한다. seed 42/7/1234 장기 테스트는 이벤트 호출이 아니라 semantic snapshot delta와 1000 accepted turn, 반복 hash를 함께 검증한다.
 
 ### v0.3.0 목표
 
@@ -78,6 +79,7 @@ AIHack is a Rust roguelike that reimplements observable NetHack 3.6.7 behavior t
 - External publication still requires an R8 technical-audit PASS plus LICENSE, NOTICE, and the complete corresponding source for the released binaries.
 - The project-owner decision is traceable as `AIHACK-OWNER-2026-07-20-NGPL-01`; release bundles carry PROJECT_OWNER_LICENSE_APPROVAL.md, MODIFICATIONS.md, commit-bound RELEASE-METADATA, and SHA256SUMS. Metadata IDs must resolve to the bundled records. No qualified legal opinion is claimed.
 - `audit_report_19.md` verified the technical and same-SHA release evidence. `audit_report_20.md` kept R8 on hold for residual active-state contradictions and a false-green documentation gate. The current state is pending independent re-audit after that remediation; external publication remains on hold until a final independent PASS and separate user approval.
+- R9 causal closure connects food/corpse consumption, content-driven armor and monster behavior, price/difficulty/gold/score, and prayer/luck to observable world-state changes. Long runs for seeds 42/7/1234 now require semantic snapshot deltas as well as 1,000 accepted turns and repeatable hashes.
 
 ### v0.3.0 target
 
@@ -108,6 +110,7 @@ AIHack は、NetHack 3.6.7 の観察可能な挙動を、出典付きシナリ�
 - Rust 1.94.1 と ratatui 0.30/crossterm 0.29 は固定済みです。R5 workspace と文書是正は `audit_report_9.md` の再監査を通過しました。
 - `audit_report_11.md` は、report 10 の public/schema contract と証拠再現性の是正をすべて Verified とし、R6 checkpoint を PASS で完了しました。実 provider smoke は非 blocking の検討事項です。
 - AIHack は NetHack 3.6.7 の AI-assisted semantic rewrite による派生物としてプロジェクト所有者に承認され、配布物全体に NGPL を適用します。外部公開には R8 技術監査 PASS と LICENSE、NOTICE、対応する完全なソースが必要です。
+- R9 の因果閉包では、食料・死体、armor、monster behavior、価格・難易度・gold・score、祈り・luck を実際の world state 変化へ接続し、seed 42/7/1234 の長期 test で semantic delta を検証します。
 
 ### 現在の実行
 
@@ -128,6 +131,7 @@ AIHack 是以具來源追蹤的情境與測試，重新實作 NetHack 3.6.7 可�
 - Rust 1.94.1 與 ratatui 0.30/crossterm 0.29 已固定；R5 workspace 與文件修正已通過 `audit_report_9.md` 複審。
 - `audit_report_11.md` 已驗證 report 10 的 public/schema contract 與證據可重現性修正，並以 PASS 完成 R6 checkpoint；實際 provider smoke 仍為非阻斷考量。
 - 專案所有者已將 AIHack 核准為 NetHack 3.6.7 的 AI-assisted semantic rewrite 衍生作品，整體散布適用 NGPL。對外發布仍需 R8 技術稽核 PASS、LICENSE、NOTICE 與對應完整原始碼。
+- R9 因果閉合把食物／屍體、armor、monster behavior、價格／難度／gold／score、祈禱／luck 連到實際 world state 變化，並以 seed 42/7/1234 長期測試驗證 semantic delta。
 
 ### 目前執行
 
@@ -148,6 +152,7 @@ AIHack 是通过带来源追踪的场景和测试，重新实现 NetHack 3.6.7 �
 - Rust 1.94.1 和 ratatui 0.30/crossterm 0.29 已固定；R5 workspace 与文档修正已通过 `audit_report_9.md` 复审。
 - `audit_report_11.md` 已验证 report 10 的 public/schema contract 与证据可复现性修正，并以 PASS 完成 R6 checkpoint；实际 provider smoke 仍为非阻断考虑项。
 - 项目所有者已将 AIHack 批准为 NetHack 3.6.7 的 AI-assisted semantic rewrite 衍生作品，整体分发适用 NGPL。对外发布仍需 R8 技术审计 PASS、LICENSE、NOTICE 与对应完整源代码。
+- R9 因果闭合将食物／尸体、armor、monster behavior、价格／难度／gold／score、祈祷／luck 连接到实际 world state 变化，并用 seed 42/7/1234 长期测试验证 semantic delta。
 
 ### 当前运行
 

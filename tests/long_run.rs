@@ -6,16 +6,36 @@ use aihack::core::{
 const SEEDS: [u64; 3] = [42, 7, 1234];
 const TARGET_TURN: u64 = 1000;
 
+fn semantic_state(session: &GameSession) -> serde_json::Value {
+    let mut value = serde_json::to_value(session.snapshot()).unwrap();
+    let object = value.as_object_mut().unwrap();
+    for metadata in ["seed", "turn", "event_count", "last_event"] {
+        object.remove(metadata);
+    }
+    value
+}
+
 #[test]
 fn survival_policy_reaches_one_thousand_accepted_turns_for_required_seeds() {
     for seed in SEEDS {
         let mut session = GameSession::new_for_playing(seed);
+        let initial_semantic_state = semantic_state(&session);
+        let initial_nutrition = session.snapshot().nutrition;
         let report = run_to_turn(&mut session, TARGET_TURN, HeadlessPolicy::survival_v1()).unwrap();
 
         assert_eq!(report.accepted_turns, TARGET_TURN, "seed={seed}");
         assert_eq!(report.final_state, RunState::Playing, "seed={seed}");
         assert!((report.accepted_turns..=report.accepted_turns * 16)
             .contains(&report.submitted_commands));
+        assert_ne!(
+            semantic_state(&session),
+            initial_semantic_state,
+            "seed={seed}"
+        );
+        assert!(
+            session.snapshot().nutrition < initial_nutrition,
+            "seed={seed}"
+        );
     }
 }
 

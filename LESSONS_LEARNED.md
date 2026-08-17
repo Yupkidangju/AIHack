@@ -1,5 +1,12 @@
 # AIHack Lessons Learned
 
+## 2026-08-17: 콘텐츠 인과 폐쇄
+
+- 1000턴 도달과 반복 hash만으로는 콘텐츠가 simulation에 참여한다는 사실을 증명할 수 없다. turn/event metadata를 제외한 semantic snapshot delta와 콘텐츠별 producer-consumer witness가 함께 필요하다.
+- schema에 필드가 있고 factory가 읽는 것만으로는 단일 진실원이 아니다. kind 기반 fallback이 실제 행동을 결정하면 content 값은 orphan이므로 동일 seed A/B registry로 행동 차이를 검증해야 한다.
+- save 호환 필드를 억지로 기능화하면 잘못된 게임 규칙이 된다. production producer가 없는 `hallucinating`은 기능처럼 PASS시키지 않고 호환성 orphan과 후속 제거/별도 spec 대상으로 명시하는 편이 안전하다.
+- 점수 helper가 존재해도 실제 GameOver 경로가 호출하지 않으면 시스템은 연결되지 않은 것이다. 종료·사망 양쪽에서 observable final score까지 추적해야 한다.
+
 문서 상태: active
 작성일: 2026-05-20
 최근 갱신: 2026-07-20

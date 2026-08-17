@@ -149,6 +149,14 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
             .and_then(|item| command_candidate(CommandIntent::Wear { item })),
         'q' => first_by(|item| matches!(item.kind, crate::domain::item::ItemKind::PotionHealing))
             .and_then(|item| command_candidate(CommandIntent::Quaff { item })),
+        'f' => first_by(|item| {
+            matches!(
+                item.kind,
+                crate::domain::item::ItemKind::FoodRation
+                    | crate::domain::item::ItemKind::CorpseJackal
+            )
+        })
+        .and_then(|item| command_candidate(CommandIntent::Eat { item })),
         'd' => observation
             .inventory
             .first()

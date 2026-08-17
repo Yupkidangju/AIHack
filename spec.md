@@ -531,6 +531,8 @@ hit = attack_roll >= defense
 
 damage = max(1, damage_roll + attacker.damage_bonus - defender.damage_reduction)
 
+death_score = gold + kill_count * 10 + depth * 100 + carried_item_base_price - turn / 10
+
 vision_radius = 8
 low_hp = hp * 100 <= max_hp * 30
 trap_pit_damage = 3
@@ -742,3 +744,49 @@ R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 �
 - provider 없는 환경에서도 TUI와 headless가 정상 동작
 - `PROVENANCE.md`에 Unknown 상태로 런타임에 포함된 자산 0건
 - `audit_roadmap.md`의 R8 판정이 PASS
+
+## 19. R9 후속 목표: 콘텐츠 인과 폐쇄
+
+작성일 2026-08-17 기준 최신 사용자 요구에 따라, v0.3.0 릴리스 기준을 훼손하지 않는 후속 구현 단계 R9를 추가한다. 현재 Cargo version은 R9 완료와 릴리스 결정 전까지 0.3.0을 유지한다.
+
+진행 상태: 2026-08-17 구현 및 local 전체 gate PASS. `hallucinating`은 save v1 호환성 orphan으로 명시적 제외하며 SaveV2 제거 또는 별도 producer feature spec 대상으로 남긴다.
+
+### 19.1 목표
+
+- 주요 콘텐츠마다 생성 원인, 소비 주체, 직접 상태 변화, 후속 영향을 추적한다.
+- 다른 시스템의 원인도 결과도 되지 않는 orphan content를 제거하거나 실질적 simulation 경로에 연결한다.
+- embedded content 값이 kind 기반 하드코딩에 가려지지 않고 runtime behavior의 진실원이 되게 한다.
+- 장기 테스트는 함수 호출이나 이벤트 존재가 아니라 관찰 가능한 semantic world state delta를 증명한다.
+
+### 19.2 인과 PASS 계약
+
+인과 루프 하나는 다음 조건을 모두 만족해야 PASS다.
+
+1. 동일 seed와 초기 상태에서 원인 입력을 재현할 수 있다.
+2. producer가 콘텐츠 또는 세계 상태를 생성·변경한다.
+3. 별도 consumer가 그 값을 규칙 판정의 입력으로 사용한다.
+4. 명령 전후 snapshot에서 turn, event count, last event를 제외한 semantic field가 변한다.
+5. 그 변화가 후속 행동의 legality, 위치, HP, AC, nutrition, gold, score, run state, entity lifecycle 중 하나 이상에 다시 영향을 준다.
+6. 같은 seed와 command sequence의 반복 실행은 같은 witness와 final hash를 만든다.
+
+이벤트만 추가되거나 코드가 호출되기만 한 경우, 또는 turn 증가만 있는 경우는 FAIL이다.
+
+### 19.3 초기 orphan register
+
+상세 근거와 함수 경로는 `docs/audit/audit_report_22.md`를 따른다. 초기 수정 대상은 item `nutrition`/food/corpse, `ac_bonus`, `base_price`/gold, monster `ai`/`passive`/`speed`/`difficulty`, production producer가 없는 luck/hallucination이다.
+
+### 19.4 검증 기준
+
+| ID | 기준 |
+| --- | --- |
+| SC-CAUSE-01 | active content와 world state의 인과 매트릭스에 생성 원인·소비 주체·직접 delta·후속 영향이 기록됨 |
+| SC-CAUSE-02 | 지원한다고 선언한 content behavior field가 runtime typed data에 투영되고 A/B registry test에서 다른 semantic delta를 생성 |
+| SC-CAUSE-03 | 음식/시체가 nutrition과 hunger 후속 전이를 실제 명령 경로에서 변경 |
+| SC-CAUSE-04 | 가격/경제, luck, hallucination은 producer-consumer 루프를 갖거나 명시적으로 비목표·제거 대상으로 닫힘 |
+| SC-CAUSE-05 | seed 42, 7, 1234 각각 1000 accepted turn 이상의 장기 simulation에서 필수 causal witness가 모두 1회 이상 발생 |
+| SC-CAUSE-06 | 각 seed를 3회 실행한 witness summary와 final hash가 모두 동일 |
+| SC-CAUSE-07 | causal regression은 event-only 또는 turn-only 변화에서 실패 |
+
+### 19.5 구현 순서
+
+R9-1은 semantic delta/witness 테스트 기반, R9-2는 음식·영양·시체, R9-3은 content behavior projection, R9-4는 경제·점수, R9-5는 상태 orphan 폐쇄, R9-6은 3 seed 장기 회귀와 전체 감사다. 각 단계는 RED 테스트를 먼저 만들고 해당 단계의 workspace build/test가 통과한 뒤 다음 단계로 진행한다.

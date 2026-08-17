@@ -34,19 +34,24 @@ pub fn run_monster_turn(
     world: &mut GameWorld,
     rng: &mut GameRng,
     state: &mut RunState,
+    turn: u64,
 ) -> Vec<GameEvent> {
-    let plan = collect_monster_turn(world, rng);
+    let plan = collect_monster_turn_at(world, rng, turn);
     let events = apply_monster_turn(world, rng, &plan);
-    *state = death::state_after_deaths(world);
+    *state = death::state_after_deaths_at(world, turn);
     events
 }
 
 pub fn collect_monster_turn(world: &GameWorld, rng: &mut GameRng) -> MonsterTurnPlan {
+    collect_monster_turn_at(world, rng, 1)
+}
+
+pub fn collect_monster_turn_at(world: &GameWorld, rng: &mut GameRng, turn: u64) -> MonsterTurnPlan {
     MonsterTurnPlan {
         intents: world
             .current_level_hostile_monsters()
             .into_iter()
-            .map(|actor| decide_monster_intent(world, rng, actor))
+            .map(|actor| decide_monster_intent(world, rng, actor, turn))
             .collect(),
     }
 }
@@ -94,7 +99,12 @@ pub fn apply_monster_turn(
     events
 }
 
-fn decide_monster_intent(world: &GameWorld, rng: &mut GameRng, actor: EntityId) -> MonsterIntent {
+fn decide_monster_intent(
+    world: &GameWorld,
+    rng: &mut GameRng,
+    actor: EntityId,
+    turn: u64,
+) -> MonsterIntent {
     let Some(entity) = world.entities.get(actor) else {
         return MonsterIntent::Wait;
     };
@@ -104,6 +114,14 @@ fn decide_monster_intent(world: &GameWorld, rng: &mut GameRng, actor: EntityId) 
     let Some((_, actor_pos)) = world.entities.actor_location(actor) else {
         return MonsterIntent::Wait;
     };
+    let speed = world
+        .entities
+        .actor_stats(actor)
+        .map(|stats| stats.speed)
+        .unwrap_or_default();
+    if !acts_on_turn(speed, turn) {
+        return MonsterIntent::Wait;
+    }
     if ai_kind == MonsterAiKind::Stationary {
         return MonsterIntent::Wait;
     }
@@ -122,6 +140,14 @@ fn decide_monster_intent(world: &GameWorld, rng: &mut GameRng, actor: EntityId) 
         }
         MonsterAiKind::Stationary => MonsterIntent::Wait,
     }
+}
+
+fn acts_on_turn(speed: i16, turn: u64) -> bool {
+    if speed <= 0 || turn == 0 {
+        return false;
+    }
+    let speed = speed as u64;
+    turn.saturating_mul(speed) / 12 > (turn - 1).saturating_mul(speed) / 12
 }
 
 fn choose_wander_intent(world: &GameWorld, rng: &mut GameRng, actor: EntityId) -> MonsterIntent {

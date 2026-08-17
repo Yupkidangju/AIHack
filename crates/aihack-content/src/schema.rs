@@ -212,11 +212,29 @@ fn validate(
     levels: &BTreeMap<String, LevelData>,
 ) -> Result<(), ContentError> {
     for item in items.values() {
+        if item.base_price.is_some_and(|price| price < 0) {
+            return Err(ContentError::Parse {
+                file: "items.toml".to_owned(),
+                message: format!("{} base_price must be non-negative", item.id),
+            });
+        }
         if let Some(damage) = &item.damage {
             validate_dice(damage)?;
         }
     }
     for monster in monsters.values() {
+        if !(0..=12).contains(&monster.speed) {
+            return Err(ContentError::Parse {
+                file: "monsters.toml".to_owned(),
+                message: format!("{} speed must be in 0..=12", monster.id),
+            });
+        }
+        if monster.difficulty <= 0 {
+            return Err(ContentError::Parse {
+                file: "monsters.toml".to_owned(),
+                message: format!("{} difficulty must be positive", monster.id),
+            });
+        }
         validate_dice(&monster.damage)?;
     }
     for level in levels.values() {

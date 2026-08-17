@@ -21,7 +21,7 @@ use aihack_core::domain::map::MapLayout;
 use aihack_core::domain::{
     combat::{AttackProfile, DamageRoll},
     item::{ConsumableEffect, ItemClass, ItemData as CoreItemData, ItemKind, WandEffect},
-    monster::{MonsterAiKind, MonsterKind, MonsterTemplate},
+    monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
     tile::{DoorState, TileKind, TrapKind},
 };
 use aihack_core::error::ContentError;
@@ -99,6 +99,16 @@ pub fn monster_template_from_registry(
         }
     };
     let damage = parse_damage(&definition.damage)?;
+    let passive = match definition.passive.as_deref() {
+        Some("paralyze_on_melee") => Some(MonsterPassive::ParalyzeOnMelee),
+        None => None,
+        Some(value) => {
+            return Err(ContentError::UnknownReference {
+                owner: id.to_owned(),
+                target: value.to_owned(),
+            })
+        }
+    };
     let name = match kind {
         MonsterKind::Jackal => "bite",
         MonsterKind::Goblin => "short sword",
@@ -112,6 +122,9 @@ pub fn monster_template_from_registry(
         hit_bonus: definition.hit_bonus,
         damage_bonus: 0,
         attack_profile: AttackProfile::natural(name, damage),
+        speed: definition.speed,
+        passive,
+        difficulty: definition.difficulty as u16,
     })
 }
 
@@ -221,6 +234,7 @@ pub fn item_data_from_registry(
         glyph,
         weight: definition.weight,
         base_price: definition.base_price.unwrap_or_default() as u32,
+        ac_bonus: definition.ac_bonus.unwrap_or_default(),
         attack_profile,
         consumable_effect,
         wand_effect: (definition.effect.as_deref() == Some("magic_missile"))

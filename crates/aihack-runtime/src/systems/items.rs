@@ -77,10 +77,11 @@ pub fn wear(world: &mut GameWorld, item: EntityId) -> Result<Option<GameEvent>, 
     if data.class != ItemClass::Armor {
         return Err("item is not armor".to_string());
     }
+    let ac_bonus = data.ac_bonus;
     world.inventory.equip_body(item);
     let player_id = world.player_id;
     if let Some(stats) = world.entities.actor_stats_mut(player_id) {
-        stats.ac -= 1;
+        stats.ac -= ac_bonus;
     }
     Ok(Some(GameEvent::ItemEquipped {
         entity: world.player_id,
@@ -149,6 +150,35 @@ pub fn quaff(
             hp_after,
         },
     ])
+}
+
+/// 음식과 시체의 콘텐츠 영양값을 월드 허기 상태로 전달한다.
+pub fn eat(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, String> {
+    if !world.inventory.contains(item) {
+        return Err("item is not in player inventory".to_string());
+    }
+    let data = *world
+        .entities
+        .item_data(item)
+        .ok_or_else(|| "entity is not an item".to_string())?;
+    if !matches!(data.class, ItemClass::Food | ItemClass::Corpse) {
+        return Err("item is not edible".to_string());
+    }
+    let nutrition = data
+        .nutrition
+        .filter(|nutrition| *nutrition > 0)
+        .ok_or_else(|| "edible item has no positive nutrition".to_string())?;
+
+    world.nutrition = world.nutrition.saturating_add(nutrition);
+    world.inventory.remove(item);
+    world
+        .entities
+        .set_item_location(item, EntityLocation::Consumed);
+
+    Ok(vec![GameEvent::ItemConsumed {
+        entity: world.player_id,
+        item,
+    }])
 }
 
 pub fn read(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, String> {

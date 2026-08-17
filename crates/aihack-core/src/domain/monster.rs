@@ -10,6 +10,11 @@ pub enum MonsterAiKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MonsterPassive {
+    ParalyzeOnMelee,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MonsterKind {
     Jackal,
     Goblin,
@@ -25,6 +30,9 @@ pub struct MonsterTemplate {
     pub hit_bonus: i16,
     pub damage_bonus: i16,
     pub attack_profile: AttackProfile,
+    pub speed: i16,
+    pub passive: Option<MonsterPassive>,
+    pub difficulty: u16,
 }
 
 impl MonsterKind {

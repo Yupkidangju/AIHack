@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- 콘텐츠 생성 원인·소비 주체·직접 상태 변화·후속 영향을 추적하는 R9 인과 폐쇄 계약과 `docs/audit/audit_report_22.md`를 추가했다.
+- 음식과 jackal 시체를 실제 nutrition/hunger/item lifecycle에 연결하는 `Eat` 행동과 상태-delta 회귀 테스트를 추가했다.
+- 동일 seed의 A/B registry로 armor `ac_bonus`, monster `speed`/`ai`/`passive`, item `base_price`가 실제 simulation 상태를 바꾸는지 검증하는 테스트를 추가했다.
+
+### Changed
+
+- monster speed, AI, passive, difficulty를 typed actor state에 보존하고 실제 turn cadence, intent, passive status, kill gold에 사용하도록 변경했다.
+- 기도가 luck을 생성하고 player attack roll이 luck을 소비하도록 연결했다.
+- 종료 점수에 소지 item의 content base price를 반영하고, 3 seed 장기 테스트가 turn/event metadata를 제외한 semantic world-state delta까지 요구하도록 강화했다.
+
 ## [0.3.0] - 2026-07-20
 
 ### Added

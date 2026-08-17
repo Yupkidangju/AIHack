@@ -12,6 +12,36 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0031: 콘텐츠 인과 폐쇄와 상태-delta 검증
+
+Status: Accepted (2026-08-17)
+Date: 2026-08-17
+Decision ID: DEC-CAUSE-01
+
+Context:
+
+기존 content registry와 snapshot은 많은 값을 저장하지만 일부 값은 kind 기반 상수에 가려지거나 production producer/consumer가 없다. 기존 1000턴 테스트는 생존과 최종 hash 반복성만 확인하므로 orphan content가 남아 있어도 통과한다.
+
+Decision:
+
+- 주요 콘텐츠는 `producer -> semantic state delta -> consumer -> downstream delta` 경로를 가져야 한다.
+- PASS 판정에서 turn, event count, last event만의 변화는 제외한다.
+- item nutrition은 Eat 행동과 hunger 전이에 연결한다.
+- armor, monster behavior처럼 schema가 지원한다고 선언한 값은 typed runtime data에 투영한다. 현재 milestone에서 의미 있게 지원하지 않을 값은 거짓 계약으로 남기지 않고 명시적으로 제거 또는 후속 비목표로 분류한다.
+- 경제 값은 가격이 후속 score 또는 경제 상태를 바꾸는 최소 루프로 연결한다.
+- luck과 hallucination은 production producer와 downstream consumer를 함께 제공할 때만 active state로 인정한다.
+- seed 42, 7, 1234의 장기 regression은 필수 causal witness와 semantic delta를 집계하고 반복 hash와 함께 검증한다.
+
+Alternatives:
+
+- 이벤트 존재만 검증: 구현 호출은 증명하지만 실제 세계 변화는 증명하지 못해 기각한다.
+- 모든 orphan 필드 삭제: save v1 호환성과 이미 노출된 관찰 계약을 불필요하게 파괴하므로 기각한다.
+- 한 번에 범용 event bus 도입: 현재 규모보다 복잡하고 인과 증거를 자동으로 보장하지 않아 기각한다.
+
+Consequences:
+
+R9는 테스트 기반을 먼저 만들고 음식/영양, content behavior, 경제/점수, 상태 orphan 순서로 작은 수직 슬라이스를 적용한다. 의도된 snapshot hash 변화는 witness와 ADR 근거 없이 baseline만 갱신할 수 없다.
+
 ## ADR-0021: NetHack 3.6.7 행동 호환 clean reimplementation
 
 Status: Implemented (2026-07-15)

@@ -288,7 +288,8 @@ fn p8_g14_death_score_computation() {
         world.set_kill_count(4);
     });
     let score = death_score(session.world(), 50);
-    assert_eq!(score, 123 + 40 + 100 - 5);
+    // 시작 인벤토리의 콘텐츠 가격 합계 285도 실제 종료 점수에 반영한다.
+    assert_eq!(score, 123 + 40 + 100 + 285 - 5);
 }
 
 #[test]

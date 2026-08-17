@@ -273,4 +273,12 @@ impl DeathScoreView for GameWorld {
     fn current_level_depth(&self) -> i16 {
         self.current_level().depth
     }
+    fn inventory_value(&self) -> u32 {
+        self.inventory
+            .entries
+            .iter()
+            .filter_map(|entry| self.entities.item_data(entry.item))
+            .map(|data| data.base_price)
+            .sum()
+    }
 }

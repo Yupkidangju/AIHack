@@ -207,6 +207,11 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
                             actions.push(CommandIntent::Quaff { item });
                         }
                     }
+                    InventoryAction::Eat => {
+                        if item_is_edible(world, item) {
+                            actions.push(CommandIntent::Eat { item });
+                        }
+                    }
                     InventoryAction::Read => {
                         if item_has_class(world, item, ItemClass::Scroll) {
                             actions.push(CommandIntent::Read { item });
@@ -250,6 +255,11 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             }
             if data.class == ItemClass::Potion {
                 actions.push(CommandIntent::Quaff { item: entry.item });
+            }
+            if matches!(data.class, ItemClass::Food | ItemClass::Corpse)
+                && data.nutrition.is_some_and(|nutrition| nutrition > 0)
+            {
+                actions.push(CommandIntent::Eat { item: entry.item });
             }
             if data.class == ItemClass::Scroll {
                 actions.push(CommandIntent::Read { item: entry.item });
@@ -298,5 +308,16 @@ fn item_has_class(world: &GameWorld, item: aihack_core::ids::EntityId, class: It
         .entities
         .item_data(item)
         .map(|data| data.class == class)
+        .unwrap_or(false)
+}
+
+fn item_is_edible(world: &GameWorld, item: aihack_core::ids::EntityId) -> bool {
+    world
+        .entities
+        .item_data(item)
+        .map(|data| {
+            matches!(data.class, ItemClass::Food | ItemClass::Corpse)
+                && data.nutrition.is_some_and(|nutrition| nutrition > 0)
+        })
         .unwrap_or(false)
 }

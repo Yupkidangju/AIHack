@@ -920,3 +920,31 @@ cargo test -p aihack --locked --test golden_phase8_rules
 ## 10. 구현 시작 순서
 
 다음 단계는 `audit_report_20.md` active-state/false-green 문서 시정의 독립 재감사다. project-owner NGPL approval, SC-LICENSE-01, root distribution license, source packaging과 SC-BUILD-02 evidence는 검증됐지만 외부 게시는 최종 R8 독립 PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+
+## 11. R9 콘텐츠 인과 폐쇄 Task
+
+진행 상태 (2026-08-17): R9-1..R9-6 구현과 local 전체 gate 완료. 상세 인과 매트릭스와 accepted compatibility risk는 `docs/audit/audit_report_22.md`를 따른다.
+
+### Task R9-1: semantic delta와 causal witness 기반
+
+snapshot의 자동 메타 변화와 게임 의미 상태 변화를 구분한다. event-only와 turn-only 변화는 FAIL이고 위치, HP, AC, nutrition, gold, score, run state, entity lifecycle 변화만 witness가 된다.
+
+### Task R9-2: 음식·영양·시체 루프
+
+Food/Corpse item의 content nutrition을 Eat 명령으로 소비해 world nutrition과 hunger state에 연결한다. ration과 jackal corpse 모두 content 값만큼 nutrition을 바꾸고 consumed tombstone으로 전이해야 한다.
+
+### Task R9-3: content behavior projection
+
+`ac_bonus`, monster `ai`/`passive` 등 지원 필드를 typed runtime data에 보존하고 실제 규칙 소비자가 사용한다. `speed`/`difficulty`는 실제 소비 경로를 제공하거나 schema 비목표로 닫는다. injected registry A/B는 해당 값 하나의 차이로 예상한 semantic delta 차이를 생성해야 한다.
+
+### Task R9-4: 경제·점수 루프
+
+`base_price`와 production에서 생성 가능한 경제 상태를 후속 score에 연결한다. 가격이 다른 loot를 획득한 동일 seed scenario의 후속 score 또는 gold가 달라야 한다.
+
+### Task R9-5: luck·hallucination 폐쇄
+
+두 상태에 production producer와 별도 downstream consumer를 제공하거나 호환 경계만 남기는 비목표 결정을 문서화한다.
+
+### Task R9-6: seed 기반 장기 인과 회귀
+
+seed 42, 7, 1234 각각 1000 accepted turn 이상 실행하며 필수 witness와 final hash를 3회 반복 비교한다. SC-CAUSE-01..07과 전체 workspace quality gate 통과가 완료 조건이다.

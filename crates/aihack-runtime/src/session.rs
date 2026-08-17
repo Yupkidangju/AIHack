@@ -4,7 +4,7 @@ use aihack_ai_contract::{ClientRevision, Observation};
 use aihack_content::ContentRegistry;
 use aihack_core::{
     action::{CommandIntent, DirectionalAction, InventoryAction},
-    domain::{combat::DeathCause, entity::EntityKind, monster::MonsterKind, tile::TrapKind},
+    domain::{combat::DeathCause, monster::MonsterPassive, tile::TrapKind},
     error::ContentError,
     event::{GameEvent, MessagePriority},
     ids::EntityId,
@@ -19,7 +19,9 @@ pub use aihack_core::{meta::GameMeta, run_state::RunState};
 use crate::{
     observation,
     snapshot::GameSnapshot,
-    systems::{combat, death, doors, items, monster_ai, movement, projectiles, stairs, traps},
+    systems::{
+        combat, death, doors, items, monster_ai, movement, projectiles, score, stairs, traps,
+    },
     world::GameWorld,
 };
 
@@ -206,6 +208,7 @@ impl GameSession {
             CommandIntent::Wield { item } => self.submit_wield(item),
             CommandIntent::Wear { item } => self.submit_wear(item),
             CommandIntent::Quaff { item } => self.submit_quaff(item),
+            CommandIntent::Eat { item } => self.submit_eat(item),
             CommandIntent::Zap { item, direction } => self.submit_zap(item, direction),
             CommandIntent::Read { item } => self.submit_read(item),
             CommandIntent::Pray => self.submit_pray(),
@@ -323,7 +326,7 @@ impl GameSession {
                         trap: TrapKind::Pit,
                     },
                 ));
-                self.state = death::state_after_deaths(&self.world);
+                self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
                 self.accept_turn(events)
             }
             Err(error) => self.reject(format!("{error}")),
@@ -343,8 +346,8 @@ impl GameSession {
             self.world
                 .entities
                 .get(defender)
-                .map(|entity| entity.kind()),
-            Some(EntityKind::Monster(MonsterKind::FloatingEye))
+                .and_then(|entity| entity.monster_passive()),
+            Some(MonsterPassive::ParalyzeOnMelee)
         ) {
             self.world.paralysis_turns = self.world.paralysis_turns.max(2);
             events.push(GameEvent::PassiveAttackTriggered {
@@ -357,7 +360,7 @@ impl GameSession {
             attacker,
             defender,
         ));
-        self.state = death::state_after_deaths(&self.world);
+        self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
         self.accept_turn(events)
     }
 
@@ -377,7 +380,7 @@ impl GameSession {
         let state = &mut self.inner;
         match projectiles::throw_item(&mut state.world, &mut state.rng, item, direction) {
             Ok(events) => {
-                self.state = death::state_after_deaths(&self.world);
+                self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
                 self.accept_turn(events)
             }
             Err(error) => self.reject(error),
@@ -407,6 +410,13 @@ impl GameSession {
         }
     }
 
+    fn submit_eat(&mut self, item: EntityId) -> TurnOutcome {
+        match items::eat(&mut self.world, item) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
     fn submit_wear(&mut self, item: EntityId) -> TurnOutcome {
         match items::wear(&mut self.world, item) {
             Ok(Some(event)) => self.accept_turn(vec![event]),
@@ -419,7 +429,7 @@ impl GameSession {
         let state = &mut self.inner;
         match projectiles::zap_wand(&mut state.world, &mut state.rng, item, direction) {
             Ok(events) => {
-                self.state = death::state_after_deaths(&self.world);
+                self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
                 self.accept_turn(events)
             }
             Err(error) => self.reject(error),
@@ -445,6 +455,7 @@ impl GameSession {
             return self.reject("prayer is on cooldown".to_string());
         }
         self.world.prayer_cooldown = 20;
+        self.world.luck = self.world.luck.saturating_add(1).min(3);
         self.accept_turn(vec![GameEvent::PrayerOffered {
             entity: self.world.player_id(),
             cooldown_after: self.world.prayer_cooldown,
@@ -489,7 +500,7 @@ impl GameSession {
                 cause: DeathCause::Combat {
                     attacker: EntityId(0),
                 },
-                final_score: 0,
+                final_score: score::death_score(&self.world, self.turn),
             };
         }
         self.accept_without_turn(vec![GameEvent::CommandRejected {
@@ -512,6 +523,7 @@ impl GameSession {
                 &mut state.world,
                 &mut state.rng,
                 &mut state.state,
+                next_turn,
             ));
         }
         self.event_log.extend(events.clone());

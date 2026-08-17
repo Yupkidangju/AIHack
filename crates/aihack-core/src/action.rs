@@ -20,6 +20,7 @@ pub enum InventoryAction {
     Wield,
     Wear,
     Quaff,
+    Eat,
     Read,
 }
 
@@ -48,6 +49,9 @@ pub enum CommandIntent {
         item: EntityId,
     },
     Quaff {
+        item: EntityId,
+    },
+    Eat {
         item: EntityId,
     },
     Zap {

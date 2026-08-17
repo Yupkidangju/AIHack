@@ -54,6 +54,8 @@ pub struct ItemData {
     pub glyph: char,
     pub weight: i16,
     pub base_price: u32,
+    #[serde(default)]
+    pub ac_bonus: i16,
     pub attack_profile: Option<AttackProfile>,
     pub consumable_effect: Option<ConsumableEffect>,
     pub wand_effect: Option<WandEffect>,

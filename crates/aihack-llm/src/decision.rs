@@ -237,6 +237,7 @@ fn wire_command_value(command: CommandIntent) -> Value {
         CommandIntent::Wield { item } => item_action("WIELD", item.0),
         CommandIntent::Wear { item } => item_action("WEAR", item.0),
         CommandIntent::Quaff { item } => item_action("QUAFF", item.0),
+        CommandIntent::Eat { item } => item_action("EAT", item.0),
         CommandIntent::Zap { item, direction } => json!({
             "type": "ZAP",
             "item": item.0,

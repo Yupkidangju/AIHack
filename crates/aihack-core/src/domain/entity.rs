@@ -5,7 +5,7 @@ use crate::{
         combat::{AttackProfile, DamageRoll},
         inventory::InventoryLetter,
         item::{ItemData, ItemKind},
-        monster::{MonsterAiKind, MonsterKind, MonsterTemplate},
+        monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
         player::adventurer_template,
     },
     ids::{EntityId, LevelId},
@@ -56,6 +56,18 @@ pub struct ActorStats {
     pub damage_reduction: i16,
     pub damage: DamageRoll,
     pub weapon_hit_bonus: i16,
+    #[serde(default = "default_actor_speed")]
+    pub speed: i16,
+    #[serde(default)]
+    pub ai_kind: Option<MonsterAiKind>,
+    #[serde(default)]
+    pub passive: Option<MonsterPassive>,
+    #[serde(default)]
+    pub difficulty: u16,
+}
+
+fn default_actor_speed() -> i16 {
+    12
 }
 
 /// [v0.1.0] Phase 5 actor/item 공용 위치다. Consumed tombstone은 assigned_letter를 유지한다.
@@ -172,9 +184,43 @@ impl Entity {
     }
 
     pub fn monster_ai_kind(&self) -> Option<MonsterAiKind> {
-        self.actor_kind()
-            .and_then(ActorKind::monster_kind)
-            .map(MonsterKind::ai_kind)
+        match &self.payload {
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(kind),
+                stats,
+                ..
+            } => stats.ai_kind.or_else(|| Some(kind.ai_kind())),
+            _ => None,
+        }
+    }
+
+    pub fn monster_passive(&self) -> Option<MonsterPassive> {
+        match &self.payload {
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(kind),
+                stats,
+                ..
+            } => stats.passive.or_else(|| {
+                (stats.ai_kind.is_none() && *kind == MonsterKind::FloatingEye)
+                    .then_some(MonsterPassive::ParalyzeOnMelee)
+            }),
+            _ => None,
+        }
+    }
+
+    pub fn monster_difficulty(&self) -> Option<u16> {
+        match &self.payload {
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(kind),
+                stats,
+                ..
+            } => Some(if stats.difficulty == 0 {
+                u16::from(kind.difficulty())
+            } else {
+                stats.difficulty
+            }),
+            _ => None,
+        }
     }
 
     pub fn actor_mut(&mut self) -> Option<(&mut EntityLocation, &mut ActorStats, &mut bool)> {
@@ -277,6 +323,10 @@ impl EntityStore {
                 damage_reduction: 0,
                 damage: template.attack_profile.damage,
                 weapon_hit_bonus: template.attack_profile.hit_bonus,
+                speed: 12,
+                ai_kind: None,
+                passive: None,
+                difficulty: 0,
             },
         )
     }
@@ -300,6 +350,10 @@ impl EntityStore {
                 damage_reduction: 0,
                 damage: template.attack_profile.damage,
                 weapon_hit_bonus: template.attack_profile.hit_bonus,
+                speed: template.speed,
+                ai_kind: Some(template.ai_kind),
+                passive: template.passive,
+                difficulty: template.difficulty,
             },
         )
     }
