@@ -124,7 +124,6 @@ impl BundleFixture {
             &["config", "user.name", "AIHack release test"][..],
             &["config", "user.email", "release-test@invalid"][..],
             &["add", "."][..],
-            &["commit", "-qm", "release fixture"][..],
         ] {
             let status = Command::new("git")
                 .args(args)
@@ -133,6 +132,20 @@ impl BundleFixture {
                 .unwrap();
             assert!(status.success(), "git fixture command 실패: {args:?}");
         }
+        if matches!(case, BundleCase::IncludedLegacy) {
+            let status = Command::new("git")
+                .args(["add", "-f", "legacy_nethack_port_reference/probe.txt"])
+                .current_dir(&root)
+                .status()
+                .unwrap();
+            assert!(status.success(), "legacy negative fixture 강제 추적 실패");
+        }
+        let status = Command::new("git")
+            .args(["commit", "-qm", "release fixture"])
+            .current_dir(&root)
+            .status()
+            .unwrap();
+        assert!(status.success(), "release fixture commit 실패");
         let commit = String::from_utf8(
             Command::new("git")
                 .args(["rev-parse", "HEAD"])
@@ -180,6 +193,18 @@ impl BundleFixture {
             .status()
             .unwrap();
         assert!(status.success());
+        if matches!(case, BundleCase::IncludedLegacy) {
+            let listing = Command::new("tar")
+                .args(["-tzf", archive.to_str().unwrap()])
+                .output()
+                .unwrap();
+            assert!(listing.status.success());
+            assert!(
+                String::from_utf8_lossy(&listing.stdout)
+                    .contains("legacy_nethack_port_reference/probe.txt"),
+                "legacy negative fixture archive에 차단 경로가 실제 포함되어야 한다"
+            );
+        }
 
         let mut names = vec![
             "aihack",
