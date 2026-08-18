@@ -19,7 +19,7 @@
 
 변경 파일, finding별 상태, 실행 명령과 남은 gate는 `docs/audit/audit_report_23_remediation.md`에 기록한다.
 
-`docs/audit/audit_report_24.md` 재감사에서 새로 열린 DBG-F011, SEC-F003, IMP-F019는 2026-08-18 로컬 시정을 완료했다. cargo-deny 0.19.4는 winx 0.36.4 한정 exception으로 licenses/bans/sources PASS했고, Windows 권한 계약은 parent DACL 상속으로 좁혔으며, SC-CAUSE-01..07은 production 심볼과 실제 테스트 함수에 개별 연결했다. clean same-SHA 양 OS CI는 commit/push 뒤 확인한다.
+`docs/audit/audit_report_24.md` 재감사에서 새로 열린 DBG-F011, SEC-F003, IMP-F019는 2026-08-18 시정을 완료했다. cargo-deny 0.19.4는 winx 0.36.4 한정 exception으로 PASS했고, Windows 권한 계약은 parent DACL 상속으로 좁혔으며, SC-CAUSE-01..07은 production 심볼과 실제 테스트 함수에 개별 연결했다. implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 Ubuntu/Windows 전체 gate와 bundle이 success다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 

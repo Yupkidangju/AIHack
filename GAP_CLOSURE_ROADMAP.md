@@ -33,13 +33,13 @@
 | Gap ID | 등급 | 문제 | 현재 증거 | Task | 성공 기준 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- |
 | G-PRODUCT-001 | P0 | inspired game와 3.6.7 변환 목표 충돌 | 과거 spec은 1:1 포트 비목표 | R0-1, R0-2 | SC-DOC-01 | Closed |
-| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | owner approval ID, whole-work NGPL, 공식 LICENSE/NOTICE와 modification manifest; `audit_report_21.md`가 R8 문서 시정을 종결했고 R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`의 Actions `32034295607` 양 OS gate가 success | R8-1 | SC-LICENSE-01 | Closed |
+| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | owner approval ID, whole-work NGPL, 공식 LICENSE/NOTICE와 modification manifest; `audit_report_21.md` 종결 및 `2519bc8e0ede81c39f46b5778e62a41d4ca66901` Actions `32107862171` 양 OS success | R8-1 | SC-LICENSE-01 | Closed |
 | G-BUILD-001 | P1 | toolchain/MSRV 미고정 | rust-toolchain과 locked local build/audit evidence; `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | locked dependency/security policy와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-003 | P1 | build script가 copy 실패를 무시 | fail-fast script와 `audit_report_3.md` independent verification | R1-2 | SC-BUILD-01 | Closed |
-| G-BUILD-004 | P1 | CI 부재 | R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`, [Actions `32034295607`](https://github.com/Yupkidangju/AIHack/actions/runs/32034295607) `ubuntu-latest quality gate`/`windows-latest quality gate` success | R1-3 | SC-BUILD-02 | Closed |
+| G-BUILD-004 | P1 | CI 부재 | report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, [Actions `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171) Ubuntu/Windows success | R1-3 | SC-BUILD-02 | Closed |
 | G-BUILD-005 | P0 | Windows Git Bash R7/R8 checkpoint가 CRLF manifest에서 실패 | `.gitattributes` LF 정책, script CR 제거, CRLF positive/checksum drift negative와 Windows 실제 R7/R8 exit 0 | R8/R9 시정 | SC-BUILD-01, SC-COMPAT-01 | Implemented / report 23 re-audit pending |
-| G-BUILD-006 | P0 | `winx 0.36.4` LLVM exception이 cargo-deny allowlist와 불일치 | ADR-0033 version-scoped exception, cargo-deny 0.19.4 실제 licenses/bans/sources PASS | report 24 시정 | SC-BUILD-01, SC-LICENSE-01 | Implemented / same-SHA CI pending |
+| G-BUILD-006 | P0 | `winx 0.36.4` LLVM exception이 cargo-deny allowlist와 불일치 | ADR-0033 version-scoped exception, cargo-deny 0.19.4 실제 PASS, same-SHA Actions `32107862171` | report 24 시정 | SC-BUILD-01, SC-LICENSE-01 | Closed / re-audit pending |
 | G-RUN-001 | P1 | README 기본 실행 명령 실패 | default binary/run command와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-CORE-001 | P0 | session/world mutable field 공개 | private state, read accessor, fixture boundary와 `audit_report_3.md` independent verification | R2-1, R2-2 | SC-CORE-01 | Closed |
 | G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy transaction과 no-commit regression, `audit_report_3.md` independent verification | R2-3 | SC-CORE-02 | Closed |
@@ -57,9 +57,9 @@
 | G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests | R7-2 | SC-COMPAT-01 | Closed / License risk tracked separately |
 | G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | 0.3.0 동기화와 report 20 active-status/false-green 시정을 `audit_report_21.md`가 Verified | R8-1 | SC-DOC-01 | Closed |
 | G-DOC-004 | P0 | report 20/22 과거 finding과 현재 권한 상태 혼재 | report 21 종결 계보, report 22 Initial/Current 상태, report 23 새 HOLD와 coder remediation을 분리 | R9 시정 | SC-DOC-01 | Implemented / report 23 re-audit pending |
-| G-DOC-005 | P2 | SC-CAUSE-01..07 개별 ID가 실행·테스트 책임에 연결되지 않음 | audit roadmap와 implementation summary의 7개 개별 ID/code/test 중앙 매핑 및 문서 회귀 PASS | report 24 시정 | SC-CAUSE-01, SC-CAUSE-02, SC-CAUSE-03, SC-CAUSE-04, SC-CAUSE-05, SC-CAUSE-06, SC-CAUSE-07 | Implemented / same-SHA CI pending |
+| G-DOC-005 | P2 | SC-CAUSE-01..07 개별 ID가 실행·테스트 책임에 연결되지 않음 | 7개 개별 ID/code/test 중앙 매핑·문서 회귀와 same-SHA Actions `32107862171` PASS | report 24 시정 | SC-CAUSE-01, SC-CAUSE-02, SC-CAUSE-03, SC-CAUSE-04, SC-CAUSE-05, SC-CAUSE-06, SC-CAUSE-07 | Closed / re-audit pending |
 | G-SEC-001 | P0 | 예측 가능한 save temp와 replay link open이 외부 파일을 손상 가능 | ADR-0032 `ArtifactStore`, no-follow/single-link handle 검증, atomic temp replace와 Windows hard-link 회귀 | R9 시정 | SEC-F001 | Implemented / report 23 re-audit pending |
-| G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | Unix mode 0600과 Windows parent DACL 상속을 분리하고 Windows private root 요구를 문서·metadata regression으로 고정 | report 24 시정 | SEC-F003 | Implemented / same-SHA CI pending |
+| G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | Unix 0600/Windows parent DACL 계약과 양 OS same-SHA Actions `32107862171` PASS | report 24 시정 | SEC-F003 | Closed / re-audit pending |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 

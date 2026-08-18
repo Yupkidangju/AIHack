@@ -383,7 +383,7 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `docs/audit/audit_report_23.md`는 이 후속 기준선에 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017의 새 HOLD를 열었다. 2026-08-18 coder remediation은 관련 코드·문서·회귀를 갱신했고 Windows 실제 R7/R8 checkpoint와 표적 검증을 통과했다. 독립 재감사 전에는 전체 PASS나 외부 게시를 선언하지 않는다.
 
-`docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. clean same-SHA 양 OS CI와 bundle 결과는 commit/push 뒤 이 문서와 coder remediation 기록에 연결한다.
+`docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 [Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)은 Ubuntu/Windows test, canonical R7/R8, release build/bundle, cargo-audit, cargo-deny와 lockfile 불변을 모두 PASS했다.
 
 ```bash
 scripts/r8_checkpoint.sh

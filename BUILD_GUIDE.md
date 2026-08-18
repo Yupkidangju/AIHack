@@ -19,7 +19,7 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`, [run `32034295607`](https://github.com/Yupkidangju/AIHack/actions/runs/32034295607), `ubuntu-latest quality gate`/`windows-latest quality gate` success | Linux/Windows green |
+| CI | report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, [run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171), Ubuntu/Windows success | Linux/Windows green |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | wait-only, 조기 사망도 exit 0 | survival-v1, accepted turn 1000 |
 
@@ -445,6 +445,6 @@ R8 checkpoint도 script-relative canonical repository만 검사한다. 승인된
 - [x] 프로젝트 로컬 cargo-deny 0.19.4 `licenses`, `bans`, `sources` 실제 PASS — winx 0.36.4 한정 exception
 - [x] report 20 문서 시정 독립 재감사 PASS — `audit_report_21.md`
 - [ ] `docs/audit/audit_report_23.md` 우선 finding 시정 독립 재감사 — 로컬 coder 검증 완료, 외부 게시 HOLD
-- [ ] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — 로컬 gate 완료, push 대기
+- [x] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — `2519bc8e`, Actions `32107862171`
 
 기존 R8 문서 시정은 report 21이 종결했고, R9 기준 양 OS CI는 run `32034295607`이 제공한다. report 23 시정 diff는 아직 새 immutable same-SHA CI나 독립 재감사를 받지 않았으므로 외부 게시는 마지막 미완료 항목과 별도 사용자 승인이 모두 충족되기 전까지 수행하지 않는다.

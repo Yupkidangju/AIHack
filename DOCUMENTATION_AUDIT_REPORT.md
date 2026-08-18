@@ -230,4 +230,4 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - `DBG-F011`: winx 0.36.4 전용 SPDX exception과 cargo-deny 0.19.4 실제 PASS로 시정
 - `SEC-F003`: Unix mode 0600과 Windows parent DACL 상속을 분리해 문서·코드·platform test를 정렬
 - `IMP-F019`: SC-CAUSE-01..07을 audit roadmap/implementation summary의 production 심볼·테스트 함수에 개별 연결
-- 현재 권한 상태: 로컬 시정 완료, clean same-SHA Ubuntu/Windows CI와 후속 독립 재감사 대기
+- 현재 권한 상태: implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171` 양 OS PASS. 후속 독립 재감사와 외부 게시 승인은 별도 gate

@@ -39,6 +39,8 @@ Consequences:
 
 `deny.toml` exception은 crate와 version을 함께 고정한다. 만료 또는 dependency 변경 시 exception 유지, dependency 교체, 일반 정책 변경 중 하나를 다시 결정하고 `BUILD_GUIDE.md`와 감사 기록을 갱신한다.
 
+Verification update: implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 Ubuntu/Windows cargo-deny 0.19.4와 전체 quality gate가 success다. report 23/24 시정은 후속 독립 재감사와 외부 게시 승인을 대체하지 않는다.
+
 ## ADR-0032: capability 기반 save/replay 파일 경계
 
 Status: Accepted (2026-08-18)

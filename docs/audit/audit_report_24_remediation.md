@@ -53,15 +53,16 @@ range 표기만 존재하거나 test 함수가 제거되면 문서 회귀가 실
 | `cargo audit` | PASS, vulnerability/warning 0 |
 | Windows Git Bash R7/R8 checkpoint | PASS / PASS |
 | `git diff --check` | PASS |
-| clean same-SHA Ubuntu/Windows CI | commit/push 대기 |
+| clean same-SHA Ubuntu/Windows CI | PASS — `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions run `32107862171` |
 
 첫 원격 실행 `32106910778`의 Ubuntu test는 Linux `O_TMPFILE`의 정상 link count 0을 기존-file validator가 거부해 실패했다. destination/read file은 nlink 1을 계속 요구하고, 원자적으로 신규 생성된 temp validator만 nlink 0 또는 1을 허용하도록 분리했다. `unix_save_file_uses_mode_0600`과 기존 save/load 회귀가 이 platform 경로를 검증한다.
 
 두 번째 원격 실행 `32107476736`에서 save와 Unix 0600 회귀는 PASS했다. 이후 Unix 전용 release-bundle negative fixture가 환경별 Git ignore 상태 때문에 legacy probe를 archive에 넣지 못해 실패했다. `IncludedLegacy` case는 probe를 `git add -f`로 추적하고 archive listing에 차단 경로가 실제 포함됐는지 verifier 전에 확인하도록 수정했다.
 
+최종 implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 [Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)은 Ubuntu 8분 8초, Windows 17분 5초로 모두 success다. 두 job은 전체 tests, canonical R7/R8, release build와 platform bundle, cargo-audit, cargo-deny 0.19.4 `licenses/bans/sources`, Cargo.lock 불변을 같은 SHA에서 통과했다.
+
 ## 6. 남은 gate
 
 - final diff review와 secret check
-- clean commit/push
-- 동일 commit SHA의 Ubuntu/Windows quality gate, R7/R8 checkpoint, release bundle, cargo-audit/cargo-deny 확인
+- report 24 시정의 후속 독립 재감사
 - 외부 게시에는 별도 사용자 승인 필요

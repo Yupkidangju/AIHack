@@ -109,8 +109,8 @@ fn r8_documentation_self_check_is_current_without_rewriting_the_r0_audit() {
 #[test]
 fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
     let evidence = [
-        "41a1b63f11a57a671b0f705883431dab24298b5a",
-        "32034295607",
+        "2519bc8e0ede81c39f46b5778e62a41d4ca66901",
+        "32107862171",
         "audit_report_21.md",
         "audit_report_23.md",
     ];
@@ -167,13 +167,13 @@ fn active_release_sections_reject_known_stale_statuses() {
     let gaps = project_file("GAP_CLOSURE_ROADMAP.md");
     let license = gap_row(&gaps, "G-LICENSE-001");
     assert!(license.contains("audit_report_21.md"));
-    assert!(license.contains("41a1b63f11a57a671b0f705883431dab24298b5a"));
-    assert!(license.contains("32034295607"));
+    assert!(license.contains("2519bc8e0ede81c39f46b5778e62a41d4ca66901"));
+    assert!(license.contains("32107862171"));
     assert!(license.ends_with("| Closed |"));
 
     let build = gap_row(&gaps, "G-BUILD-004");
-    assert!(build.contains("41a1b63f11a57a671b0f705883431dab24298b5a"));
-    assert!(build.contains("32034295607"));
+    assert!(build.contains("2519bc8e0ede81c39f46b5778e62a41d4ca66901"));
+    assert!(build.contains("32107862171"));
     assert!(build.ends_with("| Closed |"));
 
     let documentation = gap_row(&gaps, "G-DOC-001");
