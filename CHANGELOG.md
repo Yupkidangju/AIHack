@@ -7,12 +7,26 @@
 - 콘텐츠 생성 원인·소비 주체·직접 상태 변화·후속 영향을 추적하는 R9 인과 폐쇄 계약과 `docs/audit/audit_report_22.md`를 추가했다.
 - 음식과 jackal 시체를 실제 nutrition/hunger/item lifecycle에 연결하는 `Eat` 행동과 상태-delta 회귀 테스트를 추가했다.
 - 동일 seed의 A/B registry로 armor `ac_bonus`, monster `speed`/`ai`/`passive`, item `base_price`가 실제 simulation 상태를 바꾸는지 검증하는 테스트를 추가했다.
+- `CausalProjection`, 9종 typed `CausalWitness`와 seed별 witness multiset/final hash 반복 및 negative acceptance gate를 추가했다.
+- capability 기반 save/load/replay/report `ArtifactStore`와 hard-link/symlink/temp-file 보안 회귀를 추가했다.
 
 ### Changed
 
 - monster speed, AI, passive, difficulty를 typed actor state에 보존하고 실제 turn cadence, intent, passive status, kill gold에 사용하도록 변경했다.
 - 기도가 luck을 생성하고 player attack roll이 luck을 소비하도록 연결했다.
 - 종료 점수에 소지 item의 content base price를 반영하고, 3 seed 장기 테스트가 turn/event metadata를 제외한 semantic world-state delta까지 요구하도록 강화했다.
+- R7/R8 checkpoint를 Linux/Windows 공통 canonical 명령으로 고정하고 checksum manifest/content LF checkout과 CRLF 입력 정규화를 적용했다.
+- report 20/21/22/23의 역사적 finding, 종결 권한, 새 HOLD와 coder remediation 상태를 분리했다.
+- `SC-CAUSE-01`부터 `SC-CAUSE-07`까지 각 계약을 production 책임 심볼과 정확한 테스트 함수에 개별 매핑했다.
+- save 권한 계약을 Unix mode `0600`과 Windows parent DACL 상속으로 구분해 Windows owner-only 과대주장을 제거했다.
+
+### Fixed
+
+- 예측 가능한 save `.tmp`와 replay hard-link/symlink가 외부 파일을 truncate하거나 변경할 수 있던 경로를 fail-closed handle 검증과 원자 교체로 수정했다.
+- Windows 실제 checkout에서 CRLF checksum manifest 때문에 R7/R8 checkpoint가 FAIL 2로 끝나던 문제를 수정했다.
+- `RUSTSEC-2026-0253`을 제거하도록 전이 의존성 `lru`를 0.18.2로 갱신했다.
+- 두 binary의 `--help`에서 오래된 v0.1.0/Phase 설명을 제거하고 현재 제품 설명으로 교체했다.
+- `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception`을 version-scoped cargo-deny exception으로 기록해 cargo-deny 0.19.4 license gate를 복구했다.
 
 ## [0.3.0] - 2026-07-20
 

@@ -244,7 +244,7 @@ done
   "policy": "survival-v1",
   "requested_turns": 1000,
   "accepted_turns": 1000,
-  "submitted_commands": 1017,
+  "submitted_commands": 1000,
   "final_state": "Playing",
   "final_hash": "16-lowercase-hex"
 }
@@ -258,7 +258,7 @@ PASS 조건:
 - policy가 한 turn에 16개 legal candidate를 모두 거부당하면 성공이 아니라 `NoAcceptedAction`이다.
 - save/load continuation hash가 direct run hash와 같다.
 
-Checkpoint R4 현재 상태: LOCAL PASS. `tests/long_run.rs`는 seed 42, 7, 1234 각각의 1000 accepted turn과 seed별 3회 hash 일치를 검증한다. release runner report hash는 각각 `7dc03ca706e350df`, `360a7c07904c78e2`, `0c73bd75ff8cd540`이다.
+Checkpoint R4/R9 현재 상태: LOCAL PASS. `tests/long_run.rs`는 seed 42, 7, 1234 각각의 1000 accepted turn과 seed별 3회 hash 일치를 검증한다. R9 `survival-v1` release runner hash는 각각 `c734eeafedc77c82`, `de24bb6e33a8c43f`, `c6f5e6ca9498ef35`이고 submitted command는 각각 1000이다. 별도 `causal-v1` fixture는 9종 필수 witness를 seed별 각 1회 집계하며 final hash는 `5cde4a5f145ff3af`, `942403c665e19ad9`, `01a8631d0ad95d96`이다. witness multiset과 hash는 각 seed 3회 반복 일치하고 event-only·turn-only·witness 누락 fixture는 acceptance validator를 통과하지 못한다.
 
 ## 8. R5 workspace 경계 게이트
 
@@ -342,6 +342,8 @@ cargo test -p aihack --locked --test golden_phase8_rules
 scripts/r7_checkpoint.sh
 ```
 
+R7 checksum manifest와 검증 대상 content TOML은 `.gitattributes`에서 LF canonical checkout으로 고정한다. 스크립트도 manifest 입력에서 CR을 제거해 외부 CRLF fixture를 동일하게 처리해야 하며, `tests/provenance_manifest.rs`는 CRLF positive와 checksum drift negative를 별도로 검증한다. Windows authority도 Git Bash의 같은 `scripts/r7_checkpoint.sh`이며 `build.bat --release`는 이를 대체하지 않는다.
+
 PASS 조건:
 
 - runtime 포함 파일의 provenance status가 모두 `Approved`다.
@@ -377,6 +379,12 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `audit_report_20.md`는 report 19의 핵심 동기화를 부분 Verified했지만 implementation summary 최상단, `G-LICENSE-001`, BUILD_GUIDE 테스트 수와 document-wide false-green gate를 `IMP-F016`/`DBG-F008`로 HOLD했다. 해당 active-state를 교정하고 section/row별 positive·negative 회귀 계약으로 강화했으며, 현재 남은 gate는 이 report 20 시정의 독립 재감사다.
 
+`audit_report_21.md`는 report 20의 `IMP-F016`, `DBG-F008`, `XPF-F011` 시정을 Verified/Resolved하고 R8 문서 remediation을 PASS로 종결했다. 따라서 report 20 재감사 대기는 역사적 상태이며 현재 blocker가 아니다. R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`와 Actions run `32034295607`이 후속 양 OS 기준선이다.
+
+`docs/audit/audit_report_23.md`는 이 후속 기준선에 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017의 새 HOLD를 열었다. 2026-08-18 coder remediation은 관련 코드·문서·회귀를 갱신했고 Windows 실제 R7/R8 checkpoint와 표적 검증을 통과했다. 독립 재감사 전에는 전체 PASS나 외부 게시를 선언하지 않는다.
+
+`docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. clean same-SHA 양 OS CI와 bundle 결과는 commit/push 뒤 이 문서와 coder remediation 기록에 연결한다.
+
 ```bash
 scripts/r8_checkpoint.sh
 cargo fmt --all -- --check
@@ -391,6 +399,8 @@ cargo test -p aihack --locked --test release_bundle
 ```
 
 `scripts/r8_checkpoint.sh` exit code는 PASS 0, 승인·release 준비 대기 HOLD 1, version dependency drift·archive 손상 등 구조적 FAIL 2다. R8 최종 감사에서는 먼저 checkpoint PASS를 확인한 뒤 나머지 전체 명령을 실행한다.
+
+Windows CI는 release bundle 외에 Git Bash로 R7/R8 canonical checkpoint를 실제 checkout에서 실행한다. R7/R8 모두 exit 0이어야 하며 CRLF manifest 허용이 checksum drift 허용으로 확장되지 않아야 한다.
 
 최종 수동 확인:
 
@@ -409,7 +419,27 @@ scripts/r6_pending_exit_smoke.sh
 
 2026-07-20 로컬 PTY 결과: core flow는 high contrast/reduced motion에서 Title → Character Creation → Playing → Inventory → Game Over → New Run과 59x23 최소 크기 clean exit를 PASS했다. deterministic loopback degraded matrix는 success/timeout/stale/down을, pending-exit smoke는 terminal restore-before-worker-wait를 PASS했다. 실제 LLM/API는 호출하지 않았다.
 
-## 12. 최종 판정 템플릿
+## 12. R9 SC-CAUSE 계약 추적 게이트
+
+각 ID는 `spec.md` 정의, production 책임 심볼과 실제 회귀 테스트 함수에 개별 연결되어야 한다. range 표기만으로는 PASS하지 않는다.
+
+| ID | Production 책임 | 검증 파일·함수 |
+| --- | --- | --- |
+| SC-CAUSE-01 | `docs/audit/audit_report_22.md` 인과 인벤토리, `CausalProjection`, `CausalSummary` | `tests/r8_documentation.rs::sc_cause_contract_ids_map_to_code_and_tests` |
+| SC-CAUSE-02 | `CausalProjection`, content-backed actor/item runtime data | `tests/causal_content.rs::monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent`, `monster_passive_content_changes_player_status`, `armor_content_bonus_changes_player_defense_state` |
+| SC-CAUSE-03 | `systems::items::eat`, `systems::death::collect_death_events_if_hp_depleted` | `tests/causal_content.rs::eating_food_changes_nutrition_hunger_and_item_lifecycle`, `jackal_death_creates_an_edible_corpse_that_changes_hunger` |
+| SC-CAUSE-04 | `CausalSummary::observe`, death/quit score와 Pray/luck 경로, `hallucinating` time-bounded risk | `tests/causal_content.rs::item_base_price_changes_actual_game_over_score`, `prayer_created_luck_changes_the_next_attack_roll`, `tests/r8_documentation.rs::sc_cause_contract_ids_map_to_code_and_tests` |
+| SC-CAUSE-05 | `REQUIRED_CAUSAL_WITNESSES`, `CausalSummary::validate_required` | `tests/long_run.rs::causal_fixture_covers_every_required_witness_for_each_seed` |
+| SC-CAUSE-06 | `CausalSummary` equality와 stable snapshot hash | `tests/long_run.rs::causal_witness_multiset_and_final_hash_are_stable_across_three_runs` |
+| SC-CAUSE-07 | `CausalSummary::observe`의 semantic projection 변화 gate | `tests/long_run.rs::causal_validator_rejects_event_only_turn_only_and_missing_witnesses` |
+
+검증 명령:
+
+```bash
+cargo test -p aihack --locked --test causal_content --test long_run --test r8_documentation
+```
+
+## 13. 최종 판정 템플릿
 
 ```text
 AIHack v0.3.0 Audit
@@ -430,5 +460,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1~R6 PASS, R7 `PASS WITH KNOWN RISKS`, SC-BUILD-02와 R8 기술·release evidence는 `audit_report_19.md`에서 Verified. R8 전체는 `audit_report_20.md` active-state/false-green HOLD 시정의 독립 재감사 전까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
-현재 문서 감사 판정: `audit_report_9.md`가 IMP-F008과 R1~R5를, `audit_report_11.md`가 보고서 10 시정과 R6 checkpoint를 PASS로 종결했다. `audit_report_20.md`는 `IMP-F016`을 Partially Verified하고 `DBG-F008`을 신규 HOLD했다. 전체 program PASS는 이 시정의 독립 재감사 뒤에만 선언한다.
+현재 구현 판정: R1~R8 기존 remediation은 report 21까지 종결됐고 R9 기준 commit의 양 OS CI가 success다. report 23 우선 finding의 coder remediation과 로컬 표적 gate는 완료했으나 독립 재감사 전까지 전체는 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `audit_report_21.md`가 report 20 문서 시정을 종결했다. report 22는 Initial Finding과 post-fix 상태를 분리했고 report 23의 새 HOLD 및 coder remediation을 현재 권한으로 둔다. 전체 program PASS는 report 23 시정의 독립 재감사 뒤에만 선언한다.

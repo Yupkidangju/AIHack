@@ -12,6 +12,62 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0033: winx 0.36.4 LLVM exception 한정 허용
+
+Status: Accepted (2026-08-18), cargo-deny 0.19.4 검증 대기
+Date: 2026-08-18
+Decision ID: DEC-DEP-02
+
+Context:
+
+ADR-0032의 capability filesystem은 Windows에서 `cap-primitives -> winx 0.36.4`를 shipped dependency로 추가한다. `winx`의 유일한 SPDX 식은 `Apache-2.0 WITH LLVM-exception`이며 기존 `deny.toml`의 일반 `Apache-2.0` 허용만으로는 cargo-deny license gate를 통과하지 못한다.
+
+Decision:
+
+- 일반 allowlist를 넓히지 않고 `winx 0.36.4`에만 `Apache-2.0 WITH LLVM-exception`을 허용한다.
+- exception owner는 Dependency owner / Release manager다.
+- exception은 2026-10-31에 만료하며, 그 전에 `winx`, `cap-primitives`, `cap-std`, `cap-fs-ext`, `cap-tempfile` 중 하나의 version이 바뀌면 즉시 재검토한다.
+- cargo-deny 0.19.4의 `licenses`, `bans`, `sources` 실제 PASS를 R1/R8 필수 증거로 유지한다.
+
+Alternatives:
+
+- `Apache-2.0 WITH LLVM-exception`을 일반 allowlist에 추가: 향후 무관한 crate까지 자동 허용하므로 기각한다.
+- capability dependency 제거: SEC-F001의 portable path sandbox와 atomic replace 경계를 후퇴시키므로 기각한다.
+- cargo-deny gate 생략: shipped dependency policy를 검증하지 못하므로 기각한다.
+
+Consequences:
+
+`deny.toml` exception은 crate와 version을 함께 고정한다. 만료 또는 dependency 변경 시 exception 유지, dependency 교체, 일반 정책 변경 중 하나를 다시 결정하고 `BUILD_GUIDE.md`와 감사 기록을 갱신한다.
+
+## ADR-0032: capability 기반 save/replay 파일 경계
+
+Status: Accepted (2026-08-18)
+Date: 2026-08-18
+Decision ID: DEC-SAVE-02
+
+Context:
+
+기존 headless 경로는 문자열 경로를 canonicalize한 뒤 실제 파일을 다시 열었고, save는 예측 가능한 `.tmp`를 truncate mode로 생성했다. 이 구조는 경로 검사와 open 사이의 교체 경쟁을 남기며, 미리 배치한 symbolic link 또는 hard link가 root 밖 파일을 열거나 truncate하게 할 수 있다. TUI quick-save도 모든 프로세스가 같은 OS temp 경로를 공유했다.
+
+Decision:
+
+- headless의 save/load/replay/report I/O는 열린 runtime root directory capability와 검증된 상대 경로를 함께 보유하는 `ArtifactStore`를 통한다. absolute path와 root 탈출은 구조적으로 거부하고, 각 open/rename은 root handle 기준으로 수행한다.
+- 쓰기 대상의 마지막 경로 요소는 symbolic link를 따라가지 않는다. 열린 handle이 일반 파일이며 hard-link count가 1인지 쓰기 전에 검증한다.
+- save는 대상과 같은 directory에 충돌하지 않는 임시 파일을 `create_new`로 생성하고 payload와 file metadata를 동기화한 뒤 capability-relative rename으로 교체한다. Unix는 mode `0600`을 강제하고 Windows는 parent directory DACL을 상속하므로, Windows에서 기밀성이 필요한 runtime root는 사용자 전용 directory여야 한다. 실패 시 새 임시 파일만 정리하고 기존 save는 보존한다.
+- replay append는 같은 no-follow·regular-file·single-link 검증을 통과한 handle에만 기록한다.
+- TUI quick-save는 프로세스별 임시 directory를 사용해 다른 실행과 경로를 공유하지 않는다.
+
+Alternatives:
+
+- canonicalize 후 일반 `File::open`/`File::create` 유지: 검사와 사용 사이 경쟁을 닫지 못해 기각한다.
+- 고정 `.tmp` 이름에 `create_new`만 추가: 사전 배치 공격의 truncate는 막지만 동시 실행 충돌과 parent 교체 경계를 해결하지 못해 기각한다.
+- 플랫폼별 raw descriptor API를 프로젝트에서 직접 구현: `unsafe`와 OS별 유지보수 표면을 늘리므로 기각하고, 검증된 capability filesystem dependency를 사용한다.
+- Windows DACL을 runtime에서 직접 재작성: `unsafe` Windows ACL API와 권한 상속 파괴 위험이 현재 save 데이터 민감도보다 크므로 기각한다. owner-only가 필수인 배포는 사용자 전용 application directory를 root로 제공한다.
+
+Consequences:
+
+`aihack-runtime`은 capability filesystem dependency를 추가한다. path 기반 compatibility helper는 신뢰된 테스트 경로에서만 유지하고 production CLI는 `ArtifactStore`를 사용한다. `tests/headless_paths.rs`는 Windows와 Unix에서 temp hard-link/symlink, replay link, parent escape, 기존 save 보존과 platform permission contract를 직접 회귀한다. Windows inherited DACL은 owner-only hard boundary로 표현하지 않는다.
+
 ## ADR-0031: 콘텐츠 인과 폐쇄와 상태-delta 검증
 
 Status: Accepted (2026-08-17)
@@ -41,6 +97,8 @@ Alternatives:
 Consequences:
 
 R9는 테스트 기반을 먼저 만들고 음식/영양, content behavior, 경제/점수, 상태 orphan 순서로 작은 수직 슬라이스를 적용한다. 의도된 snapshot hash 변화는 witness와 ADR 근거 없이 baseline만 갱신할 수 없다.
+
+2026-08-18 verification update: `CausalProjection`과 9종 필수 `CausalWitness`가 seed 42/7/1234의 1000턴 fixture에서 각 1회 이상 발생하고 witness multiset/final hash가 3회 반복 일치한다. `hallucinating` SaveDataV1 compatibility risk owner는 Project owner/runtime maintainer이며 SaveDataV2·v0.4.0 scope 승인 또는 2026-10-31 중 먼저 도래하는 시점에 제거 migration과 실제 producer feature 중 하나를 재결정한다.
 
 ## ADR-0021: NetHack 3.6.7 행동 호환 clean reimplementation
 
@@ -98,7 +156,7 @@ Consequences:
 
 ## ADR-0028: RustSec 경고 없는 ratatui 0.30/crossterm 0.29 계열
 
-Status: Accepted; R1 and SC-BUILD-02 verified by `audit_report_19.md`
+Status: Accepted; R1/report 21 verified, RUSTSEC-2026-0253 remediation updated 2026-08-18
 Date: 2026-07-15
 Decision ID: DEC-UI-DEP-01
 
@@ -108,7 +166,7 @@ ADR-0022의 ratatui 0.29 계열은 crossterm 중복을 피했지만, 현재 Rust
 
 Decision:
 
-UI dependency를 `ratatui = "0.30"`과 `crossterm = "0.29"`로 함께 올린다. lockfile은 ratatui 0.30.2, crossterm 0.29.0, lru 0.18.1을 고정하며 `cargo audit`, `cargo deny check licenses bans sources`, crossterm 단일 버전 검증을 R1 gate에 포함한다.
+UI dependency를 `ratatui = "0.30"`과 `crossterm = "0.29"`로 함께 유지한다. lockfile은 ratatui 0.30.2, crossterm 0.29.0을 고정하고 전이 의존성 `lru`는 `RUSTSEC-2026-0253`이 수정된 0.18.2 이상을 요구한다. `cargo audit`, `cargo deny check licenses bans sources`, crossterm 단일 버전 검증을 R1 gate에 포함한다.
 
 Alternatives Considered:
 
@@ -296,7 +354,7 @@ Consequences:
 
 ## ADR-0030: NetHack 3.6.7 파생물 분류와 whole-work NGPL 배포
 
-Status: Implemented; report 19 technical evidence verified, report 20 documentation remediation pending re-audit
+Status: Implemented; report 21 closed report 20 documentation remediation, `docs/audit/audit_report_23.md` remediation pending independent re-audit
 Date: 2026-07-20
 Decision ID: DEC-LICENSE-03
 
@@ -323,4 +381,4 @@ Consequences:
 - source archive는 `.git/` history에 의존하지 않고 `MODIFICATIONS.md`의 scope/date와 `RELEASE-METADATA`의 commit을 수신자에게 전달한다.
 - 라이선스 정비 완료는 독립 R8 기술 감사 `PASS`나 외부 게시 실행을 자동 승인하지 않는다.
 - 이 결정과 프로젝트 기록은 qualified legal opinion이나 법률 자문을 대체하지 않는다.
-- Release verification update (2026-07-22): commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)에서 `ubuntu-latest quality gate`와 `windows-latest quality gate` 및 bundle이 PASS했고 `audit_report_19.md`가 기술 evidence를 Verified했다. `audit_report_20.md`가 남긴 active-state/false-green 문서 HOLD 시정의 독립 재감사 전까지 R8 전체는 HOLD다.
+- Release verification update (2026-08-18): `audit_report_21.md`가 report 20의 active-state/false-green 문서 시정을 PASS로 종결했다. R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`의 [Actions run `32034295607`](https://github.com/Yupkidangju/AIHack/actions/runs/32034295607)은 양 OS success다. `docs/audit/audit_report_23.md`의 새 filesystem/causal/checkpoint/document finding 시정은 독립 재감사 전까지 전체 PASS나 외부 게시를 승인하지 않는다.

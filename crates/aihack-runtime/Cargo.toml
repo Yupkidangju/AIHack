@@ -10,5 +10,8 @@ publish = false
 aihack-core = { path = "../aihack-core", version = "0.3.0" }
 aihack-content = { path = "../aihack-content", version = "0.3.0" }
 aihack-ai-contract = { path = "../aihack-ai-contract", version = "0.3.0" }
+cap-fs-ext = "4.0.2"
+cap-std = "4.0.2"
+cap-tempfile = "4.0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

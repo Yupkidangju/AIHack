@@ -692,6 +692,11 @@ NH367-C008 hunger projection은 3.6.7 `newuhs` 경계를 따른다: nutrition `<
 - LLM narrative, rationale, soft verdict는 save와 replay truth에 포함하지 않음
 - content_hash는 save metadata에 추가하지 않고 v0.3.0 load 시 현재 registry와 fixture test로 검증
 - schema 필드 추가가 필요하면 v0.4.0 spec에서 SaveDataV2를 정의
+- production artifact I/O는 열린 runtime root directory capability와 상대 경로를 결합한 단일 경계를 사용
+- save 임시 파일은 대상과 같은 directory에서 원자적 `create_new`로 생성하고, 일반 파일·single hard link를 handle 기준으로 확인한 뒤 sync와 atomic replace 수행
+- Unix save/temp는 mode `0600`을 강제한다. Windows save/temp는 parent directory DACL을 상속하며 runtime이 owner-only DACL을 재작성하지 않으므로, Windows 기밀성 경계는 사용자가 선택한 runtime root의 ACL이다.
+- replay append와 load/read는 마지막 symbolic link를 따라가지 않으며, 쓰기 대상 hard-link count가 1이 아니면 fail-closed
+- TUI quick-save는 실행별 임시 directory를 사용하며 다른 프로세스와 고정 temp filename을 공유하지 않음
 
 현재 replay wire는 `TurnOutcome`을 직접 직렬화한다. `ReplayLineV1`은 turn_before, command, outcome, snapshot_hash_after를 보유하며, `outcome.accepted=false`는 거절/no-commit 결과를 나타낸다. canonical JSON fixture의 추가와 `Result<TurnOutcome, SubmitError>` projection은 R5/R6 public boundary 도입 시 함께 정의한다.
 
@@ -719,7 +724,9 @@ R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 �
 - prompt에 save 경로, 환경변수, 파일 내용, 비밀정보를 넣지 않음
 - LLM response를 로그에 남길 때 최대 240 chars로 제한
 - content 파일은 embedded read-only이며 실행 중 임의 경로를 읽지 않음
-- save/replay path는 CLI가 받은 root 안에서 정규화하고 상위 디렉터리 탈출을 거부
+- save/replay/report path는 열린 runtime root capability 아래의 상대 경로로만 처리하고 absolute path, 상위 디렉터리 탈출, root 밖 symbolic link를 거부
+- save/replay 쓰기는 no-follow open, 일반 파일·single hard-link handle 검증, 충돌 없는 `create_new` 임시 파일을 강제하며 검사 후 bare path를 다시 열지 않음
+- Windows에서 다른 principal의 읽기를 차단해야 하는 배포는 사용자 전용 application directory를 runtime root로 사용해야 하며, 일반 workspace root를 owner-only 저장소로 간주하지 않음
 - `unsafe` 도입은 별도 ADR과 Miri 검증 없이는 금지
 - 레거시 라이선스 파일은 수정하지 않고 공식 원문과 checksum으로 교체 계획을 별도 기록
 
@@ -749,7 +756,7 @@ R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 �
 
 작성일 2026-08-17 기준 최신 사용자 요구에 따라, v0.3.0 릴리스 기준을 훼손하지 않는 후속 구현 단계 R9를 추가한다. 현재 Cargo version은 R9 완료와 릴리스 결정 전까지 0.3.0을 유지한다.
 
-진행 상태: 2026-08-17 구현 및 local 전체 gate PASS. `hallucinating`은 save v1 호환성 orphan으로 명시적 제외하며 SaveV2 제거 또는 별도 producer feature spec 대상으로 남긴다.
+진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프 구현. `docs/audit/audit_report_23.md`가 R9-6 필수 장기 witness 부재를 HOLD했고, 2026-08-18 coder remediation은 아래 9종 witness와 negative gate를 구현해 로컬 검증을 통과했다. 독립 재감사 전에는 R9 최종 PASS를 선언하지 않는다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
 
 ### 19.1 목표
 
@@ -786,6 +793,10 @@ R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 �
 | SC-CAUSE-05 | seed 42, 7, 1234 각각 1000 accepted turn 이상의 장기 simulation에서 필수 causal witness가 모두 1회 이상 발생 |
 | SC-CAUSE-06 | 각 seed를 3회 실행한 witness summary와 final hash가 모두 동일 |
 | SC-CAUSE-07 | causal regression은 event-only 또는 turn-only 변화에서 실패 |
+
+`SC-CAUSE-05..07`의 필수 typed witness 집합은 `FoodNutrition`, `CorpseNutrition`, `ArmorDefense`, `MonsterSpeed`, `MonsterAi`, `MonsterPassive`, `MonsterDifficultyEconomy`, `PrayerLuckCombat`, `GoldScore` 9개다. 일반 사용자 정책 `survival-v1`은 변경하지 않고, 테스트 전용 deterministic `causal-v1` fixture가 같은 `GameSession::submit` 경로에서 각 원인 명령과 downstream delta를 만든 뒤 absolute turn 1000까지 진행하고 마지막 score projection을 닫는다. witness는 명령·event 이름만으로 기록하지 않으며 command 전후 `CausalProjection`의 실제 semantic field가 함께 변한 경우에만 집계한다.
+
+각 seed의 완료 증거는 9개 witness count map과 final hash다. seed 42, 7, 1234를 각각 3회 반복했을 때 두 값이 모두 같아야 한다. 동일 projection을 전후 값으로 넣은 event-only fixture, turn만 증가한 projection, 필수 witness 하나를 제거한 summary는 acceptance validator에서 실패해야 한다.
 
 ### 19.5 구현 순서
 

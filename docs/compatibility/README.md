@@ -1,6 +1,6 @@
 # NetHack 3.6.7 Compatibility Records
 
-문서 상태: R7 engineering PASS WITH KNOWN RISKS, project-owner NGPL approval recorded, report 20 active-state/false-green HOLD remediation pending re-audit
+문서 상태: R7 engineering PASS WITH KNOWN RISKS, project-owner NGPL approval recorded, report 21 closed report 20 remediation, report 23 coder remediation pending independent re-audit
 작성일: 2026-07-15 (2026-07-18 R7 구현 갱신)
 관련 Task: R7-2
 기준: `../../spec.md` 13절, `../../PROVENANCE.md`

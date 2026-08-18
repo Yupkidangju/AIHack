@@ -269,6 +269,7 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - rejected suggestion: current action space 재검증 결과 표시, submit 미호출
 - invariant error: core error panel을 최상위로 표시하며 LLM 결과 숨김
 - save/load error: typed error 요약과 경로만 표시하며 secret/path traversal detail 숨김
+- TUI quick-save: 실행별 임시 directory 안의 `quick-save.json`만 사용하며 `ArtifactStore`의 no-follow·single-link·atomic replace 경계를 우회하지 않음
 
 ## 11. 접근성
 

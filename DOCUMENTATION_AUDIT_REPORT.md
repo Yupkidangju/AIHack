@@ -168,8 +168,9 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 | R6 deterministic PTY degraded matrix | PASS; success/timeout/stale/down, pending-exit restore |
 | fmt / clippy / full workspace test / release build | PASS |
 | cargo-audit / cargo-deny | PASS; cargo-audit는 local advisory DB 사용 |
-| 독립 R8 감사 | HOLD — report 20: report 19 evidence verified, residual active-state/false-green documentation HOLD |
-| Linux/Windows remote CI evidence | PASS — `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, Actions `29886410221` |
+| 독립 R8 문서 시정 감사 | PASS — report 21이 report 20의 `IMP-F016`/`DBG-F008`/`XPF-F011` 종결 |
+| Linux/Windows remote CI evidence | PASS — R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`, Actions `32034295607` |
+| report 23 통합 시정 | coder remediation 로컬 완료 / 독립 재감사 대기 |
 
 따라서 R8 문서 구현은 독립 감사에 전달 가능한 상태지만, 전체 프로그램 또는 외부 배포 `PASS`는 아직 선언하지 않는다.
 
@@ -210,3 +211,23 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - `IMP-F016`: 최상단 current baseline, `G-LICENSE-001`과 BUILD_GUIDE의 고정 테스트 수를 현재 evidence와 정렬
 - `DBG-F008`: document-wide token 검사에 section/row별 positive·negative assertion을 추가
 - 현재 권한 상태: report 20 시정 완료 후 독립 재감사 대기. 기술 evidence는 다시 pending으로 되돌리지 않으며 최종 R8 PASS나 외부 게시를 선언하지 않는다.
+
+### 10.9 `audit_report_21.md` 종결 상태 (2026-07-22)
+
+- `IMP-F016`, `DBG-F008`: Verified
+- `XPF-F011`: Resolved
+- report 20의 active-state/false-green 시정은 PASS로 종결됐으며 해당 재감사 대기는 더 이상 current state가 아님
+- 외부 게시 승인은 별도 운영 gate로 유지
+
+### 10.10 `docs/audit/audit_report_22.md` / `docs/audit/audit_report_23.md` 현재 상태 (2026-08-18)
+
+- report 22의 5절은 Initial Finding, 4·7절은 2026-08-17 post-fix 판정으로 분리했으며 report 23이 장기 witness false-green을 후속 HOLD함
+- report 23의 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017은 coder remediation과 로컬 표적 검증을 완료했으나 독립 재감사 전에는 Verified로 승격하지 않음
+- `hallucinating` compatibility risk는 Project owner/runtime maintainer가 소유하고 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 시점에 재검토
+
+### 10.11 `docs/audit/audit_report_24.md` 시정 상태 (2026-08-18)
+
+- `DBG-F011`: winx 0.36.4 전용 SPDX exception과 cargo-deny 0.19.4 실제 PASS로 시정
+- `SEC-F003`: Unix mode 0600과 Windows parent DACL 상속을 분리해 문서·코드·platform test를 정렬
+- `IMP-F019`: SC-CAUSE-01..07을 audit roadmap/implementation summary의 production 심볼·테스트 함수에 개별 연결
+- 현재 권한 상태: 로컬 시정 완료, clean same-SHA Ubuntu/Windows CI와 후속 독립 재감사 대기

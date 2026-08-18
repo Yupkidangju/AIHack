@@ -30,6 +30,9 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Run tests
         run: cargo test --workspace --all-targets --locked
+      - name: Verify canonical R7 and R8 checkpoints
+        shell: bash
+        run: ./scripts/r7_checkpoint.sh && ./scripts/r8_checkpoint.sh
       - name: Build release artifacts
         run: cargo build --workspace --release --locked
       - name: Verify Linux release bundle

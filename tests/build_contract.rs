@@ -217,3 +217,26 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
     assert!(deny_config.contains("unknown-registry = \"deny\""));
     assert!(deny_config.contains("unknown-git = \"deny\""));
 }
+
+#[test]
+fn winx_license_exception_is_version_scoped_and_time_bounded() {
+    let deny_config = read_project_file("deny.toml");
+    let guide = read_project_file("BUILD_GUIDE.md");
+
+    for contract in [
+        "[[licenses.exceptions]]",
+        "name = \"winx\"",
+        "version = \"=0.36.4\"",
+        "allow = [\"Apache-2.0 WITH LLVM-exception\"]",
+    ] {
+        assert!(deny_config.contains(contract), "deny.toml 누락: {contract}");
+    }
+    for contract in [
+        "Dependency owner / Release manager",
+        "2026-10-31",
+        "winx 0.36.4",
+        "다른 crate에는 이 exception을 확장하지 않는다",
+    ] {
+        assert!(guide.contains(contract), "BUILD_GUIDE 누락: {contract}");
+    }
+}

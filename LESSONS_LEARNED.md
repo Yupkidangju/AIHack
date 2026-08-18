@@ -1,5 +1,15 @@
 # AIHack Lessons Learned
 
+## 2026-08-18: 감사 false-green과 파일 handle 경계
+
+- 경로를 canonicalize한 뒤 bare path를 다시 여는 방식은 보안 경계가 아니다. root directory capability와 실제 open/rename을 결합하고, 열린 handle의 file type과 hard-link count를 확인해야 한다.
+- 임시 파일 이름을 예측하기 어렵게 만드는 것만으로는 충분하지 않다. 원자적 신규 생성, 같은 directory의 sync·replace, 실패 시 기존 파일 보존을 하나의 API가 책임져야 한다.
+- 장기 테스트의 “상태가 달라졌다” assertion은 여러 인과 계약을 한꺼번에 증명하지 못한다. 필수 witness를 닫힌 enum과 count map으로 정의하고 누락·event-only·turn-only negative를 acceptance validator에 넣어야 한다.
+- 감사 보고서는 Initial Finding, coder remediation, 독립 재감사 판정을 같은 현재형으로 섞지 않는다. 후속 보고서의 종결 권한과 새 HOLD를 시간 순서대로 분리해야 자동 문서 회귀가 과거 pending을 현재 상태로 되살리지 않는다.
+- line-ending fixture를 무조건 정규화하면 실제 Windows checkout 실패를 숨길 수 있다. canonical checkout 속성과 CRLF 입력 회귀를 모두 검사하고 실제 platform 명령을 CI에서 실행해야 한다.
+- SPDX exception은 기본 license와 별개이며 일반 allowlist보다 crate/version 한정 exception이 권한 확대를 줄인다. owner, 만료일과 dependency 변경 trigger를 함께 기록하고 고정 cargo-deny binary로 실제 실행해야 한다.
+- Unix mode 0600을 Windows owner-only ACL과 동일하게 표현하면 안 된다. Windows가 parent DACL을 상속한다면 문서·함수 이름·테스트가 그 실제 경계를 그대로 말해야 한다.
+
 ## 2026-08-17: 콘텐츠 인과 폐쇄
 
 - 1000턴 도달과 반복 hash만으로는 콘텐츠가 simulation에 참여한다는 사실을 증명할 수 없다. turn/event metadata를 제외한 semantic snapshot delta와 콘텐츠별 producer-consumer witness가 함께 필요하다.
@@ -9,7 +19,7 @@
 
 문서 상태: active
 작성일: 2026-05-20
-최근 갱신: 2026-07-20
+최근 갱신: 2026-08-18
 버전: v0.3.0
 
 ---

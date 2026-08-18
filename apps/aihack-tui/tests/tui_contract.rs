@@ -5,6 +5,7 @@ use aihack_tui::tui::{
 };
 use crossterm::event::KeyCode;
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+use std::process::Command;
 
 #[test]
 fn tui_package_owns_the_runtime_app_and_layout() {
@@ -60,4 +61,18 @@ fn text_panel_clears_underlying_content_for_modal_blank_lines() {
     .render(area, &mut buffer);
 
     assert_eq!(buffer[(5, 1)].symbol(), " ");
+}
+
+#[test]
+fn tui_help_uses_current_product_description() {
+    let output = Command::new(env!("CARGO_BIN_EXE_aihack"))
+        .arg("--help")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert!(output.status.success());
+    assert!(stdout.contains("NetHack 3.6.7 호환 Rust 로그라이크"));
+    assert!(!stdout.contains("v0.1.0"));
+    assert!(!stdout.contains("Phase"));
 }

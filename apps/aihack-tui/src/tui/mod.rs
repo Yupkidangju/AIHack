@@ -689,7 +689,8 @@ fn run_tui_with_service(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut app = TuiApp::new_with_llm_enabled(GameSession::try_new(seed)?, ui_config, llm_enabled);
-    let save_path = std::env::temp_dir().join("aihack-tui-save.json");
+    let save_directory = tempfile::tempdir()?;
+    let save_path = save_directory.path().join("quick-save.json");
     let load_path = save_path.clone();
     let run_result = (|| -> Result<(), Box<dyn std::error::Error>> {
         loop {

@@ -1,6 +1,7 @@
 //! Content bootstrap과 게임 실행을 조합하고 adapter에는 안정된 client 계약만 제공한다.
 
 pub mod bootstrap;
+pub mod causal;
 pub mod client;
 pub mod domain;
 pub mod observation;
