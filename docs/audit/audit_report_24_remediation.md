@@ -9,9 +9,9 @@
 
 | Finding | 코더 상태 | 시정 내용 | 로컬 증거 |
 | --- | --- | --- | --- |
-| DBG-F011 | Remediated / CI pending | `winx 0.36.4`에만 `Apache-2.0 WITH LLVM-exception` 허용, owner/2026-10-31 만료/version 변경 trigger 기록 | cargo-deny 0.19.4 `bans ok, licenses ok, sources ok` |
-| SEC-F003 | Remediated by contract narrowing / CI pending | Unix mode 0600과 Windows parent DACL 상속을 문서·함수 이름·platform test에 정렬 | Windows writable/replace test PASS, Unix mode test는 Unix CI 대상 |
-| IMP-F019 | Remediated / CI pending | SC-CAUSE-01..07 각각을 production 심볼과 정확한 테스트 함수에 중앙 매핑 | `sc_cause_contract_ids_map_to_code_and_tests` PASS |
+| DBG-F011 | Remediated / same-SHA CI verified | `winx 0.36.4`에만 `Apache-2.0 WITH LLVM-exception` 허용, owner/2026-10-31 만료/version 변경 trigger 기록 | cargo-deny 0.19.4와 Actions `32107862171` 양 OS PASS |
+| SEC-F003 | Remediated by contract narrowing / same-SHA CI verified | Unix mode 0600과 Windows parent DACL 상속을 문서·함수 이름·platform test에 정렬 | Unix/Windows platform test와 Actions `32107862171` PASS |
+| IMP-F019 | Remediated / same-SHA CI verified | SC-CAUSE-01..07 각각을 production 심볼과 정확한 테스트 함수에 중앙 매핑 | mapping regression과 Actions `32107862171` PASS |
 
 ## 2. Dependency exception 통제
 
