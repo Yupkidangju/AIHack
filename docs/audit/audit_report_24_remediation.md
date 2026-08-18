@@ -55,6 +55,8 @@ range 표기만 존재하거나 test 함수가 제거되면 문서 회귀가 실
 | `git diff --check` | PASS |
 | clean same-SHA Ubuntu/Windows CI | commit/push 대기 |
 
+첫 원격 실행 `32106910778`의 Ubuntu test는 Linux `O_TMPFILE`의 정상 link count 0을 기존-file validator가 거부해 실패했다. destination/read file은 nlink 1을 계속 요구하고, 원자적으로 신규 생성된 temp validator만 nlink 0 또는 1을 허용하도록 분리했다. `unix_save_file_uses_mode_0600`과 기존 save/load 회귀가 이 platform 경로를 검증한다.
+
 ## 6. 남은 gate
 
 - final diff review와 secret check

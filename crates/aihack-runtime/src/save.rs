@@ -95,11 +95,11 @@ impl ArtifactStore {
         // 임시 파일은 capability가 가리키는 동일 directory 안에서 원자적으로 생성된다.
         let mut temporary = TempFile::new(&parent).map_err(io_error)?;
         set_platform_writable_permissions(temporary.as_file())?;
-        validate_open_file(temporary.as_file(), path)?;
+        validate_new_temporary_file(temporary.as_file(), path)?;
         temporary.write_all(payload).map_err(io_error)?;
         temporary.flush().map_err(io_error)?;
         temporary.as_file().sync_all().map_err(io_error)?;
-        validate_open_file(temporary.as_file(), path)?;
+        validate_new_temporary_file(temporary.as_file(), path)?;
 
         // 공격자가 검증 뒤 destination을 link로 바꾼 경우 replace 직전에도 중단한다.
         validate_destination(&parent, &file_name, path)?;
@@ -245,6 +245,15 @@ fn validate_destination(parent: &Dir, file_name: &Path, display: &Path) -> Resul
 fn validate_open_file(file: &File, display: &Path) -> Result<(), GameError> {
     let metadata = file.metadata().map_err(io_error)?;
     validate_metadata(&metadata, display)
+}
+
+fn validate_new_temporary_file(file: &File, display: &Path) -> Result<(), GameError> {
+    let metadata = file.metadata().map_err(io_error)?;
+    // Linux O_TMPFILE은 directory entry가 생기기 전까지 link count가 0이다.
+    if !metadata.is_file() || metadata.nlink() > 1 {
+        return Err(invalid_runtime_path(display));
+    }
+    Ok(())
 }
 
 fn validate_metadata(metadata: &Metadata, display: &Path) -> Result<(), GameError> {

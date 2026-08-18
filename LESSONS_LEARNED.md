@@ -9,6 +9,7 @@
 - line-ending fixture를 무조건 정규화하면 실제 Windows checkout 실패를 숨길 수 있다. canonical checkout 속성과 CRLF 입력 회귀를 모두 검사하고 실제 platform 명령을 CI에서 실행해야 한다.
 - SPDX exception은 기본 license와 별개이며 일반 allowlist보다 crate/version 한정 exception이 권한 확대를 줄인다. owner, 만료일과 dependency 변경 trigger를 함께 기록하고 고정 cargo-deny binary로 실제 실행해야 한다.
 - Unix mode 0600을 Windows owner-only ACL과 동일하게 표현하면 안 된다. Windows가 parent DACL을 상속한다면 문서·함수 이름·테스트가 그 실제 경계를 그대로 말해야 한다.
+- Linux `O_TMPFILE`은 이름이 붙기 전 link count가 0이다. 기존 destination의 single-link 불변조건을 신규 anonymous temp에 그대로 재사용하면 보안 강화가 정상 저장을 차단하므로 lifecycle별 validator를 분리해야 한다.
 
 ## 2026-08-17: 콘텐츠 인과 폐쇄
 
