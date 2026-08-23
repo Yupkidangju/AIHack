@@ -85,7 +85,9 @@ for file in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RE
     tar -tzf "$ARCHIVE" "$file" >/dev/null
 done
 
-if tar -tzf "$ARCHIVE" | grep -Eq '^(legacy_nethack_port_reference|target|output)/'; then
+archive_listing=$(tar -tzf "$ARCHIVE") \
+    || fail 'source archive listing failed'
+if grep -Eq '^(legacy_nethack_port_reference|target|output)/' <<<"$archive_listing"; then
     printf '%s\n' 'release source archive contains an excluded path' >&2
     exit 1
 fi

@@ -96,3 +96,7 @@
 - Windows: 19개 step success — tests/ConPTY, dependency gates, R7/R8, actual Windows bundle, cargo-audit, cargo-deny 0.19.4, lockfile 불변
 
 로컬 셸에서 별도 outside-victim hard-link를 production output에 직접 사전 배치하는 명령은 실행 정책이 파일 삭제가 포함된 계산 경로 작업을 실행 전에 거부했다. 같은 경계는 `windows_release_staging_promotes_a_fresh_directory_without_writing_a_preplaced_hard_link`와 양 OS verifier hard-link negative로 자동 보존했고 모두 PASS했다. 이 구현 evidence는 독립 감사 PASS나 외부 게시 승인이 아니며 program/publication HOLD를 유지한다.
+
+### 3.6 최종 evidence SHA CI에서 발견한 Linux verifier false-green
+
+evidence commit `a9a39d87235109c0fb1d1ea7a31ea3751fd37a30`의 Actions `32660221745`에서 Ubuntu `Run tests`가 `verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree` 실패를 재현했다. source archive에 legacy path가 실제 포함됐지만 `set -o pipefail` 아래의 `tar -tzf | grep -q`에서 grep 조기 종료가 tar의 SIGPIPE를 만들었고, pipeline 전체 nonzero가 차단 경로 없음처럼 해석됐다. 구현 run `32658658526`의 양 OS PASS는 유효한 부분 증거지만 이 재현 뒤의 최종 closure로 사용하지 않는다. archive listing을 먼저 완전히 캡처해 tar 성공과 blocked-path predicate를 분리하고 같은 negative fixture를 GREEN으로 만든 뒤 새 clean same-SHA 양 OS run을 요구한다.

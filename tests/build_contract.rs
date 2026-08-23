@@ -373,6 +373,14 @@ runs:
 }
 
 #[test]
+fn linux_release_verifier_does_not_hide_a_blocked_path_behind_pipefail_sigpipe() {
+    let verifier = read_project_file("scripts/verify_release_bundle.sh");
+    assert!(verifier.contains("archive_listing=$(tar -tzf \"$ARCHIVE\")"));
+    assert!(verifier.contains("<<<\"$archive_listing\""));
+    assert!(!verifier.contains("tar -tzf \"$ARCHIVE\" | grep"));
+}
+
+#[test]
 fn winx_license_exception_is_version_scoped_and_time_bounded() {
     let deny_config = read_project_file("deny.toml");
     let guide = read_project_file("BUILD_GUIDE.md");
