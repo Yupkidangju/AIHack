@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use aihack_content::ContentRegistry;
 use aihack_core::{
@@ -27,10 +27,22 @@ pub const PHASE3_GOBLIN_START: Pos = Pos { x: 20, y: 12 };
 pub const PHASE4_POTION_START: Pos = Pos { x: 8, y: 5 };
 pub const PHASE7_WAND_START_CHARGES: u8 = 3;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct GameWorld {
     state: WorldState<EntityStore>,
+    registry: ContentRegistry,
+    corpse_jackal_data: aihack_core::domain::item::ItemData,
 }
+
+impl PartialEq for GameWorld {
+    fn eq(&self, other: &Self) -> bool {
+        self.state == other.state
+            && self.registry.content_hash() == other.registry.content_hash()
+            && self.corpse_jackal_data == other.corpse_jackal_data
+    }
+}
+
+impl Eq for GameWorld {}
 
 impl Deref for GameWorld {
     type Target = WorldState<EntityStore>;
@@ -40,13 +52,26 @@ impl Deref for GameWorld {
     }
 }
 
-impl DerefMut for GameWorld {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.state
-    }
-}
-
 impl GameWorld {
+    pub fn from_saved_world(saved: SavedWorldV1) -> Result<Self, aihack_core::error::GameError> {
+        crate::save::validate_saved_world(&saved)?;
+        Ok(Self::from_saved_world_with_registry(
+            saved,
+            aihack_content::registry()?,
+        )?)
+    }
+
+    /// 호환 시나리오의 `ResolveDeath` 직전 HP 0 world만 구성하는 제한 경계다.
+    pub fn from_depleted_saved_world(
+        saved: SavedWorldV1,
+    ) -> Result<Self, aihack_core::error::GameError> {
+        crate::save::validate_depleted_saved_world(&saved)?;
+        Ok(Self::from_saved_world_with_registry(
+            saved,
+            aihack_content::registry()?,
+        )?)
+    }
+
     pub fn try_fixture_phase5() -> Result<Self, ContentError> {
         Self::try_fixture_phase5_with_registry(aihack_content::registry()?)
     }
@@ -54,8 +79,13 @@ impl GameWorld {
     pub fn try_fixture_phase5_with_registry(
         registry: &ContentRegistry,
     ) -> Result<Self, ContentError> {
+        let state = crate::bootstrap::initial_world(registry)?;
+        let corpse_jackal_data =
+            crate::domain::item::try_item_data_from_registry(ItemKind::CorpseJackal, registry)?;
         Ok(Self {
-            state: crate::bootstrap::initial_world(registry)?,
+            state,
+            registry: registry.clone(),
+            corpse_jackal_data,
         })
     }
 
@@ -78,7 +108,7 @@ impl GameWorld {
 
     pub fn fixture_without_monsters() -> Self {
         let mut world = Self::fixture_phase5();
-        world.entities.clear_monsters();
+        world.state.entities.clear_monsters();
         world
     }
 
@@ -88,6 +118,10 @@ impl GameWorld {
 
     pub fn state(&self) -> &WorldState<EntityStore> {
         &self.state
+    }
+
+    pub(crate) fn state_mut(&mut self) -> &mut WorldState<EntityStore> {
+        &mut self.state
     }
 
     pub fn current_level(&self) -> LevelId {
@@ -115,34 +149,37 @@ impl GameWorld {
     }
 
     pub fn current_map_mut(&mut self) -> &mut GameMap {
-        self.map_mut(self.current_level)
+        self.map_mut(self.state.current_level)
     }
 
     pub fn map(&self, level: LevelId) -> &GameMap {
         self.levels
             .map(level)
-            .expect("Phase 5 world는 fixed level map만 조회한다")
+            .expect("검증된 world는 요청한 level map을 가진다")
     }
 
     pub fn map_mut(&mut self, level: LevelId) -> &mut GameMap {
-        self.levels
+        self.state
+            .levels
             .map_mut(level)
-            .expect("Phase 5 world는 fixed level map만 갱신한다")
+            .expect("검증된 world는 갱신할 level map을 가진다")
     }
 
     pub fn player_location(&self) -> (LevelId, Pos) {
         self.entities
             .actor_location(self.player_id)
-            .expect("Phase 5 world는 항상 player actor 위치를 가진다")
+            .expect("검증된 world는 player actor 위치를 가진다")
     }
 
     pub fn set_player_location(&mut self, level: LevelId, pos: Pos) {
         let player_id = self.player_id;
         assert!(
-            self.entities.set_actor_location(player_id, level, pos),
-            "Phase 5 world는 항상 player actor를 가진다"
+            self.state
+                .entities
+                .set_actor_location(player_id, level, pos),
+            "검증된 world는 player actor를 가진다"
         );
-        self.current_level = level;
+        self.state.current_level = level;
     }
 
     pub fn player_pos(&self) -> Pos {
@@ -167,9 +204,9 @@ impl GameWorld {
     }
 
     pub fn identify_item_kind(&mut self, kind: ItemKind) {
-        if !self.identified_items.contains(&kind) {
-            self.identified_items.push(kind);
-            self.identified_items.sort_by_key(|kind| *kind as u8);
+        if !self.state.identified_items.contains(&kind) {
+            self.state.identified_items.push(kind);
+            self.state.identified_items.sort_by_key(|kind| *kind as u8);
         }
     }
 
@@ -181,13 +218,13 @@ impl GameWorld {
         self.gold
     }
     pub fn set_gold(&mut self, gold: u32) {
-        self.gold = gold;
+        self.state.gold = gold;
     }
     pub fn kill_count(&self) -> u32 {
         self.kill_count
     }
     pub fn set_kill_count(&mut self, kill_count: u32) {
-        self.kill_count = kill_count;
+        self.state.kill_count = kill_count;
     }
 
     pub fn carried_weight(&self) -> i16 {
@@ -209,21 +246,32 @@ impl GameWorld {
     }
 
     pub fn set_status(&mut self, status: Status) {
-        self.nutrition = status.nutrition;
-        self.luck = status.luck;
-        self.prayer_cooldown = status.prayer_cooldown;
-        self.paralysis_turns = status.paralysis_turns;
-        self.hallucinating = status.hallucinating;
+        self.state.nutrition = status.nutrition;
+        self.state.luck = status.luck;
+        self.state.prayer_cooldown = status.prayer_cooldown;
+        self.state.paralysis_turns = status.paralysis_turns;
+        self.state.hallucinating = status.hallucinating;
     }
 
     pub fn hunger_state(&self) -> HungerState {
         self.status().hunger_state()
     }
 
-    pub fn from_saved_world(saved: SavedWorldV1) -> Self {
-        Self {
+    pub(crate) fn from_saved_world_with_registry(
+        saved: SavedWorldV1,
+        registry: &ContentRegistry,
+    ) -> Result<Self, ContentError> {
+        let corpse_jackal_data =
+            crate::domain::item::try_item_data_from_registry(ItemKind::CorpseJackal, registry)?;
+        Ok(Self {
             state: saved.into(),
-        }
+            registry: registry.clone(),
+            corpse_jackal_data,
+        })
+    }
+
+    pub(crate) fn corpse_jackal_data(&self) -> aihack_core::domain::item::ItemData {
+        self.corpse_jackal_data
     }
 }
 

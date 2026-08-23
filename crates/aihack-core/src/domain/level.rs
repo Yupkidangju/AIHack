@@ -10,14 +10,14 @@ use crate::{
     position::Pos,
 };
 
-/// [v0.1.0] Phase 5 fixed level map과 식별자를 함께 보관한다.
+/// level map과 식별자를 함께 보관한다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameLevel {
     pub id: LevelId,
     pub map: GameMap,
 }
 
-/// [v0.1.0] Phase 5는 main:1, main:2 두 층만 deterministic 순서로 보관한다.
+/// level을 deterministic 순서로 보관한다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LevelRegistry {
     pub levels: Vec<GameLevel>,

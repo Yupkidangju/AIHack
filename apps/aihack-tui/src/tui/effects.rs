@@ -9,7 +9,7 @@ pub enum UiEffectKind {
     TrapFlash,
     ProjectileTrail,
     ScrollPulse,
-    /// [v0.2.0] Phase 19: 새로 보인 entity의 자동 라벨 effect.
+    /// 새로 보인 entity의 자동 라벨 effect다.
     NewEntityLabel,
     Info,
 }
@@ -46,7 +46,7 @@ pub fn project_event_with_config(
         UiEffectKind::TrapFlash => 140,
         UiEffectKind::ProjectileTrail => 100,
         UiEffectKind::ScrollPulse => 160,
-        // [v0.2.0] Phase 19: 자동 라벨 effect 지속 시간은 1200ms.
+        // 자동 라벨 effect는 1200ms 뒤 만료한다.
         UiEffectKind::NewEntityLabel => 1200,
         UiEffectKind::Info => 80,
     };

@@ -8,7 +8,7 @@ mod support;
 
 use support::session_builder::SessionBuilder;
 
-/// [v0.2.0] Phase 17: Title 상태에서 Enter 입력 시 CharacterCreation으로 전환한다.
+/// Title 상태의 Enter는 CharacterCreation으로 전환해야 한다.
 #[test]
 fn title_screen_wait_transitions_to_character_creation() {
     let mut session = GameSession::new(42);
@@ -19,7 +19,7 @@ fn title_screen_wait_transitions_to_character_creation() {
     assert!(matches!(session.run_state(), RunState::CharacterCreation));
 }
 
-/// [v0.2.0] Phase 17: CharacterCreation 상태에서 Enter 입력 시 Playing으로 전환한다.
+/// CharacterCreation 상태의 Enter는 Playing으로 전환해야 한다.
 #[test]
 fn character_creation_wait_transitions_to_playing() {
     let mut session = GameSession::new(42);
@@ -31,7 +31,7 @@ fn character_creation_wait_transitions_to_playing() {
     assert!(matches!(session.run_state(), RunState::Playing));
 }
 
-/// [v0.2.0] Phase 17: Title 상태에서 Quit 입력 시 GameOver로 전환한다.
+/// Title 상태에서 Quit 입력은 종료 상태로 전환해야 한다.
 #[test]
 fn title_quit_transitions_to_game_over() {
     let mut session = GameSession::new(42);
@@ -40,7 +40,7 @@ fn title_quit_transitions_to_game_over() {
     assert!(matches!(session.run_state(), RunState::GameOver { .. }));
 }
 
-/// [v0.2.0] Phase 17: Playing 상태에서 사망 시 GameOver { cause, final_score }로 전환한다.
+/// Playing 상태에서 사망하면 cause와 final_score를 가진 GameOver로 전환해야 한다.
 #[test]
 fn player_death_transitions_to_game_over_with_cause_and_score() {
     let mut session = GameSession::new_for_playing(42);
@@ -66,7 +66,7 @@ fn player_death_transitions_to_game_over_with_cause_and_score() {
     );
 }
 
-/// [v0.2.0] Phase 17: GameOver 상태에서는 Quit만 허용된다.
+/// GameOver 상태에서는 동결된 종료 행동만 허용해야 한다.
 #[test]
 fn game_over_rejects_non_quit_commands() {
     let mut session = SessionBuilder::playing(42)
@@ -82,7 +82,7 @@ fn game_over_rejects_non_quit_commands() {
     assert!(!outcome.accepted);
 }
 
-/// [v0.2.0] Phase 17: MorePrompt 상태에서는 AcknowledgeMore만 허용된다.
+/// MorePrompt 상태에서는 AcknowledgeMore만 허용해야 한다.
 #[test]
 fn more_prompt_allows_acknowledge_more() {
     let mut session = SessionBuilder::playing(42)
@@ -94,7 +94,7 @@ fn more_prompt_allows_acknowledge_more() {
     assert!(matches!(session.run_state(), RunState::Playing));
 }
 
-/// [v0.2.0] Phase 17: AwaitingDirection 상태에서 방향 입력 시 Playing으로 복귀한다.
+/// AwaitingDirection 상태의 방향 입력은 Playing으로 복귀해야 한다.
 #[test]
 fn awaiting_direction_returns_to_playing() {
     let mut session = SessionBuilder::playing(42)
@@ -109,7 +109,37 @@ fn awaiting_direction_returns_to_playing() {
     assert!(matches!(session.run_state(), RunState::Playing));
 }
 
-/// [v0.2.0] Phase 17: render_panels의 화면별 lines 함수들이 비어있지 않다.
+#[test]
+fn awaiting_direction_and_inventory_support_non_turn_cancel_and_typed_selection() {
+    let mut direction = SessionBuilder::playing(42)
+        .run_state(RunState::AwaitingDirection {
+            action: aihack::core::action::DirectionalAction::Open,
+        })
+        .build();
+    let before = direction.snapshot().stable_hash();
+    let cancelled = direction.submit(CommandIntent::AcknowledgeMore);
+    assert!(cancelled.accepted);
+    assert!(!cancelled.turn_advanced);
+    assert!(matches!(direction.run_state(), RunState::Playing));
+    assert_ne!(direction.snapshot().stable_hash(), before);
+
+    let mut inventory = SessionBuilder::playing(42)
+        .run_state(RunState::AwaitingInventorySelection {
+            action: aihack::core::action::InventoryAction::Wield,
+        })
+        .build();
+    let wielded = inventory.submit(CommandIntent::Wield {
+        item: aihack::core::EntityId(5),
+    });
+    assert!(wielded.accepted);
+    assert!(matches!(inventory.run_state(), RunState::Playing));
+    assert_eq!(
+        inventory.world().inventory().equipped_melee,
+        Some(aihack::core::EntityId(5))
+    );
+}
+
+/// render_panels의 화면별 line 함수는 실제 안내 내용을 제공해야 한다.
 #[test]
 fn screen_lines_are_not_empty() {
     use aihack::ui::tui::render_panels;

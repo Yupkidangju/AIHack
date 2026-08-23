@@ -13,9 +13,13 @@ use serde::Serialize;
 struct Args {
     #[arg(long)]
     seed: Option<u64>,
-    #[arg(long, default_value_t = 1000)]
+    #[arg(
+        long,
+        default_value_t = 1000,
+        value_parser = clap::value_parser!(u64).range(1..=1_000_000)
+    )]
     turns: u64,
-    #[arg(long, default_value = "wait-v1")]
+    #[arg(long, default_value = "survival-v1")]
     policy: String,
     #[arg(long)]
     save: Option<PathBuf>,
@@ -54,9 +58,18 @@ fn main() {
     let replay_in_path = resolve_runtime_arg(&artifact_store, args.replay_in.as_deref());
     let replay_out_path = resolve_runtime_arg(&artifact_store, args.replay_out.as_deref());
     let report_path = resolve_runtime_arg(&artifact_store, args.report.as_deref());
-    if replay_in_path.is_some() && replay_in_path == replay_out_path {
-        eprintln!("--replay-in and --replay-out must not resolve to the same path");
-        std::process::exit(2);
+    if let (Some(input), Some(output)) = (&replay_in_path, &replay_out_path) {
+        match artifact_store.paths_refer_to_same_artifact(input, output) {
+            Ok(true) => {
+                eprintln!("--replay-in and --replay-out must not resolve to the same path");
+                std::process::exit(2);
+            }
+            Ok(false) => {}
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
     }
     let mut session = if let Some(path) = &load_path {
         match artifact_store.load_session(path) {
@@ -145,11 +158,9 @@ fn main() {
         }
     };
     if let Some(path) = &replay_out_path {
-        for line in &trace {
-            if let Err(error) = artifact_store.append_replay_line(path, line) {
-                eprintln!("{error}");
-                std::process::exit(2);
-            }
+        if let Err(error) = artifact_store.append_replay_lines(path, &trace) {
+            eprintln!("{error}");
+            std::process::exit(2);
         }
     }
 
@@ -235,5 +246,25 @@ fn write_failure_report(
     };
     if let Err(write_error) = write_report(store, path, &report) {
         eprintln!("{write_error}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Args;
+    use clap::Parser;
+
+    #[test]
+    fn implicit_policy_is_survival_and_turn_bounds_are_closed() {
+        let defaults = Args::try_parse_from(["aihack-headless"]).unwrap();
+        assert_eq!(defaults.policy, "survival-v1");
+        assert_eq!(defaults.turns, 1_000);
+
+        for turns in ["1", "1000000"] {
+            assert!(Args::try_parse_from(["aihack-headless", "--turns", turns]).is_ok());
+        }
+        for turns in ["0", "1000001"] {
+            assert!(Args::try_parse_from(["aihack-headless", "--turns", turns]).is_err());
+        }
     }
 }

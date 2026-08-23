@@ -320,7 +320,7 @@ fn p8_g18_encumbrance_blocks_movement_when_over_threshold() {
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.saved().entities.clear_monsters()
     });
-    // Add enough heavy rocks to exceed threshold.
+    // 무게 한도를 넘도록 무거운 rock을 inventory relation과 함께 추가한다.
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         let owner = world.saved().player_id;
         for _ in 0..4 {
@@ -328,7 +328,12 @@ fn p8_g18_encumbrance_blocks_movement_when_over_threshold() {
                 ItemKind::Rock,
                 aihack::domain::entity::EntityLocation::Inventory { owner },
             );
-            let _ = world.saved().inventory.add_existing_with_next_letter(item);
+            let letter = world
+                .saved()
+                .inventory
+                .add_existing_with_next_letter(item)
+                .expect("fixture rock은 inventory letter를 받아야 한다");
+            assert!(world.saved().entities.set_item_letter(item, letter));
         }
     });
     let outcome = session.submit(CommandIntent::Move(Direction::East));

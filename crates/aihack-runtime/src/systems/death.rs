@@ -10,7 +10,7 @@ use aihack_core::{
     run_state::RunState,
 };
 
-use crate::{domain::item::item_data, systems::score, world::GameWorld};
+use crate::{systems::score, world::GameWorld};
 
 pub fn collect_death_events_after_attack(
     world: &mut GameWorld,
@@ -39,23 +39,25 @@ pub fn collect_death_events_if_hp_depleted(
 
     let location = world.entities.actor_location(entity);
     let kind = world.entities.get(entity).map(|entity| entity.kind());
+    let corpse_jackal_data = world.corpse_jackal_data();
     let difficulty = world
         .entities
         .get(entity)
         .and_then(|entity| entity.monster_difficulty())
         .unwrap_or_default();
-    world.entities.set_alive(entity, false);
+    world.state_mut().entities.set_alive(entity, false);
     if entity == world.player_id {
-        world.last_death_cause = Some(cause);
+        world.state_mut().last_death_cause = Some(cause);
     } else {
-        world.kill_count += 1;
-        world.gold = world.gold.saturating_add(u32::from(difficulty));
+        let state = world.state_mut();
+        state.kill_count += 1;
+        state.gold = state.gold.saturating_add(u32::from(difficulty));
     }
     let events = vec![GameEvent::EntityDied { entity, cause }];
     if let (Some((level, pos)), Some(EntityKind::Monster(MonsterKind::Jackal))) = (location, kind) {
-        world.entities.spawn_item_with_data(
+        world.state_mut().entities.spawn_item_with_data(
             ItemKind::CorpseJackal,
-            item_data(ItemKind::CorpseJackal),
+            corpse_jackal_data,
             EntityLocation::OnMap { level, pos },
         );
     }

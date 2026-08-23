@@ -6,7 +6,7 @@ OUTPUT_DIR=${1:-"$ROOT/output"}
 EXPECTED_COMMIT=${2:-$(git -C "$ROOT" rev-parse HEAD)}
 ARCHIVE="$OUTPUT_DIR/aihack-0.3.0-source.tar.gz"
 OWNER_APPROVAL_ID="AIHACK-OWNER-2026-07-20-NGPL-01"
-MODIFICATION_NOTICE_ID="AIHACK-MODIFICATIONS-2026-07-20-01"
+MODIFICATION_NOTICE_ID="AIHACK-MODIFICATIONS-2026-08-23-02"
 
 fail() {
     printf '%s\n' "$1" >&2
@@ -36,16 +36,35 @@ require_metadata_value() {
         || fail "$label $key mismatched: expected $expected, got $value"
 }
 
-for file in \
-    aihack \
-    aihack-headless \
-    LICENSE \
-    NOTICE \
-    MODIFICATIONS.md \
-    PROJECT_OWNER_LICENSE_APPROVAL.md \
-    RELEASE-METADATA \
-    SHA256SUMS \
-    aihack-0.3.0-source.tar.gz; do
+required=(
+    aihack
+    aihack-headless
+    LICENSE
+    NOTICE
+    MODIFICATIONS.md
+    PROJECT_OWNER_LICENSE_APPROVAL.md
+    RELEASE-METADATA
+    SHA256SUMS
+    aihack-0.3.0-source.tar.gz
+)
+mapfile -d '' -t actual_entries < <(find "$OUTPUT_DIR" -mindepth 1 -maxdepth 1 -print0)
+[[ "${#actual_entries[@]}" -eq "${#required[@]}" ]] \
+    || fail 'release output entry count mismatch'
+for path in "${actual_entries[@]}"; do
+    name=${path##*/}
+    [[ -f "$path" && ! -L "$path" ]] \
+        || fail "release output contains a directory or symbolic link: $name"
+    found=false
+    for expected in "${required[@]}"; do
+        if [[ "$name" == "$expected" ]]; then
+            found=true
+            break
+        fi
+    done
+    [[ "$found" == true ]] || fail "unexpected release output entry: $name"
+done
+
+for file in "${required[@]}"; do
     [[ -s "$OUTPUT_DIR/$file" ]] || {
         printf 'release artifact missing or empty: %s\n' "$file" >&2
         exit 1

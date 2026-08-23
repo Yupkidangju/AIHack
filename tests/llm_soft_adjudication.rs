@@ -1,5 +1,3 @@
-use std::{env, fs};
-
 use aihack::{
     core::GameSession,
     llm::soft_adjudication::{
@@ -114,12 +112,8 @@ fn high_contrast_and_reduced_motion_keep_semantic_text_and_dismiss_is_ui_only() 
     );
     assert!(panel_lines[0].contains("Soft judgment"));
 
-    app.handle_candidate(
-        UiCommandCandidate::DismissLlmResult,
-        std::path::Path::new("/tmp/unused-save.json"),
-        std::path::Path::new("/tmp/unused-load.json"),
-    )
-    .unwrap();
+    app.handle_candidate_owned(UiCommandCandidate::DismissLlmResult)
+        .unwrap();
     assert_eq!(app.revision(), before);
     assert!(app.soft_adjudication_lines()[0].contains("idle"));
 }
@@ -139,13 +133,8 @@ fn displaying_soft_adjudication_has_no_core_save_or_replay_truth_effect() {
         .iter()
         .any(|line| line.contains("LLM_UNAVAILABLE")));
 
-    let path = env::temp_dir().join(format!(
-        "aihack-soft-adjudication-save-{}.json",
-        std::process::id()
-    ));
-    app.save_to_path(&path).unwrap();
-    let saved = fs::read_to_string(&path).unwrap();
-    fs::remove_file(path).unwrap();
-    assert!(!saved.contains("LLM_UNAVAILABLE"));
-    assert!(!saved.contains("softAdjudication"));
+    app.quick_save().unwrap();
+    app.quick_load().unwrap();
+    assert_eq!(app.revision(), before_revision);
+    assert!(app.soft_adjudication_lines()[0].contains("idle"));
 }

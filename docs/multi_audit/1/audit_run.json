@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "turn": 1,
+  "project_root": "C:\\LocalDev\\rust\\AIHack",
+  "directory": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1",
+  "source_reports": [
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_01_contract_docs.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_02_core_runtime.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_03_file_security.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_04_tests_determinism.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_05_supply_chain_ci.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_06_ui_llm_platform.md"
+  ],
+  "final_report": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\final_audit_report_1.md",
+  "created_at_utc": "2026-08-23T11:30:07.175701+00:00"
+}

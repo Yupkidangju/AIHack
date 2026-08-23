@@ -1,5 +1,5 @@
 use aihack::core::{
-    causal::{CausalProjection, CausalSummary, CausalWitness, REQUIRED_CAUSAL_WITNESSES},
+    causal::{CausalProjection, CausalSummary, REQUIRED_CAUSAL_WITNESSES},
     policy::{run_to_turn, HeadlessPolicy},
     CommandIntent, Direction, EntityId, GameEvent, GameSession, RunState, SnapshotHash,
     TurnOutcome,
@@ -12,8 +12,9 @@ use aihack::domain::{
 
 const SEEDS: [u64; 3] = [42, 7, 1234];
 const TARGET_TURN: u64 = 1000;
+// Report 25의 alive/HP/max_hp 관계와 armor fixture를 함께 만족하는 정합 상태의 기준 hash다.
 const EXPECTED_CAUSAL_HASHES: [&str; 3] =
-    ["5cde4a5f145ff3af", "942403c665e19ad9", "01a8631d0ad95d96"];
+    ["e9737367c68c053d", "67074441a11c89da", "0c22555fc8344443"];
 
 fn semantic_state(session: &GameSession) -> serde_json::Value {
     let mut value = serde_json::to_value(session.snapshot()).unwrap();
@@ -69,9 +70,16 @@ fn survival_policy_hash_is_stable_across_three_runs_per_seed() {
 
 #[test]
 fn causal_fixture_covers_every_required_witness_for_each_seed() {
-    for (seed, expected_hash) in SEEDS.into_iter().zip(EXPECTED_CAUSAL_HASHES) {
-        let (summary, hash, turn) = run_causal_fixture(seed);
-
+    let runs = SEEDS
+        .into_iter()
+        .map(|seed| (seed, run_causal_fixture(seed)))
+        .collect::<Vec<_>>();
+    for (seed, (_, hash, _)) in &runs {
+        eprintln!("causal fixture seed={seed} hash={}", hash.0);
+    }
+    for ((seed, (summary, hash, turn)), expected_hash) in
+        runs.into_iter().zip(EXPECTED_CAUSAL_HASHES)
+    {
         assert!(turn >= TARGET_TURN, "seed={seed}");
         assert_eq!(hash.0, expected_hash, "seed={seed}");
         assert_eq!(summary.validate_required(), Ok(()), "seed={seed}");
@@ -108,7 +116,7 @@ fn causal_validator_rejects_event_only_turn_only_and_missing_witnesses() {
     let mut summary = CausalSummary::default();
     let event_only = TurnOutcome {
         accepted: true,
-        turn_advanced: true,
+        turn_advanced: false,
         events: vec![GameEvent::PrayerOffered {
             entity: session.world().player_id(),
             cooldown_after: 100,
@@ -121,16 +129,40 @@ fn causal_validator_rejects_event_only_turn_only_and_missing_witnesses() {
     assert_eq!(summary.total_count(), 0);
     assert!(summary.validate_required().is_err());
 
+    let turn_only = TurnOutcome {
+        accepted: true,
+        turn_advanced: true,
+        events: Vec::new(),
+        snapshot_hash: SnapshotHash("turn-only".to_string()),
+        next_state: RunState::Playing,
+    };
+    summary.observe(&projection, CommandIntent::Wait, &turn_only, &projection);
+    assert_eq!(summary.total_count(), 0);
+
     let (complete, _, _) = run_causal_fixture(42);
-    assert!(complete
-        .without(CausalWitness::ArmorDefense)
-        .validate_required()
-        .is_err());
+    for witness in REQUIRED_CAUSAL_WITNESSES {
+        let missing = complete.clone().without(witness).validate_required();
+        assert_eq!(missing, Err(vec![witness]), "witness={witness:?}");
+    }
+}
+
+#[test]
+fn gold_score_witness_uses_a_paired_production_score() {
+    let causal_source = include_str!("../crates/aihack-runtime/src/causal.rs");
+    assert!(
+        causal_source.contains("score::paired_gold_scores"),
+        "GoldScore projection must call the production paired score path"
+    );
+    assert!(
+        !causal_source.contains("let score_without_gold = i64::from(world.kill_count())"),
+        "GoldScore projection must not duplicate the production score formula"
+    );
 }
 
 fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
     let mut session = GameSession::new_for_playing(seed);
     let mut summary = CausalSummary::default();
+    record_independent_monster_attribution(seed, &mut summary);
     let food = inventory_item(&session, ItemKind::FoodRation);
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.saved().nutrition = 100;
@@ -144,18 +176,27 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.set_player_pos(aihack::core::Pos { x: 5, y: 10 });
         world.saved().entities.set_alive(EntityId(3), false);
-        world
+        let jackal = world
             .saved()
             .entities
             .actor_stats_mut(EntityId(2))
-            .expect("jackal stats must exist")
-            .hp = 100;
+            .expect("jackal stats must exist");
+        jackal.hp = 100;
+        jackal.max_hp = 100;
     });
     for _ in 0..16 {
+        let before_pos = session
+            .world()
+            .entities()
+            .actor_location(EntityId(2))
+            .unwrap();
         submit_and_observe(&mut session, &mut summary, CommandIntent::Wait);
-        if summary.count(CausalWitness::MonsterSpeed) > 0
-            && summary.count(CausalWitness::MonsterAi) > 0
-        {
+        let after_pos = session
+            .world()
+            .entities()
+            .actor_location(EntityId(2))
+            .unwrap();
+        if after_pos != before_pos {
             break;
         }
     }
@@ -174,6 +215,7 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
             .actor_stats_mut(EntityId(2))
             .expect("jackal stats must exist");
         jackal.hp = 100;
+        jackal.max_hp = 100;
         jackal.ai_kind = Some(MonsterAiKind::Stationary);
     });
     submit_and_observe(&mut session, &mut summary, CommandIntent::Pray);
@@ -218,11 +260,12 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
             .expect("jackal stats must exist");
         jackal.hp = 1;
         jackal.ai_kind = Some(MonsterAiKind::Stationary);
-        saved
+        let player = saved
             .entities
             .actor_stats_mut(player_id)
-            .expect("player stats must exist")
-            .hp = 100;
+            .expect("player stats must exist");
+        player.hp = 100;
+        player.max_hp = 100;
     });
     for _ in 0..32 {
         if !session
@@ -270,11 +313,12 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
             .entities
             .set_item_location(armor, EntityLocation::Inventory { owner }));
         if !world.saved().inventory.contains(armor) {
-            world
+            let letter = world
                 .saved()
                 .inventory
                 .add_existing_with_next_letter(armor)
                 .expect("armor must receive an inventory letter");
+            assert!(world.saved().entities.set_item_letter(armor, letter));
         }
     });
     submit_and_observe(
@@ -293,6 +337,54 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
     submit_and_observe(&mut session, &mut summary, CommandIntent::Quit);
 
     (summary, session.snapshot().stable_hash(), session.turn())
+}
+
+fn record_independent_monster_attribution(seed: u64, summary: &mut CausalSummary) {
+    let prepare = |speed: i16, ai_kind: MonsterAiKind| {
+        let mut session = GameSession::new_for_playing(seed);
+        aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+            world.set_player_pos(aihack::core::Pos { x: 5, y: 10 });
+            world.saved().entities.set_alive(EntityId(3), false);
+            let jackal = world
+                .saved()
+                .entities
+                .actor_stats_mut(EntityId(2))
+                .expect("jackal stats must exist");
+            jackal.hp = 100;
+            jackal.max_hp = 100;
+            jackal.speed = speed;
+            jackal.ai_kind = Some(ai_kind);
+        });
+        session
+    };
+
+    let mut speed_active = prepare(12, MonsterAiKind::ChaseVisiblePlayer);
+    let mut speed_control = prepare(0, MonsterAiKind::ChaseVisiblePlayer);
+    let speed_active_before = CausalProjection::from_session(&speed_active);
+    let speed_control_before = CausalProjection::from_session(&speed_control);
+    assert!(speed_active.submit(CommandIntent::Wait).accepted);
+    assert!(speed_control.submit(CommandIntent::Wait).accepted);
+    summary.observe_monster_speed_pair(
+        &speed_active_before,
+        &CausalProjection::from_session(&speed_active),
+        &speed_control_before,
+        &CausalProjection::from_session(&speed_control),
+        EntityId(2),
+    );
+
+    let mut ai_active = prepare(12, MonsterAiKind::ChaseVisiblePlayer);
+    let mut ai_control = prepare(12, MonsterAiKind::Stationary);
+    let ai_active_before = CausalProjection::from_session(&ai_active);
+    let ai_control_before = CausalProjection::from_session(&ai_control);
+    assert!(ai_active.submit(CommandIntent::Wait).accepted);
+    assert!(ai_control.submit(CommandIntent::Wait).accepted);
+    summary.observe_monster_ai_pair(
+        &ai_active_before,
+        &CausalProjection::from_session(&ai_active),
+        &ai_control_before,
+        &CausalProjection::from_session(&ai_control),
+        EntityId(2),
+    );
 }
 
 fn submit_and_observe(

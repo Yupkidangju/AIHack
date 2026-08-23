@@ -25,6 +25,18 @@ pub struct HeadlessRunReport {
     pub final_hash: SnapshotHash,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplayMismatchField {
+    TurnBefore,
+    Accepted,
+    TurnAdvanced,
+    Events,
+    OutcomeSnapshotHash,
+    NextState,
+    SnapshotHashAfter,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Error, Serialize)]
 pub enum HeadlessRunError {
     #[error("no accepted action at turn {turn} after {attempts} attempts")]
@@ -37,6 +49,12 @@ pub enum HeadlessRunError {
     GameOver { turn: u64, submitted_commands: u64 },
     #[error("replay ended before target turn {turn}")]
     ReplayExhausted { turn: u64, submitted_commands: u64 },
+    #[error("replay integrity mismatch at line {line}: {field:?}")]
+    ReplayMismatch {
+        line: usize,
+        field: ReplayMismatchField,
+        submitted_commands: u64,
+    },
 }
 
 impl HeadlessRunError {
@@ -50,49 +68,105 @@ impl HeadlessRunError {
             }
             | Self::ReplayExhausted {
                 submitted_commands, ..
+            }
+            | Self::ReplayMismatch {
+                submitted_commands, ..
             } => *submitted_commands,
         }
     }
 }
 
 /// Replay line의 command를 순서대로 적용해 absolute target turn까지 재생한다.
-pub fn run_replay_to_turn<C: GameClient + ?Sized>(
+pub fn run_replay_to_turn<C: GameClient + Clone>(
     session: &mut C,
     target_turn: u64,
     replay: &[ReplayLineV1],
 ) -> Result<HeadlessRunReport, HeadlessRunError> {
     let start_turn = session.revision().turn;
+    let mut working = session.clone();
     let mut submitted_commands = 0;
-    for line in replay {
-        if session.revision().turn >= target_turn {
+    for (line_index, line) in replay.iter().enumerate() {
+        if working.revision().turn >= target_turn {
             break;
         }
+        let line_number = line_index + 1;
+        if line.turn_before != working.revision().turn {
+            return Err(replay_mismatch(
+                line_number,
+                ReplayMismatchField::TurnBefore,
+                submitted_commands,
+            ));
+        }
         submitted_commands += 1;
-        session.submit(line.command);
-        if matches!(session.run_state(), RunState::GameOver { .. }) {
+        let actual = working.submit(line.command);
+        for (matches, field) in [
+            (
+                actual.accepted == line.outcome.accepted,
+                ReplayMismatchField::Accepted,
+            ),
+            (
+                actual.turn_advanced == line.outcome.turn_advanced,
+                ReplayMismatchField::TurnAdvanced,
+            ),
+            (
+                actual.events == line.outcome.events,
+                ReplayMismatchField::Events,
+            ),
+            (
+                actual.snapshot_hash == line.outcome.snapshot_hash,
+                ReplayMismatchField::OutcomeSnapshotHash,
+            ),
+            (
+                actual.next_state == line.outcome.next_state,
+                ReplayMismatchField::NextState,
+            ),
+            (
+                actual.snapshot_hash == line.snapshot_hash_after,
+                ReplayMismatchField::SnapshotHashAfter,
+            ),
+        ] {
+            if !matches {
+                return Err(replay_mismatch(line_number, field, submitted_commands));
+            }
+        }
+        if matches!(working.run_state(), RunState::GameOver { .. }) {
             return Err(HeadlessRunError::GameOver {
-                turn: session.revision().turn,
+                turn: working.revision().turn,
                 submitted_commands,
             });
         }
     }
-    if session.revision().turn < target_turn {
+    if working.revision().turn < target_turn {
         return Err(HeadlessRunError::ReplayExhausted {
-            turn: session.revision().turn,
+            turn: working.revision().turn,
             submitted_commands,
         });
     }
-    let observation = session.observation();
-    let revision = session.revision();
-    Ok(HeadlessRunReport {
+    let observation = working.observation();
+    let revision = working.revision();
+    let report = HeadlessRunReport {
         seed: observation.seed,
         policy: HeadlessPolicy::ReplayFile,
         requested_turns: target_turn,
         accepted_turns: revision.turn - start_turn,
         submitted_commands,
-        final_state: session.run_state(),
+        final_state: working.run_state(),
         final_hash: revision.snapshot_hash,
-    })
+    };
+    *session = working;
+    Ok(report)
+}
+
+fn replay_mismatch(
+    line: usize,
+    field: ReplayMismatchField,
+    submitted_commands: u64,
+) -> HeadlessRunError {
+    HeadlessRunError::ReplayMismatch {
+        line,
+        field,
+        submitted_commands,
+    }
 }
 
 /// 목표 absolute turn까지 진행하며, 한 turn에서 최대 16개 후보만 시도한다.

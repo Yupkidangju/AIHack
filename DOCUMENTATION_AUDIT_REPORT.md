@@ -170,7 +170,8 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 | cargo-audit / cargo-deny | PASS; cargo-audit는 local advisory DB 사용 |
 | 독립 R8 문서 시정 감사 | PASS — report 21이 report 20의 `IMP-F016`/`DBG-F008`/`XPF-F011` 종결 |
 | Linux/Windows remote CI evidence | PASS — R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`, Actions `32034295607` |
-| report 23 통합 시정 | coder remediation 로컬 완료 / 독립 재감사 대기 |
+| report 23/24 통합 시정 | report 24와 same-SHA Actions `32107862171`로 historical closed |
+| final multi-audit report 1 | HOLD / 2026-08-23 coder remediation과 전체 재검증 진행 |
 
 따라서 R8 문서 구현은 독립 감사에 전달 가능한 상태지만, 전체 프로그램 또는 외부 배포 `PASS`는 아직 선언하지 않는다.
 
@@ -219,10 +220,10 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - report 20의 active-state/false-green 시정은 PASS로 종결됐으며 해당 재감사 대기는 더 이상 current state가 아님
 - 외부 게시 승인은 별도 운영 gate로 유지
 
-### 10.10 `docs/audit/audit_report_22.md` / `docs/audit/audit_report_23.md` 현재 상태 (2026-08-18)
+### 10.10 `docs/audit/audit_report_22.md` / `docs/audit/audit_report_23.md` 역사적 상태 (2026-08-18)
 
 - report 22의 5절은 Initial Finding, 4·7절은 2026-08-17 post-fix 판정으로 분리했으며 report 23이 장기 witness false-green을 후속 HOLD함
-- report 23의 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017은 coder remediation과 로컬 표적 검증을 완료했으나 독립 재감사 전에는 Verified로 승격하지 않음
+- report 23의 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017은 report 24 재감사와 후속 same-SHA CI로 종결됐으며 현재 pending gate로 사용하지 않음
 - `hallucinating` compatibility risk는 Project owner/runtime maintainer가 소유하고 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 시점에 재검토
 
 ### 10.11 `docs/audit/audit_report_24.md` 시정 상태 (2026-08-18)
@@ -231,3 +232,9 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - `SEC-F003`: Unix mode 0600과 Windows parent DACL 상속을 분리해 문서·코드·platform test를 정렬
 - `IMP-F019`: SC-CAUSE-01..07을 audit roadmap/implementation summary의 production 심볼·테스트 함수에 개별 연결
 - 현재 권한 상태: implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171` 양 OS PASS. 후속 독립 재감사와 외부 게시 승인은 별도 gate
+
+### 10.12 `docs/audit/audit_report_25.md` 현재 상태 (2026-08-23)
+
+- final multi-audit report 1은 audited HEAD `80d959af94cb08c5d9b2f2601f5e63f3827a1210`의 역사적 FIN-F001..F018 입력이며 첫 coder remediation은 partial evidence로 보존
+- `docs/audit/audit_report_25.md`가 inverse save relation, writer budget, replay alias, paired score, production TUI/terminal, release actual-set과 active lifecycle을 다시 HOLD했으므로 현재 권위로 사용
+- report 25 시정의 RED/GREEN, 전체 로컬 gate, 새 clean same-SHA Ubuntu/Windows CI와 독립 재감사가 기록되기 전까지 program HOLD이며 report 23/24 대기를 current state로 되살리지 않음

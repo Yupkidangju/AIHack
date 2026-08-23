@@ -1,6 +1,6 @@
 # AIHack Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-08-23
 
 ### Added
 
@@ -9,6 +9,9 @@
 - 동일 seed의 A/B registry로 armor `ac_bonus`, monster `speed`/`ai`/`passive`, item `base_price`가 실제 simulation 상태를 바꾸는지 검증하는 테스트를 추가했다.
 - `CausalProjection`, 9종 typed `CausalWitness`와 seed별 witness multiset/final hash 반복 및 negative acceptance gate를 추가했다.
 - capability 기반 save/load/replay/report `ArtifactStore`와 hard-link/symlink/temp-file 보안 회귀를 추가했다.
+- SaveDataV1 semantic validator, artifact/RNG/text 예산, replay field별 self-verification과 no-partial-commit 회귀를 추가했다.
+- state-aware Inventory/MorePrompt/cancel/storage-error TUI, 실제 high-contrast renderer, mouse capture와 terminal restore failure-injection test를 추가했다.
+- dependency exception JSON ledger와 expiry/graph negative gate, Windows release bundle PowerShell verifier와 tamper matrix를 추가했다.
 
 ### Changed
 
@@ -19,6 +22,10 @@
 - report 20/21/22/23의 역사적 finding, 종결 권한, 새 HOLD와 coder remediation 상태를 분리했다.
 - `SC-CAUSE-01`부터 `SC-CAUSE-07`까지 각 계약을 production 책임 심볼과 정확한 테스트 함수에 개별 매핑했다.
 - save 권한 계약을 Unix mode `0600`과 Windows parent DACL 상속으로 구분해 Windows owner-only 과대주장을 제거했다.
+- headless 기본 policy를 `survival-v1`, `--turns`를 `1..=1,000,000`으로 고정하고 public `DerefMut` mutation 우회를 제거했다.
+- v0.3.0 release modification 범위를 2026-08-23까지 확장하고 CI action을 immutable commit으로 고정했다.
+- report 25 재감사에 따라 save read/write 예산, replay path identity, GoldScore production pair, TUI dispatcher/CTA geometry, release output exact-set을 단일 production 계약으로 강화했다.
+- active audit authority를 `docs/audit/audit_report_25.md` HOLD로 전환하고 first final-audit remediation의 broad-green 주장을 partial historical evidence로 분류했다.
 
 ### Fixed
 
@@ -27,10 +34,16 @@
 - `RUSTSEC-2026-0253`을 제거하도록 전이 의존성 `lru`를 0.18.2로 갱신했다.
 - 두 binary의 `--help`에서 오래된 v0.1.0/Phase 설명을 제거하고 현재 제품 설명으로 교체했다.
 - `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception`을 version-scoped cargo-deny exception으로 기록해 cargo-deny 0.19.4 license gate를 복구했다.
+- malformed save panic/모호한 entity 수용, forged replay 성공, injected registry corpse drift와 armor drop AC 누적을 수정했다.
+- TUI quick-save ambient path, dead inventory affordance, 전역 Esc quit, theme/mouse 미연결과 terminal cleanup short-circuit를 수정했다.
+- Windows bundle의 legacy include, metadata/record 불일치, zero-size, duplicate/wrong checksum fail-open 경로를 수정했다.
+- inverse inventory owner/index, actor HP/alive와 armor overflow malformed save가 수용되거나 panic하던 경계를 typed `InvalidSave`로 닫고, writer가 self-unloadable 16 MiB 초과 save를 게시하지 않도록 수정했다.
+- replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
+- Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.
 
-## [0.3.0] - 2026-07-20
+### 2026-07-20 기준 누적 내역
 
-### Added
+#### Added
 
 - `AI_IMPLEMENTATION_DOC_STANDARD.md`에 맞춘 v0.3.0 리팩터링 구현 계획을 `spec.md`, `IMPLEMENTATION_SUMMARY.md`, `GAP_CLOSURE_ROADMAP.md`, `audit_roadmap.md`에 작성했다.
 - build reproducibility, private state transaction, runtime content registry, accepted-turn 1000 검증, workspace 경계, local LLM transport/revision gate, provenance/compatibility의 R0~R8 Task와 종료 게이트를 정의했다.
@@ -60,7 +73,7 @@
 - R6 재감사를 위해 versioned `LlmRequestInput`/`LlmObservationView`, request·response schema mismatch gate와 synchronous payload bound를 추가했다.
 - `scripts/r6_loopback_fixture.py`, `scripts/r6_pty_matrix.sh`, `scripts/r6_pending_exit_smoke.sh`를 추가해 success/timeout/stale/down과 pending-exit terminal 복원을 재현 가능하게 했다.
 
-### Changed
+#### Changed
 
 - `audit_report_20.md`의 `IMP-F016`/`DBG-F008` 후속 시정으로 구현 요약 최상단, `G-LICENSE-001`, R8 전체 테스트 표현을 실제 evidence와 정렬하고 section/row별 positive·negative 문서 회귀 gate를 추가했다.
 - `audit_report_19.md`의 `IMP-F016`/`XPF-F011` 시정으로 활성 README, 구현 요약, gap/audit roadmap, build guide, ADR와 문서 감사표를 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16` 및 Actions run `29886410221`의 same-SHA 양 OS success와 동기화했다. 기술 gate PASS와 문서 시정 재감사 HOLD를 분리해 기록한다.
@@ -93,13 +106,13 @@
 - Windows 병렬 테스트에서 해제된 ephemeral port가 재사용되던 경합을 transport/TUI 통합 테스트에서 제거하고, 연결 직후 종료하는 loopback fixture로 LLM `Unavailable` 분류를 결정론적으로 검증한다. 환경 잠금 poison은 후속 독립 테스트로 전파하지 않는다.
 - `audit_report_10.md`의 IMP-F009/010 시정으로 public LLM error/command enum을 non-exhaustive 계약에 맞추고 TUI consumer에 wildcard 처리를 추가했다.
 
-### Security
+#### Security
 
 - LLM은 loopback endpoint와 presentation-only 권한을 기본으로 하며, stale/invalid response와 자유 텍스트 state mutation을 차단하는 계획을 명시했다.
 - local LLM endpoint의 scheme/credential/query/fragment와 resolve 결과를 검증하고, client 연결 주소를 loopback으로 고정했으며 redirect와 system proxy를 비활성화했다.
 - 출처 상태가 `Approved`가 아닌 legacy 코드·데이터·문자열은 runtime 포함 및 배포를 금지하는 gate를 명시했다.
 
-### Verification
+#### Verification
 
 - R0 문서 gate는 PASS다.
 - R1의 로컬 fmt, clippy, test, release build, cargo audit, cargo deny gate는 통과했다. Linux/Windows 원격 CI는 workflow push 후에만 PASS로 기록한다.

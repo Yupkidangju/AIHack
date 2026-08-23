@@ -34,7 +34,7 @@ pub fn resolve_attack_with_profile(
     profile: AttackProfile,
 ) -> Option<AttackResolution> {
     aihack_core::domain::combat::resolve_attack_with_profile(
-        &mut world.entities,
+        world.state_mut().entities.inner_mut(),
         rng,
         attacker_id,
         defender_id,

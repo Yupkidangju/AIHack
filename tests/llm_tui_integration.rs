@@ -1,26 +1,38 @@
 use std::{
     io::{Read, Write},
     net::TcpListener,
-    path::Path,
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
     thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use aihack::{
     core::{CommandIntent, GameSession},
-    ui::tui::{key_to_candidate, LlmUiStatus, TuiApp, UiCommandCandidate, UiRuntimeConfig},
+    ui::tui::{
+        key_to_candidate, LlmUiStatus, TuiApp, UiClock, UiCommandCandidate, UiRuntimeConfig,
+    },
 };
 use aihack_llm::config::LlmRequestKind;
-use aihack_llm::{
-    config::LocalLlmConfig,
-    service::{LocalLlmPort, LocalLlmService},
-};
+use aihack_llm::{config::LocalLlmConfig, service::LocalLlmService};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-fn unused() -> &'static Path {
-    Path::new("/tmp/aihack-unused.json")
+#[derive(Default)]
+struct TestClock(AtomicU64);
+
+impl TestClock {
+    fn advance(&self, milliseconds: u64) {
+        self.0.fetch_add(milliseconds, Ordering::Relaxed);
+    }
+}
+
+impl UiClock for TestClock {
+    fn now(&self) -> Duration {
+        Duration::from_millis(self.0.load(Ordering::Relaxed))
+    }
 }
 
 #[test]
@@ -50,7 +62,7 @@ fn disabled_llm_cta_is_typed_and_does_not_mutate_core() {
     let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
     let before = app.revision();
 
-    app.handle_candidate(UiCommandCandidate::LlmNarrative, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmNarrative)
         .unwrap();
 
     assert_eq!(app.llm_status(), &LlmUiStatus::Disabled);
@@ -66,20 +78,20 @@ fn judge_modal_bounds_unicode_input_and_queues_only_valid_trimmed_text() {
         true,
     );
     let before = app.revision();
-    app.handle_candidate(UiCommandCandidate::LlmJudge, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmJudge)
         .unwrap();
     assert_eq!(app.soft_input(), Some(""));
 
     for _ in 0..241 {
-        app.handle_candidate(UiCommandCandidate::LlmInput('가'), unused(), unused())
+        app.handle_candidate_owned(UiCommandCandidate::LlmInput('가'))
             .unwrap();
     }
     assert_eq!(app.soft_input().unwrap().chars().count(), 240);
-    app.handle_candidate(UiCommandCandidate::LlmBackspace, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmBackspace)
         .unwrap();
-    app.handle_candidate(UiCommandCandidate::LlmInput('!'), unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmInput('!'))
         .unwrap();
-    app.handle_candidate(UiCommandCandidate::LlmSubmitInput, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmSubmitInput)
         .unwrap();
 
     let request = app.take_llm_request().unwrap();
@@ -99,11 +111,11 @@ fn empty_judge_submission_stays_in_the_modal_without_a_request() {
         UiRuntimeConfig::default(),
         true,
     );
-    app.handle_candidate(UiCommandCandidate::LlmJudge, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmJudge)
         .unwrap();
-    app.handle_candidate(UiCommandCandidate::LlmInput(' '), unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmInput(' '))
         .unwrap();
-    app.handle_candidate(UiCommandCandidate::LlmSubmitInput, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmSubmitInput)
         .unwrap();
 
     assert_eq!(app.soft_input(), Some(" "));
@@ -178,7 +190,7 @@ fn live_decision_waits_for_explicit_apply_and_soft_verdict_never_submits() {
         true,
     );
     decision_app
-        .handle_candidate(UiCommandCandidate::LlmSuggest, unused(), unused())
+        .handle_candidate_owned(UiCommandCandidate::LlmSuggest)
         .unwrap();
     decision_app.dispatch_llm_request(&decision_service);
     poll_until_ready(&mut decision_app, &decision_service);
@@ -186,7 +198,7 @@ fn live_decision_waits_for_explicit_apply_and_soft_verdict_never_submits() {
     assert!(decision_app.decision_lines()[0].contains("Provider"));
 
     decision_app
-        .handle_candidate(UiCommandCandidate::LlmApply, unused(), unused())
+        .handle_candidate_owned(UiCommandCandidate::LlmApply)
         .unwrap();
     assert_eq!(decision_app.observation().turn, 1);
     assert!(decision_service.shutdown_with_grace(Duration::from_millis(250)));
@@ -201,15 +213,15 @@ fn live_decision_waits_for_explicit_apply_and_soft_verdict_never_submits() {
     );
     let before = soft_app.revision();
     soft_app
-        .handle_candidate(UiCommandCandidate::LlmJudge, unused(), unused())
+        .handle_candidate_owned(UiCommandCandidate::LlmJudge)
         .unwrap();
     for character in "I greet the guard.".chars() {
         soft_app
-            .handle_candidate(UiCommandCandidate::LlmInput(character), unused(), unused())
+            .handle_candidate_owned(UiCommandCandidate::LlmInput(character))
             .unwrap();
     }
     soft_app
-        .handle_candidate(UiCommandCandidate::LlmSubmitInput, unused(), unused())
+        .handle_candidate_owned(UiCommandCandidate::LlmSubmitInput)
         .unwrap();
     soft_app.dispatch_llm_request(&soft_service);
     poll_until_ready(&mut soft_app, &soft_service);
@@ -231,28 +243,70 @@ fn response_becomes_stale_when_core_advances_before_tui_acceptance() {
         UiRuntimeConfig::default(),
         true,
     );
-    app.handle_candidate(UiCommandCandidate::LlmSuggest, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmSuggest)
         .unwrap();
     app.dispatch_llm_request(&service);
-    app.handle_candidate(
-        UiCommandCandidate::Command(CommandIntent::Wait),
-        unused(),
-        unused(),
-    )
-    .unwrap();
+    app.handle_candidate_owned(UiCommandCandidate::Command(CommandIntent::Wait))
+        .unwrap();
 
-    let deadline = Instant::now() + Duration::from_secs(1);
-    while matches!(app.llm_status(), LlmUiStatus::Pending { .. }) {
-        app.poll_llm_response(&service);
-        assert!(Instant::now() < deadline);
-        thread::yield_now();
-    }
+    assert!(service.wait_for_response(Duration::from_secs(5)));
+    app.poll_llm_response(&service);
     assert_eq!(app.llm_status(), &LlmUiStatus::Stale);
-    app.handle_candidate(UiCommandCandidate::LlmApply, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmApply)
         .unwrap();
     assert_eq!(app.observation().turn, 1);
     assert!(service.shutdown_with_grace(Duration::from_millis(250)));
     server.join().unwrap();
+}
+
+#[test]
+fn reset_ignored_response_is_discarded_before_matching_a_new_outstanding_request() {
+    let _lock = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let narrative_body =
+        r#"{"choices":[{"message":{"content":"{\"kind\":\"NARRATIVE\",\"text\":\"Old run.\"}"}}]}"#;
+    let decision_body = r#"{"choices":[{"message":{"content":"{\"kind\":\"DECISION\",\"action\":{\"type\":\"WAIT\"},\"rationale\":\"New run.\",\"confidence\":0.5}"}}]}"#;
+    let (mut old_service, old_server) = service_for_response(narrative_body);
+    let (mut new_service, new_server) = service_for_response(decision_body);
+    let mut app = TuiApp::new_with_llm_enabled(
+        GameSession::new_for_playing(42),
+        UiRuntimeConfig::default(),
+        true,
+    );
+
+    app.handle_candidate_owned(UiCommandCandidate::LlmNarrative)
+        .unwrap();
+    app.dispatch_llm_request(&old_service);
+    app.handle_candidate_owned(UiCommandCandidate::NewRun)
+        .unwrap();
+    app.handle_candidate_owned(UiCommandCandidate::LlmSuggest)
+        .unwrap();
+    app.dispatch_llm_request(&new_service);
+    assert!(matches!(
+        app.llm_status(),
+        LlmUiStatus::Pending {
+            kind: LlmRequestKind::Decision,
+            ..
+        }
+    ));
+
+    let old_envelope = old_service
+        .recv_timeout(Duration::from_secs(5))
+        .expect("old response signal");
+    app.accept_llm_response(old_envelope);
+
+    assert!(matches!(
+        app.llm_status(),
+        LlmUiStatus::Pending {
+            kind: LlmRequestKind::Decision,
+            ..
+        }
+    ));
+    assert!(old_service.shutdown_with_grace(Duration::from_millis(250)));
+    assert!(new_service.shutdown_with_grace(Duration::from_millis(250)));
+    old_server.join().unwrap();
+    new_server.join().unwrap();
 }
 
 #[test]
@@ -268,18 +322,13 @@ fn unsupported_response_schema_is_rejected_before_tui_payload_acceptance() {
         true,
     );
     let before = app.revision();
-    app.handle_candidate(UiCommandCandidate::LlmNarrative, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmNarrative)
         .unwrap();
     app.dispatch_llm_request(&service);
 
-    let deadline = Instant::now() + Duration::from_secs(1);
-    let mut envelope = loop {
-        if let Some(envelope) = service.try_recv() {
-            break envelope;
-        }
-        assert!(Instant::now() < deadline);
-        thread::yield_now();
-    };
+    let mut envelope = service
+        .recv_timeout(Duration::from_secs(5))
+        .expect("response signal");
     envelope.schema_version = 2;
     app.accept_llm_response(envelope);
 
@@ -300,30 +349,28 @@ fn connection_failure_shows_down_and_fallback_without_core_effect() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let (address, unavailable_server) = spawn_disconnect_server();
     let mut service = LocalLlmService::from_config(config_for_address(address)).unwrap();
-    let mut app = TuiApp::new_with_llm_enabled(
+    let clock = Arc::new(TestClock::default());
+    let mut app = TuiApp::new_with_llm_enabled_and_clock(
         GameSession::new_for_playing(42),
         UiRuntimeConfig::default(),
         true,
+        clock.clone(),
     );
     let before = app.revision();
-    app.handle_candidate(UiCommandCandidate::LlmNarrative, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmNarrative)
         .unwrap();
     app.dispatch_llm_request(&service);
 
-    let deadline = Instant::now() + Duration::from_secs(1);
-    while matches!(app.llm_status(), LlmUiStatus::Pending { .. }) {
-        app.poll_llm_response(&service);
-        assert!(Instant::now() < deadline);
-        thread::yield_now();
-    }
+    assert!(service.wait_for_response(Duration::from_secs(5)));
+    app.poll_llm_response(&service);
     assert_eq!(app.llm_status(), &LlmUiStatus::Unavailable);
     assert_eq!(app.revision(), before);
     assert_eq!(app.narrative_lines()[1], "Local narrator unavailable.");
-    app.handle_candidate(UiCommandCandidate::LlmRetry, unused(), unused())
+    app.handle_candidate_owned(UiCommandCandidate::LlmRetry)
         .unwrap();
     assert!(app.take_llm_request().is_none());
-    thread::sleep(Duration::from_millis(260));
-    app.handle_candidate(UiCommandCandidate::LlmRetry, unused(), unused())
+    clock.advance(250);
+    app.handle_candidate_owned(UiCommandCandidate::LlmRetry)
         .unwrap();
     assert!(matches!(
         app.take_llm_request(),
@@ -334,12 +381,8 @@ fn connection_failure_shows_down_and_fallback_without_core_effect() {
 }
 
 fn poll_until_ready(app: &mut TuiApp, service: &LocalLlmService) {
-    let deadline = Instant::now() + Duration::from_secs(1);
-    while matches!(app.llm_status(), LlmUiStatus::Pending { .. }) {
-        app.poll_llm_response(service);
-        assert!(Instant::now() < deadline);
-        thread::yield_now();
-    }
+    assert!(service.wait_for_response(Duration::from_secs(5)));
+    app.poll_llm_response(service);
     assert_eq!(app.llm_status(), &LlmUiStatus::Ready);
 }
 

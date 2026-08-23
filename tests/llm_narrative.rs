@@ -110,6 +110,7 @@ fn provider_failure_uses_fallback() {
     );
     assert_eq!(response.source, NarrativeSource::Fallback);
     assert!(!response.text.is_empty());
+    assert!(response.text.starts_with("Turn "));
 }
 
 #[test]

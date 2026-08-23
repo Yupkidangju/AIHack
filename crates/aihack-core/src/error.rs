@@ -5,6 +5,22 @@ use crate::{
     position::Pos,
 };
 
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum SaveValidationError {
+    #[error("resource limit exceeded for {resource}: limit {limit}, actual {actual}")]
+    ResourceLimit {
+        resource: String,
+        limit: u64,
+        actual: u64,
+    },
+    #[error("save seed {save_seed} does not match RNG seed {rng_seed}")]
+    RngSeedMismatch { save_seed: u64, rng_seed: u64 },
+    #[error("invalid persisted text at event {event_index}")]
+    InvalidText { event_index: usize },
+    #[error("invalid persisted world: {reason}")]
+    InvalidWorld { reason: String },
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum GameError {
     #[error(transparent)]
@@ -29,6 +45,8 @@ pub enum GameError {
     Serialization(String),
     #[error("save schema mismatch: expected {expected}, actual {actual}")]
     SaveSchemaVersionMismatch { expected: u16, actual: u16 },
+    #[error("invalid save: {0}")]
+    InvalidSave(#[from] SaveValidationError),
     #[error("invalid CLI option: {0}")]
     InvalidCliOption(String),
     #[error("invalid runtime path: {0}")]

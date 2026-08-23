@@ -191,6 +191,8 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
         "cargo fmt --all -- --check",
         "cargo clippy --workspace --all-targets --locked -- -D warnings",
         "cargo test --workspace --all-targets --locked",
+        "cargo test --locked -p aihack --test dependency_exception_gate",
+        "cargo test --locked -p aihack --test dependency_duplicate_gate",
         "cargo build --workspace --release --locked",
         "cargo audit",
         "cargo deny check licenses bans sources",
@@ -198,6 +200,39 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
     ] {
         assert!(workflow.contains(command), "CI command: {command}");
     }
+    let uses = workflow
+        .lines()
+        .map(str::trim)
+        .filter_map(|line| {
+            line.strip_prefix("- uses:")
+                .or_else(|| line.strip_prefix("uses:"))
+        })
+        .map(str::trim)
+        .collect::<Vec<_>>();
+    assert!(
+        !uses.is_empty(),
+        "workflow must contain action uses entries"
+    );
+    for action in uses {
+        let (_, reference) = action
+            .rsplit_once('@')
+            .unwrap_or_else(|| panic!("action ref missing: {action}"));
+        assert_eq!(
+            reference.len(),
+            40,
+            "action ref must be a full SHA: {action}"
+        );
+        assert!(
+            reference
+                .chars()
+                .all(|character| character.is_ascii_hexdigit()),
+            "action ref must be a full SHA: {action}"
+        );
+    }
+    assert!(workflow.contains("# actions/checkout v4.4.0"));
+    assert!(!workflow.contains("# actions/checkout v4.2.2"));
+    assert!(!workflow.contains("actions/checkout@v4"));
+    assert!(!workflow.contains("dtolnay/rust-toolchain@1.94.1"));
 
     for release_gate in [
         "if: runner.os == 'Linux'",
@@ -222,6 +257,7 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
 fn winx_license_exception_is_version_scoped_and_time_bounded() {
     let deny_config = read_project_file("deny.toml");
     let guide = read_project_file("BUILD_GUIDE.md");
+    let ledger = read_project_file("dependency-exceptions.json");
 
     for contract in [
         "[[licenses.exceptions]]",
@@ -238,5 +274,16 @@ fn winx_license_exception_is_version_scoped_and_time_bounded() {
         "다른 crate에는 이 exception을 확장하지 않는다",
     ] {
         assert!(guide.contains(contract), "BUILD_GUIDE 누락: {contract}");
+    }
+    for contract in [
+        "DEP-EXC-0001",
+        "\"winx\": \"0.36.4\"",
+        "\"expires_on\": \"2026-10-31\"",
+        "\"cap-primitives\": \"4.0.2\"",
+    ] {
+        assert!(
+            ledger.contains(contract),
+            "exception ledger 누락: {contract}"
+        );
     }
 }

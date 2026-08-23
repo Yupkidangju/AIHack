@@ -1,6 +1,6 @@
 # NetHack 3.6.7 Compatibility Records
 
-문서 상태: R7 engineering PASS WITH KNOWN RISKS, project-owner NGPL approval recorded, report 21 closed report 20 remediation, report 23 coder remediation pending independent re-audit
+문서 상태: NH367-C001..C010 engineering/provenance closed; current program gate is audit report 25 remediation/re-audit
 작성일: 2026-07-15 (2026-07-18 R7 구현 갱신)
 관련 Task: R7-2
 기준: `../../spec.md` 13절, `../../PROVENANCE.md`

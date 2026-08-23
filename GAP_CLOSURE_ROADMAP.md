@@ -19,6 +19,7 @@
 - baseline hash는 의도와 ADR 없이 갱신하지 않는다.
 - 이 문서의 계획 작성은 코드 구현 완료를 의미하지 않는다.
 - `Closed`는 해당 gap의 독립 audit 또는 동등한 re-audit evidence가 source·test·문서 정합성을 확인했음을 뜻한다. `Verified`는 구현 검증이 끝났지만 독립 closure evidence가 아직 없는 중간 상태다.
+- aggregate gap은 연결된 active child 중 가장 낮은 lifecycle보다 앞설 수 없다. child가 `Implemented`이면 aggregate도 최대 `Implemented`이고, 모두 로컬 gate를 통과한 뒤에만 함께 `Verified`로 올린다.
 
 ## 2. 우선순위
 
@@ -38,8 +39,8 @@
 | G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | locked dependency/security policy와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-003 | P1 | build script가 copy 실패를 무시 | fail-fast script와 `audit_report_3.md` independent verification | R1-2 | SC-BUILD-01 | Closed |
 | G-BUILD-004 | P1 | CI 부재 | report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, [Actions `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171) Ubuntu/Windows success | R1-3 | SC-BUILD-02 | Closed |
-| G-BUILD-005 | P0 | Windows Git Bash R7/R8 checkpoint가 CRLF manifest에서 실패 | `.gitattributes` LF 정책, script CR 제거, CRLF positive/checksum drift negative와 Windows 실제 R7/R8 exit 0 | R8/R9 시정 | SC-BUILD-01, SC-COMPAT-01 | Implemented / report 23 re-audit pending |
-| G-BUILD-006 | P0 | `winx 0.36.4` LLVM exception이 cargo-deny allowlist와 불일치 | ADR-0033 version-scoped exception, cargo-deny 0.19.4 실제 PASS, same-SHA Actions `32107862171` | report 24 시정 | SC-BUILD-01, SC-LICENSE-01 | Closed / re-audit pending |
+| G-BUILD-005 | P0 | Windows Git Bash R7/R8 checkpoint가 CRLF manifest에서 실패 | report 24 재감사와 Actions `32107862171` 양 OS 검증 | R8/R9 시정 | SC-BUILD-01, SC-COMPAT-01 | Closed |
+| G-BUILD-006 | P0 | `winx 0.36.4` exception lifecycle/graph drift | cargo-deny PASS와 report 24는 역사적 종결; `DEP-EXC-0001` expiry/version/graph negative gate는 final audit 시정으로 구현 | final audit FIN-F013 | SC-BUILD-01, SC-LICENSE-01 | Implemented |
 | G-RUN-001 | P1 | README 기본 실행 명령 실패 | default binary/run command와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-CORE-001 | P0 | session/world mutable field 공개 | private state, read accessor, fixture boundary와 `audit_report_3.md` independent verification | R2-1, R2-2 | SC-CORE-01 | Closed |
 | G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy transaction과 no-commit regression, `audit_report_3.md` independent verification | R2-3 | SC-CORE-02 | Closed |
@@ -48,18 +49,19 @@
 | G-DATA-002 | P1 | invalid embedded content가 session bootstrap에서 panic 가능 | fallible TUI/headless bootstrap, injected missing level/item regression, `audit_report_3.md` independent verification | R3-1, R3-4 | SC-DATA-01 | Closed |
 | G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | policy runner 조기 실패 처리와 3 seed accepted turn 1000, `audit_report_6.md` 재감사 | R4-1, R4-2 | SC-TEST-01 | Closed |
 | G-TEST-002 | P1 | long-run 반복 hash가 실제 1000 accepted turn을 증명하지 않음 | 3 seed x 1000 accepted turn x 3회 hash, `audit_report_6.md` 재감사 | R4-2 | SC-TEST-02 | Closed |
-| G-TEST-003 | P0 | R9 장기 테스트가 필수 causal witness 전체를 증명하지 않음 | 9종 typed witness, seed 42/7/1234 x 1000턴 x 3회 witness multiset/final hash, event-only·turn-only·누락 negative gate | R9-6 | SC-CAUSE-05, SC-CAUSE-06, SC-CAUSE-07 | Implemented / report 23 re-audit pending |
+| G-TEST-003 | P0 | R9 causal witness 원인별 독립성 | field별 A/B pair attribution, exact gold score, seed 42/7/1234 x 1000턴 x 3회 record/hash | final audit FIN-F006 | SC-CAUSE-05, SC-CAUSE-06, SC-CAUSE-07 | Implemented |
 | G-ARCH-001 | P2 | core/UI/LLM이 한 package dependency tree 공유 | 7개 crate/app workspace, app core 직접 의존 0건, R4 hash 유지, `audit_report_6.md` 재감사 | R5-1, R5-2 | SC-ARCH-01 | Closed |
 | G-LLM-001 | P0 | 실제 local LLM provider 없음 | loopback transport·strict response validation·bounded worker 구현, `audit_report_11.md` 독립 재감사 | R6-1, R6-6 | SC-LLM-01 | Closed |
 | G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | transport deadline·deterministic fallback·재현 fixture 구현, `audit_report_11.md` 독립 재감사 | R6-1, R6-6 | SC-LLM-01 | Closed |
 | G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | versioned request/response, opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증; `audit_report_11.md` 독립 재감사 | R6-2, R6-6 | SC-LLM-02 | Closed |
 | G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0; `audit_report_11.md` 독립 재감사 | R6-3, R6-6 | SC-LLM-03 | Closed |
-| G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests | R7-2 | SC-COMPAT-01 | Closed / License risk tracked separately |
+| G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests; license risk는 별도 ledger | R7-2 | SC-COMPAT-01 | Closed |
 | G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | 0.3.0 동기화와 report 20 active-status/false-green 시정을 `audit_report_21.md`가 Verified | R8-1 | SC-DOC-01 | Closed |
-| G-DOC-004 | P0 | report 20/22 과거 finding과 현재 권한 상태 혼재 | report 21 종결 계보, report 22 Initial/Current 상태, report 23 새 HOLD와 coder remediation을 분리 | R9 시정 | SC-DOC-01 | Implemented / report 23 re-audit pending |
-| G-DOC-005 | P2 | SC-CAUSE-01..07 개별 ID가 실행·테스트 책임에 연결되지 않음 | 7개 개별 ID/code/test 중앙 매핑·문서 회귀와 same-SHA Actions `32107862171` PASS | report 24 시정 | SC-CAUSE-01, SC-CAUSE-02, SC-CAUSE-03, SC-CAUSE-04, SC-CAUSE-05, SC-CAUSE-06, SC-CAUSE-07 | Closed / re-audit pending |
-| G-SEC-001 | P0 | 예측 가능한 save temp와 replay link open이 외부 파일을 손상 가능 | ADR-0032 `ArtifactStore`, no-follow/single-link handle 검증, atomic temp replace와 Windows hard-link 회귀 | R9 시정 | SEC-F001 | Implemented / report 23 re-audit pending |
-| G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | Unix 0600/Windows parent DACL 계약과 양 OS same-SHA Actions `32107862171` PASS | report 24 시정 | SEC-F003 | Closed / re-audit pending |
+| G-DOC-004 | P0 | 과거 finding과 현재 권한 상태 혼재 | report 23/24는 historical closed, final multi-audit report 1 HOLD를 current authority로 단일화 | final audit FIN-F012 | SC-DOC-01 | Implemented |
+| G-DOC-005 | P2 | SC-CAUSE-01..07 개별 ID mapping | report 24와 same-SHA Actions `32107862171`이 종결 | report 24 시정 | SC-CAUSE-01..07 | Closed |
+| G-SEC-001 | P0 | artifact link/root/ambient path 경계 | root no-follow, atomic replay rewrite, app-owned TUI store와 link/budget 회귀 | final audit FIN-F004/F018 | SEC-F001 | Implemented |
+| G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | report 24와 Actions `32107862171`이 Unix 0600/Windows parent DACL 계약을 종결 | report 24 시정 | SEC-F003 | Closed |
+| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 25 재현 HOLD | 첫 시정의 broad local green은 report 25 production probes로 partial evidence로 강등; R25 IMP/DBG/SEC 13개 finding 시정·RED/GREEN·same-SHA CI 필요 | report 25 remediation | FIN-F001..F018과 report 25 finding 13건 | Implemented |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -256,4 +258,4 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0 문서화와 R1~R8의 기존 remediation은 `audit_report_21.md`가 report 20의 `IMP-F016`/`DBG-F008`을 Verified하면서 종결됐다. R6는 `audit_report_11.md`, R8 문서 closure는 `audit_report_21.md`가 종결 권한이다. R9 기준 commit `41a1b63f11a57a671b0f705883431dab24298b5a`의 Actions run `32034295607`은 양 OS success다. 이후 `docs/audit/audit_report_23.md`가 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017의 새 HOLD를 열었고, 2026-08-18 coder remediation은 구현·표적 검증을 마쳤으나 독립 재감사 전까지 전체 프로그램과 외부 게시는 HOLD다.
+R0 문서화와 R1~R8의 기존 remediation은 `docs/audit/audit_report_21.md`가 report 20의 `IMP-F016`/`DBG-F008`을 Verified하면서 종결됐다. R6는 `audit_report_11.md`, R8 문서 closure는 `audit_report_21.md`가 종결 권한이다. report 23/24는 implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`와 Actions run `32107862171`로 historical closed다. final multi-audit report 1의 첫 remediation은 `docs/audit/audit_report_25.md`가 9 Major/4 Minor production 결함을 재현해 partial evidence로 강등했다. 현재 authority는 report 25 HOLD이며 child/aggregate gap은 `Implemented`; 시정 전체 로컬 gate 뒤 함께 `Verified`, 독립 재감사 뒤에만 `Closed`로 올린다.

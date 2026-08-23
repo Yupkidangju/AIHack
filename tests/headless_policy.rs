@@ -1,7 +1,10 @@
 use aihack::{
     core::{
-        policy::{run_replay_to_turn, run_to_turn, run_to_turn_with_trace, HeadlessPolicy},
-        CommandIntent, Direction, GameSession,
+        policy::{
+            run_replay_to_turn, run_to_turn, run_to_turn_with_trace, HeadlessPolicy,
+            HeadlessRunError, ReplayMismatchField,
+        },
+        CommandIntent, Direction, GameSession, RunState, SnapshotHash,
     },
     testing::SessionBuilder,
 };
@@ -52,6 +55,80 @@ fn replay_runner_replays_recorded_commands_to_the_absolute_target() {
         replayed.snapshot().stable_hash(),
         source.snapshot().stable_hash()
     );
+}
+
+#[test]
+fn replay_runner_rejects_each_tampered_integrity_field_without_partial_commit() {
+    type ReplayMutation = Box<dyn Fn(&mut aihack::core::ReplayLineV1)>;
+    type ReplayCase = (ReplayMismatchField, ReplayMutation);
+
+    let mut source = GameSession::new_for_playing(42);
+    let (_, trace) = run_to_turn_with_trace(&mut source, 1, HeadlessPolicy::wait_v1()).unwrap();
+    let cases: Vec<ReplayCase> = vec![
+        (
+            ReplayMismatchField::TurnBefore,
+            Box::new(|line| line.turn_before = 999),
+        ),
+        (
+            ReplayMismatchField::Accepted,
+            Box::new(|line| line.outcome.accepted = false),
+        ),
+        (
+            ReplayMismatchField::TurnAdvanced,
+            Box::new(|line| line.outcome.turn_advanced = false),
+        ),
+        (
+            ReplayMismatchField::Events,
+            Box::new(|line| line.outcome.events.clear()),
+        ),
+        (
+            ReplayMismatchField::OutcomeSnapshotHash,
+            Box::new(|line| line.outcome.snapshot_hash = SnapshotHash("forged-inner".into())),
+        ),
+        (
+            ReplayMismatchField::NextState,
+            Box::new(|line| line.outcome.next_state = RunState::Title),
+        ),
+        (
+            ReplayMismatchField::SnapshotHashAfter,
+            Box::new(|line| line.snapshot_hash_after = SnapshotHash("forged-outer".into())),
+        ),
+    ];
+
+    for (expected_field, mutate) in cases {
+        let mut tampered = trace.clone();
+        mutate(&mut tampered[0]);
+        let mut replayed = GameSession::new_for_playing(42);
+        let before = replayed.snapshot().stable_hash();
+
+        let error = run_replay_to_turn(&mut replayed, 1, &tampered).unwrap_err();
+
+        assert!(matches!(
+            error,
+            HeadlessRunError::ReplayMismatch {
+                line: 1,
+                field,
+                ..
+            } if field == expected_field
+        ));
+        assert_eq!(replayed.turn(), 0);
+        assert_eq!(replayed.snapshot().stable_hash(), before);
+    }
+}
+
+#[test]
+fn replay_exhaustion_does_not_commit_a_valid_prefix() {
+    let mut source = GameSession::new_for_playing(42);
+    let (_, trace) = run_to_turn_with_trace(&mut source, 1, HeadlessPolicy::wait_v1()).unwrap();
+    let mut replayed = GameSession::new_for_playing(42);
+    let before = replayed.snapshot().stable_hash();
+
+    assert!(matches!(
+        run_replay_to_turn(&mut replayed, 2, &trace),
+        Err(HeadlessRunError::ReplayExhausted { .. })
+    ));
+    assert_eq!(replayed.turn(), 0);
+    assert_eq!(replayed.snapshot().stable_hash(), before);
 }
 
 #[test]

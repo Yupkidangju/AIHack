@@ -1,4 +1,4 @@
-use aihack::core::{CommandIntent, GameSession, RunState};
+use aihack::core::{error::GameError, CommandIntent, GameSession};
 
 fn save_with_inventory_owner(owner: u32) -> aihack::core::SaveDataV1 {
     let save = GameSession::new_for_playing(42).to_save_data();
@@ -8,18 +8,11 @@ fn save_with_inventory_owner(owner: u32) -> aihack::core::SaveDataV1 {
 }
 
 #[test]
-fn invariant_failure_rejects_without_committing_world_or_turn() {
-    let mut session = GameSession::from_save_data(save_with_inventory_owner(2)).unwrap();
-    let before_hash = session.snapshot().stable_hash();
-    let before_turn = session.turn();
-
-    let outcome = session.submit(CommandIntent::Wait);
-
-    assert!(!outcome.accepted);
-    assert!(!outcome.turn_advanced);
-    assert_eq!(session.turn(), before_turn);
-    assert_eq!(session.snapshot().stable_hash(), before_hash);
-    assert_eq!(session.run_state(), RunState::Playing);
+fn invalid_persisted_invariant_is_rejected_before_session_creation() {
+    assert!(matches!(
+        GameSession::from_save_data(save_with_inventory_owner(2)),
+        Err(GameError::InvalidSave(_))
+    ));
 }
 
 #[test]
@@ -37,14 +30,9 @@ fn rejected_command_preserves_the_following_deterministic_turn() {
 }
 
 #[test]
-fn invariant_failure_discards_rng_draws_from_the_working_copy() {
-    let mut session = GameSession::from_save_data(save_with_inventory_owner(2)).unwrap();
-    let before_rng = session.to_save_data().rng_state;
-
-    let outcome = session.submit(CommandIntent::Move(aihack::core::Direction::East));
-
-    assert!(!outcome.accepted);
-    assert_eq!(session.to_save_data().rng_state, before_rng);
+fn invalid_persisted_invariant_cannot_materialize_an_rng() {
+    let result = GameSession::from_save_data(save_with_inventory_owner(2));
+    assert!(matches!(result, Err(GameError::InvalidSave(_))));
 }
 
 #[test]

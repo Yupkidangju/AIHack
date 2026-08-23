@@ -128,7 +128,7 @@ impl ReleaseFixture {
         fs::write(root.join("README.md"), "> Current code: Cargo 0.3.0\n").unwrap();
         fs::write(
             root.join("CHANGELOG.md"),
-            "# Changelog\n\n## [0.3.0] - 2026-07-20\n",
+            "# Changelog\n\n## [0.3.0] - 2026-08-23\n",
         )
         .unwrap();
         fs::write(

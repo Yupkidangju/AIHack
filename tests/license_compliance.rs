@@ -200,7 +200,7 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
 
     let modifications = project_file("MODIFICATIONS.md");
     for phrase in [
-        "2025-05-20..2026-07-20",
+        "2025-05-20..2026-08-23",
         "src/**",
         "crates/**",
         "apps/**",
@@ -218,7 +218,7 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
     assert!(metadata.contains("version=0.3.0"));
     assert!(metadata.contains("commit=$Format:%H$"));
     assert!(metadata.contains("owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01"));
-    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01"));
+    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-08-23-02"));
 }
 
 #[test]
@@ -275,6 +275,7 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     let linux = project_file("build.sh");
     let windows = project_file("build.bat");
     let verifier = project_file("scripts/verify_release_bundle.sh");
+    let windows_verifier = project_file("scripts/verify_release_bundle.ps1");
     let attributes = project_file(".gitattributes");
 
     for required in [
@@ -304,13 +305,26 @@ fn release_packaging_includes_license_notice_and_complete_source() {
         "Windows checkout에서도 Bash 검증 스크립트의 LF를 보존해야 한다"
     );
     assert!(linux.contains("verify_release_bundle.sh"));
+    assert!(windows.contains("verify_release_bundle.ps1"));
+    for contract in [
+        "release source archive contains an excluded path",
+        "metadata mismatch or duplicate key",
+        "SHA256SUMS record count mismatch",
+        "duplicate SHA256SUMS record",
+        "release artifact is empty",
+    ] {
+        assert!(
+            windows_verifier.contains(contract),
+            "Windows verifier 누락: {contract}"
+        );
+    }
     assert!(
         windows.contains("git show HEAD:LICENSE"),
         "Windows binary bundle도 Git blob의 공식 LICENSE 바이트를 포함해야 한다"
     );
     for reference in [
         "owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01",
-        "modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01",
+        "modification_notice=AIHACK-MODIFICATIONS-2026-08-23-02",
     ] {
         assert!(linux.contains(reference), "build.sh 누락: {reference}");
         assert!(windows.contains(reference), "build.bat 누락: {reference}");

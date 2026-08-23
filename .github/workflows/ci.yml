@@ -17,9 +17,11 @@ jobs:
         os: [ubuntu-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout v4.4.0 — https://github.com/actions/checkout/releases/tag/v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Install Rust 1.94.1
-        uses: dtolnay/rust-toolchain@1.94.1
+        # dtolnay/rust-toolchain 1.94.1 — https://github.com/dtolnay/rust-toolchain/commit/75be91dd2711b583df57c31d0873b4145c89f1d9
+        uses: dtolnay/rust-toolchain@75be91dd2711b583df57c31d0873b4145c89f1d9
         with:
           components: rustfmt, clippy
       - name: Verify locked metadata
@@ -30,6 +32,10 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Run tests
         run: cargo test --workspace --all-targets --locked
+      - name: Verify dependency exception expiry and graph
+        run: cargo test --locked -p aihack --test dependency_exception_gate
+      - name: Verify duplicate dependency budget
+        run: cargo test --locked -p aihack --test dependency_duplicate_gate
       - name: Verify canonical R7 and R8 checkpoints
         shell: bash
         run: ./scripts/r7_checkpoint.sh && ./scripts/r8_checkpoint.sh

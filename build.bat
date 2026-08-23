@@ -83,7 +83,7 @@ if "!BUILD_TYPE!"=="release" (
     >>"%OUTPUT_DIR%\RELEASE-METADATA" echo version=0.3.0
     >>"%OUTPUT_DIR%\RELEASE-METADATA" echo commit=!RELEASE_COMMIT!
     >>"%OUTPUT_DIR%\RELEASE-METADATA" echo source_license=NGPL
-    >>"%OUTPUT_DIR%\RELEASE-METADATA" echo modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01
+    >>"%OUTPUT_DIR%\RELEASE-METADATA" echo modification_notice=AIHACK-MODIFICATIONS-2026-08-23-02
     >>"%OUTPUT_DIR%\RELEASE-METADATA" echo owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01
     git archive --format=zip --output="%OUTPUT_DIR%\aihack-0.3.0-source.zip" HEAD
     if errorlevel 1 exit /b 1
@@ -93,17 +93,19 @@ if "!BUILD_TYPE!"=="release" (
     )
     tar -tf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA Cargo.toml >nul
     if errorlevel 1 exit /b 1
-    powershell -NoProfile -Command "$archiveMetadata=@(& tar -xOf '%OUTPUT_DIR%\aihack-0.3.0-source.zip' RELEASE-METADATA); if($LASTEXITCODE -ne 0){exit 1}; $expected=[ordered]@{product='AIHack';version='0.3.0';commit='!RELEASE_COMMIT!';source_license='NGPL';modification_notice='AIHACK-MODIFICATIONS-2026-07-20-01';owner_approval='AIHACK-OWNER-2026-07-20-NGPL-01'}; function Assert-Metadata([string[]]$lines){foreach($key in $expected.Keys){$prefix=$key+'='; $matches=@($lines | Where-Object {$_.StartsWith($prefix,[System.StringComparison]::Ordinal)}); if($matches.Count -ne 1 -or $matches[0] -cne ($prefix+$expected[$key])){Write-Error ('invalid release metadata key: '+$key); exit 1}}}; Assert-Metadata (Get-Content -LiteralPath '%OUTPUT_DIR%\RELEASE-METADATA'); Assert-Metadata $archiveMetadata"
+    powershell -NoProfile -Command "$archiveMetadata=@(& tar -xOf '%OUTPUT_DIR%\aihack-0.3.0-source.zip' RELEASE-METADATA); if($LASTEXITCODE -ne 0){exit 1}; $expected=[ordered]@{product='AIHack';version='0.3.0';commit='!RELEASE_COMMIT!';source_license='NGPL';modification_notice='AIHACK-MODIFICATIONS-2026-08-23-02';owner_approval='AIHACK-OWNER-2026-07-20-NGPL-01'}; function Assert-Metadata([string[]]$lines){foreach($key in $expected.Keys){$prefix=$key+'='; $matches=@($lines | Where-Object {$_.StartsWith($prefix,[System.StringComparison]::Ordinal)}); if($matches.Count -ne 1 -or $matches[0] -cne ($prefix+$expected[$key])){Write-Error ('invalid release metadata key: '+$key); exit 1}}}; Assert-Metadata (Get-Content -LiteralPath '%OUTPUT_DIR%\RELEASE-METADATA'); Assert-Metadata $archiveMetadata"
     if errorlevel 1 exit /b 1
     findstr /c:"Approval ID: `AIHACK-OWNER-2026-07-20-NGPL-01`" "%OUTPUT_DIR%\PROJECT_OWNER_LICENSE_APPROVAL.md" >nul
     if errorlevel 1 exit /b 1
     tar -xOf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" PROJECT_OWNER_LICENSE_APPROVAL.md | findstr /c:"Approval ID: `AIHACK-OWNER-2026-07-20-NGPL-01`" >nul
     if errorlevel 1 exit /b 1
-    findstr /c:"Notice ID: `AIHACK-MODIFICATIONS-2026-07-20-01`" "%OUTPUT_DIR%\MODIFICATIONS.md" >nul
+    findstr /c:"Notice ID: `AIHACK-MODIFICATIONS-2026-08-23-02`" "%OUTPUT_DIR%\MODIFICATIONS.md" >nul
     if errorlevel 1 exit /b 1
-    tar -xOf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" MODIFICATIONS.md | findstr /c:"Notice ID: `AIHACK-MODIFICATIONS-2026-07-20-01`" >nul
+    tar -xOf "%OUTPUT_DIR%\aihack-0.3.0-source.zip" MODIFICATIONS.md | findstr /c:"Notice ID: `AIHACK-MODIFICATIONS-2026-08-23-02`" >nul
     if errorlevel 1 exit /b 1
-    powershell -NoProfile -Command "$names=@('aihack.exe','aihack-headless.exe','LICENSE','NOTICE','MODIFICATIONS.md','PROJECT_OWNER_LICENSE_APPROVAL.md','RELEASE-METADATA','aihack-0.3.0-source.zip'); $lines=foreach($name in $names){$hash=(Get-FileHash -Algorithm SHA256 (Join-Path '%OUTPUT_DIR%' $name)).Hash.ToLower(); $hash+'  '+$name}; Set-Content -Encoding Ascii (Join-Path '%OUTPUT_DIR%' 'SHA256SUMS') $lines"
+    powershell -NoProfile -Command "function Hash([string]$path){$stream=[IO.File]::OpenRead($path);try{$sha=[Security.Cryptography.SHA256]::Create();try{return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}}finally{$stream.Dispose()}}; $names=@('aihack.exe','aihack-headless.exe','LICENSE','NOTICE','MODIFICATIONS.md','PROJECT_OWNER_LICENSE_APPROVAL.md','RELEASE-METADATA','aihack-0.3.0-source.zip'); $lines=foreach($name in $names){(Hash (Join-Path '%OUTPUT_DIR%' $name))+'  '+$name}; Set-Content -Encoding Ascii (Join-Path '%OUTPUT_DIR%' 'SHA256SUMS') $lines"
+    if errorlevel 1 exit /b 1
+    powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\verify_release_bundle.ps1" -OutputDir "%OUTPUT_DIR%" -ExpectedCommit "!RELEASE_COMMIT!"
     if errorlevel 1 exit /b 1
 )
 

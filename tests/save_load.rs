@@ -1,14 +1,18 @@
 use std::{env, fs};
 
 use aihack::{
-    core::{save, CommandIntent, Direction, EntityId, GameSession, GameSnapshot, SaveDataV1},
+    core::{
+        save::ArtifactStore, CommandIntent, Direction, EntityId, GameSession, GameSnapshot,
+        SaveDataV1,
+    },
     domain::inventory::InventoryLetter,
 };
 
-fn temp_path(name: &str) -> std::path::PathBuf {
-    let mut path = env::temp_dir();
-    path.push(format!("aihack-{name}-{}.json", std::process::id()));
-    path
+fn temp_store(name: &str) -> (std::path::PathBuf, ArtifactStore) {
+    let root = env::temp_dir().join(format!("aihack-{name}-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    let store = ArtifactStore::open(&root).unwrap();
+    (root, store)
 }
 
 #[test]
@@ -38,23 +42,26 @@ fn rng_state_restores_continuation() {
 
 #[test]
 fn save_load_preserves_snapshot_hash() {
-    let path = temp_path("save-hash");
+    let (root, store) = temp_store("save-hash");
+    let path = std::path::Path::new("save.json");
     let mut session = GameSession::new_for_playing(42);
     assert!(session.submit(CommandIntent::Wait).accepted);
     let before = session.snapshot().stable_hash();
-    save::save_session_to_path(&session, &path).unwrap();
-    let loaded = save::load_session_from_path(&path).unwrap();
+    store.save_session(&session, path).unwrap();
+    let loaded = store.load_session(path).unwrap();
     assert_eq!(before, loaded.snapshot().stable_hash());
-    let _ = fs::remove_file(path);
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn loaded_session_matches_direct_continuation() {
-    let path = temp_path("save-continue");
+    let (root, store) = temp_store("save-continue");
+    let path = std::path::Path::new("save.json");
     let mut direct = GameSession::new_for_playing(42);
     assert!(direct.submit(CommandIntent::Wait).accepted);
-    save::save_session_to_path(&direct, &path).unwrap();
-    let mut loaded = save::load_session_from_path(&path).unwrap();
+    store.save_session(&direct, path).unwrap();
+    let mut loaded = store.load_session(path).unwrap();
 
     let commands = [
         CommandIntent::Search,
@@ -73,12 +80,14 @@ fn loaded_session_matches_direct_continuation() {
         direct.snapshot().stable_hash(),
         loaded.snapshot().stable_hash()
     );
-    let _ = fs::remove_file(path);
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn phase8_state_roundtrip_is_complete() {
-    let path = temp_path("save-state");
+    let (root, store) = temp_store("save-state");
+    let path = std::path::Path::new("save.json");
     let mut session = GameSession::new_for_playing(42);
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.set_status(aihack::domain::status::Status {
@@ -95,11 +104,28 @@ fn phase8_state_roundtrip_is_complete() {
             .saved()
             .entities
             .set_item_charges(EntityId(7), Some(2)));
-        world.saved().inventory.equipped_body = Some(EntityId(10));
-        world.saved().inventory.entries[0].letter = InventoryLetter('z');
+        let saved = world.saved();
+        let player = saved.player_id;
+        let armor = EntityId(10);
+        let armor_letter = saved
+            .inventory
+            .add_existing_with_next_letter(armor)
+            .expect("fixture armor must receive an inventory letter");
+        assert!(saved.entities.set_item_location(
+            armor,
+            aihack::domain::entity::EntityLocation::Inventory { owner: player }
+        ));
+        assert!(saved.entities.set_item_letter(armor, armor_letter));
+        saved.inventory.equipped_body = Some(armor);
+        let armor_bonus = saved.entities.item_data(armor).unwrap().ac_bonus;
+        saved.entities.actor_stats_mut(player).unwrap().ac -= armor_bonus;
+        saved.inventory.entries[0].letter = InventoryLetter('z');
+        assert!(saved
+            .entities
+            .set_item_letter(EntityId(5), InventoryLetter('z')));
     });
-    save::save_session_to_path(&session, &path).unwrap();
-    let loaded = save::load_session_from_path(&path).unwrap();
+    store.save_session(&session, path).unwrap();
+    let loaded = store.load_session(path).unwrap();
     let loaded_snapshot: GameSnapshot = loaded.snapshot();
     assert_eq!(loaded_snapshot.nutrition, 777);
     assert_eq!(loaded_snapshot.luck, 2);
@@ -117,17 +143,22 @@ fn phase8_state_roundtrip_is_complete() {
         loaded.world().inventory().entries[0].letter,
         InventoryLetter('z')
     );
-    let _ = fs::remove_file(path);
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn invalid_save_schema_is_rejected() {
-    let path = temp_path("save-invalid");
-    fs::write(
-        &path,
-        r#"{\"schema_version\":999,\"seed\":42,\"turn\":0,\"run_state\":\"Playing\",\"rng_state\":{\"seed\":42,\"draws\":0},\"world\":{},\"event_log\":[]}"#,
-    )
-    .unwrap();
-    assert!(save::load_session_from_path(&path).is_err());
-    let _ = fs::remove_file(path);
+    let (root, store) = temp_store("save-invalid");
+    let path = std::path::Path::new("save.json");
+    store
+        .write_atomic(
+            path,
+            r#"{\"schema_version\":999,\"seed\":42,\"turn\":0,\"run_state\":\"Playing\",\"rng_state\":{\"seed\":42,\"draws\":0},\"world\":{},\"event_log\":[]}"#
+                .as_bytes(),
+        )
+        .unwrap();
+    assert!(store.load_session(path).is_err());
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
 }

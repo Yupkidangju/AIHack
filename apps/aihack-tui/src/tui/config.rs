@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{MIN_TERMINAL_HEIGHT, MIN_TERMINAL_WIDTH};
 
-/// [v0.1.0] Phase 10 TUI runtime 설정이다.
+/// TUI runtime 설정이다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UiRuntimeConfig {
     pub enable_mouse: bool,

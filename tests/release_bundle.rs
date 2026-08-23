@@ -9,7 +9,7 @@ use std::{
 
 static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 const OWNER_APPROVAL_ID: &str = "AIHACK-OWNER-2026-07-20-NGPL-01";
-const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-07-20-01";
+const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-08-23-02";
 
 fn project_path(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(path)
@@ -371,5 +371,35 @@ fn verifier_rejects_wrong_suffixed_or_duplicate_metadata_values_in_archive_and_o
                 "metadata exactness 우회를 허용하면 안 됩니다: {target:?} {fault:?}"
             );
         }
+    }
+}
+
+#[test]
+fn verifier_rejects_extra_file_directory_and_symbolic_link_entries() {
+    use std::os::unix::fs::symlink;
+
+    for name in [
+        "UNTRACKED-UNSIGNED-PAYLOAD",
+        "unexpected-directory",
+        "linked-payload",
+    ] {
+        let fixture = BundleFixture::new(BundleCase::Complete);
+        let output_dir = fixture.root.join("output");
+        match name {
+            "UNTRACKED-UNSIGNED-PAYLOAD" => {
+                fs::write(output_dir.join(name), "unsigned\n").unwrap();
+            }
+            "unexpected-directory" => fs::create_dir(output_dir.join(name)).unwrap(),
+            "linked-payload" => {
+                symlink(output_dir.join("aihack"), output_dir.join(name)).unwrap();
+            }
+            _ => unreachable!(),
+        }
+
+        let output = fixture.verify();
+        assert!(
+            !output.status.success(),
+            "release verifier accepted extra output entry: {name}"
+        );
     }
 }

@@ -16,7 +16,7 @@ use aihack_core::{
 };
 use serde::Serialize;
 
-use crate::GameSession;
+use crate::{systems::score, GameSession};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -44,6 +44,68 @@ pub const REQUIRED_CAUSAL_WITNESSES: [CausalWitness; 9] = [
     CausalWitness::GoldScore,
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CausalScenario {
+    FoodConsumption,
+    CorpseConsumption,
+    ArmorWear,
+    MonsterSpeedPair,
+    MonsterAiPair,
+    PassiveCombat,
+    DifficultyEconomy,
+    PrayerCombat,
+    GoldScoreProjection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CausalField {
+    ItemNutrition,
+    ArmorAcBonus,
+    MonsterSpeed,
+    MonsterAi,
+    MonsterPassive,
+    MonsterDifficulty,
+    PlayerLuck,
+    Gold,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CausalConsumer {
+    Nutrition,
+    PlayerAc,
+    MonsterPosition,
+    ParalysisTurns,
+    Gold,
+    AttackRoll,
+    FinalScore,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
+pub enum CausalValue {
+    None,
+    Signed(i64),
+    Unsigned(u64),
+    Position(Option<Pos>),
+    Text(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CausalWitnessRecord {
+    pub witness: CausalWitness,
+    pub scenario: CausalScenario,
+    pub producer: Option<EntityId>,
+    pub field: CausalField,
+    pub source_before: CausalValue,
+    pub source_after: CausalValue,
+    pub consumer: CausalConsumer,
+    pub consumer_before: CausalValue,
+    pub consumer_after: CausalValue,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CausalEntityProjection {
     id: EntityId,
@@ -56,6 +118,9 @@ struct CausalEntityProjection {
     ai_kind: Option<MonsterAiKind>,
     passive: Option<MonsterPassive>,
     difficulty: Option<u16>,
+    nutrition: Option<i16>,
+    ac_bonus: Option<i16>,
+    base_price: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +137,7 @@ pub struct CausalProjection {
     paralysis_turns: u8,
     kill_count: u32,
     gold: u32,
+    gold_scores: Option<(i64, i64)>,
     entities: Vec<CausalEntityProjection>,
 }
 
@@ -100,9 +166,12 @@ impl CausalProjection {
                         ai_kind: entity.monster_ai_kind(),
                         passive: entity.monster_passive(),
                         difficulty: entity.monster_difficulty(),
+                        nutrition: None,
+                        ac_bonus: None,
+                        base_price: None,
                     }
                 } else {
-                    let (_, _, location, _, _) =
+                    let (_, data, location, _, _) =
                         entity.item().expect("actor가 아니면 item payload여야 한다");
                     CausalEntityProjection {
                         id: entity.id,
@@ -115,11 +184,19 @@ impl CausalProjection {
                         ai_kind: None,
                         passive: None,
                         difficulty: None,
+                        nutrition: data.nutrition,
+                        ac_bonus: Some(data.ac_bonus),
+                        base_price: Some(data.base_price),
                     }
                 }
             })
             .collect::<Vec<_>>();
         entities.sort_by_key(|entity| entity.id.0);
+
+        let gold_scores = matches!(session.run_state(), RunState::GameOver { .. }).then(|| {
+            let (with_gold, without_gold) = score::paired_gold_scores(world, session.turn());
+            (i64::from(with_gold), i64::from(without_gold))
+        });
 
         Self {
             run_state: session.run_state(),
@@ -134,6 +211,7 @@ impl CausalProjection {
             paralysis_turns: world.paralysis_turns,
             kill_count: world.kill_count(),
             gold: world.gold(),
+            gold_scores,
             entities,
         }
     }
@@ -146,6 +224,7 @@ impl CausalProjection {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct CausalSummary {
     counts: BTreeMap<CausalWitness, u64>,
+    records: Vec<CausalWitnessRecord>,
     prayer_luck_pending: bool,
     corpse_produced: bool,
 }
@@ -162,16 +241,25 @@ impl CausalSummary {
             return;
         }
 
-        self.observe_monster_behavior(before, after);
-
         match command {
             CommandIntent::Eat { item } => self.observe_eating(before, after, item),
             CommandIntent::Wear { item } => {
+                let bonus = before.entity(item).and_then(|entity| entity.ac_bonus);
                 if before.inventory.equipped_body != Some(item)
                     && after.inventory.equipped_body == Some(item)
-                    && after.player_ac < before.player_ac
+                    && bonus.is_some_and(|value| after.player_ac == before.player_ac - value)
                 {
-                    self.record(CausalWitness::ArmorDefense);
+                    self.record(CausalWitnessRecord {
+                        witness: CausalWitness::ArmorDefense,
+                        scenario: CausalScenario::ArmorWear,
+                        producer: Some(item),
+                        field: CausalField::ArmorAcBonus,
+                        source_before: CausalValue::Signed(0),
+                        source_after: CausalValue::Signed(i64::from(bonus.unwrap_or_default())),
+                        consumer: CausalConsumer::PlayerAc,
+                        consumer_before: CausalValue::Signed(i64::from(before.player_ac)),
+                        consumer_after: CausalValue::Signed(i64::from(after.player_ac)),
+                    });
                 }
             }
             CommandIntent::Pray => {
@@ -180,14 +268,27 @@ impl CausalSummary {
                 }
             }
             CommandIntent::Quit => {
-                if before.gold > 0
-                    && matches!(
-                        after.run_state,
-                        RunState::GameOver { final_score, .. }
-                            if i64::from(final_score) >= i64::from(before.gold)
-                    )
+                if let (RunState::GameOver { final_score, .. }, Some((with_gold, without_gold))) =
+                    (after.run_state, after.gold_scores)
                 {
-                    self.record(CausalWitness::GoldScore);
+                    let gold_delta = with_gold.checked_sub(without_gold);
+                    if before.gold > 0
+                        && after.gold == before.gold
+                        && i64::from(final_score) == with_gold
+                        && gold_delta == Some(i64::from(before.gold))
+                    {
+                        self.record(CausalWitnessRecord {
+                            witness: CausalWitness::GoldScore,
+                            scenario: CausalScenario::GoldScoreProjection,
+                            producer: Some(before.player_id),
+                            field: CausalField::Gold,
+                            source_before: CausalValue::Unsigned(0),
+                            source_after: CausalValue::Unsigned(u64::from(before.gold)),
+                            consumer: CausalConsumer::FinalScore,
+                            consumer_before: CausalValue::Signed(without_gold),
+                            consumer_after: CausalValue::Signed(i64::from(final_score)),
+                        });
+                    }
                 }
             }
             _ => {}
@@ -204,6 +305,107 @@ impl CausalSummary {
         self.counts.values().sum()
     }
 
+    pub fn records(&self) -> &[CausalWitnessRecord] {
+        &self.records
+    }
+
+    pub fn observe_monster_speed_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_after: &CausalProjection,
+        entity: EntityId,
+    ) {
+        let (Some(active_before_entity), Some(active_after_entity)) =
+            (active_before.entity(entity), active_after.entity(entity))
+        else {
+            return;
+        };
+        let (Some(control_before_entity), Some(control_after_entity)) =
+            (control_before.entity(entity), control_after.entity(entity))
+        else {
+            return;
+        };
+        if active_before_entity.kind != control_before_entity.kind
+            || active_before_entity.ai_kind != control_before_entity.ai_kind
+            || active_before_entity.pos != control_before_entity.pos
+            || active_before_entity.speed.is_none_or(|speed| speed <= 0)
+            || control_before_entity.speed != Some(0)
+            || active_after_entity.pos == active_before_entity.pos
+            || control_after_entity.pos != control_before_entity.pos
+        {
+            return;
+        }
+        self.record(CausalWitnessRecord {
+            witness: CausalWitness::MonsterSpeed,
+            scenario: CausalScenario::MonsterSpeedPair,
+            producer: Some(entity),
+            field: CausalField::MonsterSpeed,
+            source_before: CausalValue::Signed(i64::from(
+                control_before_entity.speed.unwrap_or_default(),
+            )),
+            source_after: CausalValue::Signed(i64::from(
+                active_before_entity.speed.unwrap_or_default(),
+            )),
+            consumer: CausalConsumer::MonsterPosition,
+            consumer_before: CausalValue::Position(control_after_entity.pos),
+            consumer_after: CausalValue::Position(active_after_entity.pos),
+        });
+    }
+
+    pub fn observe_monster_ai_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_after: &CausalProjection,
+        entity: EntityId,
+    ) {
+        let (Some(active_before_entity), Some(active_after_entity)) =
+            (active_before.entity(entity), active_after.entity(entity))
+        else {
+            return;
+        };
+        let (Some(control_before_entity), Some(control_after_entity)) =
+            (control_before.entity(entity), control_after.entity(entity))
+        else {
+            return;
+        };
+        if active_before_entity.kind != control_before_entity.kind
+            || active_before_entity.speed != control_before_entity.speed
+            || active_before_entity.pos != control_before_entity.pos
+            || active_before_entity.ai_kind == control_before_entity.ai_kind
+            || active_before_entity.ai_kind == Some(MonsterAiKind::Stationary)
+            || control_before_entity.ai_kind != Some(MonsterAiKind::Stationary)
+            || active_after_entity.pos == active_before_entity.pos
+            || control_after_entity.pos != control_before_entity.pos
+        {
+            return;
+        }
+        self.record(CausalWitnessRecord {
+            witness: CausalWitness::MonsterAi,
+            scenario: CausalScenario::MonsterAiPair,
+            producer: Some(entity),
+            field: CausalField::MonsterAi,
+            source_before: CausalValue::Text(format!(
+                "{:?}",
+                control_before_entity
+                    .ai_kind
+                    .unwrap_or(MonsterAiKind::Stationary)
+            )),
+            source_after: CausalValue::Text(format!(
+                "{:?}",
+                active_before_entity
+                    .ai_kind
+                    .unwrap_or(MonsterAiKind::Stationary)
+            )),
+            consumer: CausalConsumer::MonsterPosition,
+            consumer_before: CausalValue::Position(control_after_entity.pos),
+            consumer_after: CausalValue::Position(active_after_entity.pos),
+        });
+    }
+
     pub fn validate_required(&self) -> Result<(), Vec<CausalWitness>> {
         let missing = REQUIRED_CAUSAL_WITNESSES
             .into_iter()
@@ -218,6 +420,7 @@ impl CausalSummary {
 
     pub fn without(mut self, witness: CausalWitness) -> Self {
         self.counts.remove(&witness);
+        self.records.retain(|record| record.witness != witness);
         self
     }
 
@@ -238,28 +441,34 @@ impl CausalSummary {
         {
             return;
         }
+        let source_after = CausalValue::Signed(i64::from(
+            before_item
+                .nutrition
+                .unwrap_or(after.nutrition - before.nutrition),
+        ));
+        let common = |witness, scenario| CausalWitnessRecord {
+            witness,
+            scenario,
+            producer: Some(item),
+            field: CausalField::ItemNutrition,
+            source_before: CausalValue::Signed(0),
+            source_after: source_after.clone(),
+            consumer: CausalConsumer::Nutrition,
+            consumer_before: CausalValue::Signed(i64::from(before.nutrition)),
+            consumer_after: CausalValue::Signed(i64::from(after.nutrition)),
+        };
         match before_item.kind {
-            EntityKind::Item(ItemKind::FoodRation) => self.record(CausalWitness::FoodNutrition),
+            EntityKind::Item(ItemKind::FoodRation) => self.record(common(
+                CausalWitness::FoodNutrition,
+                CausalScenario::FoodConsumption,
+            )),
             EntityKind::Item(ItemKind::CorpseJackal) if self.corpse_produced => {
-                self.record(CausalWitness::CorpseNutrition)
+                self.record(common(
+                    CausalWitness::CorpseNutrition,
+                    CausalScenario::CorpseConsumption,
+                ))
             }
             _ => {}
-        }
-    }
-
-    fn observe_monster_behavior(&mut self, before: &CausalProjection, after: &CausalProjection) {
-        let moved = before.entities.iter().any(|entity| {
-            matches!(entity.kind, EntityKind::Monster(_))
-                && entity.alive == Some(true)
-                && entity.speed.is_some_and(|speed| speed > 0)
-                && entity.ai_kind != Some(MonsterAiKind::Stationary)
-                && after
-                    .entity(entity.id)
-                    .is_some_and(|next| next.pos != entity.pos)
-        });
-        if moved {
-            self.record(CausalWitness::MonsterSpeed);
-            self.record(CausalWitness::MonsterAi);
         }
     }
 
@@ -269,32 +478,59 @@ impl CausalSummary {
         after: &CausalProjection,
         outcome: &TurnOutcome,
     ) {
-        if outcome.events.iter().any(|event| {
-            matches!(
-                event,
-                GameEvent::PassiveAttackTriggered { source, target }
-                    if *target == before.player_id
-                        && before.entity(*source).and_then(|entity| entity.passive).is_some()
-            )
-        }) && after.paralysis_turns > before.paralysis_turns
-        {
-            self.record(CausalWitness::MonsterPassive);
+        if let Some(source) = outcome.events.iter().find_map(|event| match event {
+            GameEvent::PassiveAttackTriggered { source, target }
+                if *target == before.player_id
+                    && before
+                        .entity(*source)
+                        .and_then(|entity| entity.passive)
+                        .is_some() =>
+            {
+                Some(*source)
+            }
+            _ => None,
+        }) {
+            if after.paralysis_turns > before.paralysis_turns {
+                let passive = before.entity(source).and_then(|entity| entity.passive);
+                self.record(CausalWitnessRecord {
+                    witness: CausalWitness::MonsterPassive,
+                    scenario: CausalScenario::PassiveCombat,
+                    producer: Some(source),
+                    field: CausalField::MonsterPassive,
+                    source_before: CausalValue::None,
+                    source_after: CausalValue::Text(format!("{passive:?}")),
+                    consumer: CausalConsumer::ParalysisTurns,
+                    consumer_before: CausalValue::Unsigned(u64::from(before.paralysis_turns)),
+                    consumer_after: CausalValue::Unsigned(u64::from(after.paralysis_turns)),
+                });
+            }
         }
 
-        if self.prayer_luck_pending
-            && outcome.events.iter().any(|event| {
-                matches!(
-                    event,
-                    GameEvent::AttackResolved { attacker, .. } if *attacker == before.player_id
-                )
-            })
-            && before.luck > 0
-        {
-            self.record(CausalWitness::PrayerLuckCombat);
+        let player_attack_roll = outcome.events.iter().find_map(|event| match event {
+            GameEvent::AttackResolved {
+                attacker,
+                attack_roll,
+                ..
+            } if *attacker == before.player_id => Some(*attack_roll),
+            _ => None,
+        });
+        if self.prayer_luck_pending && player_attack_roll.is_some() && before.luck > 0 {
+            let attack_roll = player_attack_roll.unwrap_or_default();
+            self.record(CausalWitnessRecord {
+                witness: CausalWitness::PrayerLuckCombat,
+                scenario: CausalScenario::PrayerCombat,
+                producer: Some(before.player_id),
+                field: CausalField::PlayerLuck,
+                source_before: CausalValue::Signed(0),
+                source_after: CausalValue::Signed(i64::from(before.luck)),
+                consumer: CausalConsumer::AttackRoll,
+                consumer_before: CausalValue::Signed(i64::from(attack_roll - before.luck)),
+                consumer_after: CausalValue::Signed(i64::from(attack_roll)),
+            });
             self.prayer_luck_pending = false;
         }
 
-        let killed_with_economy = before.entities.iter().any(|entity| {
+        let killed_with_economy = before.entities.iter().find(|entity| {
             matches!(entity.kind, EntityKind::Monster(_))
                 && entity.alive == Some(true)
                 && after
@@ -304,8 +540,19 @@ impl CausalSummary {
                     .difficulty
                     .is_some_and(|difficulty| after.gold >= before.gold + u32::from(difficulty))
         });
-        if killed_with_economy && after.kill_count > before.kill_count {
-            self.record(CausalWitness::MonsterDifficultyEconomy);
+        if let Some(entity) = killed_with_economy.filter(|_| after.kill_count > before.kill_count) {
+            let difficulty = entity.difficulty.unwrap_or_default();
+            self.record(CausalWitnessRecord {
+                witness: CausalWitness::MonsterDifficultyEconomy,
+                scenario: CausalScenario::DifficultyEconomy,
+                producer: Some(entity.id),
+                field: CausalField::MonsterDifficulty,
+                source_before: CausalValue::Unsigned(0),
+                source_after: CausalValue::Unsigned(u64::from(difficulty)),
+                consumer: CausalConsumer::Gold,
+                consumer_before: CausalValue::Unsigned(u64::from(before.gold)),
+                consumer_after: CausalValue::Unsigned(u64::from(after.gold)),
+            });
         }
 
         let corpse_created = after.entities.iter().any(|entity| {
@@ -318,7 +565,8 @@ impl CausalSummary {
         self.corpse_produced |= corpse_created;
     }
 
-    fn record(&mut self, witness: CausalWitness) {
-        *self.counts.entry(witness).or_insert(0) += 1;
+    fn record(&mut self, record: CausalWitnessRecord) {
+        *self.counts.entry(record.witness).or_insert(0) += 1;
+        self.records.push(record);
     }
 }

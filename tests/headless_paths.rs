@@ -4,7 +4,10 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use aihack::core::{save::ArtifactStore, CommandIntent, GameSession, ReplayLineV1};
+use aihack::core::{
+    save::{ArtifactStore, MAX_REPLAY_BYTES, MAX_REPLAY_LINE_BYTES},
+    CommandIntent, GameSession, ReplayLineV1,
+};
 
 static TEST_DIRECTORY_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -27,6 +30,75 @@ fn runtime_path_resolver_rejects_absolute_and_parent_traversal() {
     assert!(store.validate_path(Path::new("/tmp/escape.json")).is_err());
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn artifact_store_rejects_a_symbolic_link_runtime_root() {
+    use std::os::unix::fs::symlink;
+
+    let link = temp_test_dir("root-link");
+    let outside = temp_test_dir("root-link-outside");
+    fs::create_dir_all(&outside).unwrap();
+    symlink(&outside, &link).unwrap();
+
+    assert!(ArtifactStore::open(&link).is_err());
+
+    fs::remove_file(link).unwrap();
+    fs::remove_dir_all(outside).unwrap();
+}
+
+#[cfg(windows)]
+#[test]
+fn artifact_store_rejects_a_windows_junction_runtime_root() {
+    use std::process::Command;
+
+    let link = temp_test_dir("root-junction");
+    let outside = temp_test_dir("root-junction-outside");
+    fs::create_dir_all(&outside).unwrap();
+    let status = Command::new("cmd.exe")
+        .args([
+            "/d",
+            "/c",
+            "mklink",
+            "/J",
+            link.to_str().unwrap(),
+            outside.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    assert!(ArtifactStore::open(&link).is_err());
+
+    fs::remove_dir(link).unwrap();
+    fs::remove_dir_all(outside).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn opened_runtime_root_handle_is_not_redirected_by_a_later_path_swap() {
+    use std::os::unix::fs::symlink;
+
+    let root = temp_test_dir("root-swap");
+    let held = temp_test_dir("root-swap-held");
+    let outside = temp_test_dir("root-swap-outside");
+    fs::create_dir_all(&root).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    let store = ArtifactStore::open(&root).unwrap();
+    fs::rename(&root, &held).unwrap();
+    symlink(&outside, &root).unwrap();
+
+    store
+        .write_atomic(Path::new("proof.txt"), b"inside")
+        .unwrap();
+
+    assert_eq!(fs::read(held.join("proof.txt")).unwrap(), b"inside");
+    assert!(!outside.join("proof.txt").exists());
+    drop(store);
+    fs::remove_file(root).unwrap();
+    fs::remove_dir_all(held).unwrap();
+    fs::remove_dir_all(outside).unwrap();
 }
 
 #[test]
@@ -195,6 +267,72 @@ fn replay_append_rejects_hard_link_without_changing_victim() {
     drop(store);
     fs::remove_dir_all(root).unwrap();
     fs::remove_dir_all(outside).unwrap();
+}
+
+#[test]
+fn replay_atomic_rewrite_rejects_a_hard_link_added_after_initial_creation() {
+    let root = temp_test_dir("replay-late-hard-link");
+    let outside = temp_test_dir("replay-late-hard-link-outside");
+    fs::create_dir_all(root.join("replays")).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    let store = ArtifactStore::open(&root).unwrap();
+    let mut session = GameSession::new_for_playing(42);
+    let command = CommandIntent::Wait;
+    let outcome = session.submit(command);
+    let line = ReplayLineV1 {
+        turn_before: 0,
+        command,
+        snapshot_hash_after: outcome.snapshot_hash.clone(),
+        outcome,
+    };
+    let path = Path::new("replays/run.jsonl");
+    store.append_replay_line(path, &line).unwrap();
+    let linked = outside.join("linked.jsonl");
+    fs::hard_link(root.join(path), &linked).unwrap();
+    let before = fs::read(&linked).unwrap();
+
+    assert!(store.append_replay_line(path, &line).is_err());
+    assert_eq!(fs::read(&linked).unwrap(), before);
+
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
+    fs::remove_dir_all(outside).unwrap();
+}
+
+#[test]
+fn replay_reader_enforces_total_and_per_line_byte_budgets() {
+    let root = temp_test_dir("replay-budget");
+    fs::create_dir_all(root.join("replays")).unwrap();
+    let store = ArtifactStore::open(&root).unwrap();
+    let path = Path::new("replays/run.jsonl");
+    let absolute = root.join(path);
+    let mut session = GameSession::new_for_playing(42);
+    let command = CommandIntent::Wait;
+    let turn_before = session.turn();
+    let outcome = session.submit(command);
+    let line = ReplayLineV1 {
+        turn_before,
+        command,
+        snapshot_hash_after: outcome.snapshot_hash.clone(),
+        outcome,
+    };
+    let encoded = serde_json::to_string(&line).unwrap();
+
+    let mut exact = encoded.clone();
+    exact.push_str(&" ".repeat(MAX_REPLAY_LINE_BYTES - exact.len()));
+    fs::write(&absolute, format!("{exact}\n")).unwrap();
+    assert_eq!(store.read_replay_lines(path).unwrap(), vec![line.clone()]);
+
+    let mut too_long = encoded;
+    too_long.push_str(&" ".repeat(MAX_REPLAY_LINE_BYTES + 1 - too_long.len()));
+    fs::write(&absolute, format!("{too_long}\n")).unwrap();
+    assert!(store.read_replay_lines(path).is_err());
+
+    fs::write(&absolute, vec![b' '; MAX_REPLAY_BYTES + 1]).unwrap();
+    assert!(store.read_replay_lines(path).is_err());
+
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[cfg(unix)]

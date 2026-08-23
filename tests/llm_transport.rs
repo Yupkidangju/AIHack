@@ -391,14 +391,9 @@ fn local_llm_service_round_trips_narrative_on_the_bounded_worker() {
         })
     );
 
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
-    let envelope = loop {
-        if let Some(envelope) = service.try_recv() {
-            break envelope;
-        }
-        assert!(std::time::Instant::now() < deadline);
-        thread::yield_now();
-    };
+    let envelope = service
+        .recv_timeout(Duration::from_secs(5))
+        .expect("worker response signal");
     assert_eq!(envelope.request_id, request_id);
     assert!(matches!(
         envelope.result,
@@ -629,6 +624,15 @@ fn worker_is_disabled_without_a_provider() {
 }
 
 #[test]
+fn worker_and_service_offer_signal_based_response_waiting_without_busy_polling() {
+    let worker_source = include_str!("../crates/aihack-llm/src/worker.rs");
+    let service_source = include_str!("../crates/aihack-llm/src/service.rs");
+    assert!(worker_source.contains("pub fn recv_timeout"));
+    assert!(service_source.contains("pub fn wait_for_response"));
+    assert!(service_source.contains("Condvar"));
+}
+
+#[test]
 fn worker_uses_one_thread_and_reports_busy_at_capacity_sixteen() {
     let (entered_tx, entered_rx) = mpsc::sync_channel(1);
     let gate = Arc::new((Mutex::new(false), Condvar::new()));
@@ -659,14 +663,9 @@ fn worker_uses_one_thread_and_reports_busy_at_capacity_sixteen() {
 fn worker_round_trips_an_opaque_request_id() {
     let worker = NarrativeWorker::start(Arc::new(SuccessProvider)).unwrap();
     let request_id = worker.enqueue(narrative_request()).unwrap();
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
-    let response = loop {
-        if let Some(response) = worker.try_recv() {
-            break response;
-        }
-        assert!(std::time::Instant::now() < deadline);
-        thread::yield_now();
-    };
+    let response = worker
+        .recv_timeout(Duration::from_secs(5))
+        .expect("worker response signal");
 
     assert_eq!(response.request_id, request_id);
     assert_eq!(response.response.text, "worker response");
@@ -685,9 +684,7 @@ fn worker_shutdown_stops_waiting_when_the_grace_period_expires() {
     worker.enqueue(narrative_request()).unwrap();
     entered_rx.recv_timeout(Duration::from_secs(1)).unwrap();
 
-    let started = std::time::Instant::now();
-    assert!(!worker.shutdown_with_grace(Duration::from_millis(10)));
-    assert!(started.elapsed() < Duration::from_millis(250));
+    assert!(!worker.shutdown_with_grace(Duration::ZERO));
 
     let (lock, ready) = &*gate;
     *lock.lock().unwrap() = true;

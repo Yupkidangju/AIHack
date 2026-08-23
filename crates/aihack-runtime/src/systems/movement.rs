@@ -27,7 +27,11 @@ pub fn move_actor(
 
     if actor == world.player_id {
         world.set_player_location(level, to);
-    } else if !world.entities.set_actor_location(actor, level, to) {
+    } else if !world
+        .state_mut()
+        .entities
+        .set_actor_location(actor, level, to)
+    {
         return Err(GameError::CommandRejected(format!(
             "actor {actor:?} position update failed"
         )));

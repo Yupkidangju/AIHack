@@ -37,14 +37,14 @@ pub fn throw_item(
         return Err("item is not in player inventory".to_string());
     }
     if data.attack_profile.is_none() {
-        return Err("item cannot be thrown in phase 7".to_string());
+        return Err("item cannot be thrown".to_string());
     }
 
     let from = world.player_pos();
     let outcome = trace_path(world, from, direction);
-    world.inventory.remove(item);
+    world.state_mut().inventory.remove(item);
     let level = world.current_level();
-    world.entities.set_item_location(
+    world.state_mut().entities.set_item_location(
         item,
         EntityLocation::OnMap {
             level,
@@ -98,7 +98,10 @@ pub fn zap_wand(
     }
 
     let charges_after = charges_before - 1;
-    world.entities.set_item_charges(item, Some(charges_after));
+    world
+        .state_mut()
+        .entities
+        .set_item_charges(item, Some(charges_after));
     let outcome = trace_path(world, world.player_pos(), direction);
     let mut events = vec![GameEvent::WandZapped {
         entity: world.player_id,

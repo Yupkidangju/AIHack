@@ -1,7 +1,7 @@
 use aihack::core::session::GameSession;
 use aihack::ui::tui::labels::{collect_auto_labels, filter_expired_labels, LabelKind};
 
-/// [v0.2.0] Phase 19: collect_auto_labels가 비어있지 않은 라벨을 반환한다.
+/// collect_auto_labels가 관찰 가능한 라벨을 반환해야 한다.
 #[test]
 fn collect_auto_labels_returns_labels() {
     let session = GameSession::new_for_playing(42);
@@ -15,7 +15,7 @@ fn collect_auto_labels_returns_labels() {
     );
 }
 
-/// [v0.2.0] Phase 19: 인접한 jackal은 HostileAdjacent 라벨이 생성된다.
+/// 인접한 jackal은 HostileAdjacent 라벨을 생성해야 한다.
 #[test]
 fn collect_auto_labels_includes_hostile_adjacent() {
     let session = GameSession::new_for_playing(42);
@@ -31,7 +31,7 @@ fn collect_auto_labels_includes_hostile_adjacent() {
     );
 }
 
-/// [v0.2.0] Phase 19: 계단은 Stairs 라벨이 생성된다.
+/// 계단은 Stairs 라벨을 생성해야 한다.
 #[test]
 fn collect_auto_labels_includes_stairs() {
     let session = GameSession::new_for_playing(42);
@@ -44,7 +44,7 @@ fn collect_auto_labels_includes_stairs() {
     println!("stairs label found: {}", has_stairs);
 }
 
-/// [v0.2.0] Phase 19: 최대 3개 라벨만 반환한다.
+/// 자동 라벨은 최대 3개만 반환해야 한다.
 #[test]
 fn collect_auto_labels_limits_to_three() {
     let session = GameSession::new_for_playing(42);
@@ -58,7 +58,7 @@ fn collect_auto_labels_limits_to_three() {
     );
 }
 
-/// [v0.2.0] Phase 19: 라벨 우선순위가 올바르게 정렬된다.
+/// 라벨 우선순위가 동결된 순서로 정렬되어야 한다.
 #[test]
 fn collect_auto_labels_are_sorted_by_priority() {
     let session = GameSession::new_for_playing(42);
@@ -75,7 +75,7 @@ fn collect_auto_labels_are_sorted_by_priority() {
     }
 }
 
-/// [v0.2.0] Phase 19: filter_expired_labels가 만료된 라벨을 제거한다.
+/// filter_expired_labels가 만료된 라벨을 제거해야 한다.
 #[test]
 fn filter_expired_labels_removes_old_labels() {
     let session = GameSession::new_for_playing(42);
@@ -92,7 +92,7 @@ fn filter_expired_labels_removes_old_labels() {
     );
 }
 
-/// [v0.2.0] Phase 19: filter_expired_labels가 유효한 라벨은 유지한다.
+/// filter_expired_labels가 유효한 라벨을 유지해야 한다.
 #[test]
 fn filter_expired_labels_keeps_fresh_labels() {
     let session = GameSession::new_for_playing(42);

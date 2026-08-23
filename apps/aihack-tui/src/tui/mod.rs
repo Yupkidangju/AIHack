@@ -1,18 +1,21 @@
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, MouseEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseEventKind,
+    },
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, layout::Rect, Terminal};
 
 use aihack_ai_contract::{ClientRevision, Observation, RunState};
-use aihack_runtime::{save, GameClient, GameError, GameSession};
+use aihack_runtime::{save::ArtifactStore, GameClient, GameError, GameSession};
 
 use crate::llm::{
     config::{validate_user_text, LlmRequestKind, LocalLlmConfig},
@@ -51,6 +54,43 @@ pub enum LlmUiStatus {
     Stale,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageOperation {
+    Save,
+    Load,
+    NewRun,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UiOverlay {
+    None,
+    Inventory,
+    StorageError { operation: StorageOperation },
+}
+
+/// UI cooldown 검증을 wall clock과 분리하는 monotonic clock 경계다.
+pub trait UiClock: Send + Sync {
+    fn now(&self) -> Duration;
+}
+
+struct SystemUiClock {
+    started: Instant,
+}
+
+impl Default for SystemUiClock {
+    fn default() -> Self {
+        Self {
+            started: Instant::now(),
+        }
+    }
+}
+
+impl UiClock for SystemUiClock {
+    fn now(&self) -> Duration {
+        self.started.elapsed()
+    }
+}
+
 struct OutstandingLlmRequest {
     request_id: RequestId,
     revision: ClientRevision,
@@ -85,21 +125,22 @@ pub fn terminal_size_supported(width: u16, height: u16) -> bool {
     width >= MIN_TERMINAL_WIDTH && height >= MIN_TERMINAL_HEIGHT
 }
 
-/// [v0.2.0] Phase 18: TUI adapter 런타임 상태에 debug observation 토글 추가.
+/// TUI adapter가 저장·새 run과 runtime 조회에 사용하는 경계다.
 pub trait TuiClient: GameClient {
-    fn save_to_path(&self, path: &Path) -> Result<(), GameError>;
-    fn load_from_path(&mut self, path: &Path) -> Result<(), GameError>;
+    fn save_to_store(&self, store: &ArtifactStore, path: &Path) -> Result<(), GameError>;
+    fn load_from_store(&mut self, store: &ArtifactStore, path: &Path) -> Result<(), GameError>;
     fn start_new_run(&mut self) -> Result<(), GameError>;
+    fn back_to_title(&mut self) -> Result<(), GameError>;
     fn kill_count(&self) -> u32;
 }
 
 impl TuiClient for GameSession {
-    fn save_to_path(&self, path: &Path) -> Result<(), GameError> {
-        save::save_session_to_path(self, path)
+    fn save_to_store(&self, store: &ArtifactStore, path: &Path) -> Result<(), GameError> {
+        store.save_session(self, path)
     }
 
-    fn load_from_path(&mut self, path: &Path) -> Result<(), GameError> {
-        *self = save::load_session_from_path(path)?;
+    fn load_from_store(&mut self, store: &ArtifactStore, path: &Path) -> Result<(), GameError> {
+        *self = store.load_session(path)?;
         Ok(())
     }
 
@@ -108,13 +149,39 @@ impl TuiClient for GameSession {
         Ok(())
     }
 
+    fn back_to_title(&mut self) -> Result<(), GameError> {
+        *self = GameSession::try_new(self.observation().seed)?;
+        Ok(())
+    }
+
     fn kill_count(&self) -> u32 {
         self.world().kill_count()
     }
 }
 
+struct TuiStorage {
+    _directory: tempfile::TempDir,
+    store: ArtifactStore,
+    quick_save: PathBuf,
+}
+
+impl TuiStorage {
+    fn ephemeral() -> Result<Self, GameError> {
+        let directory = tempfile::tempdir().map_err(|error| GameError::Io(error.to_string()))?;
+        let store = ArtifactStore::open(directory.path())?;
+        Ok(Self {
+            _directory: directory,
+            store,
+            quick_save: PathBuf::from("quick-save.json"),
+        })
+    }
+}
+
 pub struct TuiApp {
     client: Box<dyn TuiClient>,
+    storage: Option<TuiStorage>,
+    overlay: UiOverlay,
+    clock: Arc<dyn UiClock>,
     pub config: UiRuntimeConfig,
     next_effect_id: u64,
     latest_narrative: Option<NarrativeResponse>,
@@ -125,18 +192,19 @@ pub struct TuiApp {
     soft_input: Option<String>,
     queued_llm_request: Option<LlmRequestKind>,
     outstanding_llm_request: Option<OutstandingLlmRequest>,
+    ignored_request_ids: Vec<RequestId>,
     last_llm_request: Option<LlmRequestKind>,
     validated_decision: Option<ValidatedDecision>,
-    last_llm_enqueue: [Option<Instant>; 3],
+    last_llm_enqueue: [Option<Duration>; 3],
     hovered_pos: Option<crate::core::Pos>,
     focused_panel: UiPanel,
-    /// [v0.2.0] Phase 18: F9 키로 토글하는 debug observation 패널 표시 상태.
+    /// F9 키로 토글하는 debug observation 패널 표시 상태다.
     /// 이 상태는 UI-only이며 core나 snapshot hash에 영향을 주지 않는다.
     pub debug_observation_visible: bool,
-    /// [v0.2.0] Phase 19: 현재 표시 중인 자동 라벨 목록.
+    /// 현재 표시 중인 자동 라벨 목록이다.
     /// 이 상태는 UI-only이며 core나 snapshot hash에 영향을 주지 않는다.
     pub active_labels: Vec<labels::AutoLabel>,
-    /// [v0.2.0] Phase 19: 마지막으로 라벨을 업데이트한 턴 번호.
+    /// 마지막으로 라벨을 업데이트한 턴 번호다.
     /// 턴이 진행될 때만 새 라벨을 수집한다.
     pub last_label_update_turn: u64,
 }
@@ -151,8 +219,34 @@ impl TuiApp {
         config: UiRuntimeConfig,
         llm_enabled: bool,
     ) -> Self {
+        Self::new_with_llm_enabled_and_clock(
+            client,
+            config,
+            llm_enabled,
+            Arc::new(SystemUiClock::default()),
+        )
+    }
+
+    /// 결정적 cooldown test가 주입 clock을 사용할 수 있는 생성 경계다.
+    pub fn new_with_llm_enabled_and_clock(
+        client: impl TuiClient + 'static,
+        config: UiRuntimeConfig,
+        llm_enabled: bool,
+        clock: Arc<dyn UiClock>,
+    ) -> Self {
+        let storage = TuiStorage::ephemeral().ok();
+        let overlay = if storage.is_some() {
+            UiOverlay::None
+        } else {
+            UiOverlay::StorageError {
+                operation: StorageOperation::Save,
+            }
+        };
         Self {
             client: Box::new(client),
+            storage,
+            overlay,
+            clock,
             config,
             next_effect_id: 1,
             latest_narrative: None,
@@ -167,6 +261,7 @@ impl TuiApp {
             soft_input: None,
             queued_llm_request: None,
             outstanding_llm_request: None,
+            ignored_request_ids: Vec::new(),
             last_llm_request: None,
             validated_decision: None,
             last_llm_enqueue: [None; 3],
@@ -209,7 +304,7 @@ impl TuiApp {
             self.llm_status = LlmUiStatus::Invalid;
             return;
         };
-        self.last_llm_enqueue[kind_index] = Some(Instant::now());
+        self.last_llm_enqueue[kind_index] = Some(self.clock.now());
         self.last_llm_request = Some(kind.clone());
         match enqueue_result {
             Ok(request_id) => {
@@ -239,6 +334,14 @@ impl TuiApp {
     }
 
     pub fn accept_llm_response(&mut self, envelope: LlmResponseEnvelope) {
+        if let Some(index) = self
+            .ignored_request_ids
+            .iter()
+            .position(|request_id| request_id == &envelope.request_id)
+        {
+            self.ignored_request_ids.remove(index);
+            return;
+        }
         if validate_response_schema(envelope.schema_version).is_err() {
             self.outstanding_llm_request.take();
             self.llm_status = LlmUiStatus::Invalid;
@@ -350,8 +453,9 @@ impl TuiApp {
             self.llm_status = LlmUiStatus::Invalid;
             return;
         };
+        let now = self.clock.now();
         if self.last_llm_enqueue[kind_index]
-            .is_some_and(|instant| instant.elapsed() < Duration::from_millis(250))
+            .is_some_and(|instant| now.saturating_sub(instant) < Duration::from_millis(250))
         {
             return;
         }
@@ -373,12 +477,35 @@ impl TuiApp {
         self.client.run_state()
     }
 
-    pub fn save_to_path(&self, path: &Path) -> Result<(), GameError> {
-        self.client.save_to_path(path)
+    pub fn quick_save(&self) -> Result<(), GameError> {
+        let storage = self
+            .storage
+            .as_ref()
+            .ok_or_else(|| GameError::Io("TUI quick-save storage unavailable".to_string()))?;
+        self.client
+            .save_to_store(&storage.store, &storage.quick_save)
     }
 
-    pub fn load_from_path(&mut self, path: &Path) -> Result<(), GameError> {
-        self.client.load_from_path(path)
+    pub fn quick_load(&mut self) -> Result<(), GameError> {
+        let storage = self
+            .storage
+            .as_ref()
+            .ok_or_else(|| GameError::Io("TUI quick-load storage unavailable".to_string()))?;
+        self.client
+            .load_from_store(&storage.store, &storage.quick_save)?;
+        self.reset_transients();
+        Ok(())
+    }
+
+    pub fn ui_overlay(&self) -> &UiOverlay {
+        &self.overlay
+    }
+
+    pub fn storage_error(&self) -> Option<StorageOperation> {
+        match self.overlay {
+            UiOverlay::StorageError { operation } => Some(operation),
+            UiOverlay::None | UiOverlay::Inventory => None,
+        }
     }
 
     pub fn project_effects(&mut self) -> Vec<UiEffectEvent> {
@@ -474,6 +601,35 @@ impl TuiApp {
         };
     }
 
+    fn reset_transients(&mut self) {
+        if let Some(outstanding) = self.outstanding_llm_request.take() {
+            if self.ignored_request_ids.len() == 16 {
+                self.ignored_request_ids.remove(0);
+            }
+            self.ignored_request_ids.push(outstanding.request_id);
+        }
+        self.next_effect_id = 1;
+        self.latest_narrative = None;
+        self.latest_decision = None;
+        self.latest_soft_adjudication = None;
+        self.soft_input = None;
+        self.queued_llm_request = None;
+        self.last_llm_request = None;
+        self.validated_decision = None;
+        self.last_llm_enqueue = [None; 3];
+        self.hovered_pos = None;
+        self.focused_panel = UiPanel::Map;
+        self.overlay = UiOverlay::None;
+        self.debug_observation_visible = false;
+        self.active_labels.clear();
+        self.last_label_update_turn = 0;
+        self.llm_status = if self.llm_enabled {
+            LlmUiStatus::Ready
+        } else {
+            LlmUiStatus::Disabled
+        };
+    }
+
     pub fn hovered_pos(&self) -> Option<crate::core::Pos> {
         self.hovered_pos
     }
@@ -505,16 +661,80 @@ impl TuiApp {
         Viewport::from_rect(origin, observation.player_pos, layout.map)
     }
 
-    pub fn handle_candidate(
+    fn inventory_intent_for_letter(
+        &self,
+        letter: char,
+    ) -> Option<aihack_ai_contract::CommandIntent> {
+        use aihack_ai_contract::{CommandIntent, InventoryAction, ItemKind};
+
+        let observation = self.observation();
+        let item = observation
+            .inventory
+            .iter()
+            .find(|item| item.letter.0 == letter)?;
+        let intent = match self.run_state() {
+            RunState::AwaitingInventorySelection { action } => match action {
+                InventoryAction::Drop => CommandIntent::Drop { item: item.item },
+                InventoryAction::Wield => CommandIntent::Wield { item: item.item },
+                InventoryAction::Wear => CommandIntent::Wear { item: item.item },
+                InventoryAction::Quaff => CommandIntent::Quaff { item: item.item },
+                InventoryAction::Eat => CommandIntent::Eat { item: item.item },
+                InventoryAction::Read => CommandIntent::Read { item: item.item },
+            },
+            _ => match item.kind {
+                ItemKind::Dagger => CommandIntent::Wield { item: item.item },
+                ItemKind::ArmorLeather => CommandIntent::Wear { item: item.item },
+                ItemKind::PotionHealing => CommandIntent::Quaff { item: item.item },
+                ItemKind::FoodRation | ItemKind::CorpseJackal => {
+                    CommandIntent::Eat { item: item.item }
+                }
+                ItemKind::ScrollReveal
+                | ItemKind::ScrollIdentify
+                | ItemKind::ScrollLevelTeleport => CommandIntent::Read { item: item.item },
+                ItemKind::WandMagicMissile | ItemKind::Rock => return None,
+            },
+        };
+        observation
+            .legal_actions
+            .contains(&intent)
+            .then_some(intent)
+    }
+
+    fn cycle_focus(&mut self, backwards: bool) {
+        const ORDER: [UiPanel; 6] = [
+            UiPanel::Map,
+            UiPanel::Status,
+            UiPanel::Inventory,
+            UiPanel::Inspect,
+            UiPanel::Log,
+            UiPanel::Command,
+        ];
+        let index = ORDER
+            .iter()
+            .position(|panel| *panel == self.focused_panel)
+            .unwrap_or(0);
+        let next = if backwards {
+            (index + ORDER.len() - 1) % ORDER.len()
+        } else {
+            (index + 1) % ORDER.len()
+        };
+        self.focused_panel = ORDER[next];
+    }
+
+    pub fn handle_candidate_owned(
         &mut self,
         candidate: UiCommandCandidate,
-        save_path: &Path,
-        load_path: &Path,
     ) -> Result<bool, GameError> {
         match candidate {
             UiCommandCandidate::Command(intent) => {
                 let outcome = self.client.submit(intent);
-                // [v0.2.0] Phase 19: 턴이 진행되면 새로운 자동 라벨을 수집한다.
+                if intent == aihack_ai_contract::CommandIntent::ShowInventory && outcome.accepted {
+                    self.overlay = UiOverlay::Inventory;
+                    self.focused_panel = UiPanel::Inventory;
+                } else if outcome.accepted {
+                    self.overlay = UiOverlay::None;
+                }
+                // 턴이 진행된 경우에만 새 자동 라벨을 수집한다.
                 if outcome.turn_advanced {
                     let observation = self.observation();
                     let current_time_ms = std::time::SystemTime::now()
@@ -541,19 +761,69 @@ impl TuiApp {
                 Ok(false)
             }
             UiCommandCandidate::Save => {
-                self.save_to_path(save_path)?;
+                if self.quick_save().is_err() {
+                    self.overlay = UiOverlay::StorageError {
+                        operation: StorageOperation::Save,
+                    };
+                } else {
+                    self.overlay = UiOverlay::None;
+                }
                 Ok(false)
             }
             UiCommandCandidate::Load => {
-                self.load_from_path(load_path)?;
+                if self.quick_load().is_err() {
+                    self.overlay = UiOverlay::StorageError {
+                        operation: StorageOperation::Load,
+                    };
+                }
                 Ok(false)
             }
             UiCommandCandidate::Quit => Ok(true),
             UiCommandCandidate::NewRun => {
-                self.client.start_new_run()?;
-                self.dismiss_llm_result();
-                self.soft_input = None;
-                self.queued_llm_request = None;
+                if self.client.start_new_run().is_err() {
+                    self.overlay = UiOverlay::StorageError {
+                        operation: StorageOperation::NewRun,
+                    };
+                    return Ok(false);
+                }
+                self.reset_transients();
+                Ok(false)
+            }
+            UiCommandCandidate::CloseOverlay => {
+                self.overlay = UiOverlay::None;
+                self.focused_panel = UiPanel::Map;
+                Ok(false)
+            }
+            UiCommandCandidate::BackToTitle => {
+                if self.client.back_to_title().is_err() {
+                    self.overlay = UiOverlay::StorageError {
+                        operation: StorageOperation::NewRun,
+                    };
+                } else {
+                    self.reset_transients();
+                }
+                Ok(false)
+            }
+            UiCommandCandidate::InventoryLetter(letter) => {
+                if let Some(intent) = self.inventory_intent_for_letter(letter) {
+                    let outcome = self.client.submit(intent);
+                    if outcome.accepted {
+                        self.overlay = UiOverlay::None;
+                        self.focused_panel = UiPanel::Map;
+                    }
+                }
+                Ok(false)
+            }
+            UiCommandCandidate::FocusNext => {
+                self.cycle_focus(false);
+                Ok(false)
+            }
+            UiCommandCandidate::FocusPrevious => {
+                self.cycle_focus(true);
+                Ok(false)
+            }
+            UiCommandCandidate::ToggleDebug => {
+                self.debug_observation_visible = !self.debug_observation_visible;
                 Ok(false)
             }
             UiCommandCandidate::DismissLlmResult => {
@@ -655,8 +925,7 @@ fn llm_kind_index(kind: &LlmRequestKind) -> Option<usize> {
     }
 }
 
-/// [v0.2.0] Phase 17: RunState에 따라 화면을 분기한다.
-/// Title -> CharacterCreation -> Playing <-> GameOver 흐름을 지원한다.
+/// RunState에 따라 Title -> CharacterCreation -> Playing <-> GameOver 화면을 분기한다.
 pub fn run_tui(seed: u64) -> Result<(), Box<dyn std::error::Error>> {
     run_tui_with_config(seed, UiRuntimeConfig::default())
 }
@@ -677,6 +946,156 @@ pub fn run_tui_with_config(
     run_tui_with_service(seed, service, llm_enabled, ui_config)
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct TerminalRestoreState {
+    cursor_hidden: bool,
+    mouse_capture: bool,
+    raw_mode: bool,
+    alternate_screen: bool,
+}
+
+trait TerminalRestoreOps {
+    fn show_cursor(&mut self) -> std::io::Result<()>;
+    fn disable_mouse_capture(&mut self) -> std::io::Result<()>;
+    fn disable_raw_mode(&mut self) -> std::io::Result<()>;
+    fn leave_alternate_screen(&mut self) -> std::io::Result<()>;
+}
+
+trait TerminalSetupOps {
+    fn enter_alternate_screen(&mut self) -> std::io::Result<()>;
+    fn enable_raw_mode(&mut self) -> std::io::Result<()>;
+    fn enable_mouse_capture(&mut self) -> std::io::Result<()>;
+    fn hide_cursor(&mut self) -> std::io::Result<()>;
+}
+
+struct CrosstermSetupOps<'a> {
+    stdout: &'a mut std::io::Stdout,
+}
+
+impl TerminalSetupOps for CrosstermSetupOps<'_> {
+    fn enter_alternate_screen(&mut self) -> std::io::Result<()> {
+        self.stdout.execute(EnterAlternateScreen).map(|_| ())
+    }
+
+    fn enable_raw_mode(&mut self) -> std::io::Result<()> {
+        terminal::enable_raw_mode()
+    }
+
+    fn enable_mouse_capture(&mut self) -> std::io::Result<()> {
+        self.stdout.execute(EnableMouseCapture).map(|_| ())
+    }
+
+    fn hide_cursor(&mut self) -> std::io::Result<()> {
+        self.stdout.execute(cursor::Hide).map(|_| ())
+    }
+}
+
+struct CrosstermRestoreOps;
+
+impl TerminalRestoreOps for CrosstermRestoreOps {
+    fn show_cursor(&mut self) -> std::io::Result<()> {
+        std::io::stdout().execute(cursor::Show).map(|_| ())
+    }
+
+    fn disable_mouse_capture(&mut self) -> std::io::Result<()> {
+        std::io::stdout().execute(DisableMouseCapture).map(|_| ())
+    }
+
+    fn disable_raw_mode(&mut self) -> std::io::Result<()> {
+        terminal::disable_raw_mode()
+    }
+
+    fn leave_alternate_screen(&mut self) -> std::io::Result<()> {
+        std::io::stdout().execute(LeaveAlternateScreen).map(|_| ())
+    }
+}
+
+fn setup_terminal_state(
+    state: &mut TerminalRestoreState,
+    ops: &mut impl TerminalSetupOps,
+    enable_mouse: bool,
+) -> std::io::Result<()> {
+    ops.enter_alternate_screen()?;
+    state.alternate_screen = true;
+    ops.enable_raw_mode()?;
+    state.raw_mode = true;
+    if enable_mouse {
+        ops.enable_mouse_capture()?;
+        state.mouse_capture = true;
+    }
+    ops.hide_cursor()?;
+    state.cursor_hidden = true;
+    Ok(())
+}
+
+fn restore_terminal_state(
+    state: &mut TerminalRestoreState,
+    ops: &mut impl TerminalRestoreOps,
+) -> std::io::Result<()> {
+    let mut first_error = None;
+    let mut attempt = |result: std::io::Result<()>| {
+        if let Err(error) = result {
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
+    };
+
+    if state.cursor_hidden {
+        attempt(ops.show_cursor());
+        state.cursor_hidden = false;
+    }
+    if state.mouse_capture {
+        attempt(ops.disable_mouse_capture());
+        state.mouse_capture = false;
+    }
+    if state.raw_mode {
+        attempt(ops.disable_raw_mode());
+        state.raw_mode = false;
+    }
+    if state.alternate_screen {
+        attempt(ops.leave_alternate_screen());
+        state.alternate_screen = false;
+    }
+    first_error.map_or(Ok(()), Err)
+}
+
+fn run_with_terminal_restore<T, E>(
+    state: &mut TerminalRestoreState,
+    ops: &mut impl TerminalRestoreOps,
+    run: impl FnOnce() -> Result<T, E>,
+) -> Result<T, E>
+where
+    E: From<std::io::Error>,
+{
+    let run_result = run();
+    let restore_result = restore_terminal_state(state, ops).map_err(E::from);
+    match run_result {
+        Ok(value) => restore_result.map(|()| value),
+        Err(error) => {
+            let _ = restore_result;
+            Err(error)
+        }
+    }
+}
+
+#[derive(Default)]
+struct TerminalSessionGuard {
+    state: TerminalRestoreState,
+}
+
+impl TerminalSessionGuard {
+    fn restore(&mut self) -> std::io::Result<()> {
+        restore_terminal_state(&mut self.state, &mut CrosstermRestoreOps)
+    }
+}
+
+impl Drop for TerminalSessionGuard {
+    fn drop(&mut self) {
+        let _ = self.restore();
+    }
+}
+
 fn run_tui_with_service(
     seed: u64,
     mut llm_service: LocalLlmService,
@@ -684,149 +1103,104 @@ fn run_tui_with_service(
     ui_config: UiRuntimeConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut stdout = std::io::stdout();
-    stdout.execute(EnterAlternateScreen)?;
-    terminal::enable_raw_mode()?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let mut app = TuiApp::new_with_llm_enabled(GameSession::try_new(seed)?, ui_config, llm_enabled);
-    let save_directory = tempfile::tempdir()?;
-    let save_path = save_directory.path().join("quick-save.json");
-    let load_path = save_path.clone();
-    let run_result = (|| -> Result<(), Box<dyn std::error::Error>> {
-        loop {
-            app.poll_llm_response(&llm_service);
-            terminal.draw(|frame| {
-                let size = frame.area();
-                if !app.supports_terminal_size(size.width, size.height) {
-                    frame.render_widget(
-                        render_panels::TextPanel {
-                            title: "TUI",
-                            lines: vec!["terminal requires 60x24; resize or press Q/Esc to exit"
-                                .to_string()],
-                        },
-                        size,
-                    );
-                    return;
-                }
-                match app.run_state() {
-                    crate::core::session::RunState::Title => render_title_screen(frame, size),
-                    crate::core::session::RunState::CharacterCreation => {
-                        render_character_creation_screen(frame, size)
+    let mut terminal_guard = TerminalSessionGuard::default();
+    {
+        let mut setup_ops = CrosstermSetupOps {
+            stdout: &mut stdout,
+        };
+        setup_terminal_state(
+            &mut terminal_guard.state,
+            &mut setup_ops,
+            ui_config.enable_mouse,
+        )?;
+    }
+    let mut restore_ops = CrosstermRestoreOps;
+    let run_result = run_with_terminal_restore(
+        &mut terminal_guard.state,
+        &mut restore_ops,
+        || -> Result<(), Box<dyn std::error::Error>> {
+            let backend = CrosstermBackend::new(stdout);
+            let mut terminal = Terminal::new(backend)?;
+            let mut app =
+                TuiApp::new_with_llm_enabled(GameSession::try_new(seed)?, ui_config, llm_enabled);
+            loop {
+                app.poll_llm_response(&llm_service);
+                terminal.draw(|frame| {
+                    let size = frame.area();
+                    if !app.supports_terminal_size(size.width, size.height) {
+                        frame.render_widget(
+                            render_panels::ThemedTextPanel {
+                                title: "TUI",
+                                lines: vec![
+                                    "terminal requires 60x24; resize or press Q/Esc to exit"
+                                        .to_string(),
+                                ],
+                                theme: app.theme(),
+                            },
+                            size,
+                        );
+                        return;
                     }
-                    crate::core::session::RunState::Playing
-                    | crate::core::session::RunState::AwaitingDirection { .. }
-                    | crate::core::session::RunState::AwaitingInventorySelection { .. }
-                    | crate::core::session::RunState::MorePrompt => {
-                        render_play_screen(frame, size, &mut app)
-                    }
-                    crate::core::session::RunState::GameOver { cause, final_score } => {
-                        render_game_over_screen(frame, size, &app, cause, final_score)
-                    }
-                }
-            })?;
-            let size = terminal.size()?;
-            if event::poll(Duration::from_millis(50))? {
-                let input_event = event::read()?;
-                let candidate = if !app.supports_terminal_size(size.width, size.height) {
-                    match input_event {
-                        Event::Key(key)
-                            if matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc) =>
-                        {
-                            Some(UiCommandCandidate::Quit)
+                    match app.run_state() {
+                        crate::core::session::RunState::Title => {
+                            render_title_screen(frame, size, app.theme())
                         }
-                        _ => None,
-                    }
-                } else {
-                    match input_event {
-                        Event::Key(key) if app.soft_input().is_some() => match key.code {
-                            KeyCode::Enter => Some(UiCommandCandidate::LlmSubmitInput),
-                            KeyCode::Backspace => Some(UiCommandCandidate::LlmBackspace),
-                            KeyCode::Esc => Some(UiCommandCandidate::LlmCancelInput),
-                            KeyCode::Char(character) => {
-                                Some(UiCommandCandidate::LlmInput(character))
-                            }
-                            _ => None,
-                        },
-                        Event::Key(key) => match key.code {
-                            KeyCode::Char('N') if app.has_llm_result() => {
-                                Some(UiCommandCandidate::DismissLlmResult)
-                            }
-                            KeyCode::Esc if app.has_llm_result() => {
-                                Some(UiCommandCandidate::DismissLlmResult)
-                            }
-                            KeyCode::Esc => Some(UiCommandCandidate::Quit),
-                            // [v0.2.0] Phase 18: F9 키로 debug observation 패널을 토글한다.
-                            // 이 입력은 UI-only이며 core나 snapshot hash에 영향을 주지 않는다.
-                            KeyCode::F(9) => {
-                                app.debug_observation_visible = !app.debug_observation_visible;
-                                None
-                            }
-                            key_code => runtime_key_to_candidate(
-                                key_code,
-                                &app.run_state(),
-                                &app.observation(),
-                            ),
-                        },
-                        Event::Mouse(mouse) => {
-                            let layout = compute_layout(size.width, size.height);
-                            let viewport = app.viewport_for_observation(layout);
-                            let input = match mouse.kind {
-                                MouseEventKind::Moved => UiInputEvent::MouseHover {
-                                    column: mouse.column,
-                                    row: mouse.row,
-                                },
-                                MouseEventKind::Down(_) => UiInputEvent::MouseClick {
-                                    column: mouse.column,
-                                    row: mouse.row,
-                                },
-                                _ => UiInputEvent::FocusPanel(UiPanel::Map),
-                            };
-                            map_mouse_event_for_state(input, layout, viewport, &app)
+                        crate::core::session::RunState::CharacterCreation => {
+                            render_character_creation_screen(frame, size, app.theme())
                         }
-                        _ => None,
+                        crate::core::session::RunState::Playing
+                        | crate::core::session::RunState::AwaitingDirection { .. }
+                        | crate::core::session::RunState::AwaitingInventorySelection { .. }
+                        | crate::core::session::RunState::MorePrompt => {
+                            render_play_screen(frame, size, &mut app)
+                        }
+                        crate::core::session::RunState::GameOver { cause, final_score } => {
+                            render_game_over_screen(frame, size, &app, cause, final_score)
+                        }
                     }
-                };
-                if let Some(candidate) = candidate {
-                    if app.handle_candidate(candidate, &save_path, &load_path)? {
-                        break;
+                    render_global_overlay(frame, size, &app);
+                })?;
+                let size = terminal.size()?;
+                if event::poll(Duration::from_millis(50))? {
+                    let input_event = event::read()?;
+                    let candidate =
+                        runtime_event_to_candidate(input_event, size.width, size.height, &app);
+                    if let Some(candidate) = candidate {
+                        if app.handle_candidate_owned(candidate)? {
+                            break;
+                        }
+                        app.dispatch_llm_request(&llm_service);
                     }
-                    app.dispatch_llm_request(&llm_service);
                 }
             }
-        }
-        Ok(())
-    })();
+            Ok(())
+        },
+    );
 
-    // 외부 응답이 지연되어도 terminal은 먼저 정상 상태로 복원한다.
-    let backend = terminal.backend_mut();
-    let restore_result = (|| -> Result<(), Box<dyn std::error::Error>> {
-        backend.execute(cursor::Show)?;
-        terminal::disable_raw_mode()?;
-        backend.execute(LeaveAlternateScreen)?;
-        Ok(())
-    })();
+    // 외부 응답이 지연되어도 terminal cleanup을 마친 뒤 worker 종료를 기다린다.
     let _worker_stopped = llm_service.shutdown_with_grace(Duration::from_millis(250));
 
     run_result?;
-    restore_result?;
     Ok(())
 }
 
-fn render_title_screen(frame: &mut ratatui::Frame, size: Rect) {
+fn render_title_screen(frame: &mut ratatui::Frame, size: Rect, theme: UiTheme) {
     frame.render_widget(
-        render_panels::TextPanel {
+        render_panels::ThemedTextPanel {
             title: "AIHack",
             lines: render_panels::title_lines(),
+            theme,
         },
         size,
     );
 }
 
-fn render_character_creation_screen(frame: &mut ratatui::Frame, size: Rect) {
+fn render_character_creation_screen(frame: &mut ratatui::Frame, size: Rect, theme: UiTheme) {
     frame.render_widget(
-        render_panels::TextPanel {
+        render_panels::ThemedTextPanel {
             title: "Character Creation",
             lines: render_panels::character_creation_lines(),
+            theme,
         },
         size,
     );
@@ -837,7 +1211,7 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
     let observation = app.observation();
     let viewport = app.viewport_for_observation(layout);
 
-    // [v0.2.0] Phase 19: 만료된 라벨 필터링
+    // frame 직전에 만료된 라벨을 제거한다.
     let current_time_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -874,6 +1248,7 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
             observation: &observation,
             viewport,
             labels: &app.active_labels,
+            theme: app.theme(),
         },
         layout.map,
     );
@@ -884,9 +1259,10 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
             .take(1),
     );
     frame.render_widget(
-        render_panels::TextPanel {
+        render_panels::ThemedTextPanel {
             title: "STATUS",
             lines: status_lines,
+            theme: app.theme(),
         },
         layout.status,
     );
@@ -897,21 +1273,23 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
         app.has_llm_result(),
     );
     frame.render_widget(
-        render_panels::TextPanel {
+        render_panels::ThemedTextPanel {
             title: "COMMANDS",
             lines: command_lines,
+            theme: app.theme(),
         },
         layout.command,
     );
     frame.render_widget(
-        render_panels::TextPanel {
+        render_panels::ThemedTextPanel {
             title: "LOG",
             lines: render_panels::log_lines(&observation, &app.narrative_lines()),
+            theme: app.theme(),
         },
         layout.log,
     );
     frame.render_widget(
-        render_panels::TextPanel {
+        render_panels::ThemedTextPanel {
             title: "INSPECT",
             lines: render_panels::inspect_lines(
                 &observation,
@@ -919,10 +1297,11 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
                 app.focused_panel(),
                 &app.llm_result_lines(),
             ),
+            theme: app.theme(),
         },
         layout.inspect,
     );
-    // [v0.2.0] Phase 18: F9 토글 debug observation 패널.
+    // F9 토글 debug observation 패널이다.
     // 이 패널은 UI-only이며 snapshot hash에 영향을 주지 않는다.
     if app.debug_observation_visible {
         let debug_lines = render_panels::debug_observation_lines(&observation);
@@ -935,18 +1314,20 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
             height: debug_height.min(layout.map.height),
         };
         frame.render_widget(
-            render_panels::TextPanel {
+            render_panels::ThemedTextPanel {
                 title: "DEBUG OBS",
                 lines: debug_lines,
+                theme: app.theme(),
             },
             debug_area,
         );
     } else if let Some(debug) = layout.debug {
         // roomy layout(120x36+)에서 기본 debug 패널 표시
         frame.render_widget(
-            render_panels::TextPanel {
+            render_panels::ThemedTextPanel {
                 title: "DEBUG",
                 lines: vec![format!("effects {}", app.project_effects().len())],
+                theme: app.theme(),
             },
             debug,
         );
@@ -954,27 +1335,30 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
 
     if let Some(input) = app.soft_input() {
         frame.render_widget(
-            render_panels::TextPanel {
+            render_panels::ThemedTextPanel {
                 title: "SOFT JUDGMENT INPUT",
                 lines: render_panels::soft_input_lines(input),
+                theme: app.theme(),
             },
             layout.inspect,
         );
     }
 
-    // 상태 오버레이 표시 (하단 로그 영역 위에 작게)
+    // blocking prompt는 최소 화면의 1행 log에 자르지 않고 root 중앙 modal로 표시한다.
     if let Some(lines) = state_overlay {
-        let overlay_height = lines.len() as u16 + 2;
+        let overlay_height = (lines.len() as u16 + 1).min(_size.height);
+        let overlay_width = _size.width.min(72);
         let overlay_area = Rect {
-            x: layout.log.x,
-            y: layout.log.y + layout.log.height.saturating_sub(overlay_height),
-            width: layout.log.width,
-            height: overlay_height.min(layout.log.height),
+            x: _size.x + _size.width.saturating_sub(overlay_width) / 2,
+            y: _size.y + _size.height.saturating_sub(overlay_height) / 2,
+            width: overlay_width,
+            height: overlay_height,
         };
         frame.render_widget(
-            render_panels::TextPanel {
+            render_panels::ThemedTextPanel {
                 title: "STATE",
                 lines,
+                theme: app.theme(),
             },
             overlay_area,
         );
@@ -1006,15 +1390,16 @@ fn render_game_over_screen(
         observation.seed,
     );
     frame.render_widget(
-        render_panels::TextPanel {
+        render_panels::ThemedTextPanel {
             title: "GAME OVER",
             lines,
+            theme: app.theme(),
         },
         size,
     );
 }
 
-/// [v0.2.0] Phase 17: RunState에 따라 키 입력을 다른 후보로 매핑한다.
+/// RunState에 따라 키 입력을 다른 후보로 매핑한다.
 fn key_to_candidate_for_state(
     ch: char,
     state: &crate::core::session::RunState,
@@ -1027,6 +1412,7 @@ fn key_to_candidate_for_state(
                 crate::core::action::CommandIntent::Wait,
             )),
             'q' | 'Q' => Some(UiCommandCandidate::Quit),
+            'l' | 'L' => Some(UiCommandCandidate::Load),
             _ => None,
         },
         RunState::CharacterCreation => match ch {
@@ -1041,10 +1427,18 @@ fn key_to_candidate_for_state(
             'q' | 'Q' => Some(UiCommandCandidate::Quit),
             _ => None,
         },
-        RunState::AwaitingDirection { .. }
-        | RunState::AwaitingInventorySelection { .. }
-        | RunState::MorePrompt
-        | RunState::Playing => key_to_candidate(ch, observation),
+        RunState::AwaitingDirection { .. } => direction_for_key(ch)
+            .map(crate::core::action::CommandIntent::Move)
+            .map(UiCommandCandidate::Command),
+        RunState::AwaitingInventorySelection { .. } => observation
+            .inventory
+            .iter()
+            .any(|item| item.letter.0 == ch)
+            .then_some(UiCommandCandidate::InventoryLetter(ch)),
+        RunState::MorePrompt => Some(UiCommandCandidate::Command(
+            crate::core::action::CommandIntent::AcknowledgeMore,
+        )),
+        RunState::Playing => key_to_candidate(ch, observation),
     }
 }
 
@@ -1053,14 +1447,192 @@ pub fn runtime_key_to_candidate(
     state: &crate::core::session::RunState,
     observation: &Observation,
 ) -> Option<UiCommandCandidate> {
+    use crate::core::session::RunState;
+    match state {
+        RunState::MorePrompt => {
+            return Some(UiCommandCandidate::Command(
+                crate::core::action::CommandIntent::AcknowledgeMore,
+            ));
+        }
+        RunState::AwaitingDirection { .. } => {
+            return match key_code {
+                KeyCode::Esc => Some(UiCommandCandidate::Command(
+                    crate::core::action::CommandIntent::AcknowledgeMore,
+                )),
+                KeyCode::Char(character) => {
+                    key_to_candidate_for_state(character, state, observation)
+                }
+                _ => None,
+            };
+        }
+        RunState::AwaitingInventorySelection { .. } => {
+            return match key_code {
+                KeyCode::Esc => Some(UiCommandCandidate::Command(
+                    crate::core::action::CommandIntent::AcknowledgeMore,
+                )),
+                KeyCode::Char(character) => {
+                    key_to_candidate_for_state(character, state, observation)
+                }
+                _ => None,
+            };
+        }
+        RunState::GameOver { .. } => {
+            return match key_code {
+                KeyCode::Esc => Some(UiCommandCandidate::Quit),
+                KeyCode::Char(character) => {
+                    key_to_candidate_for_state(character, state, observation)
+                }
+                _ => None,
+            };
+        }
+        _ => {}
+    }
     match key_code {
+        KeyCode::Esc => match state {
+            crate::core::session::RunState::CharacterCreation => {
+                Some(UiCommandCandidate::BackToTitle)
+            }
+            crate::core::session::RunState::AwaitingDirection { .. }
+            | crate::core::session::RunState::AwaitingInventorySelection { .. }
+            | crate::core::session::RunState::MorePrompt => Some(UiCommandCandidate::Command(
+                crate::core::action::CommandIntent::AcknowledgeMore,
+            )),
+            crate::core::session::RunState::Title
+            | crate::core::session::RunState::Playing
+            | crate::core::session::RunState::GameOver { .. } => Some(UiCommandCandidate::Quit),
+        },
+        KeyCode::Tab => Some(UiCommandCandidate::FocusNext),
+        KeyCode::BackTab => Some(UiCommandCandidate::FocusPrevious),
         KeyCode::Enter => key_to_candidate_for_state('\n', state, observation),
         KeyCode::Char(character) => key_to_candidate_for_state(character, state, observation),
         _ => None,
     }
 }
 
-/// [v0.2.0] Phase 17: RunState에 따라 마우스 입력을 처리한다.
+/// 실제 event loop와 회귀 테스트가 공유하는 단일 state-aware dispatcher다.
+pub fn runtime_event_to_candidate(
+    input_event: Event,
+    width: u16,
+    height: u16,
+    app: &TuiApp,
+) -> Option<UiCommandCandidate> {
+    let Event::Key(key) = &input_event else {
+        if !app.supports_terminal_size(width, height) {
+            return None;
+        }
+        return match input_event {
+            Event::Mouse(mouse) => {
+                let layout = compute_layout(width, height);
+                let viewport = app.viewport_for_observation(layout);
+                let input = match mouse.kind {
+                    MouseEventKind::Moved => UiInputEvent::MouseHover {
+                        column: mouse.column,
+                        row: mouse.row,
+                    },
+                    MouseEventKind::Down(_) => UiInputEvent::MouseClick {
+                        column: mouse.column,
+                        row: mouse.row,
+                    },
+                    _ => UiInputEvent::FocusPanel(UiPanel::Map),
+                };
+                map_mouse_event_for_state(input, layout, viewport, app)
+            }
+            _ => None,
+        };
+    };
+    if key.kind == KeyEventKind::Release {
+        return None;
+    }
+    if !app.supports_terminal_size(width, height) {
+        return matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc)
+            .then_some(UiCommandCandidate::Quit);
+    }
+    if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
+        return Some(UiCommandCandidate::CloseOverlay);
+    }
+    if app.ui_overlay() == &UiOverlay::Inventory {
+        return match key.code {
+            KeyCode::Esc | KeyCode::Char('i' | 'I') => Some(UiCommandCandidate::CloseOverlay),
+            KeyCode::Char(letter) => Some(UiCommandCandidate::InventoryLetter(letter)),
+            KeyCode::Tab => Some(UiCommandCandidate::FocusNext),
+            KeyCode::BackTab => Some(UiCommandCandidate::FocusPrevious),
+            _ => None,
+        };
+    }
+    if app.soft_input().is_some() {
+        return match key.code {
+            KeyCode::Enter => Some(UiCommandCandidate::LlmSubmitInput),
+            KeyCode::Backspace => Some(UiCommandCandidate::LlmBackspace),
+            KeyCode::Esc => Some(UiCommandCandidate::LlmCancelInput),
+            KeyCode::Char(character) => Some(UiCommandCandidate::LlmInput(character)),
+            _ => None,
+        };
+    }
+
+    let state = app.run_state();
+    if matches!(
+        state,
+        RunState::AwaitingDirection { .. }
+            | RunState::AwaitingInventorySelection { .. }
+            | RunState::MorePrompt
+            | RunState::GameOver { .. }
+    ) {
+        return runtime_key_to_candidate(key.code, &state, &app.observation());
+    }
+    match key.code {
+        KeyCode::F(9) => Some(UiCommandCandidate::ToggleDebug),
+        KeyCode::Char('N') | KeyCode::Esc if app.has_llm_result() => {
+            Some(UiCommandCandidate::DismissLlmResult)
+        }
+        key_code => runtime_key_to_candidate(key_code, &state, &app.observation()),
+    }
+}
+
+fn render_global_overlay(frame: &mut ratatui::Frame, size: Rect, app: &TuiApp) {
+    let (title, lines) = match app.ui_overlay() {
+        UiOverlay::None => return,
+        UiOverlay::Inventory => (
+            "INVENTORY",
+            render_panels::inventory_overlay_lines(&app.observation()),
+        ),
+        UiOverlay::StorageError { operation } => (
+            "STORAGE ERROR",
+            render_panels::storage_error_lines(*operation),
+        ),
+    };
+    let height = (lines.len() as u16 + 2).min(size.height);
+    let width = size.width.min(72);
+    let area = Rect {
+        x: size.x + size.width.saturating_sub(width) / 2,
+        y: size.y + size.height.saturating_sub(height) / 2,
+        width,
+        height,
+    };
+    frame.render_widget(
+        render_panels::ThemedTextPanel {
+            title,
+            lines,
+            theme: app.theme(),
+        },
+        area,
+    );
+}
+
+fn direction_for_key(ch: char) -> Option<crate::core::Direction> {
+    match ch {
+        'h' => Some(crate::core::Direction::West),
+        'j' => Some(crate::core::Direction::South),
+        'k' => Some(crate::core::Direction::North),
+        'l' => Some(crate::core::Direction::East),
+        'y' => Some(crate::core::Direction::NorthWest),
+        'u' => Some(crate::core::Direction::NorthEast),
+        'b' => Some(crate::core::Direction::SouthWest),
+        'n' => Some(crate::core::Direction::SouthEast),
+        _ => None,
+    }
+}
+
+/// RunState에 따라 마우스 입력을 처리한다.
 fn map_mouse_event_for_state(
     event: UiInputEvent,
     layout: TuiLayout,
@@ -1095,4 +1667,201 @@ pub fn runtime_smoke() -> Result<Rect, String> {
     );
     let layout = app.run_single_frame(100, 32)?;
     Ok(layout.map)
+}
+
+#[cfg(test)]
+mod terminal_restore_tests {
+    use super::{
+        restore_terminal_state, run_with_terminal_restore, setup_terminal_state,
+        TerminalRestoreOps, TerminalRestoreState, TerminalSetupOps,
+    };
+    use std::io;
+
+    #[derive(Default)]
+    struct FakeRestoreOps {
+        calls: Vec<&'static str>,
+        fail_at: Option<usize>,
+    }
+
+    impl FakeRestoreOps {
+        fn step(&mut self, name: &'static str) -> io::Result<()> {
+            let index = self.calls.len();
+            self.calls.push(name);
+            if self.fail_at == Some(index) {
+                Err(io::Error::other(format!("injected {name} failure")))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    impl TerminalRestoreOps for FakeRestoreOps {
+        fn show_cursor(&mut self) -> io::Result<()> {
+            self.step("show_cursor")
+        }
+        fn disable_mouse_capture(&mut self) -> io::Result<()> {
+            self.step("disable_mouse")
+        }
+        fn disable_raw_mode(&mut self) -> io::Result<()> {
+            self.step("disable_raw")
+        }
+        fn leave_alternate_screen(&mut self) -> io::Result<()> {
+            self.step("leave_alternate")
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeSetupOps {
+        calls: Vec<&'static str>,
+        fail_at: Option<usize>,
+    }
+
+    impl FakeSetupOps {
+        fn step(&mut self, name: &'static str) -> io::Result<()> {
+            let index = self.calls.len();
+            self.calls.push(name);
+            if self.fail_at == Some(index) {
+                Err(io::Error::other(format!("injected {name} failure")))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    impl TerminalSetupOps for FakeSetupOps {
+        fn enter_alternate_screen(&mut self) -> io::Result<()> {
+            self.step("enter_alternate")
+        }
+        fn enable_raw_mode(&mut self) -> io::Result<()> {
+            self.step("enable_raw")
+        }
+        fn enable_mouse_capture(&mut self) -> io::Result<()> {
+            self.step("enable_mouse")
+        }
+        fn hide_cursor(&mut self) -> io::Result<()> {
+            self.step("hide_cursor")
+        }
+    }
+
+    #[test]
+    fn best_effort_restore_attempts_every_step_after_each_injected_failure() {
+        for fail_at in 0..4 {
+            let mut state = TerminalRestoreState {
+                cursor_hidden: true,
+                mouse_capture: true,
+                raw_mode: true,
+                alternate_screen: true,
+            };
+            let mut ops = FakeRestoreOps {
+                fail_at: Some(fail_at),
+                ..Default::default()
+            };
+
+            assert!(restore_terminal_state(&mut state, &mut ops).is_err());
+            assert_eq!(
+                ops.calls,
+                [
+                    "show_cursor",
+                    "disable_mouse",
+                    "disable_raw",
+                    "leave_alternate"
+                ]
+            );
+            assert_eq!(state, TerminalRestoreState::default());
+        }
+    }
+
+    #[test]
+    fn setup_failure_records_only_completed_states_and_restores_them() {
+        for fail_at in 0..4 {
+            let mut state = TerminalRestoreState::default();
+            let mut setup = FakeSetupOps {
+                fail_at: Some(fail_at),
+                ..Default::default()
+            };
+            assert!(setup_terminal_state(&mut state, &mut setup, true).is_err());
+
+            let mut restore = FakeRestoreOps::default();
+            restore_terminal_state(&mut state, &mut restore).unwrap();
+            let expected = match fail_at {
+                0 => Vec::new(),
+                1 => vec!["leave_alternate"],
+                2 => vec!["disable_raw", "leave_alternate"],
+                3 => vec!["disable_mouse", "disable_raw", "leave_alternate"],
+                _ => unreachable!(),
+            };
+            assert_eq!(restore.calls, expected, "setup fail_at={fail_at}");
+            assert_eq!(state, TerminalRestoreState::default());
+        }
+    }
+
+    #[test]
+    fn terminal_new_draw_and_read_failures_share_the_full_restore_boundary() {
+        for stage in ["terminal_new", "draw", "read"] {
+            let mut state = TerminalRestoreState {
+                cursor_hidden: true,
+                mouse_capture: true,
+                raw_mode: true,
+                alternate_screen: true,
+            };
+            let mut restore = FakeRestoreOps::default();
+            let result: io::Result<()> =
+                run_with_terminal_restore(&mut state, &mut restore, || {
+                    Err(io::Error::other(format!("injected {stage} failure")))
+                });
+            assert!(result.is_err(), "stage={stage}");
+            assert_eq!(
+                restore.calls,
+                [
+                    "show_cursor",
+                    "disable_mouse",
+                    "disable_raw",
+                    "leave_alternate"
+                ],
+                "stage={stage}"
+            );
+            assert_eq!(state, TerminalRestoreState::default());
+        }
+    }
+}
+
+#[cfg(test)]
+mod blocking_prompt_render_tests {
+    use super::{render_play_screen, TuiApp, UiRuntimeConfig};
+    use aihack_ai_contract::RunState;
+    use aihack_runtime::GameSession;
+    use ratatui::{backend::TestBackend, Terminal};
+
+    fn rendered_symbols(state: RunState, width: u16, height: u16) -> String {
+        let mut save = GameSession::new_for_playing(42).to_save_data();
+        save.run_state = state;
+        let session = GameSession::from_save_data(save).unwrap();
+        let mut app = TuiApp::new(session, UiRuntimeConfig::default());
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| render_play_screen(frame, frame.area(), &mut app))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let mut rendered = String::new();
+        for row in 0..height {
+            for column in 0..width {
+                rendered.push_str(buffer[(column, row)].symbol());
+            }
+            rendered.push('\n');
+        }
+        rendered
+    }
+
+    #[test]
+    fn minimum_supported_sizes_render_complete_blocking_prompt_content() {
+        for (width, height) in [(60, 24), (80, 24)] {
+            let more = rendered_symbols(RunState::MorePrompt, width, height);
+            assert!(more.contains("--More--"), "size={width}x{height}");
+            assert!(
+                more.contains("Press any key to continue"),
+                "size={width}x{height}"
+            );
+        }
+    }
 }

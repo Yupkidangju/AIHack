@@ -48,7 +48,7 @@ pub fn compute_layout(width: u16, height: u16) -> TuiLayout {
     let root = Rect::new(0, 0, width, height);
     if width >= 120 && height >= 36 {
         roomy_layout(root)
-    } else if width >= 100 && height >= 32 {
+    } else if width >= 80 && height >= 24 {
         standard_layout(root)
     } else {
         degraded_layout(root)
@@ -74,10 +74,24 @@ fn degraded_layout(root: Rect) -> TuiLayout {
 }
 
 fn standard_layout(root: Rect) -> TuiLayout {
-    let map = Rect::new(0, 0, 60, 24);
-    let status = Rect::new(60, 0, root.width.saturating_sub(60), 8);
-    let inspect = Rect::new(60, 8, root.width.saturating_sub(60), 8);
-    let log = Rect::new(0, 24, root.width, root.height.saturating_sub(27));
+    let map_width = root.width.saturating_mul(65) / 100;
+    let body_height = root.height.saturating_sub(7).max(20);
+    let side_width = root.width.saturating_sub(map_width);
+    let status_height = body_height / 2;
+    let map = Rect::new(0, 0, map_width, body_height);
+    let status = Rect::new(map_width, 0, side_width, status_height);
+    let inspect = Rect::new(
+        map_width,
+        status_height,
+        side_width,
+        body_height.saturating_sub(status_height),
+    );
+    let log = Rect::new(
+        0,
+        body_height,
+        root.width,
+        root.height.saturating_sub(body_height + 3),
+    );
     let command = Rect::new(0, root.height.saturating_sub(3), root.width, 3);
     TuiLayout {
         root,
@@ -92,11 +106,25 @@ fn standard_layout(root: Rect) -> TuiLayout {
 }
 
 fn roomy_layout(root: Rect) -> TuiLayout {
-    let map = Rect::new(0, 0, 60, 24);
-    let status = Rect::new(60, 0, root.width.saturating_sub(60), 8);
-    let inspect = Rect::new(60, 8, root.width.saturating_sub(60), 8);
-    let debug = Rect::new(60, 16, root.width.saturating_sub(60), 8);
-    let log = Rect::new(0, 24, root.width, root.height.saturating_sub(27));
+    let map_width = root.width.saturating_mul(70) / 100;
+    let body_height = root.height.saturating_sub(12).max(20);
+    let side_width = root.width.saturating_sub(map_width);
+    let panel_height = body_height / 3;
+    let map = Rect::new(0, 0, map_width, body_height);
+    let status = Rect::new(map_width, 0, side_width, panel_height);
+    let inspect = Rect::new(map_width, panel_height, side_width, panel_height);
+    let debug = Rect::new(
+        map_width,
+        panel_height * 2,
+        side_width,
+        body_height.saturating_sub(panel_height * 2),
+    );
+    let log = Rect::new(
+        0,
+        body_height,
+        root.width,
+        root.height.saturating_sub(body_height + 3),
+    );
     let command = Rect::new(0, root.height.saturating_sub(3), root.width, 3);
     TuiLayout {
         root,

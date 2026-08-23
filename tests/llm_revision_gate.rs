@@ -157,6 +157,7 @@ fn action_outside_the_current_action_space_is_rejected() {
 #[test]
 fn malformed_confidence_or_rationale_is_rejected_at_the_response_boundary() {
     for (rationale, confidence, code) in [
+        ("   ".to_string(), 0.5, LlmValidationCode::EmptyText),
         (
             "valid".to_string(),
             f32::NAN,

@@ -19,9 +19,9 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, [run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171), Ubuntu/Windows success | Linux/Windows green |
+| CI | report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, [run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171), Ubuntu/Windows success; report 25 시정 SHA는 아직 미생성 | 새 clean same-SHA Linux/Windows green 필요 |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
-| long run | wait-only, 조기 사망도 exit 0 | survival-v1, accepted turn 1000 |
+| long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 
 현재 `cargo run --locked -- --seed 42`는 TUI binary를 선택한다.
 
@@ -49,6 +49,7 @@ cargo 1.94.1 (...)
 - Git
 - Bash: Linux script 및 로컬 audit
 - PowerShell 또는 cmd: Windows script
+- Windows test의 실제 ConPTY harness용 dev-only `portable-pty 0.9.0`(runtime/release binary dependency 아님)
 - `rg`: 문서·경계 audit
 - `cargo-audit 0.22.1`: RustSec dependency advisory gate
 - `cargo-deny 0.19.4`: license, source, duplicate dependency gate
@@ -56,7 +57,7 @@ cargo 1.94.1 (...)
 
 local LLM은 core build와 test의 필수 조건이 아니다. LLM integration test는 loopback mock server를 사용하고 외부 네트워크를 사용하지 않는다.
 
-R6 dependency는 `reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json"] }`로 고정한다. HTTP loopback만 허용하므로 TLS feature를 넣지 않는다. `ClientBuilder::no_proxy()`, connect timeout 500ms, request별 total timeout을 사용한다.
+R6 dependency는 `reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json"] }`로 고정한다. HTTP loopback만 허용하므로 TLS feature를 넣지 않는다. `ClientBuilder::no_proxy()`, connect timeout 500ms, narrative total timeout 2000ms, decision/soft-adjudication total timeout 1500ms를 config/helper의 단일 상수에서 사용한다. v0.3.0 built-in runtime locale은 English이며 provider Unicode output은 검증 후 그대로 표시한다.
 
 ## 3. 현재 빠른 실행
 
@@ -168,9 +169,11 @@ output\SHA256SUMS
 output\aihack-0.3.0-source.zip
 ```
 
-copy 실패 뒤 성공 메시지를 출력하면 R1 실패다.
+copy 실패 뒤 성공 메시지를 출력하면 R1 실패다. `scripts/verify_release_bundle.ps1`은 Linux verifier와 같은 fail-closed 항목을 검사한다: required/non-empty artifact, source archive 필수 record, blocked legacy/target/output path, metadata exact value와 중복 key, archive/output approval·modification record의 LF-normalized exact equality, SHA256SUMS의 정확한 file set·중복·hash 재검증이다.
 
-CI는 Ubuntu에서 `./build.sh --release`, Windows에서 `cmd /c build.bat --release`를 실행한다. 따라서 두 runner 모두 clean checkout의 동일 commit에서 실제 배포 bundle과 대응 source archive를 생성·검증한다. 양쪽 script는 approval/modification ID가 metadata와 bundled record에서 일치하는지 검사한다. R7/R8 승인·문서 checkpoint의 canonical 명령은 두 OS 모두 `scripts/r7_checkpoint.sh`, `scripts/r8_checkpoint.sh`이며 Windows에서는 Git Bash로 실행한다. `build.bat --release`는 Windows bundle gate이지만 R7/R8 checkpoint를 대체하지 않는다.
+Windows negative fixture는 legacy include, metadata mismatch/duplicate, wrong hash, zero-size artifact, duplicate checksum record를 각각 nonzero로 고정한다. 정상 bundle만 exit 0이어야 하며 `build.bat --release`는 checksum 생성 직후 이 verifier를 반드시 호출한다.
+
+CI는 Ubuntu에서 `./build.sh --release` + `scripts/verify_release_bundle.sh`, Windows에서 `cmd /c build.bat --release` + `scripts/verify_release_bundle.ps1`을 실행한다. 따라서 두 runner 모두 clean checkout의 동일 commit에서 실제 배포 bundle과 대응 source archive를 생성하고 동일한 negative contract를 검증한다. R7/R8 승인·문서 checkpoint의 canonical 명령은 두 OS 모두 `scripts/r7_checkpoint.sh`, `scripts/r8_checkpoint.sh`이며 Windows에서는 Git Bash로 실행한다. platform bundle gate는 R7/R8 checkpoint를 대체하지 않는다.
 
 ### 5.3 현재와 target artifact
 
@@ -219,7 +222,11 @@ Linux와 Windows에서 command 의미가 같아야 한다. OS별 shell 차이 �
 
 CI tool 설치는 `cargo install --locked cargo-audit --version 0.22.1`과 `cargo install --locked cargo-deny --version 0.19.4`로 고정한다. `deny.toml`은 crates.io만 허용하고 license allowlist와 crossterm duplicate deny를 정의한다. exception은 crate, version, 이유, owner, 만료일을 가져야 하며 최대 90일이다.
 
-현재 license exception은 `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception` 하나다. capability filesystem의 Windows backend에 필요한 shipped dependency이며 owner는 Dependency owner / Release manager, 만료일은 2026-10-31이다. `winx` 또는 `cap-primitives`/`cap-std`/`cap-fs-ext`/`cap-tempfile` version 변경 시 만료일 전이라도 재검토한다. 다른 crate에는 이 exception을 확장하지 않는다.
+현재 license exception은 `dependency-exceptions.json`의 `DEP-EXC-0001` 하나이며 `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception`만 허용한다. capability filesystem의 Windows backend에 필요한 shipped dependency이며 owner는 Dependency owner / Release manager, 만료일은 2026-10-31이다. `winx` 또는 `cap-primitives`/`cap-std`/`cap-fs-ext`/`cap-tempfile` version 변경 시 만료일 전이라도 machine checker가 실패한다. 다른 crate에는 이 exception을 확장하지 않는다.
+
+`cargo test --locked -p aihack --test dependency_exception_gate`는 ledger, TOML AST로 parse한 `deny.toml`, exact resolved graph trigger 집합, dependency path와 현재 UTC 날짜를 함께 대조한다. comment decoy, deny table crate swap, trigger key 삭제, invalid calendar date, expiry, version/path drift는 각각 실패해야 하며, 이 gate와 cargo-deny 0.19.4가 함께 PASS해야 dependency license gate가 닫힌다.
+
+`dependency-duplicate-budget.json`은 cargo metadata에서 둘 이상의 version이 해석되는 family를 정확히 기록한다. owner는 Dependency owner / Release manager, shipped scope는 workspace all-target resolved graph이며 platform target/proc-macro와 ConPTY dev dependency도 포함한다. 현재 review date는 2026-08-24이고 dependency/target/dev-tool 변경 trigger를 필수 metadata로 둔다. 현재 budget은 23개 family이며 새 family, version 추가/제거, metadata 누락 또는 budget 초과는 `dependency_duplicate_gate`를 실패시켜 dependency review 없이는 조용히 확장되지 않는다.
 
 ## 7. R4 headless contract
 
@@ -240,7 +247,7 @@ flag contract:
 | `--seed` | u64, default 42 | `--load`와 동시 사용 금지 |
 | `--turns` | u64, default 1000 | absolute target turn, 1..=1,000,000 |
 | `--policy` | wait-v1, survival-v1, replay-file; default survival-v1 | replay-file은 `--replay-in`이 있어야 함 |
-| `--save` | optional relative path | 성공 종료 시 SaveDataV1 atomic replace |
+| `--save` | optional normalized relative path | 성공 종료 뒤 semantic/16 MiB budget을 통과한 SaveDataV1만 atomic replace; 실패 시 exit 2와 기존 파일 보존 |
 | `--load` | optional relative path | SaveDataV1 load, seed 대신 save seed 사용 |
 | `--replay-in` | optional relative path | replay-file policy의 CommandIntent JSONL source |
 | `--replay-out` | optional relative path | 이번 invocation의 ReplayLineV1 JSONL 기록 |
@@ -248,7 +255,9 @@ flag contract:
 
 `--turns`는 현재 CLI와 같이 final target turn이다. 새 session의 turn 0에서 `--turns 1000`이면 1000번의 `turn_advanced=true`가 필요하다. load turn이 400이면 target 1000까지 600번을 수행하며 report의 `accepted_turns`는 600이다. load turn이 target보다 크면 exit code 2다.
 
-path flag는 repository `runtime/`을 열린 directory capability root로 사용한다. absolute path, `..` 탈출, root 밖 symlink를 거부하고 실제 read/write/rename도 이 root handle 기준으로 수행한다. save는 같은 directory에 신규 임시 파일을 만들고 regular-file·single-link handle 검증, write/sync, atomic replace 순서로 처리하며 실패 시 기존 save를 보존한다. Unix는 mode `0600`을 강제하지만 Windows는 parent directory DACL을 상속하므로 owner-only가 필요한 Windows 실행은 사용자 전용 ACL의 runtime root를 사용해야 한다. replay append도 final symlink를 따라가지 않고 multi-link 파일을 거부한다. `--replay-in`과 `--replay-out`은 같은 검증 상대 경로일 수 없다.
+path flag는 repository `runtime/`의 마지막 component를 no-follow로 연 directory capability root로 사용한다. `.` component는 제거하고 absolute path, `..` 탈출, root 자체 symlink/Windows junction과 root 밖 link를 거부하며 실제 read/write/rename도 이 root handle 기준으로 수행한다. save는 같은 directory에 신규 임시 파일을 만들고 regular-file·single-link handle 검증, write/sync, atomic replace 순서로 처리하며 실패 시 기존 save를 보존한다. Unix는 mode `0600`과 replace 후 parent directory fsync를 수행하지만 Windows는 parent directory DACL 상속과 file sync/atomic replace를 보장 범위로 두므로 owner-only 또는 전원 손실 metadata 보장이 필요한 실행은 별도 OS 정책이 필요하다. replay 기록도 bounded read 후 atomic rewrite하며 final symlink/multi-link 파일을 거부한다. `--replay-in`과 `--replay-out`은 normalized path, Windows case와 열린 file identity 중 하나라도 같으면 exit 2이며 input bytes를 바꾸지 않는다.
+
+`--turns 1,000,000` 허용은 save 가능성 보장이 아니다. event history 또는 pretty JSON이 save 예산을 넘은 상태에서 `--save`를 요청하면 headless는 typed resource error로 exit 2하고 기존 destination을 보존한다. v0.3.0은 증거 보존을 위해 event history를 자동 압축·삭제하지 않는다.
 
 필수 stdout 한 줄:
 
@@ -426,6 +435,8 @@ scripts/r8_checkpoint.sh
 
 R8 checkpoint도 script-relative canonical repository만 검사한다. 승인된 완전 fixture는 PASS(exit 0), R7 approval·0.3.0 version·whole-work NGPL 또는 release metadata가 빠지면 HOLD(exit 1), LICENSE checksum·NOTICE/source packaging 계약·dependency version·archive chain이 손상되면 FAIL(exit 2)다. HOLD/FAIL에서는 release artifact를 게시하지 않는다.
 
+Linux/Windows release verifier는 `output/` top-level actual entry를 선언된 platform binary 2개, `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`, `RELEASE-METADATA`, platform source archive, `SHA256SUMS`의 exact set과 비교한다. extra file/directory, symbolic link 또는 Windows reparse point가 하나라도 있으면 checksum 내용과 무관하게 FAIL이다. build script가 기존 `output/`에 쓴 경우에도 마지막 verifier가 stale entry를 차단한다.
+
 - [x] R1~R7 engineering 단계 완료, R7은 license review가 이관된 `PASS WITH KNOWN RISKS`
 - [x] R8 fail-closed preflight와 canonical-root 회귀 테스트
 - [x] R8 런칭 전 SC-LICENSE-01과 distribution license 로컬 gate PASS
@@ -444,7 +455,8 @@ R8 checkpoint도 script-relative canonical repository만 검사한다. 승인된
 - [x] `cargo deny check licenses bans sources` PASS
 - [x] 프로젝트 로컬 cargo-deny 0.19.4 `licenses`, `bans`, `sources` 실제 PASS — winx 0.36.4 한정 exception
 - [x] report 20 문서 시정 독립 재감사 PASS — `audit_report_21.md`
-- [ ] `docs/audit/audit_report_23.md` 우선 finding 시정 독립 재감사 — 로컬 coder 검증 완료, 외부 게시 HOLD
+- [x] report 23/24 시정 재감사와 same-SHA CI — `audit_report_24.md`, Actions `32107862171`
+- [ ] `docs/audit/audit_report_25.md` 시정 전체 gate·새 clean same-SHA CI·독립 재감사 — 외부 게시 HOLD
 - [x] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — `2519bc8e`, Actions `32107862171`
 
-기존 R8 문서 시정은 report 21이 종결했고, R9 기준 양 OS CI는 run `32034295607`이 제공한다. report 23 시정 diff는 아직 새 immutable same-SHA CI나 독립 재감사를 받지 않았으므로 외부 게시는 마지막 미완료 항목과 별도 사용자 승인이 모두 충족되기 전까지 수행하지 않는다.
+기존 R8 문서 시정은 report 21이, report 23/24 시정은 report 24와 Actions `32107862171`이 종결했다. final multi-audit report 1의 첫 시정 주장은 report 25가 재현한 production 결함 때문에 역사적 partial evidence로 강등한다. 현재 authority는 `docs/audit/audit_report_25.md`의 HOLD이며 새 immutable same-SHA CI와 독립 재감사를 받기 전까지 외부 게시는 별도 사용자 승인과 무관하게 수행하지 않는다.

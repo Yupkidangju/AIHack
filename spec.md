@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, R8 통합 릴리스 감사 진행 상태
+현재 코드 기준: Cargo package 0.3.0, `docs/audit/audit_report_25.md` 시정 진행 상태(PROGRAM HOLD)
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
@@ -230,7 +230,7 @@ pub struct TurnOutcome {
 }
 ```
 
-현재 공개 getter는 `seed()`, `turn()`, `run_state()`, `event_log()`, `world()`, `snapshot()`, `observation()`이며 `action_space`는 observation의 read-only field다. `submit(&mut self, CommandIntent) -> TurnOutcome`의 `accepted`가 command acceptance를 나타내고, `turn_advanced=true`인 결과만 headless accepted turn에 합산한다. 거절과 invariant failure는 world, RNG, turn, event log를 바꾸지 않는다. 테스트 상태 설정은 `aihack::testing::SessionBuilder`만 사용한다.
+현재 공개 getter는 `seed()`, `turn()`, `run_state()`, `event_log()`, `world()`, `snapshot()`, `observation()`이며 `action_space`는 observation의 read-only field다. `submit(&mut self, CommandIntent) -> TurnOutcome`의 `accepted`가 command acceptance를 나타내고, `turn_advanced=true`인 결과만 headless accepted turn에 합산한다. 거절과 invariant failure는 world, RNG, turn, event log를 바꾸지 않는다. `GameSession`, `GameWorld`, runtime `EntityStore`는 외부 crate에 `DerefMut` 또는 동등한 범용 mutable reference를 제공하지 않으며, production mutation은 `submit`과 저장 복원 validator만 통과한다. 테스트 상태 설정은 `aihack::testing::SessionBuilder`만 사용한다.
 
 `GameClient`, `SessionRevision`, typed `SubmitError`, `ReplayTurnOutcomeV1` projection은 현재 R2 완료 범위가 아니다. R5-2에서 `aihack-runtime`은 content bootstrap·명령 실행·저장 경계를 조합하고, TUI/headless에는 `GameClient` trait만 노출한다. 이 trait의 최소 읽기 계약은 `observation()`, `revision()`, `run_state()`이며 mutation entry는 `submit(CommandIntent) -> TurnOutcome`이다. 저장 I/O와 실제 session 구현은 runtime 내부에 남긴다. R6-2에서 stale-response 판정을 이 revision 계약에 연결한다.
 
@@ -501,13 +501,14 @@ wire JSON은 camelCase field와 UPPER_SNAKE enum을 사용한다.
 - response turn 또는 snapshot hash가 현재 session과 다르면 `Stale`
 - action이 현재 action space에 없으면 `InvalidAction`
 - narrative/message는 trim 후 Unicode scalar 1..=240자
-- rationale은 Unicode scalar 0..=160자
+- rationale은 trim 후 Unicode scalar 1..=160자
 - confidence는 finite `0.0..=1.0`
 - reason code는 ASCII `[A-Z0-9_]{1,32}`
 - C0/C1 control과 ANSI escape를 포함하면 `ControlCharacter`
 - unknown JSON field는 거부하고 누락 field에 default를 넣지 않음
 - soft verdict는 message 표시 외 상태 변경 권한이 없음
 - provider 실패의 UI fallback은 narrative `Local narrator unavailable.`, decision 없음, soft verdict `Neutral/LLM_UNAVAILABLE`이며 snapshot hash를 바꾸지 않음
+- v0.3.0 runtime TUI와 built-in fallback의 canonical locale은 English다. 다국어 README는 runtime locale 지원을 뜻하지 않으며, provider가 반환한 유효 Unicode text는 번역 없이 표시한다. runtime 5-locale 지원은 versioned message catalog가 승인되는 후속 범위다.
 
 ### 9.6 Public contract 안정성
 
@@ -622,6 +623,31 @@ pos = [6, 5]
 
 `world` JSON shape는 현재 save/load v1 fixture를 source of truth로 유지한다. R2/R3는 serialization field 이름과 enum tag를 바꾸지 않는다. R8 전에 `tests/fixtures/save_v1.json`을 현재 serializer로 생성하고 load→save canonical-JSON stable test를 추가한다.
 
+#### Save/replay v1 입력 예산과 semantic validation
+
+v0.3.0의 artifact 입력은 신뢰하지 않는다. decoder와 `GameSession::from_save_data*`는 live session을 만들기 전에 아래 예산과 관계 invariant를 fail-closed로 검사한다.
+
+| 항목 | 상한 | 경계 동작 |
+| --- | ---: | --- |
+| save JSON | 16 MiB (`16,777,216` bytes) | `+1` byte부터 `InvalidSave(ResourceLimit)` |
+| replay JSONL 전체 | 64 MiB (`67,108,864` bytes) | `+1` byte부터 artifact read 실패 |
+| replay record | 100,000 lines | 100,001번째 record 전에 실패 |
+| replay 한 line | 65,536 UTF-8 bytes | `+1` byte부터 실패 |
+| save event log | 100,000 events | `+1` event부터 `InvalidSave(ResourceLimit)` |
+| save entity store | 100,000 entities | `+1` entity부터 `InvalidSave(ResourceLimit)` |
+| RNG restore | 1,000,000 draws | `+1` draw부터 `InvalidSave(ResourceLimit)` |
+| persisted message/rejection text | 512 UTF-8 bytes | C0/C1/DEL control 문자 또는 `+1` byte부터 `InvalidSave(InvalidText)` |
+| headless target | `1..=1,000,000` accepted turns | Clap parse 단계에서 범위 밖 값을 거절 |
+
+semantic validator는 최소한 schema, save seed와 RNG seed 일치, current level 존재, unique entity ID와 allocator 진행값, player 존재·종류·위치·map bounds, actor stat 범위, item 위치, inventory owner/중복/letter/location, equipped item의 class/location/derived AC, event text를 검사한다. 실패는 panic이나 임의 문자열 성공이 아니라 typed `GameError::InvalidSave`다. injected content를 사용하는 복원은 같은 immutable `ContentRegistry`를 명시적으로 전달하며, v1 wire에는 registry 자체를 새 필드로 추가하지 않는다.
+
+actor와 inventory의 저장 불변조건은 다음처럼 닫는다.
+
+- 모든 actor는 `max_hp > 0`, `hp <= max_hp`, `alive == (hp > 0)`을 만족한다. `GameOver`가 아닌 save의 player는 살아 있어야 하며, 죽은 player는 `GameOver`여야 한다. 현재 `Quit`은 `DeathCause::Combat { attacker: EntityId(0) }` sentinel을 사용하는 호환 경로이므로 이 경우에만 살아 있는 player의 `GameOver`를 허용한다.
+- 모든 `EntityLocation::Inventory { owner }` item은 `owner == player_id`이고 inventory index에 정확히 한 번 존재해야 한다. 반대로 모든 inventory entry는 동일 item location과 letter를 가리켜야 한다. v1은 monster/다른 actor inventory를 지원하지 않는다.
+- persisted item `ac_bonus`의 절댓값은 actor stat 예산 `10,000` 이하여야 한다. armor 적용 후 AC는 넓은 정수형의 checked arithmetic으로 계산하고 `i16` 범위와 persisted player AC가 모두 일치해야 한다.
+- writer는 `to_save_data` 결과를 같은 semantic validator로 검사하고 pretty JSON을 16 MiB capped buffer에 직렬화한 뒤에만 destination을 원자 교체한다. 성공한 write는 같은 version loader로 즉시 읽을 수 있어야 하며, validation/byte 초과 실패는 기존 destination을 바꾸지 않는다.
+
 ## 12. Headless policy
 
 ```rust
@@ -661,6 +687,10 @@ pub enum HeadlessRunError {
 
 `--turns 1000` 성공은 `accepted_turns == 1000`일 때만 인정한다.
 
+CLI의 canonical 기본 policy는 `survival-v1`이며 `--turns`는 `1..=1,000,000`만 허용한다. help, implicit-default 실행, BUILD 예시는 이 값을 공유한다.
+
+`--turns` 상한은 실행 target 계약이며 모든 target에서 `--save` 성공을 보장하지 않는다. event history 또는 serialized payload가 위 save 예산을 넘으면 headless는 save 단계에서 typed resource error를 출력하고 exit code 2로 실패하며 기존 save를 보존한다. v0.3.0은 자동 event compaction으로 기록을 조용히 버리지 않는다.
+
 ## 13. NetHack 3.6.7 호환성 계약
 
 호환 시나리오 ID 형식은 `NH367-Cnnn`이다.
@@ -689,16 +719,21 @@ NH367-C008 hunger projection은 3.6.7 `newuhs` 경계를 따른다: nutrition `<
 - `SaveDataV1` schema_version은 1 유지
 - 저장 직후와 load 직후 snapshot hash가 같아야 함
 - replay line은 turn_before, command, outcome, snapshot_hash_after를 포함
+- replay v1은 command-only log가 아니라 self-verifying artifact다. 소비자는 각 line의 `turn_before`, submit 결과 전체(`accepted`, `turn_advanced`, `events`, `snapshot_hash`, `next_state`), `snapshot_hash_after`를 실제 결과와 비교한다.
+- replay 적용은 cloned working session에서 수행하고 소비한 prefix 전체가 일치할 때만 원 session을 교체한다. mismatch, exhaustion, GameOver를 포함한 실패는 원 session을 부분 변경하지 않으며 typed `ReplayMismatch`가 field와 line index를 제공한다.
 - LLM narrative, rationale, soft verdict는 save와 replay truth에 포함하지 않음
 - content_hash는 save metadata에 추가하지 않고 v0.3.0 load 시 현재 registry와 fixture test로 검증
 - schema 필드 추가가 필요하면 v0.4.0 spec에서 SaveDataV2를 정의
-- production artifact I/O는 열린 runtime root directory capability와 상대 경로를 결합한 단일 경계를 사용
+- production artifact I/O는 마지막 root component를 no-follow로 연 directory capability와 정규화된 상대 경로를 결합한 단일 경계를 사용한다. `.` component를 제거하고 absolute/parent/root/prefix component를 거부한다. 기존 symbolic link, Windows junction/reparse root는 거절한다.
 - save 임시 파일은 대상과 같은 directory에서 원자적 `create_new`로 생성하고, 일반 파일·single hard link를 handle 기준으로 확인한 뒤 sync와 atomic replace 수행
+- Unix는 replace 후 parent directory handle도 `sync_all`하여 directory entry crash durability를 요청한다. Windows는 payload file sync와 atomic replace를 보장 범위로 두며 parent-directory metadata의 전원 손실 내구성은 filesystem/OS flush 정책에 따른 잔여 위험이다.
 - Unix save/temp는 mode `0600`을 강제한다. Windows save/temp는 parent directory DACL을 상속하며 runtime이 owner-only DACL을 재작성하지 않으므로, Windows 기밀성 경계는 사용자가 선택한 runtime root의 ACL이다.
-- replay append와 load/read는 마지막 symbolic link를 따라가지 않으며, 쓰기 대상 hard-link count가 1이 아니면 fail-closed
-- TUI quick-save는 실행별 임시 directory를 사용하며 다른 프로세스와 고정 temp filename을 공유하지 않음
+- replay 기록은 기존 payload를 bounded read·검증한 뒤 새 임시 파일로 atomic rewrite한다. 따라서 외부 inode를 직접 append하지 않으며 destination link 검증과 file sync를 save와 공유한다.
+- `--replay-in`과 `--replay-out`은 정규화 상대 경로, Windows case-insensitive path, 열린 파일의 device/file identity 중 하나라도 같으면 동일 artifact로 판정해 실행 전에 거부한다.
+- TUI quick-save는 실행별 `ArtifactStore`와 relative `quick-save.json`을 소유하며 caller가 전달한 absolute/parent path를 production 저장 경계로 사용하지 않는다. ambient `resolve_path_in_root` compatibility helper는 제거하고 production과 test 모두 `ArtifactStore` 경계를 사용한다.
+- runtime root는 한 프로세스가 쓰는 사용자 전용 directory다. 같은 계정의 악성 프로세스가 root directory entry를 동시에 교체하거나 여러 writer가 같은 replay를 갱신하는 상황은 OS sandbox가 없는 v0.3.0의 비목표다. 다만 사전 배치 link/reparse와 외부 inode write는 fail-closed하며 atomic rewrite가 open-after-link hard-link write race를 제거한다.
 
-현재 replay wire는 `TurnOutcome`을 직접 직렬화한다. `ReplayLineV1`은 turn_before, command, outcome, snapshot_hash_after를 보유하며, `outcome.accepted=false`는 거절/no-commit 결과를 나타낸다. canonical JSON fixture의 추가와 `Result<TurnOutcome, SubmitError>` projection은 R5/R6 public boundary 도입 시 함께 정의한다.
+현재 replay wire는 `TurnOutcome`을 직접 직렬화한다. `ReplayLineV1`은 turn_before, command, outcome, snapshot_hash_after를 보유하며, `outcome.accepted=false`는 거절/no-commit 결과를 나타낸다. v1 소비자는 이 모든 필드를 검증하되 wire field를 추가하거나 제거하지 않는다. canonical JSON fixture의 추가와 `Result<TurnOutcome, SubmitError>` projection은 후속 versioned schema에서만 정의한다.
 
 ## 15. 구현 단계
 
@@ -717,6 +752,8 @@ NH367-C008 hunger projection은 3.6.7 `newuhs` 경계를 따른다: nutrition `<
 세부 Task와 파일 단위는 `IMPLEMENTATION_SUMMARY.md`가 정의한다.
 
 R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 판정하며 root `Cargo.toml`의 배포 라이선스는 검사하지 않는다. R8 release gate는 workspace 전체 `NGPL`, version 0.3.0, 공식 `LICENSE` checksum, owner approval ID, `NOTICE`, modification manifest, expanded commit metadata, checksums와 source archive 계약을 최종 검증한다. 라이선스 승인이 완료돼도 R8 기술 감사 PASS 전에는 release artifact를 외부 게시하지 않는다.
+
+release `output/` directory 전체가 게시 bundle이다. platform verifier는 top-level actual entry 집합을 선언된 binary, 문서, metadata, source archive, `SHA256SUMS`의 exact set과 비교하며 extra file, directory, symbolic link 또는 Windows reparse point를 모두 거부한다. checksum inventory에 없는 산출물은 게시 대상에서 자동 제외되는 것이 아니라 bundle 실패다.
 
 ## 16. 보안 및 구현 경계
 
@@ -756,7 +793,7 @@ R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 �
 
 작성일 2026-08-17 기준 최신 사용자 요구에 따라, v0.3.0 릴리스 기준을 훼손하지 않는 후속 구현 단계 R9를 추가한다. 현재 Cargo version은 R9 완료와 릴리스 결정 전까지 0.3.0을 유지한다.
 
-진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프 구현. `docs/audit/audit_report_23.md`가 R9-6 필수 장기 witness 부재를 HOLD했고, 2026-08-18 coder remediation은 아래 9종 witness와 negative gate를 구현해 로컬 검증을 통과했다. 독립 재감사 전에는 R9 최종 PASS를 선언하지 않는다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
+진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프 구현. report 23/24 remediation은 implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`로 historical closed다. final multi-audit의 1차 GoldScore 시정은 production score를 복제한 oracle 때문에 report 25에서 다시 HOLD됐으며, 현재는 동일 world/turn의 gold/no-gold production pair와 독립 negative matrix를 시정 중이다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
 
 ### 19.1 목표
 
@@ -794,7 +831,7 @@ R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 �
 | SC-CAUSE-06 | 각 seed를 3회 실행한 witness summary와 final hash가 모두 동일 |
 | SC-CAUSE-07 | causal regression은 event-only 또는 turn-only 변화에서 실패 |
 
-`SC-CAUSE-05..07`의 필수 typed witness 집합은 `FoodNutrition`, `CorpseNutrition`, `ArmorDefense`, `MonsterSpeed`, `MonsterAi`, `MonsterPassive`, `MonsterDifficultyEconomy`, `PrayerLuckCombat`, `GoldScore` 9개다. 일반 사용자 정책 `survival-v1`은 변경하지 않고, 테스트 전용 deterministic `causal-v1` fixture가 같은 `GameSession::submit` 경로에서 각 원인 명령과 downstream delta를 만든 뒤 absolute turn 1000까지 진행하고 마지막 score projection을 닫는다. witness는 명령·event 이름만으로 기록하지 않으며 command 전후 `CausalProjection`의 실제 semantic field가 함께 변한 경우에만 집계한다.
+`SC-CAUSE-05..07`의 필수 typed witness 집합은 `FoodNutrition`, `CorpseNutrition`, `ArmorDefense`, `MonsterSpeed`, `MonsterAi`, `MonsterPassive`, `MonsterDifficultyEconomy`, `PrayerLuckCombat`, `GoldScore` 9개다. 일반 사용자 정책 `survival-v1`은 변경하지 않고, 테스트 전용 deterministic `causal-v1` fixture가 같은 `GameSession::submit` 경로에서 각 원인 명령과 downstream delta를 만든 뒤 absolute turn 1000까지 진행하고 마지막 score projection을 닫는다. 각 witness record는 scenario ID, producer entity/item, 원인 content field와 before/after value, consumer delta를 보유한다. `MonsterSpeed`는 speed budget에 의해 실행 기회가 달라진 경우에만, `MonsterAi`는 동일 speed에서 AI 선택이 달라진 경우에만 기록한다. `GoldScore`는 동일 world/turn에서 gold만 제거한 paired score와 실제 final score의 차이가 정확히 gold와 같을 때만 기록한다. witness는 명령·event 이름만으로 기록하지 않으며 command 전후 `CausalProjection`의 실제 semantic field가 함께 변한 경우에만 집계한다.
 
 각 seed의 완료 증거는 9개 witness count map과 final hash다. seed 42, 7, 1234를 각각 3회 반복했을 때 두 값이 모두 같아야 한다. 동일 projection을 전후 값으로 넣은 event-only fixture, turn만 증가한 projection, 필수 witness 하나를 제거한 summary는 acceptance validator에서 실패해야 한다.
 

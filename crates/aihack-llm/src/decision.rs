@@ -14,7 +14,7 @@ use crate::{
     worker::RequestId,
 };
 
-pub const DECISION_TIMEOUT_MS: u64 = 2_000;
+pub use crate::config::DEFAULT_DECISION_TIMEOUT_MS as DECISION_TIMEOUT_MS;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecisionRequest {
@@ -147,6 +147,11 @@ pub fn validate_decision_payload(
         return Err(invalid(LlmValidationCode::InvalidConfidence));
     }
     let rationale = payload.rationale.trim();
+    if rationale.is_empty() {
+        return Err(LlmResponseError::InvalidSchema {
+            code: LlmValidationCode::EmptyText,
+        });
+    }
     if rationale.chars().count() > 160 {
         return Err(invalid(LlmValidationCode::TextTooLong));
     }

@@ -75,7 +75,7 @@ done
 
 if [ "$BUILD_TYPE" = "release" ]; then
     release_commit=$(git rev-parse HEAD)
-    printf 'product=AIHack\nversion=0.3.0\ncommit=%s\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-07-20-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n' \
+    printf 'product=AIHack\nversion=0.3.0\ncommit=%s\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-23-02\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n' \
         "$release_commit" >"$OUTPUT_DIR/RELEASE-METADATA"
     source_archive="$OUTPUT_DIR/aihack-0.3.0-source.tar.gz"
     git archive --format=tar.gz --output="$source_archive" HEAD

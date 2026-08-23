@@ -8,3 +8,4 @@ LICENSE text eol=lf
 docs/provenance/*.sha256 text eol=lf
 crates/aihack-content/src/data/*.toml text eol=lf
 crates/aihack-content/src/data/levels/*.toml text eol=lf
+docs/multi_audit/1/sub_audit_*.md -whitespace

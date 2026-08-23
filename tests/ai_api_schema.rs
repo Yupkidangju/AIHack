@@ -1,6 +1,8 @@
 use serde_json::Value;
 
-use aihack::core::{save, ActionIntent, ActionSpace, CommandIntent, GameSession, Observation};
+use aihack::core::{
+    save::ArtifactStore, ActionIntent, ActionSpace, CommandIntent, GameSession, Observation,
+};
 
 #[test]
 fn observation_fixture_roundtrip() {
@@ -63,18 +65,22 @@ fn action_space_fixture_roundtrip() {
 
 #[test]
 fn save_load_preserves_ai_api_shape() {
-    let path = std::env::temp_dir().join(format!("aihack-ai-api-{}.json", std::process::id()));
+    let root = std::env::temp_dir().join(format!("aihack-ai-api-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let store = ArtifactStore::open(&root).unwrap();
+    let path = std::path::Path::new("save.json");
     let mut session = GameSession::new_for_playing(42);
     assert!(session.submit(CommandIntent::Wait).accepted);
     let before = session.observation();
-    save::save_session_to_path(&session, &path).unwrap();
-    let loaded = save::load_session_from_path(&path).unwrap();
+    store.save_session(&session, path).unwrap();
+    let loaded = store.load_session(path).unwrap();
     let after = loaded.observation();
     assert_eq!(before.schema_version, after.schema_version);
     assert_eq!(before.action_space, after.action_space);
     assert_eq!(before.player, after.player);
     assert_eq!(before.current_level, after.current_level);
-    std::fs::remove_file(path).unwrap();
+    drop(store);
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

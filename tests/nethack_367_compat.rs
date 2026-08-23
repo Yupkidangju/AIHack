@@ -1,7 +1,10 @@
 use std::{env, fs};
 
 use aihack::{
-    core::{save, CommandIntent, Direction, EntityId, GameEvent, GameSession, Pos, RunState},
+    core::{
+        save::ArtifactStore, CommandIntent, Direction, EntityId, GameEvent, GameSession, Pos,
+        RunState,
+    },
     domain::{
         combat::DeathCause,
         entity::EntityLocation,
@@ -13,7 +16,7 @@ use aihack::{
         status::{HungerState, Status},
         tile::{DoorState, TileKind, TrapKind},
     },
-    systems::{death, vision::has_line_of_sight},
+    systems::vision::has_line_of_sight,
 };
 
 const ARCHIVE_SHA256: &str = "98cf67df6debf9668a61745aa84c09bcab362e5d33f5b944ec5155d44d2aacb2";
@@ -396,11 +399,14 @@ fn nh367_c009_save_load_preserves_rng_command_continuation() {
         "NH367-C009",
         "nh367_c009_save_load_preserves_rng_command_continuation",
     );
-    let path = env::temp_dir().join(format!("aihack-nh367-c009-{}.json", std::process::id()));
+    let root = env::temp_dir().join(format!("aihack-nh367-c009-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    let store = ArtifactStore::open(&root).unwrap();
+    let path = std::path::Path::new("save.json");
     let mut direct = GameSession::new_for_playing(42);
     assert!(direct.submit(CommandIntent::Wait).accepted);
-    save::save_session_to_path(&direct, &path).unwrap();
-    let mut loaded = save::load_session_from_path(&path).unwrap();
+    store.save_session(&direct, path).unwrap();
+    let mut loaded = store.load_session(path).unwrap();
 
     for command in [CommandIntent::Search, CommandIntent::Move(Direction::East)] {
         let expected = direct.submit(command);
@@ -408,7 +414,8 @@ fn nh367_c009_save_load_preserves_rng_command_continuation() {
         assert_eq!(actual.events, expected.events);
         assert_eq!(actual.snapshot_hash, expected.snapshot_hash);
     }
-    fs::remove_file(path).unwrap();
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
@@ -418,16 +425,16 @@ fn nh367_c010_player_death_records_cause_and_game_over_state() {
         "NH367-C010",
         "nh367_c010_player_death_records_cause_and_game_over_state",
     );
-    let mut session = GameSession::new_for_playing(42);
+    let session = GameSession::new_for_playing(42);
     let player = session.world().player_id();
     let attacker = EntityId(3);
-    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
-        world.saved().entities.actor_stats_mut(player).unwrap().hp = 0;
-    });
-    let mut world = aihack::core::GameWorld::from_saved_world(session.to_save_data().world);
+    let mut saved = session.to_save_data().world;
+    saved.entities.actor_stats_mut(player).unwrap().hp = 0;
+    let mut world = aihack::core::GameWorld::from_depleted_saved_world(saved).unwrap();
 
-    let events = death::collect_death_events_after_attack(&mut world, attacker, player);
-    let state = death::state_after_deaths(&world);
+    let events =
+        aihack::systems::death::collect_death_events_after_attack(&mut world, attacker, player);
+    let state = aihack::systems::death::state_after_deaths(&world);
 
     assert!(events.iter().any(|event| matches!(
         event,

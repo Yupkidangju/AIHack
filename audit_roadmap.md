@@ -377,13 +377,15 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `audit_report_19.md`는 2026-07-22 기준 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)에서 `ubuntu-latest quality gate`와 `windows-latest quality gate`가 success였고, clean release bundle 및 보고서 18 exactness 시정도 Verified했다고 판정했다. 당시 최종 판정은 활성 문서 불일치 때문에 HOLD였고 남은 gate는 `IMP-F016`/`XPF-F011` 문서 동기화 시정의 독립 재감사였다. 기술 gate와 SC-BUILD-02를 다시 pending으로 되돌리지 않는다.
 
-`audit_report_20.md`는 report 19의 핵심 동기화를 부분 Verified했지만 implementation summary 최상단, `G-LICENSE-001`, BUILD_GUIDE 테스트 수와 document-wide false-green gate를 `IMP-F016`/`DBG-F008`로 HOLD했다. 해당 active-state를 교정하고 section/row별 positive·negative 회귀 계약으로 강화했으며, 현재 남은 gate는 이 report 20 시정의 독립 재감사다.
+`audit_report_20.md`는 report 19의 핵심 동기화를 부분 Verified했지만 implementation summary 최상단, `G-LICENSE-001`, BUILD_GUIDE 테스트 수와 document-wide false-green gate를 `IMP-F016`/`DBG-F008`로 HOLD했다. 해당 active-state를 교정하고 section/row별 positive·negative 회귀 계약으로 강화했으며, 당시 남은 gate는 report 20 시정의 독립 재감사였다.
 
 `audit_report_21.md`는 report 20의 `IMP-F016`, `DBG-F008`, `XPF-F011` 시정을 Verified/Resolved하고 R8 문서 remediation을 PASS로 종결했다. 따라서 report 20 재감사 대기는 역사적 상태이며 현재 blocker가 아니다. R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`와 Actions run `32034295607`이 후속 양 OS 기준선이다.
 
-`docs/audit/audit_report_23.md`는 이 후속 기준선에 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017의 새 HOLD를 열었다. 2026-08-18 coder remediation은 관련 코드·문서·회귀를 갱신했고 Windows 실제 R7/R8 checkpoint와 표적 검증을 통과했다. 독립 재감사 전에는 전체 PASS나 외부 게시를 선언하지 않는다.
+`docs/audit/audit_report_23.md`는 이 후속 기준선에 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017의 새 HOLD를 열었고, `audit_report_24.md`와 후속 same-SHA CI가 해당 시정을 역사적으로 종결했다. report 23은 현재 pending gate가 아니다.
 
 `docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 [Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)은 Ubuntu/Windows test, canonical R7/R8, release build/bundle, cargo-audit, cargo-deny와 lockfile 불변을 모두 PASS했다.
+
+final multi-audit report 1은 최초 HOLD의 역사적 근거이고 첫 coder remediation은 partial evidence다. 현재 최상위 권위는 그 시정본에서 production 결함 13건을 재현한 `docs/audit/audit_report_25.md`의 HOLD다. report 25 시정은 아래 전체 로컬 gate, finding별 RED/GREEN, clean same-SHA 양 OS CI와 독립 감사 전에는 전체 program PASS로 전환하지 않는다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -425,13 +427,13 @@ scripts/r6_pending_exit_smoke.sh
 
 | ID | Production 책임 | 검증 파일·함수 |
 | --- | --- | --- |
-| SC-CAUSE-01 | `docs/audit/audit_report_22.md` 인과 인벤토리, `CausalProjection`, `CausalSummary` | `tests/r8_documentation.rs::sc_cause_contract_ids_map_to_code_and_tests` |
-| SC-CAUSE-02 | `CausalProjection`, content-backed actor/item runtime data | `tests/causal_content.rs::monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent`, `monster_passive_content_changes_player_status`, `armor_content_bonus_changes_player_defense_state` |
+| SC-CAUSE-01 | `CausalProjection`, `CausalSummary`, `CausalWitnessRecord` attribution | `tests/r8_documentation.rs::sc_cause_contract_ids_map_to_code_and_tests` |
+| SC-CAUSE-02 | content-backed runtime data, `observe_monster_speed_pair`, `observe_monster_ai_pair` | `tests/causal_content.rs::monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent`, `monster_passive_content_changes_player_status`, `armor_content_bonus_changes_player_defense_state` |
 | SC-CAUSE-03 | `systems::items::eat`, `systems::death::collect_death_events_if_hp_depleted` | `tests/causal_content.rs::eating_food_changes_nutrition_hunger_and_item_lifecycle`, `jackal_death_creates_an_edible_corpse_that_changes_hunger` |
-| SC-CAUSE-04 | `CausalSummary::observe`, death/quit score와 Pray/luck 경로, `hallucinating` time-bounded risk | `tests/causal_content.rs::item_base_price_changes_actual_game_over_score`, `prayer_created_luck_changes_the_next_attack_roll`, `tests/r8_documentation.rs::sc_cause_contract_ids_map_to_code_and_tests` |
-| SC-CAUSE-05 | `REQUIRED_CAUSAL_WITNESSES`, `CausalSummary::validate_required` | `tests/long_run.rs::causal_fixture_covers_every_required_witness_for_each_seed` |
-| SC-CAUSE-06 | `CausalSummary` equality와 stable snapshot hash | `tests/long_run.rs::causal_witness_multiset_and_final_hash_are_stable_across_three_runs` |
-| SC-CAUSE-07 | `CausalSummary::observe`의 semantic projection 변화 gate | `tests/long_run.rs::causal_validator_rejects_event_only_turn_only_and_missing_witnesses` |
+| SC-CAUSE-04 | 동일 world/turn의 gold/no-gold clone이 모두 production `death_score`를 통과한 exact pair, Pray/luck 경로, `hallucinating` time-bounded risk | `tests/causal_content.rs::item_base_price_changes_actual_game_over_score`, `tests/long_run.rs::gold_score_witness_uses_a_paired_production_score`, `prayer_created_luck_changes_the_next_attack_roll`, `tests/r8_documentation.rs::sc_cause_contract_ids_map_to_code_and_tests` |
+| SC-CAUSE-05 | `REQUIRED_CAUSAL_WITNESSES`, attributed record required-set validator | `tests/long_run.rs::causal_fixture_covers_every_required_witness_for_each_seed` |
+| SC-CAUSE-06 | attributed record multiset equality와 stable snapshot hash | `tests/long_run.rs::causal_witness_multiset_and_final_hash_are_stable_across_three_runs` |
+| SC-CAUSE-07 | event/turn-only 및 shared speed/AI predicate 거부 | `tests/long_run.rs::causal_validator_rejects_event_only_turn_only_and_missing_witnesses`, `tests/causal_content.rs::monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent` |
 
 검증 명령:
 
@@ -460,5 +462,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: R1~R8 기존 remediation은 report 21까지 종결됐고 R9 기준 commit의 양 OS CI가 success다. report 23 우선 finding의 coder remediation과 로컬 표적 gate는 완료했으나 독립 재감사 전까지 전체는 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
-현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `audit_report_21.md`가 report 20 문서 시정을 종결했다. report 22는 Initial Finding과 post-fix 상태를 분리했고 report 23의 새 HOLD 및 coder remediation을 현재 권한으로 둔다. 전체 program PASS는 report 23 시정의 독립 재감사 뒤에만 선언한다.
+현재 구현 판정: report 23/24까지의 시정은 종결됐고 SHA `2519bc8e`의 양 OS CI가 historical success다. final multi-audit report 1의 첫 시정은 report 25가 재현한 production 결함 때문에 partial evidence이며 report 25 시정, 새 clean same-SHA CI와 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 종결했다. current authority는 `docs/audit/audit_report_25.md`이며 report 25 remediation 재감사 뒤에만 전체 program 판정을 갱신한다.

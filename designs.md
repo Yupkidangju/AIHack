@@ -6,9 +6,9 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implemented design, report 20 active-state/false-green HOLD remediation pending re-audit
+문서 상태: active implementation contract, `audit_report_25.md` TUI production-path remediation in progress
 작성일: 2026-07-15
-최근 동기화: 2026-07-22
+최근 동기화: 2026-08-23
 기준: `spec.md`
 관련 Task: R2-1, R5-2, R6-1..R6-3
 
@@ -83,6 +83,26 @@ Title
 
 LLM 요청 중에도 core input은 block하지 않는다. 요청 뒤 turn이 진행되면 도착한 응답은 `Stale`이며 자동 표시나 실행을 하지 않는다.
 
+TUI adapter의 명시적 presentation state는 다음과 같다. 이 state는 save/replay/snapshot에 들어가지 않는다.
+
+```rust
+pub enum UiOverlay {
+    None,
+    Inventory,
+    StorageError { operation: StorageOperation },
+}
+```
+
+- `Playing`에서 `I`는 `Inventory` overlay를 열고 turn/hash를 바꾸지 않는다.
+- inventory letter는 현재 observation의 같은 letter item에 대한 typed command로만 변환한다. Esc는 overlay만 닫는다.
+- persisted `AwaitingDirection`에서는 방향키가 concrete command, Esc가 non-turn cancel이다.
+- persisted `AwaitingInventorySelection`에서는 item letter가 해당 action의 concrete command, Esc가 non-turn cancel이다.
+- `MorePrompt`에서는 Esc를 포함한 첫 key가 `AcknowledgeMore`가 되며 Quit로 해석하지 않는다.
+- blocking run state(`AwaitingDirection`, `AwaitingInventorySelection`, `MorePrompt`, `GameOver`)의 의미는 LLM result dismiss, F9, Tab/BackTab focus보다 먼저 결정한다. 따라서 `GameOver + N`은 항상 `NewRun`, `MorePrompt + Tab/BackTab/N`은 모두 `AcknowledgeMore`다.
+- `CharacterCreation`의 Esc는 같은 seed의 Title session으로 돌아가며 process를 종료하지 않는다.
+- Title의 `L`은 app이 소유한 quick-save store에서 load한다.
+- save/load 실패는 process exit가 아니라 redacted `StorageError` overlay가 되며, 다음 Esc/정상 입력으로 복구한다.
+
 ## 5. Play 화면
 
 ### 5.1 120x36 이상
@@ -115,7 +135,7 @@ LLM 요청 중에도 core input은 block하지 않는다. 요청 뒤 turn이 진
 
 - terminal width 120 이상: map 70%, side panel 30%
 - 80..119: map 65%, side panel 35%
-- 60..79: map 위, HUD 아래 수직 배치
+- 60..79: 40x20 map과 최소 HUD를 나란히 두고 하단 영역을 log/command에 배정한다. 60x24에서 모든 panel은 1행 이상이며 겹치지 않는다. blocking prompt는 log 높이에 자르지 않고 root 중앙 modal에 최소 `title + 3 content rows`를 확보해 실제 action/item/`--More--` 안내를 모두 표시한다.
 - 60 미만 또는 높이 24 미만: core status와 “terminal requires 60x24”만 표시하고 clean input loop 유지
 
 ### 5.2 정보 우선순위
@@ -133,6 +153,8 @@ LLM 패널이 core prompt나 HP를 가리지 않는다.
 ### 5.3 New run reset
 
 `GameOver`에서 N을 누르면 `new_seed = previous_seed.wrapping_add(1)`로 `GameSession::new(new_seed)`를 만들고 Title로 이동한다. 다음 N 또는 Enter에서 CharacterCreation으로 이동한다. world, turn, RNG, event log, outstanding LLM request, LLM result, hover, focus, modal, debug overlay를 초기화한다. theme, reduced-motion, high-contrast 설정은 유지한다. 기존 save/replay 파일은 삭제하거나 덮어쓰지 않는다.
+
+load 성공도 presentation transient 전체(outstanding/queued/validated LLM, result, soft input, hover, focus, inventory/error overlay, debug, labels/effect sequence)를 같은 reset 함수로 초기화한다. 늦게 도착한 이전 request ID는 새 outstanding request 존재 여부와 관계없이 응답 schema/현재 request 검증보다 먼저 `ignored` 집합에서 제거하고 표시·submit 없이 폐기한다.
 
 ## 6. CTA와 입력 계약
 
@@ -152,6 +174,7 @@ LLM 패널이 core prompt나 HP를 가리지 않는다.
 - `N`과 Esc는 core turn을 소비하지 않는다.
 - narrative와 soft verdict는 apply CTA를 갖지 않는다.
 - mouse click은 같은 CTA ID를 생성하며 별도 command path를 만들지 않는다.
+- command/inspect panel의 clickable rectangle은 렌더에 사용한 동일 CTA label model에서 파생한다. content row와 label의 실제 열 범위만 활성화하며 title, panel border, blank, label 사이 공백, label 밖 열은 focus 또는 no-op이다.
 - Pending에서 Dismiss는 request ID를 `ignored`로 표시하고 panel만 닫는다. blocking worker를 강제 종료하지 않으며 해당 kind는 응답 또는 deadline까지 재요청할 수 없다. ignored response는 표시·submit 없이 폐기한다.
 
 ## 7. LLM UI 상태
@@ -177,7 +200,7 @@ pub enum LlmUiStatus {
 | Ready | `LLM: READY` | 마지막 성공 시간 없음 | G, A, J |
 | Pending | `LLM: WAIT` | 종류와 request ID 앞 8자 | Dismiss |
 | Busy | `LLM: BUSY` | request queue 16개가 사용 중 | Retry, Dismiss |
-| Timeout | `LLM: TIMEOUT` | 제한 500/1500/2000ms 표시 | Retry, Dismiss |
+| Timeout | `LLM: TIMEOUT` | connect 500ms, narrative 2000ms, decision/soft 1500ms 표시 | Retry, Dismiss |
 | Unavailable | `LLM: DOWN` | 연결 거부/transport 분류만 표시 | Retry, Dismiss |
 | Invalid | `LLM: INVALID` | 응답 schema 또는 legal action 불일치 | Dismiss |
 | Stale | `LLM: STALE` | 요청 turn과 현재 turn 표시 | Dismiss |
@@ -269,7 +292,7 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - rejected suggestion: current action space 재검증 결과 표시, submit 미호출
 - invariant error: core error panel을 최상위로 표시하며 LLM 결과 숨김
 - save/load error: typed error 요약과 경로만 표시하며 secret/path traversal detail 숨김
-- TUI quick-save: 실행별 임시 directory 안의 `quick-save.json`만 사용하며 `ArtifactStore`의 no-follow·single-link·atomic replace 경계를 우회하지 않음
+- TUI quick-save: `TuiApp`이 실행별 임시 directory handle, `ArtifactStore`, relative `quick-save.json`을 함께 소유한다. renderer/input caller는 absolute path나 parent를 전달할 수 없으며 `ArtifactStore`의 no-follow·single-link·atomic replace 경계를 우회하지 않는다.
 
 ## 11. 접근성
 
@@ -282,6 +305,12 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - status 갱신은 core message를 덮어쓰지 않는다.
 - key repeat는 LLM 요청 중복 생성에 사용하지 않는다.
 
+### 11.1 v0.3.0 locale 범위
+
+- runtime TUI의 built-in screen, status, error와 deterministic fallback은 English 하나를 canonical locale로 사용한다.
+- 한국어/영어/일본어/중국어 번체/중국어 간체 README는 문서 접근성을 위한 번역이며 runtime message catalog 완료를 주장하지 않는다.
+- provider의 유효 Unicode narrative/verdict는 번역하지 않고 그대로 표시한다. 5-locale runtime은 key 기반 catalog와 locale별 snapshot matrix를 함께 도입하는 후속 versioned 기능이다.
+
 ## 12. 구현 제약
 
 - render 함수는 `&Observation`, `&ActionSpace`, `&UiState`만 받는다.
@@ -293,7 +322,10 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - user text 240자, narrative 240자, rationale 160자, reason code 32자 제한을 render 이전에 검사한다.
 - prompt injection text는 command로 parse하지 않는다.
 - LLM result에 ANSI escape/control character를 허용하지 않는다.
+- terminal session guard는 alternate screen, raw mode, cursor, mouse capture 활성 상태를 각각 추적한다. setup/draw/read/restore 중 어느 단계가 실패해도 Drop에서 `Show`, `DisableMouseCapture`, raw disable, `LeaveAlternateScreen`을 가능한 항목 모두 best-effort 수행한다.
 - app exit는 terminal을 먼저 복원하고 request sender를 닫은 뒤 worker 종료 확인을 최대 250ms 기다린다. 250ms 안에 확인이 없으면 JoinHandle을 drop하고 process exit를 계속한다.
+- Windows CI는 dev-only `portable-pty 0.9.0`의 native `ConPtySystem`으로 실제 `aihack.exe`를 80x24 pseudoconsole에 실행한다. Enter 1회씩 Title→Creation→Playing, `i` Inventory, Esc 복귀, mouse capture enable/disable sequence, Q clean exit를 byte stream에서 검증한다.
+- in-process one-event/failure-injection unit harness는 ConPTY test와 별도로 setup/restore 각 단계 실패 후 후속 cleanup 시도를 검증한다. Windows Terminal application 자체의 GUI 동작은 ConPTY contract와 구분하며 자동 PASS 범위에 넣지 않는다.
 
 ## 13. 검증
 

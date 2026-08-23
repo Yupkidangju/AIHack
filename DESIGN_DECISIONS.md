@@ -12,9 +12,72 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0035: report 25 production 경계와 exact-set 재시정
+
+Status: Accepted; implementation and same-SHA verification in progress (2026-08-23)
+Date: 2026-08-23
+Decision ID: DEC-AUDIT-R25-01
+
+Context:
+
+`docs/audit/audit_report_25.md`는 final multi-audit report 1의 첫 시정본을 실제 production entrypoint와 변조 fixture로 재검증했다. broad workspace green과 helper-level test는 inverse save relation, write-side budget, replay alias identity, production GoldScore pair, TUI event-loop 우선순위/geometry, terminal failure lifecycle, actual release output 집합을 닫지 못했다. 문서도 report 23/24, final report 1과 report 25의 authority를 동시에 current처럼 표현했다.
+
+Decision:
+
+- save read/write는 동일 semantic/byte 예산을 사용한다. actor `alive/hp/max_hp`, inventory 양방향 relation과 armor checked arithmetic을 복원 전에 검증하고, writer도 capped serialization 성공 전에 destination을 열거나 교체하지 않는다.
+- headless target 1,000,000은 실행 범위일 뿐 save 성공 보장이 아니다. budget 초과 save는 typed 실패와 no-clobber로 닫으며 v0.3.0에서 history를 자동 폐기하지 않는다.
+- artifact relative path는 `.`을 제거한 canonical lexical form을 사용한다. replay input/output은 lexical form, Windows case와 열린 file identity를 함께 비교하고 ambient path helper를 public API에서 제거한다.
+- GoldScore는 동일 world/turn의 active/control clone에서 gold만 0으로 바꾸고 양쪽 모두 production `death_score`를 호출한 결과로만 witness를 기록한다.
+- TUI는 raw event에서 candidate를 만드는 state-aware dispatcher 하나를 production loop와 tests가 공유한다. blocking state는 LLM dismiss/focus보다 우선하고, reset 이전 response ID는 새 outstanding 존재 여부와 무관하게 먼저 폐기한다.
+- blocking prompt는 최소 60x24/80x24에서 별도 modal 높이를 보장한다. command/inspect mouse hit box는 renderer와 같은 CTA label model에서 파생한다.
+- release `output/` 전체를 게시 bundle로 정의하고 platform별 actual top-level entry exact set을 검사한다. extra file/directory/link/reparse는 checksum 미포함 여부와 관계없이 실패다.
+- dependency exception은 parsed TOML AST, exact trigger set과 valid calendar date를 검사한다. 모든 CI `uses:`는 40-hex ref여야 하며 provenance comment는 실제 tag/SHA와 일치해야 한다.
+- 현재 authority는 report 25 HOLD다. report 23/24는 historical closed, final report 1과 첫 remediation은 partial historical evidence이며 gap child/aggregate는 동일 lifecycle을 따른다.
+
+Alternatives:
+
+- loader, checksum inventory, mapper helper만 보강: production writer/output/event loop가 계속 다른 계약을 실행하므로 기각한다.
+- 1,000,000턴 save를 항상 보장하도록 즉시 event compaction 도입: wire/evidence retention 정책을 새로 만들고 범위를 확대하므로 v0.3.0에서는 기각한다.
+- release publish 대상을 checksum에 적힌 파일만으로 간주: 현재 build와 문서가 `output/` directory를 bundle로 전달하므로 기각한다.
+
+Consequences:
+
+기존 malformed save와 stale release directory 일부는 새 gate에서 거부된다. public ambient path helper 제거는 pre-release internal API 정리이며 production caller는 이미 `ArtifactStore`를 사용한다. 각 수정은 report 25의 수정 전 fixture를 이름 붙인 RED 기록으로 보존하고, 로컬 전체 gate 뒤 clean 동일 SHA의 Ubuntu/Windows release verifier까지 통과해야 `Verified`로 승격한다.
+
+## ADR-0034: SaveDataV1 fail-closed 복원과 self-verifying replay
+
+Status: Superseded in part by ADR-0035; report 25 remediation in progress
+Date: 2026-08-23
+Decision ID: DEC-SAVE-03
+
+Context:
+
+최종 다중 감사 `FIN-F001..F007`은 v1 save가 schema 외 semantic 관계와 자원 상한을 검사하지 않고, replay metadata를 검증하지 않으며, public `DerefMut`와 registry/equipment lifecycle가 transaction truth를 우회한다고 확인했다. 기존 valid-fixture test와 deterministic hash는 손상 artifact와 외부 mutation을 증명하지 못한다.
+
+Decision:
+
+- SaveDataV1 wire shape와 schema version 1은 유지하되 16 MiB, event/entity 각 100,000개, RNG 1,000,000 draw, persisted text 512 UTF-8 byte의 fail-closed 경계를 둔다.
+- 복원 전에 entity, player, map, inventory, equipment, actor stat과 text 관계를 typed validator로 검사한다. invalid artifact는 `GameError::InvalidSave`이며 live session이나 RNG를 만들지 않는다.
+- ReplayLineV1은 self-verifying artifact다. 소비한 line의 turn, full outcome, outer hash를 working clone에서 비교하고 전체 성공 후 한 번만 commit한다.
+- GameSession/GameWorld/runtime EntityStore의 외부 `DerefMut`를 제거하고 crate-private typed mutation surface만 사용한다.
+- GameWorld는 immutable registry context를 runtime-only로 보존한다. injected save 복원은 동일 registry를 인자로 받으며, runtime-created corpse/equipment도 그 context와 공통 lifecycle helper를 사용한다.
+- replay append는 bounded read 후 atomic rewrite로 바꿔 외부 hard-link inode에 열린 append handle로 쓰지 않는다.
+- atomic replace 뒤 Unix parent directory를 fsync한다. Windows directory handle flush의 portable 보장은 현재 dependency에서 제공하지 않으므로 file sync + atomic replace 이후 전원 손실 metadata durability는 명시적 platform 잔여 위험이다.
+
+Alternatives:
+
+- SaveDataV2로 즉시 변경: v0.3.0 wire 호환을 불필요하게 깨므로 기각한다.
+- replay를 command-only로 축소: 기존 integrity 필드와 감사/재현 용도를 무의미하게 만들어 기각한다.
+- invalid state를 deserialize 뒤 runtime `expect`에 맡김: panic과 부분 상태를 허용하므로 기각한다.
+- 같은 계정의 악성 concurrent writer까지 애플리케이션 lock으로 격리: OS sandbox 없이 완전한 경계를 보장할 수 없고 현재 single-writer 제품 모델을 넘으므로 비목표로 둔다. 사전 배치 link와 외부 inode write는 계속 차단한다.
+
+Consequences:
+
+valid v1 save/replay wire는 유지되지만 과거에 우연히 수용된 malformed artifact는 typed error가 된다. 테스트는 boundary-1/boundary/boundary+1, malformed 관계 matrix, replay field별 tamper/no-partial-commit, 외부 compile-fail, custom registry continuation, armor wear/drop/rewear를 직접 검증한다.
+
 ## ADR-0033: winx 0.36.4 LLVM exception 한정 허용
 
-Status: Accepted (2026-08-18), cargo-deny 0.19.4 검증 대기
+Status: Implemented with machine expiry/graph gate (2026-08-23)
 Date: 2026-08-18
 Decision ID: DEC-DEP-02
 
@@ -27,6 +90,7 @@ Decision:
 - 일반 allowlist를 넓히지 않고 `winx 0.36.4`에만 `Apache-2.0 WITH LLVM-exception`을 허용한다.
 - exception owner는 Dependency owner / Release manager다.
 - exception은 2026-10-31에 만료하며, 그 전에 `winx`, `cap-primitives`, `cap-std`, `cap-fs-ext`, `cap-tempfile` 중 하나의 version이 바뀌면 즉시 재검토한다.
+- `dependency-exceptions.json`의 `DEP-EXC-0001`을 예외 owner, 사유, 승인일, 만료일과 trigger version의 단일 ledger로 사용한다. CI test는 오늘 날짜가 만료일을 지났거나 deny 설정·Cargo graph가 ledger와 다르면 실패한다.
 - cargo-deny 0.19.4의 `licenses`, `bans`, `sources` 실제 PASS를 R1/R8 필수 증거로 유지한다.
 
 Alternatives:
@@ -37,13 +101,15 @@ Alternatives:
 
 Consequences:
 
-`deny.toml` exception은 crate와 version을 함께 고정한다. 만료 또는 dependency 변경 시 exception 유지, dependency 교체, 일반 정책 변경 중 하나를 다시 결정하고 `BUILD_GUIDE.md`와 감사 기록을 갱신한다.
+`deny.toml` exception은 crate와 version을 함께 고정한다. `dependency-exceptions.json` checker가 만료, unrelated crate 확장, dependency version 변경을 fail-closed한다. 실패 시 exception 유지, dependency 교체, 일반 정책 변경 중 하나를 다시 결정하고 `BUILD_GUIDE.md`와 감사 기록을 갱신한다.
+
+전역 `multiple-versions = "allow"`는 무제한 허용이 아니다. `dependency-duplicate-budget.json`의 정확한 all-target family/version 집합과 최대 23개 family를 별도 machine gate로 고정하며 drift는 review 전까지 실패한다.
 
 Verification update: implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 Ubuntu/Windows cargo-deny 0.19.4와 전체 quality gate가 success다. report 23/24 시정은 후속 독립 재감사와 외부 게시 승인을 대체하지 않는다.
 
 ## ADR-0032: capability 기반 save/replay 파일 경계
 
-Status: Accepted (2026-08-18)
+Status: Superseded in part by ADR-0034 (2026-08-23)
 Date: 2026-08-18
 Decision ID: DEC-SAVE-02
 
@@ -56,8 +122,9 @@ Decision:
 - headless의 save/load/replay/report I/O는 열린 runtime root directory capability와 검증된 상대 경로를 함께 보유하는 `ArtifactStore`를 통한다. absolute path와 root 탈출은 구조적으로 거부하고, 각 open/rename은 root handle 기준으로 수행한다.
 - 쓰기 대상의 마지막 경로 요소는 symbolic link를 따라가지 않는다. 열린 handle이 일반 파일이며 hard-link count가 1인지 쓰기 전에 검증한다.
 - save는 대상과 같은 directory에 충돌하지 않는 임시 파일을 `create_new`로 생성하고 payload와 file metadata를 동기화한 뒤 capability-relative rename으로 교체한다. Unix는 mode `0600`을 강제하고 Windows는 parent directory DACL을 상속하므로, Windows에서 기밀성이 필요한 runtime root는 사용자 전용 directory여야 한다. 실패 시 새 임시 파일만 정리하고 기존 save는 보존한다.
-- replay append는 같은 no-follow·regular-file·single-link 검증을 통과한 handle에만 기록한다.
+- replay 기록은 기존 payload를 bounded read한 뒤 같은 directory의 temporary file로 atomic rewrite한다. 열린 외부 inode에 append하지 않는다.
 - TUI quick-save는 프로세스별 임시 directory를 사용해 다른 실행과 경로를 공유하지 않는다.
+- `ArtifactStore::open`은 root의 마지막 component를 no-follow로 열고 symbolic link와 Windows junction/reparse root를 거절한다. TUI는 store와 relative quick-save path를 소유한다.
 
 Alternatives:
 
@@ -292,6 +359,8 @@ Consequences:
 - R6-3은 strict soft payload와 `Neutral / LLM_UNAVAILABLE` fallback을 UI-only state로 보관하고, terminal 복원 뒤 worker를 최대 250ms만 정리한다.
 - R6 통합은 G/A/J 요청과 Y/N/R 안전 경로, 상태·modal, 동일 종류 outstanding·250ms cooldown, capacity 16 oldest-drop 표시 큐를 실제 TUI loop에 연결한다. 자동 failure matrix와 live PTY/loopback fixture matrix를 통과했고 `audit_report_11.md`가 checkpoint를 PASS로 종결했다.
 - public request는 `schema_version = 1`, `SessionRevision`, `LlmObservationView`, 독립 `ActionSpace`, `LlmRequestKind`를 소유하고 enqueue 전에 version·bounds·canonical size를 검증한다. response envelope도 TUI payload 수용 전에 version을 거부한다.
+- timeout의 단일 기본값은 connect 500ms, narrative 2000ms, decision/soft-adjudication 1500ms이며 helper와 env config가 같은 상수를 사용한다. decision rationale은 trim 후 1..=160자다.
+- v0.3.0 built-in runtime locale은 English로 한정한다. 다국어 README와 provider Unicode pass-through는 runtime 5-locale catalog 완료 증거가 아니다.
 - deterministic loopback fixture와 PTY script는 success/timeout/stale/down 및 pending-exit 복원 순서를 저장소에서 재현한다. `audit_report_11.md` 독립 재감사에서도 같은 evidence가 통과했다.
 - 실제 모델 smoke는 R6 필수 gate가 아니다. 최종 통합에서 별도 호환성 증거가 필요할 때만 localhost OpenAI-compatible 임시 adapter가 Google AI Studio Gemini 같은 원격 API를 대리 호출한다. AIHack은 계속 loopback만 호출하며 API key는 adapter 환경변수에만 주입하고 model ID는 실행 시점에 확인한다.
 
@@ -325,6 +394,7 @@ Consequences:
 - `audit_report_12.md` 이후 approval gate는 상태 문자열을 신뢰하지 않는다. runtime coverage, reviewer/date/license/scope/notice/evidence, content checksum, scenario schema/function과 Blocked reference를 모두 machine validation한 경우에만 PASS한다.
 - `audit_report_13.md`의 phase-cycle 시정에 따라 R7은 asset/scenario provenance를, R8은 root distribution license/version/packaging을 소유한다. R7 PASS만으로 외부 배포를 허용하지 않는다.
 - release checkpoint는 caller environment가 지정한 root를 신뢰하지 않고 script-relative canonical repository만 검사한다.
+- release bundle 무결성은 Linux Bash와 Windows PowerShell verifier가 동일한 required file, excluded path, metadata/record equality, checksum exact-set와 tamper negative matrix를 갖는다. 한 OS의 positive build만으로 다른 OS의 fail-closed parity를 대신하지 않는다.
 
 ## ADR-0029: 미승인 provenance를 R8 실제 런칭 게이트로 이관
 
@@ -356,7 +426,7 @@ Consequences:
 
 ## ADR-0030: NetHack 3.6.7 파생물 분류와 whole-work NGPL 배포
 
-Status: Implemented; report 21 closed report 20 documentation remediation, `docs/audit/audit_report_23.md` remediation pending independent re-audit
+Status: Implemented; report 21 and report 24 historical closure retained, report 25 current HOLD
 Date: 2026-07-20
 Decision ID: DEC-LICENSE-03
 
@@ -383,4 +453,4 @@ Consequences:
 - source archive는 `.git/` history에 의존하지 않고 `MODIFICATIONS.md`의 scope/date와 `RELEASE-METADATA`의 commit을 수신자에게 전달한다.
 - 라이선스 정비 완료는 독립 R8 기술 감사 `PASS`나 외부 게시 실행을 자동 승인하지 않는다.
 - 이 결정과 프로젝트 기록은 qualified legal opinion이나 법률 자문을 대체하지 않는다.
-- Release verification update (2026-08-18): `audit_report_21.md`가 report 20의 active-state/false-green 문서 시정을 PASS로 종결했다. R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`의 [Actions run `32034295607`](https://github.com/Yupkidangju/AIHack/actions/runs/32034295607)은 양 OS success다. `docs/audit/audit_report_23.md`의 새 filesystem/causal/checkpoint/document finding 시정은 독립 재감사 전까지 전체 PASS나 외부 게시를 승인하지 않는다.
+- Release verification update (2026-08-23): `audit_report_21.md`가 report 20을, `audit_report_24.md`와 implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`이 report 23/24를 historical closed했다. final multi-audit report 1의 첫 시정은 `docs/audit/audit_report_25.md`가 production 결함을 재현해 partial evidence로 강등했으며, report 25 시정·same-SHA CI·독립 재감사 전까지 전체 PASS나 외부 게시를 승인하지 않는다.

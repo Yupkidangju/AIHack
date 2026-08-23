@@ -1,8 +1,9 @@
-use std::{env, fs};
-
 use aihack::{
-    core::GameSession,
-    ui::tui::{compute_layout, runtime_smoke, TuiApp, UiCommandCandidate, UiRuntimeConfig},
+    core::{CommandIntent, GameSession},
+    ui::tui::{
+        compute_layout, runtime_smoke, StorageOperation, TuiApp, UiCommandCandidate, UiOverlay,
+        UiPanel, UiRuntimeConfig,
+    },
 };
 
 #[test]
@@ -13,13 +14,14 @@ fn ui_runtime_smoke() {
 }
 
 #[test]
-fn tui_app_save_load_bridge_uses_core_api() {
+fn tui_app_owned_quick_save_load_bridge_uses_core_api() {
     let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
-    let mut path = env::temp_dir();
-    path.push(format!("aihack-tui-save-{}.json", std::process::id()));
-    app.save_to_path(&path).unwrap();
-    app.load_from_path(&path).unwrap();
-    fs::remove_file(path).unwrap();
+    app.quick_save().unwrap();
+    app.handle_candidate_owned(UiCommandCandidate::Command(CommandIntent::Wait))
+        .unwrap();
+    assert_eq!(app.observation().turn, 1);
+    app.quick_load().unwrap();
+    assert_eq!(app.observation().turn, 0);
 }
 
 #[test]
@@ -42,13 +44,10 @@ fn viewport_roundtrip_matches_render_hit_contract() {
 #[test]
 fn handle_candidate_bridges_save_and_load() {
     let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
-    let mut path = env::temp_dir();
-    path.push(format!("aihack-tui-handle-{}.json", std::process::id()));
-    app.handle_candidate(UiCommandCandidate::Save, &path, &path)
+    app.handle_candidate_owned(UiCommandCandidate::Save)
         .unwrap();
-    app.handle_candidate(UiCommandCandidate::Load, &path, &path)
+    app.handle_candidate_owned(UiCommandCandidate::Load)
         .unwrap();
-    fs::remove_file(path).unwrap();
 }
 
 #[test]
@@ -90,11 +89,10 @@ fn decision_support_consumer_smoke() {
 fn inspect_panel_prefers_hovered_read_only_lines() {
     let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
     let before_turn = app.observation().turn;
-    app.handle_candidate(
-        UiCommandCandidate::Inspect(aihack::core::Pos { x: 6, y: 5 }),
-        std::path::Path::new("/tmp/unused-save.json"),
-        std::path::Path::new("/tmp/unused-load.json"),
-    )
+    app.handle_candidate_owned(UiCommandCandidate::Inspect(aihack::core::Pos {
+        x: 6,
+        y: 5,
+    }))
     .unwrap();
     let observation = app.observation();
     let lines = aihack::ui::tui::render_panels::inspect_lines(
@@ -105,4 +103,51 @@ fn inspect_panel_prefers_hovered_read_only_lines() {
     );
     assert_eq!(observation.turn, before_turn);
     assert!(lines.iter().any(|line| line.contains("read-only inspect")));
+}
+
+#[test]
+fn inventory_overlay_and_recoverable_storage_error_do_not_mutate_core() {
+    let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    let before = app.revision();
+
+    app.handle_candidate_owned(UiCommandCandidate::Command(CommandIntent::ShowInventory))
+        .unwrap();
+    assert_eq!(app.ui_overlay(), &UiOverlay::Inventory);
+    assert_eq!(app.revision(), before);
+    app.handle_candidate_owned(UiCommandCandidate::CloseOverlay)
+        .unwrap();
+    assert_eq!(app.ui_overlay(), &UiOverlay::None);
+
+    app.handle_candidate_owned(UiCommandCandidate::Load)
+        .unwrap();
+    assert_eq!(app.storage_error(), Some(StorageOperation::Load));
+    assert_eq!(app.revision(), before);
+}
+
+#[test]
+fn new_run_clears_every_transient_ui_state_but_preserves_config() {
+    let config = UiRuntimeConfig {
+        high_contrast: true,
+        reduced_motion: true,
+        ..Default::default()
+    };
+    let mut app = TuiApp::new(GameSession::new_for_playing(42), config);
+    app.handle_candidate_owned(UiCommandCandidate::Inspect(aihack::core::Pos {
+        x: 6,
+        y: 5,
+    }))
+    .unwrap();
+    app.handle_candidate_owned(UiCommandCandidate::Command(CommandIntent::ShowInventory))
+        .unwrap();
+    app.debug_observation_visible = true;
+
+    app.handle_candidate_owned(UiCommandCandidate::NewRun)
+        .unwrap();
+
+    assert_eq!(app.ui_overlay(), &UiOverlay::None);
+    assert_eq!(app.hovered_pos(), None);
+    assert_eq!(app.focused_panel(), UiPanel::Map);
+    assert!(!app.debug_observation_visible);
+    assert!(app.config.high_contrast);
+    assert!(app.config.reduced_motion);
 }

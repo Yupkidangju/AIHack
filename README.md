@@ -1,6 +1,6 @@
 # AIHack
 
-> Current code: Cargo 0.3.0 · Release audit target: 0.3.0 · Updated: 2026-08-18
+> Current code: Cargo 0.3.0 · Release audit target: 0.3.0 · Updated: 2026-08-23
 
 ## 한국어
 
@@ -8,7 +8,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트�
 
 ### 현재 상태
 
-- fmt, clippy, 전체 test, release build는 현재 환경에서 통과한 기준선이다.
+- fmt, clippy, 전체 test, release build의 1차 시정 기준선은 통과했지만 report 25가 production 누락을 재현했으므로 현재 전체 PASS 근거로 사용하지 않는다.
 - Rust 1.94.1과 ratatui 0.30/crossterm 0.29 계열은 repository에 고정됐다. report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901`은 [GitHub Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)에서 Ubuntu/Windows quality gate를 모두 PASS했다.
 - R1 build 재현성과 R2 private state/transaction은 local gate를 통과했다.
 - R3의 fallible `ContentRegistry` bootstrap과 R4의 policy 기반 headless runner는 local 검증을 통과했다.
@@ -18,8 +18,9 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트�
 - 실제 외부 게시에는 R8 기술 감사 `PASS`, `LICENSE`, `NOTICE`, 해당 바이너리를 만든 커밋의 complete corresponding source archive가 필요하다.
 - project-owner 결정은 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적하며, release bundle은 `PROJECT_OWNER_LICENSE_APPROVAL.md`, `MODIFICATIONS.md`, commit-bound `RELEASE-METADATA`와 `SHA256SUMS`를 포함한다. metadata key는 정확히 한 번 존재하고 owner/modification ID의 전체 값이 bundled record와 일치해야 하며 qualified legal opinion은 별도로 주장하지 않는다.
 - `audit_report_21.md`는 report 20의 `IMP-F016`/`DBG-F008` 시정을 PASS로 종결했다. report 20의 재감사 대기는 더 이상 현재 상태가 아니다.
-- `docs/audit/audit_report_23.md`는 R9 장기 witness, Windows checkpoint와 save/replay 파일 경계의 새 blocker를 HOLD했다. 2026-08-18 coder remediation은 capability 기반 artifact I/O, 9종 causal witness와 CRLF checkpoint 회귀를 구현해 로컬 검증을 통과했으며 독립 재감사를 기다린다. 외부 게시는 독립 PASS와 별도 사용자 승인 전까지 HOLD다.
-- `docs/audit/audit_report_24.md`의 후속 finding은 시정됐다. cargo-deny 0.19.4가 winx 전용 license exception으로 PASS하고, Windows save 권한은 parent DACL 상속으로 정확히 표현되며, SC-CAUSE-01..07은 코드와 테스트에 개별 매핑된다. 같은 implementation SHA의 양 OS CI와 release bundle도 PASS했다.
+- `docs/audit/audit_report_24.md`와 implementation SHA `2519bc8e`의 양 OS CI는 report 23/24 시정을 역사적으로 종결했다. report 23 재감사 대기는 현재 gate가 아니다.
+- 현재 권위는 `docs/audit/audit_report_25.md`의 HOLD다. final multi-audit report 1의 첫 시정은 partial historical evidence이며, report 25의 save/replay, paired score, TUI/terminal, dependency/CI와 release exact-set 시정·전체 로컬 gate·새 clean same-SHA CI·독립 재감사 전에는 외부 게시를 승인하지 않는다.
+- Windows all-target test는 dev-only `portable-pty 0.9.0` ConPTY에서 실제 TUI의 one-key state, mouse click, Inventory/Esc와 terminal restore를 검증한다. release binary dependency에는 포함되지 않는다.
 - R9 콘텐츠 인과 폐쇄는 음식·시체 섭취, 콘텐츠 기반 armor/monster behavior, 가격·난이도·gold·score, 기도·luck 전이를 실제 월드 상태에 연결한다. seed 42/7/1234 장기 테스트는 9종 semantic witness와 1000 accepted turn, 반복 hash를 함께 검증한다.
 
 ### v0.3.0 목표
@@ -43,7 +44,7 @@ TUI는 `default-run = "aihack"`로 선택된다. headless 실행에는 package�
 
 ### 구현 순서
 
-1. `docs/audit/audit_report_23.md` 시정의 독립 재감사
+1. `docs/audit/audit_report_25.md` 시정의 RED/GREEN, 전체 로컬 재감사와 clean same-SHA CI
 2. 최종 독립 PASS 뒤 별도 승인에 따른 외부 게시
 
 ### 문서
@@ -59,8 +60,8 @@ TUI는 `default-run = "aihack"`로 선택된다. headless 실행에는 package�
 9. [Compatibility template](docs/compatibility/README.md)
 10. [Change history](CHANGELOG.md)
 11. [R0 documentation audit](DOCUMENTATION_AUDIT_REPORT.md)
-12. [R8 remediation closure](audit_report_21.md)
-13. [Latest re-audit](docs/audit/audit_report_24.md), [report 23 remediation record](docs/audit/audit_report_23_remediation.md), [R9 causal audit](docs/audit/audit_report_22.md)
+12. [R8 remediation closure](docs/audit/audit_report_21.md)
+13. [Current re-audit](docs/audit/audit_report_25.md), [historical final audit](docs/multi_audit/1/final_audit_report_1.md), [latest historical closed re-audit](docs/audit/audit_report_24.md), [R9 causal audit](docs/audit/audit_report_22.md)
 14. [NetHack General Public License](LICENSE)와 [derivative-work notice](NOTICE)
 15. [Project-owner license decision](PROJECT_OWNER_LICENSE_APPROVAL.md)과 [modification manifest](MODIFICATIONS.md)
 
@@ -72,7 +73,7 @@ AIHack is a Rust roguelike that reimplements observable NetHack 3.6.7 behavior t
 
 ### Current status
 
-- The current baseline passes formatting, clippy, the full test suite, and a release build in the audited environment.
+- The first remediation baseline passed formatting, Clippy, the full test suite, and a release build, but report 25 reproduced production gaps, so those results are not the current whole-program PASS evidence.
 - Rust 1.94.1 and the ratatui 0.30/crossterm 0.29 family are pinned. Report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901` passed both OS quality gates in [GitHub Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171).
 - R1 build reproducibility and R2 private-state transaction gates pass locally.
 - R3's fallible `ContentRegistry` bootstrap and R4's policy-driven headless runner pass local verification.
@@ -82,8 +83,9 @@ AIHack is a Rust roguelike that reimplements observable NetHack 3.6.7 behavior t
 - External publication still requires an R8 technical-audit PASS plus LICENSE, NOTICE, and the complete corresponding source for the released binaries.
 - The project-owner decision is traceable as `AIHACK-OWNER-2026-07-20-NGPL-01`; release bundles carry PROJECT_OWNER_LICENSE_APPROVAL.md, MODIFICATIONS.md, commit-bound RELEASE-METADATA, and SHA256SUMS. Metadata IDs must resolve to the bundled records. No qualified legal opinion is claimed.
 - `audit_report_21.md` closed report 20's documentation remediation with PASS; report 20 is no longer the current pending authority.
-- `docs/audit/audit_report_23.md` placed new R9-witness, Windows-checkpoint, and save/replay filesystem findings on HOLD. The 2026-08-18 coder remediation adds capability-based artifact I/O, nine typed causal witnesses, and CRLF checkpoint regressions; independent re-audit is still pending, so external publication remains on hold.
-- The follow-up findings in `docs/audit/audit_report_24.md` are remediated: cargo-deny 0.19.4 passes with a winx-only license exception, Windows save permissions inherit the parent DACL, and SC-CAUSE-01..07 map individually to code and tests. Both OS quality gates and release bundles pass on the same implementation SHA.
+- Report 24 and the two-OS CI for implementation SHA `2519bc8e` historically closed report 23/24 remediation; report 23 is no longer the current pending gate.
+- The current authority is the HOLD in `docs/audit/audit_report_25.md`. The first final-audit remediation is partial historical evidence; publication remains blocked until the report 25 production gaps, full local gate, new clean same-SHA CI, and independent re-audit are complete.
+- Windows all-target tests use dev-only `portable-pty 0.9.0` ConPTY to exercise real TUI one-key states, mouse input, Inventory/Esc, and terminal restoration; it is not a release-binary dependency.
 - R9 causal closure connects food/corpse consumption, content-driven armor and monster behavior, price/difficulty/gold/score, and prayer/luck to observable world-state changes. Long runs for seeds 42/7/1234 now require all nine semantic witnesses as well as 1,000 accepted turns and repeatable hashes.
 
 ### v0.3.0 target
@@ -111,13 +113,14 @@ AIHack は、NetHack 3.6.7 の観察可能な挙動を、出典付きシナリ�
 
 ### 現在の状態
 
-- 現在の基準では format、clippy、全 test、release build が通過しています。
+- 最初の修正基準では format、clippy、全 test、release build が通過しましたが、report 25 が production 経路の欠落を再現したため、現在の全体 PASS 証拠ではありません。
 - Rust 1.94.1 と ratatui 0.30/crossterm 0.29 は固定済みです。R5 workspace と文書是正は `audit_report_9.md` の再監査を通過しました。
 - `audit_report_11.md` は、report 10 の public/schema contract と証拠再現性の是正をすべて Verified とし、R6 checkpoint を PASS で完了しました。実 provider smoke は非 blocking の検討事項です。
 - AIHack は NetHack 3.6.7 の AI-assisted semantic rewrite による派生物としてプロジェクト所有者に承認され、配布物全体に NGPL を適用します。外部公開には R8 技術監査 PASS と LICENSE、NOTICE、対応する完全なソースが必要です。
 - R9 の因果閉包では、食料・死体、armor、monster behavior、価格・難易度・gold・score、祈り・luck を実際の world state 変化へ接続し、seed 42/7/1234 の長期 test で semantic delta を検証します。
-- report 21 は report 20 の文書修正を PASS で完了しました。report 23 の新しい filesystem・因果 witness・Windows checkpoint 修正はローカルで完了していますが、独立再監査と外部公開承認はまだ保留です。
-- report 24 の追加 finding も修正済みです。cargo-deny 0.19.4、Windows の parent DACL 境界、SC-CAUSE-01..07 の個別 code/test 対応、および implementation SHA `2519bc8e` の両 OS CI と release bundle が PASS しました。
+- report 24 と implementation SHA `2519bc8e` の両 OS CI により report 23/24 の修正は履歴上完了し、report 23 は現在の保留 gate ではありません。
+- 現在の権威は `docs/audit/audit_report_25.md` の HOLD です。最初の final-audit 修正は部分的な履歴証拠であり、report 25 の production 修正、全ローカル gate、新しい clean same-SHA CI、独立再監査が揃うまで外部公開は保留です。
+- Windows の all-target test は dev-only `portable-pty 0.9.0` ConPTY で実 TUI の一キー遷移、mouse、Inventory/Esc、terminal 復元を検証し、release binary には含めません。
 
 ### 現在の実行
 
@@ -134,13 +137,14 @@ AIHack 是以具來源追蹤的情境與測試，重新實作 NetHack 3.6.7 可�
 
 ### 目前狀態
 
-- 目前基準已通過 format、clippy、全部 test 與 release build。
+- 第一輪修正基準曾通過 format、clippy、全部 test 與 release build，但 report 25 已重現 production 路徑缺口，因此不能作為目前整體 PASS 證據。
 - Rust 1.94.1 與 ratatui 0.30/crossterm 0.29 已固定；R5 workspace 與文件修正已通過 `audit_report_9.md` 複審。
 - `audit_report_11.md` 已驗證 report 10 的 public/schema contract 與證據可重現性修正，並以 PASS 完成 R6 checkpoint；實際 provider smoke 仍為非阻斷考量。
 - 專案所有者已將 AIHack 核准為 NetHack 3.6.7 的 AI-assisted semantic rewrite 衍生作品，整體散布適用 NGPL。對外發布仍需 R8 技術稽核 PASS、LICENSE、NOTICE 與對應完整原始碼。
 - R9 因果閉合把食物／屍體、armor、monster behavior、價格／難度／gold／score、祈禱／luck 連到實際 world state 變化，並以 seed 42/7/1234 長期測試驗證 semantic delta。
-- report 21 已以 PASS 結束 report 20 的文件修正。report 23 的 filesystem、因果 witness 與 Windows checkpoint 修正已通過本機驗證，但仍待獨立複審與對外發布核准。
-- report 24 的後續 finding 已修正：cargo-deny 0.19.4、Windows parent DACL 邊界、SC-CAUSE-01..07 個別程式碼／測試映射，以及 implementation SHA `2519bc8e` 的雙作業系統 CI 與 release bundle 均已 PASS。
+- report 24 與 implementation SHA `2519bc8e` 的雙作業系統 CI 已在歷史上結束 report 23/24 修正；report 23 不再是目前待處理 gate。
+- 目前權威是 `docs/audit/audit_report_25.md` 的 HOLD。第一輪 final-audit 修正僅是部分歷史證據；完成 report 25 production 修正、全套本機 gate、新的 clean same-SHA CI 與獨立複審前，對外發布維持暫停。
+- Windows all-target 測試使用僅供開發的 `portable-pty 0.9.0` ConPTY 驗證實際 TUI 的單鍵狀態、滑鼠、Inventory/Esc 與終端復原，不納入 release binary 相依性。
 
 ### 目前執行
 
@@ -157,13 +161,14 @@ AIHack 是通过带来源追踪的场景和测试，重新实现 NetHack 3.6.7 �
 
 ### 当前状态
 
-- 当前基线已通过 format、clippy、全部 test 和 release build。
+- 第一轮修正基线曾通过 format、clippy、全部 test 和 release build，但 report 25 已复现 production 路径缺口，因此不能作为当前整体 PASS 证据。
 - Rust 1.94.1 和 ratatui 0.30/crossterm 0.29 已固定；R5 workspace 与文档修正已通过 `audit_report_9.md` 复审。
 - `audit_report_11.md` 已验证 report 10 的 public/schema contract 与证据可复现性修正，并以 PASS 完成 R6 checkpoint；实际 provider smoke 仍为非阻断考虑项。
 - 项目所有者已将 AIHack 批准为 NetHack 3.6.7 的 AI-assisted semantic rewrite 衍生作品，整体分发适用 NGPL。对外发布仍需 R8 技术审计 PASS、LICENSE、NOTICE 与对应完整源代码。
 - R9 因果闭合将食物／尸体、armor、monster behavior、价格／难度／gold／score、祈祷／luck 连接到实际 world state 变化，并用 seed 42/7/1234 长期测试验证 semantic delta。
-- report 21 已以 PASS 结束 report 20 的文档修正。report 23 的 filesystem、因果 witness 与 Windows checkpoint 修正已通过本地验证，但仍待独立复审和对外发布批准。
-- report 24 的后续 finding 已修正：cargo-deny 0.19.4、Windows parent DACL 边界、SC-CAUSE-01..07 逐项代码／测试映射，以及 implementation SHA `2519bc8e` 的双操作系统 CI 与 release bundle 均已 PASS。
+- report 24 与 implementation SHA `2519bc8e` 的双操作系统 CI 已在历史上结束 report 23/24 修正；report 23 不再是当前待处理 gate。
+- 当前权威是 `docs/audit/audit_report_25.md` 的 HOLD。第一轮 final-audit 修正仅是部分历史证据；完成 report 25 production 修正、全部本地 gate、新的 clean same-SHA CI 与独立复审前，对外发布保持暂停。
+- Windows all-target 测试使用仅供开发的 `portable-pty 0.9.0` ConPTY 验证实际 TUI 的单键状态、鼠标、Inventory/Esc 与终端恢复，不纳入 release binary 依赖。
 
 ### 当前运行
 
