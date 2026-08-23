@@ -19,7 +19,7 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | report 25 SHA `b732c42d`/run `32650404618`은 부분 evidence, report 26 표적 회귀 GREEN | 새 clean same-SHA Ubuntu/Windows actual bundle 전 program HOLD |
+| CI | report 26 implementation `fc01ec12bac522e601bc56bced06b0908f5873b0`, [run `32658658526`](https://github.com/Yupkidangju/AIHack/actions/runs/32658658526), Ubuntu/Windows 각 19-step quality·platform bundle success | 독립 재감사 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 
@@ -460,7 +460,7 @@ Linux/Windows release verifier는 fresh staging 또는 승격된 `output/` root�
 - [x] report 23/24 시정 재감사와 same-SHA CI — `audit_report_24.md`, Actions `32107862171`
 - [x] `docs/audit/audit_report_25.md` 시정 전체 gate·clean same-SHA CI — 부분 evidence `b732c42d`, Actions `32650404618`
 - [x] `docs/audit/audit_report_26.md` malformed save/alias/producer/modal/release/date/P1 표적 회귀 GREEN
-- [ ] report 26 시정 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle — 외부 게시 HOLD
+- [x] report 26 시정 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle — `fc01ec12`, Actions `32658658526`
 - [x] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171`
 
-기존 R8 문서 시정은 report 21이, report 23/24 시정은 report 24와 Actions `32107862171`이 종결했다. report 25 시정과 Actions `32650404618`은 부분 positive evidence다. 현재 authority는 `docs/audit/audit_report_26.md`이며 새 전체 로컬 gate, clean same-SHA 양 OS bundle, 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
+기존 R8 문서 시정은 report 21이, report 23/24 시정은 report 24와 Actions `32107862171`이 종결했다. report 25 시정과 Actions `32650404618`은 부분 positive evidence다. 현재 authority는 `docs/audit/audit_report_26.md`이며 시정 구현은 SHA `fc01ec12`의 Actions `32658658526`에서 양 OS Verified다. 새 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.

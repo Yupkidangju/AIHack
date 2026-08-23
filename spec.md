@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 26 독립 재감사에서 production 경계 12건 재개방(PROGRAM HOLD), report 25 SHA `b732c42d`의 same-SHA 양 OS 결과는 역사적 positive evidence
+현재 코드 기준: Cargo package 0.3.0, report 26 시정 SHA `fc01ec12bac522e601bc56bced06b0908f5873b0`, Actions `32658658526` clean same-SHA Ubuntu/Windows Verified, 독립 재감사 pending(PROGRAM HOLD)
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
@@ -794,7 +794,7 @@ release `output/` directory 전체가 게시 bundle이다. build는 workspace �
 
 작성일 2026-08-17 기준 최신 사용자 요구에 따라, v0.3.0 릴리스 기준을 훼손하지 않는 후속 구현 단계 R9를 추가한다. 현재 Cargo version은 R9 완료와 릴리스 결정 전까지 0.3.0을 유지한다.
 
-진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프를 구현했고 report 25 시정에서 동일 world/turn의 gold/no-gold production score pair까지 완료했다. report 26 독립 재감사는 완성 summary에서 label을 지우는 negative가 actual producer removal을 증명하지 못한다고 재개방했다. 따라서 GoldScore production pair는 Verified sub-scope, 9종 actual producer-removal matrix는 시정 중이며 전체 R9/program은 HOLD다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
+진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프를 구현했고 report 25 시정에서 동일 world/turn의 gold/no-gold production score pair까지 완료했다. report 26이 재개방한 사후 label 삭제 negative는 speed/AI/difficulty production pair와 9종 actual producer-removal full-run matrix로 교체했고, SHA `fc01ec12`의 Actions `32658658526`에서 양 OS Verified됐다. 독립 재감사 전까지 전체 R9/program은 HOLD다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
 
 ### 19.1 목표
 

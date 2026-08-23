@@ -241,6 +241,6 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 
 ### 10.13 `docs/audit/audit_report_26.md` 현재 상태 (2026-08-24)
 
-- 현재 권위는 malformed scalar/ItemData, Win32 trailing-name alias, actual causal producer removal, modal/Inspect mouse, release staging root/hardlink/candidate date와 세 P1 gate를 재현한 `docs/audit/audit_report_26.md`다.
+- 현재 권위는 malformed scalar/ItemData, Win32 trailing-name alias, actual causal producer removal, modal/Inspect mouse, release staging root/hardlink/candidate date와 네 P1 범위를 재현한 `docs/audit/audit_report_26.md`다.
 - ADR-0036, active spec/design/gap과 `docs/audit/audit_report_26_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
-- 표적 회귀는 GREEN으로 전환됐지만 전체 로컬 quality gate와 새 clean same-SHA Ubuntu/Windows actual bundle 전까지 program/publication HOLD다.
+- report 26 시정은 전체 local gate와 implementation SHA `fc01ec12bac522e601bc56bced06b0908f5873b0`의 Actions `32658658526` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.

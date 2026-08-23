@@ -15,9 +15,9 @@
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
-현재 권위는 report 25 same-SHA 구현을 독립 production probe로 다시 HOLD한 `docs/audit/audit_report_26.md`다. report 25 SHA `b732c42d62f295f4d8be64480c1d0a5a440fe738`와 Actions `32650404618`은 역사적 positive/partial evidence로 보존한다. report 26 시정은 consumer-safe save/산술, Windows alias, actual causal producer pair/removal, modal mouse·Inspect presentation, fresh release staging/link count/candidate date와 dependency/action gate를 ADR-0036 계약에 따라 정렬한다.
+현재 권위는 report 25 same-SHA 구현을 독립 production probe로 다시 HOLD한 `docs/audit/audit_report_26.md`다. report 25 SHA `b732c42d`/Actions `32650404618`은 역사적 partial evidence로 보존한다. report 26 시정은 consumer-safe save/산술, Windows alias, actual causal producer pair/removal, modal mouse·Inspect presentation, fresh release staging/link count/candidate date와 dependency/action gate를 ADR-0036 계약에 따라 정렬했고 구현 SHA는 `fc01ec12bac522e601bc56bced06b0908f5873b0`이다.
 
-report 26 finding별 수정 전 RED와 표적 GREEN은 `docs/audit/audit_report_26_remediation.md`에 기록한다. 현재 표적 회귀는 GREEN으로 전환됐지만 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle은 아직 실행 전이므로 program 또는 외부 게시 가능 상태로 올리지 않는다.
+report 26 finding별 수정 전 RED, 표적 GREEN과 전체 로컬 gate는 `docs/audit/audit_report_26_remediation.md`에 기록했다. Actions `32658658526`은 같은 SHA에서 Ubuntu/Windows 각 19개 step, dependency gates, R7/R8, actual platform bundle, cargo-audit/deny와 lockfile 불변을 모두 PASS했다. 구현은 Verified지만 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -923,7 +923,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/audit/audit_report_26.md` 시정의 전체 로컬 quality gate와 새 clean same-SHA Ubuntu/Windows actual bundle이다. report 24까지의 종결 evidence, report 25의 부분 positive evidence와 project-owner NGPL approval은 유지되며, 외부 게시는 새 독립 PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `docs/audit/audit_report_26.md` 시정의 새 독립 재감사다. 전체 local gate와 clean same-SHA 양 OS CI는 SHA `fc01ec12`의 Actions `32658658526`에서 Verified했다. report 24까지의 종결 evidence, report 25의 부분 positive evidence와 project-owner NGPL approval은 유지되며, 외부 게시는 새 독립 PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 2026-08-18 `audit_report_23.md` 시정은 문서 우선으로 시작한다. 첫 slice인 SEC-F001은 ADR-0032와 `spec.md` 14·16절을 구현 권한으로 삼아 `ArtifactStore` capability root, no-follow/single-link open, `create_new` save temp, 실행별 TUI quick-save 경계를 구현한다. 회귀 기준은 사전 배치 temp hard link와 replay symlink/hard link가 외부 victim을 바꾸지 않고, 기존 save 보존과 정상 save/load/replay가 함께 통과하는 것이다. 완료 표시는 표적 테스트와 workspace 검증 후에만 갱신한다.
 
@@ -931,7 +931,7 @@ DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.
 
 ## 11. R9 콘텐츠 인과 폐쇄 Task
 
-역사 기록 (2026-08-18~24): R9-1..R9-5의 표적 인과 루프 이후 report 23이 R9-6 witness를 HOLD했고 report 24가 당시 coder remediation을 검증했다. report 25의 production GoldScore pair는 Actions `32650404618`에서 양 OS Verified됐다. report 26은 사후 summary label 삭제 negative를 재개방했으며, 현재는 speed/AI/difficulty를 독립 production pair로 실행하고 9종 producer/content/pair를 실행 전에 하나씩 제거하는 full-run matrix로 교체했다. 전체 gate와 새 same-SHA CI 전에는 R9 최종 PASS를 선언하지 않는다.
+역사 기록 (2026-08-18~24): R9-1..R9-5의 표적 인과 루프 이후 report 23이 R9-6 witness를 HOLD했고 report 24가 당시 coder remediation을 검증했다. report 25의 production GoldScore pair는 Actions `32650404618`에서 양 OS Verified됐다. report 26이 재개방한 사후 summary label 삭제 negative는 speed/AI/difficulty 독립 production pair와 9종 producer/content/pair full-run removal matrix로 교체했고 Actions `32658658526`에서 양 OS Verified됐다. 독립 재감사 전에는 R9 최종 PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 

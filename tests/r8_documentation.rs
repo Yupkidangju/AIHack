@@ -45,7 +45,7 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
 
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
-    assert!(compatibility.contains("audit report 26 remediation target regressions green"));
+    assert!(compatibility.contains("audit report 26 remediation same-SHA verified"));
 }
 
 #[test]
@@ -113,7 +113,6 @@ fn r8_documentation_self_check_is_current_without_rewriting_the_r0_audit() {
 fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
     let evidence = ["2519bc8e0ede81c39f46b5778e62a41d4ca66901", "32107862171"];
     for document in [
-        "README.md",
         "IMPLEMENTATION_SUMMARY.md",
         "audit_roadmap.md",
         "GAP_CLOSURE_ROADMAP.md",
@@ -132,6 +131,23 @@ fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
 
     for document in [
         "README.md",
+        "IMPLEMENTATION_SUMMARY.md",
+        "audit_roadmap.md",
+        "GAP_CLOSURE_ROADMAP.md",
+        "BUILD_GUIDE.md",
+        "DOCUMENTATION_AUDIT_REPORT.md",
+        "DESIGN_DECISIONS.md",
+    ] {
+        let content = project_file(document);
+        for phrase in ["fc01ec12", "32658658526"] {
+            assert!(
+                content.contains(phrase),
+                "{document} report 26 evidence 누락: {phrase}"
+            );
+        }
+    }
+
+    for document in [
         "IMPLEMENTATION_SUMMARY.md",
         "audit_roadmap.md",
         "GAP_CLOSURE_ROADMAP.md",
@@ -211,11 +227,11 @@ fn active_release_sections_reject_known_stale_statuses() {
     assert!(documentation.ends_with("| Closed |"));
     for verified in ["G-BUILD-006", "G-TEST-003", "G-DOC-004", "G-SEC-001"] {
         assert!(
-            gap_row(&gaps, verified).ends_with("| Reopened |"),
+            gap_row(&gaps, verified).ends_with("| Verified |"),
             "{verified} 현재 상태 불일치"
         );
     }
-    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Reopened |"));
+    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Verified |"));
     for row in gaps.lines().filter(|line| line.starts_with("| G-")) {
         assert!(
             !row.contains("Closed /"),
@@ -249,9 +265,10 @@ fn active_release_sections_reject_known_stale_statuses() {
 fn active_r9_status_separates_completed_gold_score_pair_from_producer_removal_work() {
     let spec = project_file("spec.md");
     let r9 = markdown_section(&spec, "## 19. R9 후속 목표", "### 19.1 목표");
-    assert!(r9.contains("GoldScore production pair는 Verified sub-scope"));
-    assert!(r9.contains("9종 actual producer-removal matrix는 시정 중"));
+    assert!(r9.contains("9종 actual producer-removal full-run matrix로 교체"));
+    assert!(r9.contains("Actions `32658658526`에서 양 OS Verified"));
     assert!(!r9.contains("gold/no-gold production pair와 독립 negative matrix를 시정 중"));
+    assert!(!r9.contains("actual producer-removal matrix는 시정 중"));
 }
 
 #[test]

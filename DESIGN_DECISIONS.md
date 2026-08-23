@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0036: report 26 consumer-safe artifact와 presentation/release authority 경계
 
-Status: Accepted / implementation in progress (2026-08-24)
+Status: Implemented and same-SHA verified; independent re-audit pending (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R26-01
 
@@ -30,7 +30,7 @@ Decision:
 - TUI는 modal/overlay guard를 event kind보다 먼저 적용한다. Inspect renderer와 mouse hit-test는 같은 `InspectPresentation`을 소비하며 LLM request key는 Press만 허용한다.
 - release build는 workspace 내부 random fresh directory에서 create-new staging하고 검증된 directory rename으로 승격한다. verifier는 root reparse/symlink와 expected file hard link를 거부한다. Windows link count는 열린 handle의 `GetFileInformationByHandle` 결과를 사용한다.
 - release metadata는 exact candidate commit에서 파생한 `candidate_date`를 포함하고 modification manifest 기간과 자동 교차 검증한다. dependency exception은 미래 approval을 거부하며 action pin gate는 `.github/**/*.yml|yaml`을 YAML node로 구조 순회한다.
-- report 26이 현재 authority다. report 25 구현과 CI는 유효한 부분 증거지만 12건의 로컬 RED→GREEN, 전체 gate와 새 clean same-SHA 양 OS bundle 전까지 program/publication HOLD를 유지한다.
+- report 26이 현재 authority다. 12건의 로컬 RED→GREEN, 전체 gate와 새 clean same-SHA 양 OS bundle 뒤에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD를 유지한다.
 
 Alternatives:
 
@@ -42,6 +42,8 @@ Alternatives:
 Consequences:
 
 wire schema version은 1로 유지하지만 registry와 소비 산술에 맞지 않는 과거 malformed save 및 Windows 비정규 artifact name은 typed error가 된다. release metadata에 새 필수 key가 추가되고 build/verifier 호출은 candidate date를 함께 전달한다. 각 경계는 수정 전 실패 fixture를 보존하고 새 clean commit의 Ubuntu/Windows actual bundle까지 통과해야 Verified가 된다.
+
+Verification update: implementation SHA `fc01ec12bac522e601bc56bced06b0908f5873b0`의 Actions `32658658526`에서 Ubuntu/Windows 각 19개 step, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success다. 이 evidence는 구현을 Verified로 올리지만 독립 재감사나 외부 게시 승인을 대신하지 않는다.
 
 ## ADR-0035: report 25 production 경계와 exact-set 재시정
 

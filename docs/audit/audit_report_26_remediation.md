@@ -3,7 +3,7 @@
 - 기준 보고서: `docs/audit/audit_report_26.md`
 - 시정 시작일: 2026-08-24
 - 기준 HEAD: `65d8fe5a7fa418794d050e318931b12133bbf616`
-- 현재 상태: **LOCAL VERIFIED / CLEAN SAME-SHA CI PENDING / PROGRAM HOLD**
+- 현재 상태: **IMPLEMENTATION SAME-SHA VERIFIED / INDEPENDENT RE-AUDIT PENDING / PROGRAM HOLD**
 
 ## 1. 문서 우선 계약
 
@@ -15,7 +15,7 @@
 6. exact candidate commit date를 metadata에 넣고 modification period와 자동 교차 검증한다.
 7. LLM request key는 Press만 허용하고 dependency approval은 미래일 수 없으며 action pin은 전체 GitHub YAML node를 구조적으로 검사한다.
 
-상세 결정과 기각 대안은 `DESIGN_DECISIONS.md`의 ADR-0036을 따른다. report 25의 구현·CI는 부분 positive evidence로 유지하지만 이 시정의 RED→GREEN, 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle 전에는 program 또는 외부 게시를 PASS로 올리지 않는다.
+상세 결정과 기각 대안은 `DESIGN_DECISIONS.md`의 ADR-0036을 따른다. report 25의 구현·CI는 부분 positive evidence로 유지한다. report 26 시정은 RED→GREEN, 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐지만 새 독립 감사와 별도 게시 승인 전에는 program 또는 외부 게시를 PASS로 올리지 않는다.
 
 ## 2. 수정 전 RED fixture
 
@@ -86,4 +86,13 @@
 - security: review 중 기존 output의 nested junction cleanup과 mutable Docker tag라는 추가 false-green을 발견해 각각 fail-closed fixture로 보강했다.
 - performance: registry equality는 기존 100,000 entity budget 안의 bounded lookup이고 production binary에는 YAML parser가 포함되지 않는다. score/combat widening은 고정 크기 산술이다.
 
-구현 SHA, clean local actual Windows bundle과 새 clean same-SHA Ubuntu/Windows Actions run은 commit/push 후 기록한다. 이 문서의 local Verified는 독립 감사 PASS나 외부 게시 승인이 아니며 program/publication HOLD를 유지한다.
+### 3.5 clean implementation SHA와 양 OS CI
+
+- 구현 SHA: `fc01ec12bac522e601bc56bced06b0908f5873b0`
+- clean local Windows production entrypoint: `cmd /c build.bat --release` PASS
+- local bundle: 9-entry exact set, metadata commit `fc01ec12bac522e601bc56bced06b0908f5873b0`, `candidate_date=2026-08-24`, notice `AIHACK-MODIFICATIONS-2026-08-24-01`
+- Actions: [run `32658658526`](https://github.com/Yupkidangju/AIHack/actions/runs/32658658526)
+- Ubuntu: 19개 step success — tests, dependency gates, R7/R8, actual Linux bundle, cargo-audit, cargo-deny 0.19.4, lockfile 불변
+- Windows: 19개 step success — tests/ConPTY, dependency gates, R7/R8, actual Windows bundle, cargo-audit, cargo-deny 0.19.4, lockfile 불변
+
+로컬 셸에서 별도 outside-victim hard-link를 production output에 직접 사전 배치하는 명령은 실행 정책이 파일 삭제가 포함된 계산 경로 작업을 실행 전에 거부했다. 같은 경계는 `windows_release_staging_promotes_a_fresh_directory_without_writing_a_preplaced_hard_link`와 양 OS verifier hard-link negative로 자동 보존했고 모두 PASS했다. 이 구현 evidence는 독립 감사 PASS나 외부 게시 승인이 아니며 program/publication HOLD를 유지한다.
