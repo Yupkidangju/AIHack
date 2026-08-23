@@ -385,7 +385,7 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 [Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)은 Ubuntu/Windows test, canonical R7/R8, release build/bundle, cargo-audit, cargo-deny와 lockfile 불변을 모두 PASS했다.
 
-final multi-audit report 1은 최초 HOLD의 역사적 근거이고 첫 coder remediation은 partial evidence다. 현재 최상위 권위는 그 시정본에서 production 결함 13건을 재현한 `docs/audit/audit_report_25.md`의 HOLD다. report 25 시정은 아래 전체 로컬 gate, finding별 RED/GREEN, clean same-SHA 양 OS CI와 독립 감사 전에는 전체 program PASS로 전환하지 않는다.
+final multi-audit report 1은 최초 HOLD의 역사적 근거이고 첫 coder remediation은 partial evidence다. 현재 최상위 권위는 그 시정본에서 production 결함 13건을 재현한 `docs/audit/audit_report_25.md`다. report 25 시정은 아래 전체 로컬 gate, finding별 RED/GREEN과 SHA `b732c42d`의 Actions `32650404618` clean same-SHA 양 OS CI를 Verified했다. 독립 감사 전에는 전체 program PASS로 전환하지 않는다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -462,5 +462,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: report 23/24까지의 시정은 종결됐고 SHA `2519bc8e`의 양 OS CI가 historical success다. final multi-audit report 1의 첫 시정은 report 25가 재현한 production 결함 때문에 partial evidence이며 report 25 시정, 새 clean same-SHA CI와 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
-현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 종결했다. current authority는 `docs/audit/audit_report_25.md`이며 report 25 remediation 재감사 뒤에만 전체 program 판정을 갱신한다.
+현재 구현 판정: report 23/24까지의 시정은 종결됐고 SHA `2519bc8e`의 양 OS CI가 historical success다. final multi-audit report 1의 첫 시정은 report 25가 재현한 production 결함 때문에 partial evidence다. report 25 시정은 SHA `b732c42d`의 Actions `32650404618`에서 양 OS Verified이며 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 종결했다. current authority는 `docs/audit/audit_report_25.md`이며 구현/lifecycle은 `Verified`, 독립 재감사 뒤에만 `Closed`와 전체 program 판정을 갱신한다.

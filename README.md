@@ -19,7 +19,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트�
 - project-owner 결정은 `AIHACK-OWNER-2026-07-20-NGPL-01`로 추적하며, release bundle은 `PROJECT_OWNER_LICENSE_APPROVAL.md`, `MODIFICATIONS.md`, commit-bound `RELEASE-METADATA`와 `SHA256SUMS`를 포함한다. metadata key는 정확히 한 번 존재하고 owner/modification ID의 전체 값이 bundled record와 일치해야 하며 qualified legal opinion은 별도로 주장하지 않는다.
 - `audit_report_21.md`는 report 20의 `IMP-F016`/`DBG-F008` 시정을 PASS로 종결했다. report 20의 재감사 대기는 더 이상 현재 상태가 아니다.
 - `docs/audit/audit_report_24.md`와 implementation SHA `2519bc8e`의 양 OS CI는 report 23/24 시정을 역사적으로 종결했다. report 23 재감사 대기는 현재 gate가 아니다.
-- 현재 권위는 `docs/audit/audit_report_25.md`의 HOLD다. final multi-audit report 1의 첫 시정은 partial historical evidence이며, report 25의 save/replay, paired score, TUI/terminal, dependency/CI와 release exact-set 시정·전체 로컬 gate·새 clean same-SHA CI·독립 재감사 전에는 외부 게시를 승인하지 않는다.
+- 현재 권위는 `docs/audit/audit_report_25.md`다. final multi-audit report 1의 첫 시정은 partial historical evidence이며, report 25 시정은 SHA `b732c42d`의 [Actions `32650404618`](https://github.com/Yupkidangju/AIHack/actions/runs/32650404618)에서 Ubuntu/Windows quality와 실제 platform bundle을 모두 PASS했다. 독립 재감사와 별도 게시 승인 전에는 program/외부 게시 HOLD다.
 - Windows all-target test는 dev-only `portable-pty 0.9.0` ConPTY에서 실제 TUI의 one-key state, mouse click, Inventory/Esc와 terminal restore를 검증한다. release binary dependency에는 포함되지 않는다.
 - R9 콘텐츠 인과 폐쇄는 음식·시체 섭취, 콘텐츠 기반 armor/monster behavior, 가격·난이도·gold·score, 기도·luck 전이를 실제 월드 상태에 연결한다. seed 42/7/1234 장기 테스트는 9종 semantic witness와 1000 accepted turn, 반복 hash를 함께 검증한다.
 
@@ -44,8 +44,8 @@ TUI는 `default-run = "aihack"`로 선택된다. headless 실행에는 package�
 
 ### 구현 순서
 
-1. `docs/audit/audit_report_25.md` 시정의 RED/GREEN, 전체 로컬 재감사와 clean same-SHA CI
-2. 최종 독립 PASS 뒤 별도 승인에 따른 외부 게시
+1. `docs/audit/audit_report_25.md` 시정의 독립 재감사
+2. 독립 PASS 뒤 별도 승인에 따른 외부 게시
 
 ### 문서
 
@@ -84,7 +84,7 @@ AIHack is a Rust roguelike that reimplements observable NetHack 3.6.7 behavior t
 - The project-owner decision is traceable as `AIHACK-OWNER-2026-07-20-NGPL-01`; release bundles carry PROJECT_OWNER_LICENSE_APPROVAL.md, MODIFICATIONS.md, commit-bound RELEASE-METADATA, and SHA256SUMS. Metadata IDs must resolve to the bundled records. No qualified legal opinion is claimed.
 - `audit_report_21.md` closed report 20's documentation remediation with PASS; report 20 is no longer the current pending authority.
 - Report 24 and the two-OS CI for implementation SHA `2519bc8e` historically closed report 23/24 remediation; report 23 is no longer the current pending gate.
-- The current authority is the HOLD in `docs/audit/audit_report_25.md`. The first final-audit remediation is partial historical evidence; publication remains blocked until the report 25 production gaps, full local gate, new clean same-SHA CI, and independent re-audit are complete.
+- The current authority is `docs/audit/audit_report_25.md`. Its remediation passed Ubuntu/Windows quality and actual platform bundles at SHA `b732c42d` in [Actions `32650404618`](https://github.com/Yupkidangju/AIHack/actions/runs/32650404618). The first final-audit remediation remains partial historical evidence; program PASS and publication stay blocked pending independent re-audit and separate publication approval.
 - Windows all-target tests use dev-only `portable-pty 0.9.0` ConPTY to exercise real TUI one-key states, mouse input, Inventory/Esc, and terminal restoration; it is not a release-binary dependency.
 - R9 causal closure connects food/corpse consumption, content-driven armor and monster behavior, price/difficulty/gold/score, and prayer/luck to observable world-state changes. Long runs for seeds 42/7/1234 now require all nine semantic witnesses as well as 1,000 accepted turns and repeatable hashes.
 
@@ -119,7 +119,7 @@ AIHack は、NetHack 3.6.7 の観察可能な挙動を、出典付きシナリ�
 - AIHack は NetHack 3.6.7 の AI-assisted semantic rewrite による派生物としてプロジェクト所有者に承認され、配布物全体に NGPL を適用します。外部公開には R8 技術監査 PASS と LICENSE、NOTICE、対応する完全なソースが必要です。
 - R9 の因果閉包では、食料・死体、armor、monster behavior、価格・難易度・gold・score、祈り・luck を実際の world state 変化へ接続し、seed 42/7/1234 の長期 test で semantic delta を検証します。
 - report 24 と implementation SHA `2519bc8e` の両 OS CI により report 23/24 の修正は履歴上完了し、report 23 は現在の保留 gate ではありません。
-- 現在の権威は `docs/audit/audit_report_25.md` の HOLD です。最初の final-audit 修正は部分的な履歴証拠であり、report 25 の production 修正、全ローカル gate、新しい clean same-SHA CI、独立再監査が揃うまで外部公開は保留です。
+- 現在の権威は `docs/audit/audit_report_25.md` です。report 25 の修正は SHA `b732c42d` の Actions `32650404618` で Ubuntu/Windows quality と実 platform bundle を PASS しました。最初の final-audit 修正は部分的な履歴証拠として残し、独立再監査と別途公開承認までは program PASS と外部公開を保留します。
 - Windows の all-target test は dev-only `portable-pty 0.9.0` ConPTY で実 TUI の一キー遷移、mouse、Inventory/Esc、terminal 復元を検証し、release binary には含めません。
 
 ### 現在の実行
@@ -143,7 +143,7 @@ AIHack 是以具來源追蹤的情境與測試，重新實作 NetHack 3.6.7 可�
 - 專案所有者已將 AIHack 核准為 NetHack 3.6.7 的 AI-assisted semantic rewrite 衍生作品，整體散布適用 NGPL。對外發布仍需 R8 技術稽核 PASS、LICENSE、NOTICE 與對應完整原始碼。
 - R9 因果閉合把食物／屍體、armor、monster behavior、價格／難度／gold／score、祈禱／luck 連到實際 world state 變化，並以 seed 42/7/1234 長期測試驗證 semantic delta。
 - report 24 與 implementation SHA `2519bc8e` 的雙作業系統 CI 已在歷史上結束 report 23/24 修正；report 23 不再是目前待處理 gate。
-- 目前權威是 `docs/audit/audit_report_25.md` 的 HOLD。第一輪 final-audit 修正僅是部分歷史證據；完成 report 25 production 修正、全套本機 gate、新的 clean same-SHA CI 與獨立複審前，對外發布維持暫停。
+- 目前權威是 `docs/audit/audit_report_25.md`。report 25 修正已在 SHA `b732c42d` 的 Actions `32650404618` 通過 Ubuntu/Windows quality 與實際 platform bundle。第一輪 final-audit 修正保留為部分歷史證據；獨立複審與另行發布核准前，program PASS 與對外發布維持暫停。
 - Windows all-target 測試使用僅供開發的 `portable-pty 0.9.0` ConPTY 驗證實際 TUI 的單鍵狀態、滑鼠、Inventory/Esc 與終端復原，不納入 release binary 相依性。
 
 ### 目前執行
@@ -167,7 +167,7 @@ AIHack 是通过带来源追踪的场景和测试，重新实现 NetHack 3.6.7 �
 - 项目所有者已将 AIHack 批准为 NetHack 3.6.7 的 AI-assisted semantic rewrite 衍生作品，整体分发适用 NGPL。对外发布仍需 R8 技术审计 PASS、LICENSE、NOTICE 与对应完整源代码。
 - R9 因果闭合将食物／尸体、armor、monster behavior、价格／难度／gold／score、祈祷／luck 连接到实际 world state 变化，并用 seed 42/7/1234 长期测试验证 semantic delta。
 - report 24 与 implementation SHA `2519bc8e` 的双操作系统 CI 已在历史上结束 report 23/24 修正；report 23 不再是当前待处理 gate。
-- 当前权威是 `docs/audit/audit_report_25.md` 的 HOLD。第一轮 final-audit 修正仅是部分历史证据；完成 report 25 production 修正、全部本地 gate、新的 clean same-SHA CI 与独立复审前，对外发布保持暂停。
+- 当前权威是 `docs/audit/audit_report_25.md`。report 25 修正已在 SHA `b732c42d` 的 Actions `32650404618` 通过 Ubuntu/Windows quality 与实际 platform bundle。第一轮 final-audit 修正保留为部分历史证据；独立复审与另行发布批准前，program PASS 和对外发布保持暂停。
 - Windows all-target 测试使用仅供开发的 `portable-pty 0.9.0` ConPTY 验证实际 TUI 的单键状态、鼠标、Inventory/Esc 与终端恢复，不纳入 release binary 依赖。
 
 ### 当前运行

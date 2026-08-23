@@ -6,9 +6,9 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implementation contract, `audit_report_25.md` TUI production-path remediation in progress
+문서 상태: active implementation contract, `audit_report_25.md` TUI production path same-SHA Verified; independent re-audit pending
 작성일: 2026-07-15
-최근 동기화: 2026-08-23
+최근 동기화: 2026-08-24
 기준: `spec.md`
 관련 Task: R2-1, R5-2, R6-1..R6-3
 

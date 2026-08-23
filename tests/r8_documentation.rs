@@ -45,7 +45,7 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
 
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
-    assert!(compatibility.contains("current program gate is audit report 25"));
+    assert!(compatibility.contains("audit report 25 remediation same-SHA verified"));
 }
 
 #[test]
@@ -134,6 +134,24 @@ fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
         "README.md",
         "IMPLEMENTATION_SUMMARY.md",
         "audit_roadmap.md",
+        "GAP_CLOSURE_ROADMAP.md",
+        "BUILD_GUIDE.md",
+        "DOCUMENTATION_AUDIT_REPORT.md",
+        "DESIGN_DECISIONS.md",
+    ] {
+        let content = project_file(document);
+        for phrase in ["b732c42d62f295f4d8be64480c1d0a5a440fe738", "32650404618"] {
+            assert!(
+                content.contains(phrase) || (phrase.len() == 40 && content.contains("b732c42d")),
+                "{document} report 25 evidence 누락: {phrase}"
+            );
+        }
+    }
+
+    for document in [
+        "README.md",
+        "IMPLEMENTATION_SUMMARY.md",
+        "audit_roadmap.md",
         "BUILD_GUIDE.md",
         "DOCUMENTATION_AUDIT_REPORT.md",
     ] {
@@ -191,13 +209,13 @@ fn active_release_sections_reject_known_stale_statuses() {
     let documentation = gap_row(&gaps, "G-DOC-001");
     assert!(documentation.contains("audit_report_21.md"));
     assert!(documentation.ends_with("| Closed |"));
-    for pending in ["G-BUILD-006", "G-TEST-003", "G-DOC-004", "G-SEC-001"] {
+    for verified in ["G-BUILD-006", "G-TEST-003", "G-DOC-004", "G-SEC-001"] {
         assert!(
-            gap_row(&gaps, pending).ends_with("| Implemented |"),
-            "{pending} 현재 상태 불일치"
+            gap_row(&gaps, verified).ends_with("| Verified |"),
+            "{verified} 현재 상태 불일치"
         );
     }
-    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Implemented |"));
+    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Verified |"));
     for row in gaps.lines().filter(|line| line.starts_with("| G-")) {
         assert!(
             !row.contains("Closed /"),

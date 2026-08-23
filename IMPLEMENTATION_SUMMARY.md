@@ -15,9 +15,9 @@
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
-현재 권위는 audited HEAD `80d959af94cb08c5d9b2f2601f5e63f3827a1210`의 dirty 시정본을 production probe로 다시 HOLD한 `docs/audit/audit_report_25.md`다. final multi-audit report 1과 첫 coder remediation은 역사적 입력/partial evidence로 보존한다. report 25 시정은 save inverse relation·write budget·path identity, paired production GoldScore, production TUI dispatcher/prompt/CTA, terminal lifecycle, release actual exact set, dependency/CI gate와 active authority를 문서 계약과 함께 정렬한다.
+현재 권위는 audited HEAD `80d959af94cb08c5d9b2f2601f5e63f3827a1210`의 dirty 시정본을 production probe로 다시 HOLD한 `docs/audit/audit_report_25.md`다. final multi-audit report 1과 첫 coder remediation은 역사적 입력/partial evidence로 보존한다. report 25 시정은 save inverse relation·write budget·path identity, paired production GoldScore, production TUI dispatcher/prompt/CTA, terminal lifecycle, release actual exact set, dependency/CI gate와 active authority를 문서 계약과 함께 정렬했고 구현 SHA는 `b732c42d62f295f4d8be64480c1d0a5a440fe738`이다.
 
-첫 시정 변경의 fmt, Clippy, workspace/all-target tests, release build, R7/R8, cargo-audit/deny, 실제 Windows ConPTY와 bundle matrix는 통과했지만 report 25의 구체적 RED 경계를 증명하지 못했으므로 전체 로컬 PASS 주장을 철회한다. report 25 finding별 수정 전 RED, 표적 GREEN, 전체 gate와 same-SHA CI 증거는 `docs/audit/audit_report_25_remediation.md`에 기록한다. 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+report 25 finding별 수정 전 RED, 표적 GREEN과 전체 로컬 gate는 `docs/audit/audit_report_25_remediation.md`에 기록했다. Actions `32650404618`은 같은 SHA에서 Ubuntu/Windows tests, dependency gates, R7/R8, actual platform bundle, cargo-audit/deny와 lockfile 불변을 모두 PASS했다. 구현은 Verified지만 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -923,7 +923,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/multi_audit/1/final_audit_report_1.md` 시정의 전체 quality gate, finding별 재감사와 새 clean same-SHA 양 OS CI다. report 24까지의 종결 evidence와 project-owner NGPL approval은 유지되며, 외부 게시는 최종 독립 PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `docs/audit/audit_report_25.md` 시정의 독립 재감사다. 전체 quality gate와 clean same-SHA 양 OS CI는 SHA `b732c42d`의 Actions `32650404618`에서 Verified했다. report 24까지의 종결 evidence와 project-owner NGPL approval은 유지되며, 외부 게시는 최종 독립 PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 2026-08-18 `audit_report_23.md` 시정은 문서 우선으로 시작한다. 첫 slice인 SEC-F001은 ADR-0032와 `spec.md` 14·16절을 구현 권한으로 삼아 `ArtifactStore` capability root, no-follow/single-link open, `create_new` save temp, 실행별 TUI quick-save 경계를 구현한다. 회귀 기준은 사전 배치 temp hard link와 replay symlink/hard link가 외부 victim을 바꾸지 않고, 기존 save 보존과 정상 save/load/replay가 함께 통과하는 것이다. 완료 표시는 표적 테스트와 workspace 검증 후에만 갱신한다.
 
@@ -931,7 +931,7 @@ DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.
 
 ## 11. R9 콘텐츠 인과 폐쇄 Task
 
-역사 기록 (2026-08-18): R9-1..R9-5의 표적 인과 루프 이후 report 23이 R9-6 witness를 HOLD했고 report 24가 당시 coder remediation을 검증했다. final multi-audit FIN-F006은 speed/AI 동시 attribution과 gold score false-green을 다시 열었으며 2026-08-23 pair attribution/exact-score 구현의 최종 재감사 전에는 R9 최종 PASS를 선언하지 않는다.
+역사 기록 (2026-08-18): R9-1..R9-5의 표적 인과 루프 이후 report 23이 R9-6 witness를 HOLD했고 report 24가 당시 coder remediation을 검증했다. final multi-audit FIN-F006과 report 25는 speed/AI 동시 attribution과 복제 gold score oracle을 다시 열었다. production pair attribution/exact-score 구현은 Actions `32650404618`에서 양 OS Verified했으며 독립 재감사 전에는 R9 최종 PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 
@@ -955,7 +955,7 @@ Food/Corpse item의 content nutrition을 Eat 명령으로 소비해 world nutrit
 
 ### Task R9-6: seed 기반 장기 인과 회귀
 
-seed 42, 7, 1234 각각 absolute turn 1000 이상 실행하며 9종 `CausalWitnessRecord`와 final hash를 3회 반복 비교한다. record는 scenario, producer, content field/source value와 consumer before/after를 보유한다. MonsterSpeed/MonsterAi는 독립 A/B pair에서만, GoldScore는 gold-only exact score projection에서만 기록한다. 일반 `survival-v1`과 분리된 테스트 전용 fixture가 production `GameSession::submit`을 사용하며 event-only·turn-only·witness 누락 negative validator가 false-green을 차단한다. SC-CAUSE-01..07과 전체 workspace quality gate 통과가 완료 조건이다.
+seed 42, 7, 1234 각각 absolute turn 1000 이상 실행하며 9종 `CausalWitnessRecord`와 final hash를 3회 반복 비교한다. record는 scenario, producer, content field/source value와 consumer before/after를 보유한다. MonsterSpeed/MonsterAi는 독립 A/B pair에서만, GoldScore는 동일 world/turn의 gold/no-gold clone이 모두 production `death_score`를 통과한 exact pair에서만 기록한다. 일반 `survival-v1`과 분리된 테스트 전용 fixture가 production `GameSession::submit`을 사용하며 event-only·turn-only·witness별 누락 negative validator가 false-green을 차단한다. SC-CAUSE-01..07과 전체 workspace quality gate 통과가 완료 조건이다.
 
 ### R9 SC-CAUSE 개별 책임 매핑
 
@@ -964,7 +964,7 @@ seed 42, 7, 1234 각각 absolute turn 1000 이상 실행하며 9종 `CausalWitne
 | SC-CAUSE-01 | `CausalProjection`, `CausalSummary`, `CausalWitnessRecord` attribution | `sc_cause_contract_ids_map_to_code_and_tests` |
 | SC-CAUSE-02 | content-backed armor·monster typed behavior, `observe_monster_speed_pair`, `observe_monster_ai_pair` | `monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent`, `monster_passive_content_changes_player_status`, `armor_content_bonus_changes_player_defense_state` |
 | SC-CAUSE-03 | Food/Corpse Eat와 death corpse producer | `eating_food_changes_nutrition_hunger_and_item_lifecycle`, `jackal_death_creates_an_edible_corpse_that_changes_hunger` |
-| SC-CAUSE-04 | exact `score_without_gold + gold`, Pray/luck와 hallucinating 비목표 risk | `item_base_price_changes_actual_game_over_score`, `prayer_created_luck_changes_the_next_attack_roll`, `sc_cause_contract_ids_map_to_code_and_tests` |
+| SC-CAUSE-04 | production gold/no-gold exact score pair, Pray/luck와 hallucinating 비목표 risk | `item_base_price_changes_actual_game_over_score`, `gold_score_witness_uses_a_paired_production_score`, `prayer_created_luck_changes_the_next_attack_roll`, `sc_cause_contract_ids_map_to_code_and_tests` |
 | SC-CAUSE-05 | `REQUIRED_CAUSAL_WITNESSES`, attributed record required-set validator | `causal_fixture_covers_every_required_witness_for_each_seed` |
 | SC-CAUSE-06 | attributed witness record multiset와 final hash 결정론 | `causal_witness_multiset_and_final_hash_are_stable_across_three_runs` |
 | SC-CAUSE-07 | event/turn-only 및 speed/AI 원인 공유 false-green 거부 | `causal_validator_rejects_event_only_turn_only_and_missing_witnesses`, `monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent` |

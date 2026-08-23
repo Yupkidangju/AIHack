@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0035: report 25 production 경계와 exact-set 재시정
 
-Status: Accepted; implementation and same-SHA verification in progress (2026-08-23)
+Status: Implemented and same-SHA verified; independent re-audit pending (2026-08-24)
 Date: 2026-08-23
 Decision ID: DEC-AUDIT-R25-01
 
@@ -45,6 +45,8 @@ Consequences:
 기존 malformed save와 stale release directory 일부는 새 gate에서 거부된다. public ambient path helper 제거는 pre-release internal API 정리이며 production caller는 이미 `ArtifactStore`를 사용한다. 각 수정은 report 25의 수정 전 fixture를 이름 붙인 RED 기록으로 보존하고, 로컬 전체 gate 뒤 clean 동일 SHA의 Ubuntu/Windows release verifier까지 통과해야 `Verified`로 승격한다.
 
 2026-08-24 same-SHA verification update: 첫 clean run `32648979651`의 Ubuntu가 O_PATH `Dir` clone에 대한 parent `sync_all`을 EBADF로 거부했다. capability root를 ambient path로 되돌리지 않고 parent 아래 `.`을 read-only directory `File`로 다시 열어 sync 가능한 descriptor를 얻는 방식으로 시정한다. 첫 run은 실패 증거로 보존하며 후속 same-SHA run만 closure evidence로 사용한다.
+
+Final implementation verification: SHA `b732c42d62f295f4d8be64480c1d0a5a440fe738`의 Actions `32650404618`에서 Ubuntu/Windows tests, R7/R8, actual platform bundle, cargo-audit/deny와 lockfile 불변이 모두 success다. 이 증거는 구현을 `Verified`로 올리지만 독립 재감사나 외부 게시 승인을 대신하지 않는다.
 
 ## ADR-0034: SaveDataV1 fail-closed 복원과 self-verifying replay
 

@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, `docs/audit/audit_report_25.md` 시정 진행 상태(PROGRAM HOLD)
+현재 코드 기준: Cargo package 0.3.0, report 25 시정 SHA `b732c42d` same-SHA 양 OS Verified, 독립 재감사 pending(PROGRAM HOLD)
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙

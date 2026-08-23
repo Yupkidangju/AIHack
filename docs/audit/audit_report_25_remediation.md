@@ -5,7 +5,7 @@
 - 기준 HEAD: `80d959af94cb08c5d9b2f2601f5e63f3827a1210`
 - 작업 브랜치: `codex/audit-report-24-remediation`
 - 시정 시작일: 2026-08-23
-- 현재 판정: **LOCAL QUALITY GATES GREEN / CLEAN BUNDLE·SAME-SHA CI PENDING / PROGRAM HOLD**
+- 현재 판정: **LOCAL + CLEAN SAME-SHA CI VERIFIED / INDEPENDENT RE-AUDIT PENDING / PROGRAM HOLD**
 
 이 문서는 report 25 finding의 현재 시정 권위다. final multi-audit report 1의 첫 시정 기록은 당시 broad gate의 역사적 증거로 보존하지만, report 25가 production probe로 재현한 경계를 닫았다는 근거로 사용하지 않는다.
 
@@ -35,13 +35,13 @@
 | 4 | R25-IMP-F002 | runtime score + causal projection | paired production gold oracle, event-only/turn-only/all-witness removal | LOCAL GREEN |
 | 5 | R25-IMP-F003 | TUI production dispatcher/response lifecycle | GameOver+N+LLM, MorePrompt Tab/BackTab, old/new response 교차 | LOCAL GREEN |
 | 6 | R25-IMP-F004 | TUI render/input geometry | 60x24/80x24 prompt buffer, CTA exact boundary negatives | LOCAL GREEN |
-| 7 | R25-SEC-F001 | 양 OS release verifier | extra file/directory/link/reparse | WINDOWS LOCAL GREEN / LINUX CI PENDING |
+| 7 | R25-SEC-F001 | 양 OS release verifier | extra file/directory/link/reparse | LOCAL + SAME-SHA 양 OS GREEN |
 | 8 | R25-IMP-F005 | active 문서와 lifecycle gate | current authority, child/aggregate, Markdown link scan | LOCAL GREEN |
 | 9 | R25-DBG-F003 | terminal lifecycle + ConPTY | setup/new/draw/read failure cleanup와 escape pair | LOCAL GREEN |
 | 10 | R25-DBG-F004 | LLM worker/service synchronization | busy polling/elapsed assertion 제거와 bounded signal | LOCAL GREEN |
-| 11 | R25-DBG-F005 | runtime package tests/maintenance ledger | semantic state delta와 metadata negative | LOCAL GREEN / LINUX CI PENDING |
+| 11 | R25-DBG-F005 | runtime package tests/maintenance ledger | semantic state delta와 metadata negative | LOCAL + SAME-SHA 양 OS GREEN |
 | 12 | R25-SEC-F002 | dependency exception checker | TOML decoy/swap/trigger/date/path drift | LOCAL GREEN |
-| 13 | R25-SEC-F003 | workflow provenance gate | 모든 `uses:` full SHA 일반 검사 | LOCAL GREEN / REMOTE CI PENDING |
+| 13 | R25-SEC-F003 | workflow provenance gate | 모든 `uses:` full SHA 일반 검사 | LOCAL + SAME-SHA 양 OS GREEN |
 
 ## 3. 검증 순서
 
@@ -110,6 +110,15 @@ clean worktree가 필요한 actual `build.bat --release`와 Linux `build.sh --re
 - 시정: parent capability 아래 `.`을 read-only directory `File`로 다시 열어 sync 가능한 descriptor인지 metadata로 확인한 뒤 `sync_all`한다. 함께 발견한 Linux verifier diagnostic-order 회귀는 required-file 검사 뒤 actual exact-set 검사를 수행하도록 순서를 조정한다.
 - 상태: 첫 run은 same-SHA 양 OS PASS 증거로 사용하지 않는다. 후속 commit/run을 새 current evidence로 사용한다.
 
+### 6.2 최종 구현 evidence run
+
+- SHA: `b732c42d62f295f4d8be64480c1d0a5a440fe738`
+- Actions: `32650404618`
+- Ubuntu: PASS. workspace/all-target tests, dependency exception/duplicate gates, R7/R8, release build, actual Linux exact-set bundle, cargo-audit 0.22.1, cargo-deny 0.19.4와 lockfile 불변 모두 green.
+- Windows: PASS. 동일 gate와 actual Windows exact-set bundle/ConPTY를 모두 포함해 green.
+- local clean Windows bundle: `build.bat --release`가 같은 SHA를 `RELEASE-METADATA`와 verifier에서 확인하고 9개 exact-set output을 PASS.
+- 판정: report 25 구현과 platform evidence는 `Verified`로 승격한다. 독립 재감사와 별도 외부 게시 승인은 이 run이 대신하지 않는다.
+
 ## 7. 3-pass 재감사와 5축 코드 리뷰
 
 - Pass 1 구현·문서: report 23/24 historical closure, final report 1 partial evidence, report 25 current HOLD가 active 문서와 lifecycle test에서 일치한다. save/headless/TUI/release 계약은 production entrypoint와 동일 심볼을 가리킨다.
@@ -121,10 +130,11 @@ clean worktree가 필요한 actual `build.bat --release`와 Linux `build.sh --re
 - performance: save serialization은 16 MiB capped buffer, replay는 batch atomic rewrite를 유지하며 GoldScore pair는 Quit/GameOver에서만 world clone 1회를 수행한다.
 - 공식 provenance: checkout SHA `11d5960a326750d5838078e36cf38b85af677262`는 공식 `actions/checkout` v4.4.0 release commit이며 workflow 주석과 일반 full-SHA gate를 동기화했다.
 
-로컬 리뷰에서 남은 Critical/Major는 없다. clean platform bundle과 same-SHA remote evidence가 없으므로 program HOLD는 유지한다.
+로컬/remote 리뷰에서 남은 Critical/Major 구현 finding은 없다. 독립 재감사가 없으므로 program HOLD는 유지한다.
 
 ## 8. 잔여 위험
 
 - 같은 계정의 악성 concurrent directory-entry swap은 기존 single-writer threat model 밖이며 report 25가 유지한 accepted risk를 확장하지 않는다.
 - Windows parent-directory power-loss durability와 실제 Windows Terminal GUI pixel/font rendering은 기존 platform 잔여 위험이다.
 - 외부 게시·tag·release는 이 시정과 CI 요청 범위에 포함되지 않는다.
+- GitHub는 pinned `actions/checkout` v4.4.0의 Node 20 metadata에 deprecation warning을 표시하고 Node 24로 강제 실행했다. 두 job은 green이며 immutability에는 영향이 없지만 후속 action pin 갱신 시 공식 runtime metadata를 다시 검토한다.
