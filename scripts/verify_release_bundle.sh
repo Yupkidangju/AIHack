@@ -47,6 +47,12 @@ required=(
     SHA256SUMS
     aihack-0.3.0-source.tar.gz
 )
+for file in "${required[@]}"; do
+    [[ -s "$OUTPUT_DIR/$file" ]] || {
+        printf 'release artifact missing or empty: %s\n' "$file" >&2
+        exit 1
+    }
+done
 mapfile -d '' -t actual_entries < <(find "$OUTPUT_DIR" -mindepth 1 -maxdepth 1 -print0)
 [[ "${#actual_entries[@]}" -eq "${#required[@]}" ]] \
     || fail 'release output entry count mismatch'
@@ -62,13 +68,6 @@ for path in "${actual_entries[@]}"; do
         fi
     done
     [[ "$found" == true ]] || fail "unexpected release output entry: $name"
-done
-
-for file in "${required[@]}"; do
-    [[ -s "$OUTPUT_DIR/$file" ]] || {
-        printf 'release artifact missing or empty: %s\n' "$file" >&2
-        exit 1
-    }
 done
 
 for file in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA Cargo.toml; do

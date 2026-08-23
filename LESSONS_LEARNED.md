@@ -1,5 +1,11 @@
 # AIHack Lessons Learned
 
+## 2026-08-24: 동일 SHA Linux 검증과 directory fsync
+
+- Windows no-op branch와 로컬 Windows 전체 green은 Unix durability branch의 실행 증거가 아니다. clean same-SHA Ubuntu가 첫 atomic save에서 EBADF를 재현하면서 platform branch를 실제 OS에서 실행해야 하는 이유를 다시 확인했다.
+- Linux의 capability directory handle은 O_PATH일 수 있다. handle clone을 일반 `File`로 변환했다고 sync 가능한 descriptor가 되는 것은 아니며, 같은 capability 아래 directory를 read-only file로 다시 열고 type을 확인한 뒤 fsync해야 한다.
+- exact-set 검사는 필수 파일 존재 검사보다 뒤에 두어야 fail-closed 강도와 구체적 진단을 함께 유지한다. 먼저 count만 비교하면 기존 negative fixture가 기대한 누락 파일 원인을 잃는다.
+
 ## 2026-08-18: 감사 false-green과 파일 handle 경계
 
 - 경로를 canonicalize한 뒤 bare path를 다시 여는 방식은 보안 경계가 아니다. root directory capability와 실제 open/rename을 결합하고, 열린 handle의 file type과 hard-link count를 확인해야 한다.

@@ -100,12 +100,21 @@ clean worktree가 필요한 actual `build.bat --release`와 Linux `build.sh --re
 
 ## 6. Same-SHA CI 증거
 
-아직 clean 시정 commit이 없으므로 미실행이다.
+### 6.1 첫 clean evidence run
+
+- SHA: `02050fece5bb2607ac8463af476599cc6c6e0547`
+- Actions: `32648979651`
+- Windows: PASS. workspace tests, dependency gates, R7/R8, release bundle, cargo-audit/deny와 lockfile 불변까지 모두 green.
+- Ubuntu: FAIL. format/Clippy는 PASS했으나 `tests/ai_api_schema.rs::save_load_preserves_ai_api_shape`의 첫 atomic save에서 `Io("Bad file descriptor (os error 9)")`를 재현했다.
+- 원인: Linux의 `cap_std::Dir`는 O_PATH handle일 수 있는데 이를 clone해 `File::sync_all`한 parent fsync 구현이 EBADF를 반환했다.
+- 시정: parent capability 아래 `.`을 read-only directory `File`로 다시 열어 sync 가능한 descriptor인지 metadata로 확인한 뒤 `sync_all`한다. 함께 발견한 Linux verifier diagnostic-order 회귀는 required-file 검사 뒤 actual exact-set 검사를 수행하도록 순서를 조정한다.
+- 상태: 첫 run은 same-SHA 양 OS PASS 증거로 사용하지 않는다. 후속 commit/run을 새 current evidence로 사용한다.
 
 ## 7. 3-pass 재감사와 5축 코드 리뷰
 
 - Pass 1 구현·문서: report 23/24 historical closure, final report 1 partial evidence, report 25 current HOLD가 active 문서와 lifecycle test에서 일치한다. save/headless/TUI/release 계약은 production entrypoint와 동일 심볼을 가리킨다.
 - Pass 2 debug·engineering: 수정 전 RED가 모두 GREEN으로 전환됐고 전체 workspace/all-target 및 release build가 통과했다. GoldScore control world clone이 모든 projection에서 실행되는 성능 문제를 리뷰 중 발견해 GameOver projection 한 번으로 축소했다.
+- Pass 2 후속 CI: 첫 Ubuntu run이 Windows에서 숨은 O_PATH parent-fsync EBADF를 재현했다. 실패를 보존하고 capability-relative syncable descriptor 재open 회귀로 시정했다.
 - Pass 3 security·supply chain: capability-relative path identity, save capped writer, 양 verifier actual exact set, parsed TOML exception과 general action pin gate를 대조했다. staged 137개 파일에서 secret-like filename/pattern 0건이며 cargo-audit/deny가 PASS했다.
 - correctness: inverse relation, state priority, no-clobber, late response와 exact-set error path를 named regression이 직접 검증한다.
 - readability/architecture: `ArtifactStore`, production score pair, state-aware dispatcher, shared CTA model, terminal lifecycle, response signal queue로 책임을 모았고 public ambient resolver와 복제 score 식을 제거했다.

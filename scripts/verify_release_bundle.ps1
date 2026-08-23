@@ -67,6 +67,15 @@ function Assert-Metadata([string]$Content, [hashtable]$Expected, [string]$Label)
 $ResolvedOutput = (Resolve-Path -LiteralPath $OutputDir).Path
 $Archive = Join-Path $ResolvedOutput $ArchiveName
 $Required = @($ChecksumNames + 'SHA256SUMS')
+foreach ($name in $Required) {
+    $path = Join-Path $ResolvedOutput $name
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        Fail "release artifact missing: $name"
+    }
+    if ((Get-Item -LiteralPath $path).Length -le 0) {
+        Fail "release artifact is empty: $name"
+    }
+}
 $ActualEntries = @(Get-ChildItem -LiteralPath $ResolvedOutput -Force)
 if ($ActualEntries.Count -ne $Required.Count) {
     Fail 'release output entry count mismatch'
@@ -77,15 +86,6 @@ foreach ($entry in $ActualEntries) {
     }
     if ($Required -cnotcontains $entry.Name) {
         Fail "unexpected release output entry: $($entry.Name)"
-    }
-}
-foreach ($name in $Required) {
-    $path = Join-Path $ResolvedOutput $name
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        Fail "release artifact missing: $name"
-    }
-    if ((Get-Item -LiteralPath $path).Length -le 0) {
-        Fail "release artifact is empty: $name"
     }
 }
 

@@ -820,12 +820,17 @@ fn set_platform_writable_permissions(file: &File) -> Result<(), GameError> {
 fn sync_parent_directory(parent: &Dir) -> Result<(), GameError> {
     #[cfg(unix)]
     {
-        parent
-            .try_clone()
-            .map_err(io_error)?
-            .into_std_file()
-            .sync_all()
+        // cap_std::Dir는 Linux에서 O_PATH handle일 수 있어 직접 fsync하면 EBADF가 된다.
+        // 같은 capability 아래의 `.`을 read-only File로 다시 열어 sync 가능한 descriptor를 얻는다.
+        let mut options = OpenOptions::new();
+        options.read(true).maybe_dir(true);
+        let directory = parent
+            .open_with(Path::new("."), &options)
             .map_err(io_error)?;
+        if !directory.metadata().map_err(io_error)?.is_dir() {
+            return Err(invalid_runtime_path(Path::new(".")));
+        }
+        directory.sync_all().map_err(io_error)?;
     }
     #[cfg(windows)]
     {

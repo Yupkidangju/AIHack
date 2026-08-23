@@ -40,6 +40,7 @@
 - inverse inventory owner/index, actor HP/alive와 armor overflow malformed save가 수용되거나 panic하던 경계를 typed `InvalidSave`로 닫고, writer가 self-unloadable 16 MiB 초과 save를 게시하지 않도록 수정했다.
 - replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
 - Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.
+- Linux에서 O_PATH 기반 `cap_std::Dir`를 직접 fsync해 atomic save가 EBADF로 실패하던 문제를 capability 아래 `.`의 syncable directory descriptor 재open으로 수정했다.
 
 ### 2026-07-20 기준 누적 내역
 

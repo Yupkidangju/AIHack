@@ -210,6 +210,23 @@ fn unix_save_file_uses_mode_0600() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn unix_atomic_save_reopens_a_syncable_parent_directory_descriptor() {
+    let root = temp_test_dir("save-unix-parent-sync");
+    fs::create_dir_all(&root).unwrap();
+    let store = ArtifactStore::open(&root).unwrap();
+    let path = Path::new("nested/run.json");
+
+    store
+        .save_session(&GameSession::new_for_playing(42), path)
+        .unwrap();
+    assert!(store.load_session(path).is_ok());
+
+    drop(store);
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[cfg(windows)]
 #[test]
 fn windows_save_file_is_writable_under_the_parent_acl_boundary() {
