@@ -105,7 +105,7 @@ fn new_family_version_or_budget_reduction_fails_closed() {
         serde_json::from_str(&project_file("dependency-duplicate-budget.json")).unwrap();
 
     let mut reduced = live.clone();
-    reduced["max_duplicate_families"] = serde_json::json!(22);
+    reduced["max_duplicate_families"] = serde_json::json!(23);
     assert!(validate_budget(&reduced, &actual).is_err());
 
     let mut version_drift = live.clone();

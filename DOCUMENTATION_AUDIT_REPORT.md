@@ -233,8 +233,14 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - `IMP-F019`: SC-CAUSE-01..07을 audit roadmap/implementation summary의 production 심볼·테스트 함수에 개별 연결
 - 현재 권한 상태: implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171` 양 OS PASS. 후속 독립 재감사와 외부 게시 승인은 별도 gate
 
-### 10.12 `docs/audit/audit_report_25.md` 현재 상태 (2026-08-23)
+### 10.12 `docs/audit/audit_report_25.md` 역사적 부분 상태 (2026-08-23~24)
 
 - final multi-audit report 1은 audited HEAD `80d959af94cb08c5d9b2f2601f5e63f3827a1210`의 역사적 FIN-F001..F018 입력이며 첫 coder remediation은 partial evidence로 보존
-- `docs/audit/audit_report_25.md`가 inverse save relation, writer budget, replay alias, paired score, production TUI/terminal, release actual-set과 active lifecycle을 다시 HOLD했으므로 현재 권위로 사용
-- report 25 시정의 RED/GREEN, 전체 로컬 gate와 SHA `b732c42d` Actions `32650404618` clean same-SHA Ubuntu/Windows CI는 Verified. 독립 재감사 전까지 program HOLD이며 report 23/24 대기를 current state로 되살리지 않음
+- `docs/audit/audit_report_25.md`는 inverse save relation, writer budget, replay alias, paired score, production TUI/terminal, release actual-set과 active lifecycle을 HOLD했고 해당 시정의 RED/GREEN 및 SHA `b732c42d` Actions `32650404618` clean same-SHA Ubuntu/Windows CI는 유효한 부분 evidence다.
+- report 26 독립 재감사가 열거되지 않은 production gap을 재개방했으므로 report 25를 현재 최상위 권위나 전체 closure로 사용하지 않는다.
+
+### 10.13 `docs/audit/audit_report_26.md` 현재 상태 (2026-08-24)
+
+- 현재 권위는 malformed scalar/ItemData, Win32 trailing-name alias, actual causal producer removal, modal/Inspect mouse, release staging root/hardlink/candidate date와 세 P1 gate를 재현한 `docs/audit/audit_report_26.md`다.
+- ADR-0036, active spec/design/gap과 `docs/audit/audit_report_26_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
+- 표적 회귀는 GREEN으로 전환됐지만 전체 로컬 quality gate와 새 clean same-SHA Ubuntu/Windows actual bundle 전까지 program/publication HOLD다.

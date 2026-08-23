@@ -1,8 +1,8 @@
 use aihack::{
     core::{CommandIntent, Direction, GameSession, Pos},
     ui::tui::{
-        compute_layout, key_to_candidate, keyboard_baseline, map_mouse_event, UiCommandCandidate,
-        UiInputEvent, UiPanel, Viewport,
+        compute_layout, key_to_candidate, keyboard_baseline, map_mouse_event, InspectPresentation,
+        UiCommandCandidate, UiInputEvent, UiPanel, Viewport,
     },
 };
 
@@ -68,6 +68,7 @@ fn mouse_mapping_matches_layout_contract() {
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
     assert_eq!(candidate, UiCommandCandidate::Inspect(Pos { x: 5, y: 7 }));
@@ -83,6 +84,7 @@ fn mouse_mapping_matches_layout_contract() {
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
     assert_eq!(
@@ -98,6 +100,7 @@ fn mouse_mapping_matches_layout_contract() {
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
     assert_eq!(focus, UiCommandCandidate::Focus(UiPanel::Status));
@@ -110,11 +113,23 @@ fn save_load_request_bridges_core_api() {
     let layout = compute_layout(100, 32);
     let viewport = Viewport::from_rect(Pos { x: 0, y: 0 }, Pos { x: 0, y: 0 }, layout.map);
     assert_eq!(
-        map_mouse_event(UiInputEvent::SaveRequest, layout, viewport, &observation),
+        map_mouse_event(
+            UiInputEvent::SaveRequest,
+            layout,
+            viewport,
+            &observation,
+            InspectPresentation::Inventory,
+        ),
         Some(UiCommandCandidate::Save)
     );
     assert_eq!(
-        map_mouse_event(UiInputEvent::LoadRequest, layout, viewport, &observation),
+        map_mouse_event(
+            UiInputEvent::LoadRequest,
+            layout,
+            viewport,
+            &observation,
+            InspectPresentation::Inventory,
+        ),
         Some(UiCommandCandidate::Load)
     );
 }
@@ -148,6 +163,7 @@ fn inventory_click_selection_matches_keyboard_flow() {
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
     assert_eq!(clicked, key_to_candidate('w', &observation).unwrap());
@@ -174,6 +190,7 @@ fn command_and_inspect_clicks_follow_the_rendered_label_boundaries() {
             layout,
             viewport,
             &observation,
+            InspectPresentation::Inventory,
         ),
         Some(UiCommandCandidate::Command(CommandIntent::Wait))
     );
@@ -186,6 +203,7 @@ fn command_and_inspect_clicks_follow_the_rendered_label_boundaries() {
             layout,
             viewport,
             &observation,
+            InspectPresentation::Inventory,
         ),
         Some(UiCommandCandidate::Focus(UiPanel::Command))
     );
@@ -198,6 +216,7 @@ fn command_and_inspect_clicks_follow_the_rendered_label_boundaries() {
             layout,
             viewport,
             &observation,
+            InspectPresentation::Inventory,
         ),
         Some(UiCommandCandidate::Focus(UiPanel::Inspect))
     );

@@ -150,7 +150,7 @@ impl ArtifactStore {
 
     pub fn save_session(&self, session: &GameSession, path: &Path) -> Result<(), GameError> {
         let save = session.to_save_data();
-        validate_save_data(&save)?;
+        validate_save_data_with_registry(&save, session.world().content_registry())?;
         let payload = encode_save_data(&save)?;
         self.write_atomic(path, &payload)
     }
@@ -367,7 +367,7 @@ impl GameSession {
                 actual: save.schema_version,
             });
         }
-        validate_save_data(&save)?;
+        validate_save_data_with_registry(&save, registry)?;
         Ok(Self {
             inner: SessionState {
                 meta: GameMeta { seed: save.seed },
@@ -381,7 +381,10 @@ impl GameSession {
     }
 }
 
-fn validate_save_data(save: &SaveDataV1) -> Result<(), GameError> {
+fn validate_save_data_with_registry(
+    save: &SaveDataV1,
+    registry: &aihack_content::ContentRegistry,
+) -> Result<(), GameError> {
     validate_count("event log", save.event_log.len(), MAX_SAVE_EVENTS)?;
     validate_count(
         "entity store",
@@ -408,7 +411,40 @@ fn validate_save_data(save: &SaveDataV1) -> Result<(), GameError> {
         .into());
     }
     validate_events(&save.event_log)?;
-    validate_saved_world_for_run_state(&save.world, save.run_state)
+    validate_saved_world_for_run_state(&save.world, save.run_state, registry)?;
+    validate_consumer_safe_arithmetic(save)
+}
+
+fn validate_consumer_safe_arithmetic(save: &SaveDataV1) -> Result<(), GameError> {
+    if save.turn == u64::MAX {
+        return invalid_world("turn cannot be incremented safely".to_string());
+    }
+    let depth = i128::from(save.world.current_level.depth);
+    let inventory_value =
+        save.world
+            .inventory
+            .entries
+            .iter()
+            .try_fold(0_i128, |total, entry| {
+                let price = save
+                    .world
+                    .entities
+                    .item_data(entry.item)
+                    .map(|data| i128::from(data.base_price))
+                    .ok_or_else(|| invalid_world_error("inventory score item is missing"))?;
+                total
+                    .checked_add(price)
+                    .ok_or_else(|| invalid_world_error("inventory score overflows"))
+            })?;
+    let score = i128::from(save.world.gold)
+        + i128::from(save.world.kill_count) * 10
+        + depth * 100
+        + inventory_value
+        - i128::from(save.turn / 10);
+    if !(i128::from(i32::MIN)..=i128::from(i32::MAX)).contains(&score) {
+        return invalid_world("persisted score inputs exceed the i32 result range".to_string());
+    }
+    Ok(())
 }
 
 fn validate_events(events: &[GameEvent]) -> Result<(), GameError> {
@@ -428,24 +464,26 @@ fn validate_events(events: &[GameEvent]) -> Result<(), GameError> {
 }
 
 pub(crate) fn validate_saved_world(world: &SavedWorldV1) -> Result<(), GameError> {
-    validate_saved_world_inner(world, false, None)
+    validate_saved_world_inner(world, false, None, aihack_content::registry()?)
 }
 
 pub(crate) fn validate_depleted_saved_world(world: &SavedWorldV1) -> Result<(), GameError> {
-    validate_saved_world_inner(world, true, None)
+    validate_saved_world_inner(world, true, None, aihack_content::registry()?)
 }
 
 fn validate_saved_world_for_run_state(
     world: &SavedWorldV1,
     run_state: RunState,
+    registry: &aihack_content::ContentRegistry,
 ) -> Result<(), GameError> {
-    validate_saved_world_inner(world, false, Some(run_state))
+    validate_saved_world_inner(world, false, Some(run_state), registry)
 }
 
 fn validate_saved_world_inner(
     world: &SavedWorldV1,
     allow_depleted_actor: bool,
     run_state: Option<RunState>,
+    registry: &aihack_content::ContentRegistry,
 ) -> Result<(), GameError> {
     let mut level_ids = HashSet::new();
     let mut total_tiles = 0usize;
@@ -507,9 +545,10 @@ fn validate_saved_world_inner(
                 if data.kind != *kind {
                     return invalid_world(format!("item {} kind/data mismatch", entity.id.0));
                 }
-                if i32::from(data.ac_bonus).abs() > MAX_ABSOLUTE_ACTOR_STAT {
+                let expected = crate::domain::item::try_item_data_from_registry(*kind, registry)?;
+                if !item_data_matches_registry(data, &expected) {
                     return invalid_world(format!(
-                        "item {} has an out-of-range AC bonus",
+                        "item {} data does not match the active content registry",
                         entity.id.0
                     ));
                 }
@@ -563,6 +602,30 @@ fn validate_saved_world_inner(
         return invalid_world("player location/current level mismatch".to_string());
     }
     validate_inventory(world)
+}
+
+fn item_data_matches_registry(
+    persisted: &aihack_core::domain::item::ItemData,
+    expected: &aihack_core::domain::item::ItemData,
+) -> bool {
+    let attack_matches = match (persisted.attack_profile, expected.attack_profile) {
+        (Some(persisted), Some(expected)) => {
+            persisted.hit_bonus == expected.hit_bonus && persisted.damage == expected.damage
+        }
+        (None, None) => true,
+        _ => false,
+    };
+    persisted.kind == expected.kind
+        && persisted.class == expected.class
+        && persisted.glyph == expected.glyph
+        && persisted.weight == expected.weight
+        && persisted.base_price == expected.base_price
+        && persisted.ac_bonus == expected.ac_bonus
+        && attack_matches
+        && persisted.consumable_effect == expected.consumable_effect
+        && persisted.wand_effect == expected.wand_effect
+        && persisted.max_charges == expected.max_charges
+        && persisted.nutrition == expected.nutrition
 }
 
 fn validate_actor_stats(
@@ -666,24 +729,26 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
     }
     validate_equipped_item(world, world.inventory.equipped_melee, ItemClass::Weapon)?;
     validate_equipped_item(world, world.inventory.equipped_body, ItemClass::Armor)?;
-    if let Some(body) = world.inventory.equipped_body {
-        let bonus = world
+    let bonus = if let Some(body) = world.inventory.equipped_body {
+        world
             .entities
             .item_data(body)
             .map(|data| data.ac_bonus)
-            .ok_or_else(|| invalid_world_error("equipped body item is missing"))?;
-        let player_ac = world
-            .entities
-            .actor_stats(world.player_id)
-            .map(|stats| stats.ac)
-            .ok_or_else(|| invalid_world_error("player stats are missing"))?;
-        let derived_ac = i32::from(adventurer_template().ac)
-            .checked_sub(i32::from(bonus))
-            .and_then(|value| i16::try_from(value).ok())
-            .ok_or_else(|| invalid_world_error("equipped body armor AC overflows"))?;
-        if player_ac != derived_ac {
-            return invalid_world("equipped body armor and player AC disagree".to_string());
-        }
+            .ok_or_else(|| invalid_world_error("equipped body item is missing"))?
+    } else {
+        0
+    };
+    let player_ac = world
+        .entities
+        .actor_stats(world.player_id)
+        .map(|stats| stats.ac)
+        .ok_or_else(|| invalid_world_error("player stats are missing"))?;
+    let derived_ac = i32::from(adventurer_template().ac)
+        .checked_sub(i32::from(bonus))
+        .and_then(|value| i16::try_from(value).ok())
+        .ok_or_else(|| invalid_world_error("equipped body armor AC overflows"))?;
+    if player_ac != derived_ac {
+        return invalid_world("equipped body armor and player AC disagree".to_string());
     }
     Ok(())
 }
@@ -742,7 +807,10 @@ fn validate_relative_path(input: &Path) -> Result<PathBuf, GameError> {
     for component in input.components() {
         match component {
             Component::CurDir => {}
-            Component::Normal(part) => normalized.push(part),
+            Component::Normal(part) => {
+                validate_platform_path_component(part, input)?;
+                normalized.push(part);
+            }
             Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
                 return Err(invalid_runtime_path(input));
             }
@@ -752,6 +820,52 @@ fn validate_relative_path(input: &Path) -> Result<PathBuf, GameError> {
         return Err(invalid_runtime_path(input));
     }
     Ok(normalized)
+}
+
+#[cfg(windows)]
+fn validate_platform_path_component(
+    component: &std::ffi::OsStr,
+    display: &Path,
+) -> Result<(), GameError> {
+    let Some(value) = component.to_str() else {
+        return Err(invalid_runtime_path(display));
+    };
+    if value.ends_with(['.', ' '])
+        || value.chars().any(|character| {
+            character.is_control() || matches!(character, '<' | '>' | ':' | '"' | '|' | '?' | '*')
+        })
+    {
+        return Err(invalid_runtime_path(display));
+    }
+    let device_stem = value
+        .split('.')
+        .next()
+        .unwrap_or(value)
+        .to_ascii_uppercase();
+    let reserved = matches!(
+        device_stem.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) || device_stem
+        .strip_prefix("COM")
+        .or_else(|| device_stem.strip_prefix("LPT"))
+        .is_some_and(|suffix| {
+            matches!(
+                suffix,
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+            )
+        });
+    if reserved {
+        return Err(invalid_runtime_path(display));
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn validate_platform_path_component(
+    _component: &std::ffi::OsStr,
+    _display: &Path,
+) -> Result<(), GameError> {
+    Ok(())
 }
 
 fn relative_paths_equal(left: &Path, right: &Path) -> bool {

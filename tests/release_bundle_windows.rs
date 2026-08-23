@@ -9,6 +9,7 @@ use std::{
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
+const CANDIDATE_DATE: &str = "2026-08-24";
 
 #[derive(Clone, Copy, Debug)]
 enum Fault {
@@ -22,6 +23,7 @@ enum Fault {
     ExtraFile,
     ExtraDirectory,
     ExtraJunction,
+    StaleModificationPeriod,
 }
 
 struct Fixture {
@@ -49,9 +51,18 @@ impl Fixture {
             fs::copy(project_path(name), source.join(name)).unwrap();
         }
         let metadata = format!(
-            "product=AIHack\nversion=0.3.0\ncommit={COMMIT}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-23-02\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
+            "product=AIHack\nversion=0.3.0\ncommit={COMMIT}\ncandidate_date={CANDIDATE_DATE}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
         );
         fs::write(source.join("RELEASE-METADATA"), &metadata).unwrap();
+        if matches!(fault, Fault::StaleModificationPeriod) {
+            let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
+                .unwrap()
+                .replace(
+                    "Covered change period: `2025-05-20..2026-08-24`",
+                    "Covered change period: `2025-05-20..2026-08-23`",
+                );
+            fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
+        }
         if matches!(fault, Fault::IncludedLegacy) {
             fs::create_dir_all(source.join("legacy_nethack_port_reference")).unwrap();
             fs::write(
@@ -157,9 +168,34 @@ impl Fixture {
                 self.root.join("output").to_str().unwrap(),
                 "-ExpectedCommit",
                 COMMIT,
+                "-ExpectedCandidateDate",
+                CANDIDATE_DATE,
             ])
             .output()
             .unwrap()
+    }
+
+    fn staging(&self, mode: &str, stage: Option<&Path>) -> std::process::Output {
+        let mut command = Command::new("powershell");
+        command.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            project_path("scripts/release_staging.ps1")
+                .to_str()
+                .unwrap(),
+            "-Mode",
+            mode,
+            "-Root",
+            self.root.to_str().unwrap(),
+            "-OutputDir",
+            "output",
+        ]);
+        if let Some(stage) = stage {
+            command.arg("-Stage").arg(stage);
+        }
+        command.output().unwrap()
     }
 }
 
@@ -209,6 +245,7 @@ fn windows_verifier_rejects_legacy_metadata_record_hash_size_and_checksum_faults
         Fault::ExtraFile,
         Fault::ExtraDirectory,
         Fault::ExtraJunction,
+        Fault::StaleModificationPeriod,
     ] {
         let fixture = Fixture::new(fault);
         let output = fixture.verify();
@@ -217,4 +254,119 @@ fn windows_verifier_rejects_legacy_metadata_record_hash_size_and_checksum_faults
             "Windows verifier accepted negative fixture: {fault:?}"
         );
     }
+}
+
+#[test]
+fn windows_verifier_rejects_an_output_root_junction() {
+    let fixture = Fixture::new(Fault::None);
+    let output = fixture.root.join("output");
+    let target = fixture.root.join("redirected-output");
+    fs::rename(&output, &target).unwrap();
+    let status = Command::new("cmd.exe")
+        .args([
+            "/d",
+            "/c",
+            "mklink",
+            "/J",
+            output.to_str().unwrap(),
+            target.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let result = fixture.verify();
+    assert!(
+        !result.status.success(),
+        "Windows verifier must reject an output-root junction"
+    );
+}
+
+#[test]
+fn windows_release_staging_rejects_an_output_root_junction_before_writing() {
+    let fixture = Fixture::new(Fault::None);
+    let output = fixture.root.join("output");
+    let target = fixture.root.join("redirected-output");
+    fs::rename(&output, &target).unwrap();
+    let marker = target.join("outside-marker");
+    fs::write(&marker, "unchanged").unwrap();
+    let status = Command::new("cmd.exe")
+        .args([
+            "/d",
+            "/c",
+            "mklink",
+            "/J",
+            output.to_str().unwrap(),
+            target.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let result = fixture.staging("New", None);
+    assert!(!result.status.success());
+    assert_eq!(fs::read_to_string(marker).unwrap(), "unchanged");
+}
+
+#[test]
+fn windows_release_staging_rejects_a_nested_output_junction_before_cleanup() {
+    let fixture = Fixture::new(Fault::ExtraJunction);
+    let marker = fixture.root.join("junction-target/outside-marker");
+    fs::write(&marker, "unchanged").unwrap();
+
+    let result = fixture.staging("New", None);
+    assert!(!result.status.success());
+    assert_eq!(fs::read_to_string(marker).unwrap(), "unchanged");
+}
+
+#[test]
+fn windows_verifier_rejects_an_expected_name_hard_link_without_mutating_its_other_name() {
+    let fixture = Fixture::new(Fault::None);
+    let output = fixture.root.join("output");
+    let victim = fixture.root.join("outside-victim.exe");
+    let original = fs::read(output.join("aihack.exe")).unwrap();
+    fs::write(&victim, &original).unwrap();
+    fs::remove_file(output.join("aihack.exe")).unwrap();
+    fs::hard_link(&victim, output.join("aihack.exe")).unwrap();
+    write_checksums(&output);
+
+    let result = fixture.verify();
+    assert!(
+        !result.status.success(),
+        "Windows verifier must reject an expected-name hard link"
+    );
+    assert_eq!(fs::read(victim).unwrap(), original);
+}
+
+#[test]
+fn windows_release_staging_promotes_a_fresh_directory_without_writing_a_preplaced_hard_link() {
+    let fixture = Fixture::new(Fault::None);
+    let output = fixture.root.join("output");
+    let victim = fixture.root.join("outside-victim.exe");
+    fs::write(&victim, "victim-must-not-change").unwrap();
+    fs::remove_file(output.join("aihack.exe")).unwrap();
+    fs::hard_link(&victim, output.join("aihack.exe")).unwrap();
+
+    let created = fixture.staging("New", None);
+    assert!(
+        created.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+    let stage = PathBuf::from(String::from_utf8(created.stdout).unwrap().trim());
+    fs::write(stage.join("aihack.exe"), "fresh-release-binary").unwrap();
+    let promoted = fixture.staging("Promote", Some(&stage));
+    assert!(
+        promoted.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&promoted.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(&victim).unwrap(),
+        "victim-must-not-change"
+    );
+    assert_eq!(
+        fs::read_to_string(output.join("aihack.exe")).unwrap(),
+        "fresh-release-binary"
+    );
 }

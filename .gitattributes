@@ -5,6 +5,7 @@ output export-ignore
 RELEASE-METADATA export-subst
 LICENSE text eol=lf
 *.sh text eol=lf
+*.bat text eol=crlf
 docs/provenance/*.sha256 text eol=lf
 crates/aihack-content/src/data/*.toml text eol=lf
 crates/aihack-content/src/data/levels/*.toml text eol=lf

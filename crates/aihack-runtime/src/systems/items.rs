@@ -86,7 +86,7 @@ pub fn wear(world: &mut GameWorld, item: EntityId) -> Result<Option<GameEvent>, 
     world.state_mut().inventory.equip_body(item);
     let player_id = world.player_id;
     if let Some(stats) = world.state_mut().entities.actor_stats_mut(player_id) {
-        stats.ac -= ac_bonus;
+        stats.ac = stats.ac.saturating_sub(ac_bonus);
     }
     Ok(Some(GameEvent::ItemEquipped {
         entity: world.player_id,
@@ -129,7 +129,10 @@ pub fn quaff(
         return Err("item is not a potion".to_string());
     };
 
-    let raw_heal = (0..dice).map(|_| roll_die(rng, sides)).sum::<i16>() + bonus;
+    let raw_heal = (0..dice)
+        .map(|_| i32::from(roll_die(rng, sides)))
+        .sum::<i32>()
+        + i32::from(bonus);
     let player_id = world.player_id;
     let stats = world
         .state_mut()
@@ -137,7 +140,10 @@ pub fn quaff(
         .actor_stats_mut(player_id)
         .ok_or_else(|| "player actor stats are missing".to_string())?;
     let before = stats.hp;
-    stats.hp = stats.max_hp.min(stats.hp + raw_heal);
+    let healed = i32::from(stats.hp)
+        .saturating_add(raw_heal)
+        .min(i32::from(stats.max_hp));
+    stats.hp = healed.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
     let effective = stats.hp - before;
     let hp_after = stats.hp;
 

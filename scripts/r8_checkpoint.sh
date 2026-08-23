@@ -68,6 +68,7 @@ for path in \
     "$ROOT/.gitattributes" \
     "$ROOT/build.sh" \
     "$ROOT/build.bat" \
+    "$ROOT/scripts/release_staging.ps1" \
     "$ROOT/scripts/verify_release_bundle.sh"; do
     required_file "$path"
 done
@@ -127,7 +128,7 @@ if ((${#ERRORS[@]} == 0)); then
             || error "NOTICE required phrase missing: $phrase"
     done
     for script in build.sh build.bat; do
-        for phrase in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA SHA256SUMS 'git status --porcelain' 'git archive' 'aihack-0.3.0-source' 'owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01' 'modification_notice=AIHACK-MODIFICATIONS-2026-08-23-02'; do
+        for phrase in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA SHA256SUMS 'git status --porcelain' 'git archive' 'aihack-0.3.0-source' 'candidate_date' 'owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01' 'modification_notice=AIHACK-MODIFICATIONS-2026-08-24-01'; do
             grep -Fq -- "$phrase" "$ROOT/$script" \
                 || error "$script release packaging contract missing: $phrase"
         done
@@ -144,6 +145,8 @@ if ((${#ERRORS[@]} == 0)); then
         'count != 1' \
         'owner_approval "$OWNER_APPROVAL_ID"' \
         'modification_notice "$MODIFICATION_NOTICE_ID"' \
+        'candidate_date "$EXPECTED_CANDIDATE_DATE"' \
+        "stat -c '%h'" \
         'Approval ID:' \
         'Notice ID:'; do
         grep -Fq -- "$phrase" "$ROOT/scripts/verify_release_bundle.sh" \
@@ -158,13 +161,15 @@ if ((${#ERRORS[@]} == 0)); then
             || error "project-owner approval record missing: $phrase"
     done
     for phrase in \
-        '2025-05-20..2026-08-23' \
+        '2025-05-20..2026-08-24' \
         'does not depend on distributed Git history'; do
         grep -Fq -- "$phrase" "$ROOT/MODIFICATIONS.md" \
             || error "modification manifest missing: $phrase"
     done
     grep -Fq -- 'commit=$Format:%H$' "$ROOT/RELEASE-METADATA" \
         || error 'RELEASE-METADATA commit export placeholder missing'
+    grep -Fq -- 'candidate_date=$Format:%cs$' "$ROOT/RELEASE-METADATA" \
+        || error 'RELEASE-METADATA candidate date export placeholder missing'
     grep -Eq 'Current code: Cargo 0\.3\.0' "$ROOT/README.md" \
         || hold "README release version pending"
     grep -Eq '^## \[0\.3\.0\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$ROOT/CHANGELOG.md" \

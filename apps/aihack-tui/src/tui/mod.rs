@@ -112,7 +112,7 @@ pub use config::UiRuntimeConfig;
 pub use effects::{project_event, UiEffectEvent, UiEffectKind};
 pub use input::{
     key_to_candidate, keyboard_baseline, llm_footer_click_candidate, map_mouse_event,
-    UiCommandCandidate, UiInputEvent, UiPanel,
+    InspectPresentation, UiCommandCandidate, UiInputEvent, UiPanel,
 };
 pub use layout::{compute_layout, LayoutTier, TuiLayout};
 pub use theme::UiTheme;
@@ -1516,10 +1516,33 @@ pub fn runtime_event_to_candidate(
     height: u16,
     app: &TuiApp,
 ) -> Option<UiCommandCandidate> {
+    if !app.supports_terminal_size(width, height) {
+        return match &input_event {
+            Event::Key(key)
+                if key.kind != KeyEventKind::Release
+                    && matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc) =>
+            {
+                Some(UiCommandCandidate::Quit)
+            }
+            _ => None,
+        };
+    }
+    if matches!(&input_event, Event::Mouse(_))
+        && (app.ui_overlay() != &UiOverlay::None
+            || app.soft_input().is_some()
+            || matches!(
+                app.run_state(),
+                RunState::Title
+                    | RunState::CharacterCreation
+                    | RunState::AwaitingDirection { .. }
+                    | RunState::AwaitingInventorySelection { .. }
+                    | RunState::MorePrompt
+                    | RunState::GameOver { .. }
+            ))
+    {
+        return None;
+    }
     let Event::Key(key) = &input_event else {
-        if !app.supports_terminal_size(width, height) {
-            return None;
-        }
         return match input_event {
             Event::Mouse(mouse) => {
                 let layout = compute_layout(width, height);
@@ -1543,9 +1566,9 @@ pub fn runtime_event_to_candidate(
     if key.kind == KeyEventKind::Release {
         return None;
     }
-    if !app.supports_terminal_size(width, height) {
-        return matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc)
-            .then_some(UiCommandCandidate::Quit);
+    if key.kind == KeyEventKind::Repeat && matches!(key.code, KeyCode::Char('G' | 'A' | 'J' | 'R'))
+    {
+        return None;
     }
     if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
         return Some(UiCommandCandidate::CloseOverlay);
@@ -1655,7 +1678,13 @@ fn map_mouse_event_for_state(
                     return Some(candidate);
                 }
             }
-            map_mouse_event(event, layout, viewport, &app.observation())
+            input::map_mouse_event(
+                event,
+                layout,
+                viewport,
+                &app.observation(),
+                input::inspect_presentation(app.hovered_pos(), &app.llm_result_lines()),
+            )
         }
     }
 }

@@ -9,7 +9,8 @@ use std::{
 
 static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 const OWNER_APPROVAL_ID: &str = "AIHACK-OWNER-2026-07-20-NGPL-01";
-const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-08-23-02";
+const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-08-24-01";
+const CANDIDATE_DATE: &str = "2026-08-24";
 
 fn project_path(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(path)
@@ -29,6 +30,7 @@ enum BundleCase {
     MissingModificationMetadata,
     MismatchedModificationRecord,
     IncludedLegacy,
+    StaleModificationPeriod,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -91,6 +93,13 @@ impl BundleFixture {
                 "AIHACK-MODIFICATIONS-MISMATCH",
             );
         }
+        if matches!(case, BundleCase::StaleModificationPeriod) {
+            replace_in_file(
+                &root.join("MODIFICATIONS.md"),
+                "Covered change period: `2025-05-20..2026-08-24`",
+                "Covered change period: `2025-05-20..2026-08-23`",
+            );
+        }
         if matches!(case, BundleCase::MissingOwnerMetadata) {
             remove_line_containing(&root.join("RELEASE-METADATA"), "owner_approval=");
         }
@@ -142,6 +151,8 @@ impl BundleFixture {
         }
         let status = Command::new("git")
             .args(["commit", "-qm", "release fixture"])
+            .env("GIT_AUTHOR_DATE", "2026-08-24T12:00:00+09:00")
+            .env("GIT_COMMITTER_DATE", "2026-08-24T12:00:00+09:00")
             .current_dir(&root)
             .status()
             .unwrap();
@@ -179,7 +190,9 @@ impl BundleFixture {
         if let Some((MetadataTarget::Output, fault)) = metadata_fault {
             output_metadata = mutate_metadata(&output_metadata, fault);
         }
-        output_metadata = output_metadata.replace("$Format:%H$", &commit);
+        output_metadata = output_metadata
+            .replace("$Format:%H$", &commit)
+            .replace("$Format:%cs$", CANDIDATE_DATE);
         fs::write(output.join("RELEASE-METADATA"), output_metadata).unwrap();
         let archive = output.join("aihack-0.3.0-source.tar.gz");
         let status = Command::new("git")
@@ -234,6 +247,7 @@ impl BundleFixture {
             .arg(project_path("scripts/verify_release_bundle.sh"))
             .arg(self.root.join("output"))
             .arg(&self.commit)
+            .arg(CANDIDATE_DATE)
             .output()
             .unwrap()
     }
@@ -303,6 +317,26 @@ impl Drop for BundleFixture {
     }
 }
 
+fn rewrite_checksums(output: &Path) {
+    let names = [
+        "aihack",
+        "aihack-headless",
+        "LICENSE",
+        "NOTICE",
+        "MODIFICATIONS.md",
+        "PROJECT_OWNER_LICENSE_APPROVAL.md",
+        "RELEASE-METADATA",
+        "aihack-0.3.0-source.tar.gz",
+    ];
+    let hashes = Command::new("sha256sum")
+        .args(names)
+        .current_dir(output)
+        .output()
+        .unwrap();
+    assert!(hashes.status.success());
+    fs::write(output.join("SHA256SUMS"), hashes.stdout).unwrap();
+}
+
 #[test]
 fn verifier_accepts_commit_bound_bundle_with_notices_and_checksums() {
     let fixture = BundleFixture::new(BundleCase::Complete);
@@ -354,6 +388,14 @@ fn verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree() {
 }
 
 #[test]
+fn verifier_rejects_a_candidate_date_outside_the_bundled_modification_period() {
+    let fixture = BundleFixture::new(BundleCase::StaleModificationPeriod);
+    let output = fixture.verify();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("candidate date"));
+}
+
+#[test]
 fn verifier_rejects_wrong_suffixed_or_duplicate_metadata_values_in_archive_and_output() {
     for target in [MetadataTarget::Archive, MetadataTarget::Output] {
         for fault in [
@@ -402,4 +444,40 @@ fn verifier_rejects_extra_file_directory_and_symbolic_link_entries() {
             "release verifier accepted extra output entry: {name}"
         );
     }
+}
+
+#[test]
+fn verifier_rejects_a_symbolic_link_output_root() {
+    use std::os::unix::fs::symlink;
+
+    let fixture = BundleFixture::new(BundleCase::Complete);
+    let output = fixture.root.join("output");
+    let real_output = fixture.root.join("redirected-output");
+    fs::rename(&output, &real_output).unwrap();
+    symlink(&real_output, &output).unwrap();
+
+    let result = fixture.verify();
+    assert!(
+        !result.status.success(),
+        "release verifier must reject an output-root symbolic link"
+    );
+}
+
+#[test]
+fn verifier_rejects_an_expected_name_hard_link_without_mutating_its_other_name() {
+    let fixture = BundleFixture::new(BundleCase::Complete);
+    let output = fixture.root.join("output");
+    let victim = fixture.root.join("outside-victim");
+    let original = fs::read(output.join("aihack")).unwrap();
+    fs::write(&victim, &original).unwrap();
+    fs::remove_file(output.join("aihack")).unwrap();
+    fs::hard_link(&victim, output.join("aihack")).unwrap();
+    rewrite_checksums(&output);
+
+    let result = fixture.verify();
+    assert!(
+        !result.status.success(),
+        "release verifier must reject an expected-name hard link"
+    );
+    assert_eq!(fs::read(victim).unwrap(), original);
 }

@@ -247,7 +247,12 @@ impl CausalSummary {
                 let bonus = before.entity(item).and_then(|entity| entity.ac_bonus);
                 if before.inventory.equipped_body != Some(item)
                     && after.inventory.equipped_body == Some(item)
-                    && bonus.is_some_and(|value| after.player_ac == before.player_ac - value)
+                    && bonus.is_some_and(|value| {
+                        before
+                            .player_ac
+                            .checked_sub(value)
+                            .is_some_and(|derived| after.player_ac == derived)
+                    })
                 {
                     self.record(CausalWitnessRecord {
                         witness: CausalWitness::ArmorDefense,
@@ -406,6 +411,54 @@ impl CausalSummary {
         });
     }
 
+    pub fn observe_monster_difficulty_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_after: &CausalProjection,
+        entity: EntityId,
+    ) {
+        let (Some(active_before_entity), Some(active_after_entity)) =
+            (active_before.entity(entity), active_after.entity(entity))
+        else {
+            return;
+        };
+        let (Some(control_before_entity), Some(control_after_entity)) =
+            (control_before.entity(entity), control_after.entity(entity))
+        else {
+            return;
+        };
+        let Some(difficulty) = active_before_entity.difficulty else {
+            return;
+        };
+        let active_gold_delta = active_after.gold.checked_sub(active_before.gold);
+        if active_before_entity.kind != control_before_entity.kind
+            || control_before_entity.difficulty != Some(difficulty)
+            || active_before_entity.alive != Some(true)
+            || control_before_entity.alive != Some(true)
+            || active_after_entity.alive != Some(false)
+            || control_after_entity.alive != Some(true)
+            || active_after.kill_count != active_before.kill_count.saturating_add(1)
+            || control_after.kill_count != control_before.kill_count
+            || active_gold_delta != Some(u32::from(difficulty))
+            || control_after.gold != control_before.gold
+        {
+            return;
+        }
+        self.record(CausalWitnessRecord {
+            witness: CausalWitness::MonsterDifficultyEconomy,
+            scenario: CausalScenario::DifficultyEconomy,
+            producer: Some(entity),
+            field: CausalField::MonsterDifficulty,
+            source_before: CausalValue::Unsigned(0),
+            source_after: CausalValue::Unsigned(u64::from(difficulty)),
+            consumer: CausalConsumer::Gold,
+            consumer_before: CausalValue::Unsigned(u64::from(active_before.gold)),
+            consumer_after: CausalValue::Unsigned(u64::from(active_after.gold)),
+        });
+    }
+
     pub fn validate_required(&self) -> Result<(), Vec<CausalWitness>> {
         let missing = REQUIRED_CAUSAL_WITNESSES
             .into_iter()
@@ -416,12 +469,6 @@ impl CausalSummary {
         } else {
             Err(missing)
         }
-    }
-
-    pub fn without(mut self, witness: CausalWitness) -> Self {
-        self.counts.remove(&witness);
-        self.records.retain(|record| record.witness != witness);
-        self
     }
 
     fn observe_eating(
@@ -441,11 +488,12 @@ impl CausalSummary {
         {
             return;
         }
-        let source_after = CausalValue::Signed(i64::from(
+        let source_after = CausalValue::Signed(
             before_item
                 .nutrition
-                .unwrap_or(after.nutrition - before.nutrition),
-        ));
+                .map(i64::from)
+                .unwrap_or_else(|| i64::from(after.nutrition) - i64::from(before.nutrition)),
+        );
         let common = |witness, scenario| CausalWitnessRecord {
             witness,
             scenario,
@@ -524,35 +572,12 @@ impl CausalSummary {
                 source_before: CausalValue::Signed(0),
                 source_after: CausalValue::Signed(i64::from(before.luck)),
                 consumer: CausalConsumer::AttackRoll,
-                consumer_before: CausalValue::Signed(i64::from(attack_roll - before.luck)),
+                consumer_before: CausalValue::Signed(i64::from(
+                    attack_roll.saturating_sub(before.luck),
+                )),
                 consumer_after: CausalValue::Signed(i64::from(attack_roll)),
             });
             self.prayer_luck_pending = false;
-        }
-
-        let killed_with_economy = before.entities.iter().find(|entity| {
-            matches!(entity.kind, EntityKind::Monster(_))
-                && entity.alive == Some(true)
-                && after
-                    .entity(entity.id)
-                    .is_some_and(|next| next.alive == Some(false))
-                && entity
-                    .difficulty
-                    .is_some_and(|difficulty| after.gold >= before.gold + u32::from(difficulty))
-        });
-        if let Some(entity) = killed_with_economy.filter(|_| after.kill_count > before.kill_count) {
-            let difficulty = entity.difficulty.unwrap_or_default();
-            self.record(CausalWitnessRecord {
-                witness: CausalWitness::MonsterDifficultyEconomy,
-                scenario: CausalScenario::DifficultyEconomy,
-                producer: Some(entity.id),
-                field: CausalField::MonsterDifficulty,
-                source_before: CausalValue::Unsigned(0),
-                source_after: CausalValue::Unsigned(u64::from(difficulty)),
-                consumer: CausalConsumer::Gold,
-                consumer_before: CausalValue::Unsigned(u64::from(before.gold)),
-                consumer_after: CausalValue::Unsigned(u64::from(after.gold)),
-            });
         }
 
         let corpse_created = after.entities.iter().any(|entity| {
@@ -566,7 +591,8 @@ impl CausalSummary {
     }
 
     fn record(&mut self, record: CausalWitnessRecord) {
-        *self.counts.entry(record.witness).or_insert(0) += 1;
+        let count = self.counts.entry(record.witness).or_insert(0);
+        *count = count.saturating_add(1);
         self.records.push(record);
     }
 }

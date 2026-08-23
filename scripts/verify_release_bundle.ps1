@@ -3,12 +3,14 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OutputDir,
     [Parameter(Mandatory = $true)]
-    [string]$ExpectedCommit
+    [string]$ExpectedCommit,
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedCandidateDate
 )
 
 $ErrorActionPreference = 'Stop'
 $OwnerApprovalId = 'AIHACK-OWNER-2026-07-20-NGPL-01'
-$ModificationNoticeId = 'AIHACK-MODIFICATIONS-2026-08-23-02'
+$ModificationNoticeId = 'AIHACK-MODIFICATIONS-2026-08-24-01'
 $ArchiveName = 'aihack-0.3.0-source.zip'
 $ChecksumNames = @(
     'aihack.exe',
@@ -23,6 +25,63 @@ $ChecksumNames = @(
 
 function Fail([string]$Message) {
     throw $Message
+}
+
+function Assert-NoReparsePath([string]$Path) {
+    $full = [System.IO.Path]::GetFullPath($Path)
+    $root = [System.IO.Path]::GetPathRoot($full)
+    $current = $root
+    $relative = $full.Substring($root.Length)
+    foreach ($component in $relative.Split([System.IO.Path]::DirectorySeparatorChar, [System.StringSplitOptions]::RemoveEmptyEntries)) {
+        $current = Join-Path $current $component
+        $item = Get-Item -Force -LiteralPath $current
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            Fail "release output path contains a reparse component: $current"
+        }
+    }
+    return $full
+}
+
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+public static class AIHackFileIdentity {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct FileInformation {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GetFileInformationByHandle(
+        SafeFileHandle handle,
+        out FileInformation information
+    );
+}
+'@
+
+function Get-HardLinkCount([string]$Path) {
+    $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+    try {
+        $information = New-Object AIHackFileIdentity+FileInformation
+        if (-not [AIHackFileIdentity]::GetFileInformationByHandle($stream.SafeFileHandle, [ref]$information)) {
+            Fail "file identity query failed: $Path"
+        }
+        return [uint32]$information.NumberOfLinks
+    }
+    finally {
+        $stream.Dispose()
+    }
 }
 
 function Normalize-Text([string]$Text) {
@@ -64,7 +123,12 @@ function Assert-Metadata([string]$Content, [hashtable]$Expected, [string]$Label)
     }
 }
 
-$ResolvedOutput = (Resolve-Path -LiteralPath $OutputDir).Path
+$ResolvedOutput = Assert-NoReparsePath $OutputDir
+$candidateDate = [datetime]::ParseExact(
+    $ExpectedCandidateDate,
+    'yyyy-MM-dd',
+    [System.Globalization.CultureInfo]::InvariantCulture
+)
 $Archive = Join-Path $ResolvedOutput $ArchiveName
 $Required = @($ChecksumNames + 'SHA256SUMS')
 foreach ($name in $Required) {
@@ -74,6 +138,9 @@ foreach ($name in $Required) {
     }
     if ((Get-Item -LiteralPath $path).Length -le 0) {
         Fail "release artifact is empty: $name"
+    }
+    if ((Get-HardLinkCount $path) -ne 1) {
+        Fail "release artifact must have exactly one hard link: $name"
     }
 }
 $ActualEntries = @(Get-ChildItem -LiteralPath $ResolvedOutput -Force)
@@ -106,6 +173,7 @@ $ExpectedMetadata = @{
     product = 'AIHack'
     version = '0.3.0'
     commit = $ExpectedCommit
+    candidate_date = $ExpectedCandidateDate
     source_license = 'NGPL'
     modification_notice = $ModificationNoticeId
     owner_approval = $OwnerApprovalId
@@ -130,6 +198,16 @@ if ($outputApproval -cne $archiveApproval) {
 }
 if ($outputModifications -cne $archiveModifications) {
     Fail 'MODIFICATIONS.md differs between output and source archive'
+}
+$periodPattern = '(?m)^Covered change period: `(?<start>[0-9]{4}-[0-9]{2}-[0-9]{2})\.\.(?<end>[0-9]{4}-[0-9]{2}-[0-9]{2})`$'
+$periodMatches = [regex]::Matches($outputModifications, $periodPattern)
+if ($periodMatches.Count -ne 1) {
+    Fail 'MODIFICATIONS.md must contain one covered change period'
+}
+$periodStart = [datetime]::ParseExact($periodMatches[0].Groups['start'].Value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+$periodEnd = [datetime]::ParseExact($periodMatches[0].Groups['end'].Value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+if ($candidateDate -lt $periodStart -or $candidateDate -gt $periodEnd) {
+    Fail 'candidate date falls outside the modification period'
 }
 
 $checksumLines = @(Get-Content -LiteralPath (Join-Path $ResolvedOutput 'SHA256SUMS'))

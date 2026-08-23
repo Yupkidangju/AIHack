@@ -159,6 +159,51 @@ fn semantic_validator_rejects_inverse_inventory_actor_and_armor_arithmetic_bound
 }
 
 #[test]
+fn semantic_validator_rejects_consumer_unsafe_scalars_unequipped_ac_and_forged_item_data() {
+    let mut cases = Vec::new();
+
+    cases.push((
+        "unequipped player AC",
+        malformed_save(|value| {
+            value["world"]["entities"]["entities"][0]["payload"]["Actor"]["stats"]["ac"] =
+                serde_json::json!(-1);
+        }),
+    ));
+    cases.push((
+        "turn increment overflow",
+        malformed_save(|value| value["turn"] = serde_json::json!(u64::MAX)),
+    ));
+    cases.push((
+        "kill-count score overflow",
+        malformed_save(|value| {
+            value["world"]["kill_count"] = serde_json::json!(u32::MAX);
+        }),
+    ));
+    cases.push((
+        "forged item base price",
+        malformed_save(|value| {
+            value["world"]["entities"]["entities"][4]["payload"]["Item"]["data"]["base_price"] =
+                serde_json::json!(u32::MAX);
+        }),
+    ));
+
+    let accepted = cases
+        .into_iter()
+        .filter_map(|(name, save)| {
+            (!matches!(
+                GameSession::from_save_data(save),
+                Err(GameError::InvalidSave(_))
+            ))
+            .then_some(name)
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        accepted.is_empty(),
+        "consumer-unsafe malformed save가 수용됐습니다: {accepted:?}"
+    );
+}
+
+#[test]
 fn persisted_text_accepts_the_byte_limit_and_rejects_control_or_limit_plus_one() {
     let mut exact = GameSession::new_for_playing(42).to_save_data();
     exact.event_log = vec![GameEvent::Message {
@@ -238,7 +283,8 @@ fn artifact_store_accepts_the_exact_save_byte_limit() {
         .write_atomic(Path::new("exact.json"), &payload)
         .unwrap();
 
-    assert!(store.load_session(Path::new("exact.json")).is_ok());
+    let loaded = store.load_session(Path::new("exact.json"));
+    assert!(loaded.is_ok(), "exact-byte save failed: {loaded:?}");
 
     drop(store);
     fs::remove_dir_all(root).unwrap();

@@ -12,9 +12,40 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0036: report 26 consumer-safe artifact와 presentation/release authority 경계
+
+Status: Accepted / implementation in progress (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R26-01
+
+Context:
+
+`docs/audit/audit_report_26.md`는 report 25 시정 SHA의 clean same-SHA 양 OS PASS를 인정하면서도, 열거되지 않은 malformed scalar, Win32 trailing-name alias, modal mouse, hidden Inspect CTA, summary-label deletion, preplaced release root/inode와 stale modification date를 production probe로 재현했다. helper와 self-consistent metadata만으로는 다음 consumer와 실제 filesystem/UI 의미가 안전하다고 증명되지 않았다.
+
+Decision:
+
+- SaveDataV1 복원은 unequipped player base AC, consumer-safe turn/score 조합과 전달된 registry에 대한 persisted `ItemData` equality를 검사한다. runtime 좁은 정수 consumer도 widening/saturating 정책으로 wraparound를 만들지 않는다.
+- Windows artifact component는 trailing dot/space, ADS·금지 문자와 reserved device name을 거부한다. lexical compare, handle identity와 atomic replace가 같은 Win32 이름 의미를 사용한다.
+- causal negative는 `CausalSummary::without` 같은 사후 evidence 삭제를 사용하지 않는다. 각 producer command/content/pair를 실행 전에 하나씩 제거한 full production run으로 exactly-one missing witness를 확인한다.
+- TUI는 modal/overlay guard를 event kind보다 먼저 적용한다. Inspect renderer와 mouse hit-test는 같은 `InspectPresentation`을 소비하며 LLM request key는 Press만 허용한다.
+- release build는 workspace 내부 random fresh directory에서 create-new staging하고 검증된 directory rename으로 승격한다. verifier는 root reparse/symlink와 expected file hard link를 거부한다. Windows link count는 열린 handle의 `GetFileInformationByHandle` 결과를 사용한다.
+- release metadata는 exact candidate commit에서 파생한 `candidate_date`를 포함하고 modification manifest 기간과 자동 교차 검증한다. dependency exception은 미래 approval을 거부하며 action pin gate는 `.github/**/*.yml|yaml`을 YAML node로 구조 순회한다.
+- report 26이 현재 authority다. report 25 구현과 CI는 유효한 부분 증거지만 12건의 로컬 RED→GREEN, 전체 gate와 새 clean same-SHA 양 OS bundle 전까지 program/publication HOLD를 유지한다.
+
+Alternatives:
+
+- validator 뒤 consumer만 saturating 처리: forged state를 정상 save로 승인하므로 기각한다.
+- mouse click을 마지막에 취소: 이미 생성된 hidden candidate와 renderer 불일치를 유지하므로 기각한다.
+- 기존 `output/` 안에서 destination별 replace: root junction과 preplaced inode authority를 계속 신뢰하므로 fresh directory promotion을 선택한다.
+- modification ID 문자열만 날짜와 함께 변경: exact commit이 범위 안인지 자동 증명하지 못하므로 `candidate_date` 필드를 추가한다.
+
+Consequences:
+
+wire schema version은 1로 유지하지만 registry와 소비 산술에 맞지 않는 과거 malformed save 및 Windows 비정규 artifact name은 typed error가 된다. release metadata에 새 필수 key가 추가되고 build/verifier 호출은 candidate date를 함께 전달한다. 각 경계는 수정 전 실패 fixture를 보존하고 새 clean commit의 Ubuntu/Windows actual bundle까지 통과해야 Verified가 된다.
+
 ## ADR-0035: report 25 production 경계와 exact-set 재시정
 
-Status: Implemented and same-SHA verified; independent re-audit pending (2026-08-24)
+Status: Superseded in part by ADR-0036; report 25 evidence retained (2026-08-24)
 Date: 2026-08-23
 Decision ID: DEC-AUDIT-R25-01
 
@@ -50,7 +81,7 @@ Final implementation verification: SHA `b732c42d62f295f4d8be64480c1d0a5a440fe738
 
 ## ADR-0034: SaveDataV1 fail-closed 복원과 self-verifying replay
 
-Status: Superseded in part by ADR-0035; report 25 remediation in progress
+Status: Superseded in part by ADR-0035 and ADR-0036
 Date: 2026-08-23
 Decision ID: DEC-SAVE-03
 

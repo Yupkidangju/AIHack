@@ -5,7 +5,9 @@ use aihack_tui::tui::{
     compute_layout, runtime_event_to_candidate, runtime_key_to_candidate, TuiApp,
     UiCommandCandidate, UiRuntimeConfig, UiTheme, MIN_TERMINAL_HEIGHT, MIN_TERMINAL_WIDTH,
 };
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::style::Color;
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use std::process::Command;
@@ -173,6 +175,119 @@ fn production_dispatcher_prioritizes_game_over_new_run_over_llm_dismiss() {
         &app,
     );
     assert_eq!(candidate, Some(UiCommandCandidate::NewRun));
+}
+
+fn command_wait_click(width: u16, height: u16, app: &TuiApp) -> Event {
+    let layout = compute_layout(width, height);
+    let line =
+        aihack_tui::tui::render_panels::command_lines(&app.observation(), app.focused_panel())
+            .remove(0);
+    let offset = line.find("[. ] Wait").expect("Wait CTA must be rendered") as u16;
+    Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: layout.command.x + offset,
+        row: layout.command.y + 1,
+        modifiers: KeyModifiers::NONE,
+    })
+}
+
+#[test]
+fn modal_and_overlay_mouse_clicks_never_submit_underlying_core_commands() {
+    let mut inventory = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    inventory
+        .handle_candidate_owned(UiCommandCandidate::Command(CommandIntent::ShowInventory))
+        .unwrap();
+
+    let mut storage = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    storage
+        .handle_candidate_owned(UiCommandCandidate::Load)
+        .unwrap();
+
+    let mut soft = TuiApp::new_with_llm_enabled(
+        GameSession::new_for_playing(42),
+        UiRuntimeConfig::default(),
+        true,
+    );
+    soft.handle_candidate_owned(UiCommandCandidate::LlmJudge)
+        .unwrap();
+
+    for (name, app) in [
+        ("inventory", &mut inventory),
+        ("storage", &mut storage),
+        ("soft-input", &mut soft),
+    ] {
+        let before = app.revision();
+        let candidate = runtime_event_to_candidate(command_wait_click(80, 24, app), 80, 24, app);
+        if let Some(candidate) = candidate {
+            app.handle_candidate_owned(candidate).unwrap();
+        }
+        assert_eq!(app.revision(), before, "modal={name}");
+    }
+}
+
+#[test]
+fn inspect_hover_and_decision_presentations_do_not_expose_hidden_inventory_commands() {
+    let layout = compute_layout(80, 24);
+    let click = || {
+        Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: layout.inspect.x,
+            row: layout.inspect.y + 1,
+            modifiers: KeyModifiers::NONE,
+        })
+    };
+
+    let mut hover = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    hover
+        .handle_candidate_owned(UiCommandCandidate::Inspect(aihack_ai_contract::Pos {
+            x: 6,
+            y: 5,
+        }))
+        .unwrap();
+    assert!(
+        !matches!(
+            runtime_event_to_candidate(click(), 80, 24, &hover),
+            Some(UiCommandCandidate::Command(_))
+        ),
+        "hover presentation must not expose an inventory command"
+    );
+
+    let mut decision = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    let observation = decision.observation();
+    let suggestion = aihack_llm::decision::fallback_suggestion(
+        &aihack_llm::decision::DecisionRequest {
+            revision: decision.revision(),
+            action_space: observation.action_space.clone(),
+            observation,
+        },
+        aihack_llm::decision::DecisionSource::Fallback,
+    );
+    decision.set_decision_suggestion(suggestion, Some(false));
+    assert!(
+        !matches!(
+            runtime_event_to_candidate(click(), 80, 24, &decision),
+            Some(UiCommandCandidate::Command(_))
+        ),
+        "decision presentation must not expose an inventory command"
+    );
+}
+
+#[test]
+fn llm_request_key_repeat_never_creates_a_new_candidate() {
+    let app = TuiApp::new_with_llm_enabled(
+        GameSession::new_for_playing(42),
+        UiRuntimeConfig::default(),
+        true,
+    );
+    for key in ['G', 'A', 'J', 'R'] {
+        let repeat =
+            KeyEvent::new_with_kind(KeyCode::Char(key), KeyModifiers::NONE, KeyEventKind::Repeat);
+        assert_eq!(
+            runtime_event_to_candidate(Event::Key(repeat), 80, 24, &app),
+            None,
+            "key={key}"
+        );
+    }
 }
 
 #[test]

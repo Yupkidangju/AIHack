@@ -335,7 +335,12 @@ fn player_death_stops_remaining_monster_actions() {
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         let stats = world.saved().entities.actor_stats_mut(player).unwrap();
         stats.hp = 1;
-        stats.ac = -20;
+        world
+            .saved()
+            .entities
+            .actor_stats_mut(EntityId(2))
+            .unwrap()
+            .hit_bonus = 100;
     });
     assert!(aihack::testing::SessionBuilder::mutate(
         &mut session,

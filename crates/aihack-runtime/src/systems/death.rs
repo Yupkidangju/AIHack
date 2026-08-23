@@ -50,7 +50,7 @@ pub fn collect_death_events_if_hp_depleted(
         world.state_mut().last_death_cause = Some(cause);
     } else {
         let state = world.state_mut();
-        state.kill_count += 1;
+        state.kill_count = state.kill_count.saturating_add(1);
         state.gold = state.gold.saturating_add(u32::from(difficulty));
     }
     let events = vec![GameEvent::EntityDied { entity, cause }];

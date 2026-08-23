@@ -110,7 +110,7 @@ fn causal_witness_multiset_and_final_hash_are_stable_across_three_runs() {
 }
 
 #[test]
-fn causal_validator_rejects_event_only_turn_only_and_missing_witnesses() {
+fn causal_validator_rejects_event_only_and_turn_only_changes() {
     let session = GameSession::new_for_playing(42);
     let projection = CausalProjection::from_session(&session);
     let mut summary = CausalSummary::default();
@@ -138,11 +138,35 @@ fn causal_validator_rejects_event_only_turn_only_and_missing_witnesses() {
     };
     summary.observe(&projection, CommandIntent::Wait, &turn_only, &projection);
     assert_eq!(summary.total_count(), 0);
+}
 
-    let (complete, _, _) = run_causal_fixture(42);
-    for witness in REQUIRED_CAUSAL_WITNESSES {
-        let missing = complete.clone().without(witness).validate_required();
-        assert_eq!(missing, Err(vec![witness]), "witness={witness:?}");
+#[test]
+fn causal_actual_producer_removal_loses_exactly_one_required_witness() {
+    let (complete, _, complete_turn) = run_causal_fixture(42);
+    assert_eq!(
+        complete.total_count(),
+        REQUIRED_CAUSAL_WITNESSES.len() as u64
+    );
+    for omitted in REQUIRED_CAUSAL_WITNESSES {
+        let (summary, hash, turn) = run_causal_fixture_without(42, omitted);
+        let repeated = run_causal_fixture_without(42, omitted);
+        assert_eq!(
+            summary.validate_required(),
+            Err(vec![omitted]),
+            "omitted={omitted:?} records={:?}",
+            summary.records()
+        );
+        for witness in REQUIRED_CAUSAL_WITNESSES {
+            assert_eq!(
+                summary.count(witness) > 0,
+                witness != omitted,
+                "omitted={omitted:?} witness={witness:?}"
+            );
+        }
+        assert_eq!(summary.total_count(), 8, "omitted={omitted:?}");
+        assert_eq!(summary.records().len(), 8, "omitted={omitted:?}");
+        assert_eq!(turn, complete_turn, "omitted={omitted:?}");
+        assert_eq!((summary, hash, turn), repeated, "omitted={omitted:?}");
     }
 }
 
@@ -160,18 +184,36 @@ fn gold_score_witness_uses_a_paired_production_score() {
 }
 
 fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
+    run_causal_fixture_with_omission(seed, None)
+}
+
+fn run_causal_fixture_without(
+    seed: u64,
+    omitted: aihack::core::causal::CausalWitness,
+) -> (CausalSummary, SnapshotHash, u64) {
+    run_causal_fixture_with_omission(seed, Some(omitted))
+}
+
+fn run_causal_fixture_with_omission(
+    seed: u64,
+    omitted: Option<aihack::core::causal::CausalWitness>,
+) -> (CausalSummary, SnapshotHash, u64) {
+    use aihack::core::causal::CausalWitness;
+
     let mut session = GameSession::new_for_playing(seed);
     let mut summary = CausalSummary::default();
-    record_independent_monster_attribution(seed, &mut summary);
+    record_independent_monster_attribution(seed, &mut summary, omitted);
     let food = inventory_item(&session, ItemKind::FoodRation);
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.saved().nutrition = 100;
     });
-    submit_and_observe(
-        &mut session,
-        &mut summary,
-        CommandIntent::Eat { item: food },
-    );
+    if omitted != Some(CausalWitness::FoodNutrition) {
+        submit_and_observe(
+            &mut session,
+            &mut summary,
+            CommandIntent::Eat { item: food },
+        );
+    }
 
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.set_player_pos(aihack::core::Pos { x: 5, y: 10 });
@@ -218,30 +260,39 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
         jackal.max_hp = 100;
         jackal.ai_kind = Some(MonsterAiKind::Stationary);
     });
-    submit_and_observe(&mut session, &mut summary, CommandIntent::Pray);
+    if omitted != Some(CausalWitness::PrayerLuckCombat) {
+        submit_and_observe(&mut session, &mut summary, CommandIntent::Pray);
+    }
     submit_and_observe(
         &mut session,
         &mut summary,
         CommandIntent::Move(Direction::East),
     );
 
-    let floating_eye = aihack::testing::SessionBuilder::mutate(&mut session, |world| {
-        world.saved().entities.set_alive(EntityId(2), false);
-        world.saved().entities.set_alive(EntityId(3), false);
-        world.set_player_pos(aihack::core::Pos { x: 5, y: 5 });
-        world
-            .saved()
-            .entities
-            .spawn_monster(MonsterKind::FloatingEye, aihack::core::Pos { x: 6, y: 5 })
-    });
-    submit_and_observe(
-        &mut session,
-        &mut summary,
-        CommandIntent::Move(Direction::East),
-    );
+    let floating_eye = if omitted == Some(CausalWitness::MonsterPassive) {
+        None
+    } else {
+        let entity = aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+            world.saved().entities.set_alive(EntityId(2), false);
+            world.saved().entities.set_alive(EntityId(3), false);
+            world.set_player_pos(aihack::core::Pos { x: 5, y: 5 });
+            world
+                .saved()
+                .entities
+                .spawn_monster(MonsterKind::FloatingEye, aihack::core::Pos { x: 6, y: 5 })
+        });
+        submit_and_observe(
+            &mut session,
+            &mut summary,
+            CommandIntent::Move(Direction::East),
+        );
+        Some(entity)
+    };
 
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
-        world.saved().entities.set_alive(floating_eye, false);
+        if let Some(floating_eye) = floating_eye {
+            world.saved().entities.set_alive(floating_eye, false);
+        }
         world.saved().entities.set_alive(EntityId(3), false);
         world.saved().paralysis_turns = 0;
         world.set_player_pos(aihack::core::Pos { x: 5, y: 5 });
@@ -299,11 +350,13 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
         world.set_player_pos(corpse_pos);
     });
     submit_and_observe(&mut session, &mut summary, CommandIntent::Pickup);
-    submit_and_observe(
-        &mut session,
-        &mut summary,
-        CommandIntent::Eat { item: corpse },
-    );
+    if omitted != Some(CausalWitness::CorpseNutrition) {
+        submit_and_observe(
+            &mut session,
+            &mut summary,
+            CommandIntent::Eat { item: corpse },
+        );
+    }
 
     let armor = world_item(&session, ItemKind::ArmorLeather);
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
@@ -321,11 +374,13 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
             assert!(world.saved().entities.set_item_letter(armor, letter));
         }
     });
-    submit_and_observe(
-        &mut session,
-        &mut summary,
-        CommandIntent::Wear { item: armor },
-    );
+    if omitted != Some(CausalWitness::ArmorDefense) {
+        submit_and_observe(
+            &mut session,
+            &mut summary,
+            CommandIntent::Wear { item: armor },
+        );
+    }
 
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.saved().entities.clear_monsters();
@@ -334,12 +389,22 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
     while session.turn() < TARGET_TURN {
         submit_and_observe(&mut session, &mut summary, CommandIntent::Wait);
     }
+    if omitted == Some(CausalWitness::GoldScore) {
+        aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+            world.saved().gold = 0;
+        });
+    }
     submit_and_observe(&mut session, &mut summary, CommandIntent::Quit);
 
     (summary, session.snapshot().stable_hash(), session.turn())
 }
 
-fn record_independent_monster_attribution(seed: u64, summary: &mut CausalSummary) {
+fn record_independent_monster_attribution(
+    seed: u64,
+    summary: &mut CausalSummary,
+    omitted: Option<aihack::core::causal::CausalWitness>,
+) {
+    use aihack::core::causal::CausalWitness;
     let prepare = |speed: i16, ai_kind: MonsterAiKind| {
         let mut session = GameSession::new_for_playing(seed);
         aihack::testing::SessionBuilder::mutate(&mut session, |world| {
@@ -358,33 +423,73 @@ fn record_independent_monster_attribution(seed: u64, summary: &mut CausalSummary
         session
     };
 
-    let mut speed_active = prepare(12, MonsterAiKind::ChaseVisiblePlayer);
-    let mut speed_control = prepare(0, MonsterAiKind::ChaseVisiblePlayer);
-    let speed_active_before = CausalProjection::from_session(&speed_active);
-    let speed_control_before = CausalProjection::from_session(&speed_control);
-    assert!(speed_active.submit(CommandIntent::Wait).accepted);
-    assert!(speed_control.submit(CommandIntent::Wait).accepted);
-    summary.observe_monster_speed_pair(
-        &speed_active_before,
-        &CausalProjection::from_session(&speed_active),
-        &speed_control_before,
-        &CausalProjection::from_session(&speed_control),
-        EntityId(2),
-    );
+    if omitted != Some(CausalWitness::MonsterSpeed) {
+        let mut speed_active = prepare(12, MonsterAiKind::ChaseVisiblePlayer);
+        let mut speed_control = prepare(0, MonsterAiKind::ChaseVisiblePlayer);
+        let speed_active_before = CausalProjection::from_session(&speed_active);
+        let speed_control_before = CausalProjection::from_session(&speed_control);
+        assert!(speed_active.submit(CommandIntent::Wait).accepted);
+        assert!(speed_control.submit(CommandIntent::Wait).accepted);
+        summary.observe_monster_speed_pair(
+            &speed_active_before,
+            &CausalProjection::from_session(&speed_active),
+            &speed_control_before,
+            &CausalProjection::from_session(&speed_control),
+            EntityId(2),
+        );
+    }
 
-    let mut ai_active = prepare(12, MonsterAiKind::ChaseVisiblePlayer);
-    let mut ai_control = prepare(12, MonsterAiKind::Stationary);
-    let ai_active_before = CausalProjection::from_session(&ai_active);
-    let ai_control_before = CausalProjection::from_session(&ai_control);
-    assert!(ai_active.submit(CommandIntent::Wait).accepted);
-    assert!(ai_control.submit(CommandIntent::Wait).accepted);
-    summary.observe_monster_ai_pair(
-        &ai_active_before,
-        &CausalProjection::from_session(&ai_active),
-        &ai_control_before,
-        &CausalProjection::from_session(&ai_control),
-        EntityId(2),
-    );
+    if omitted != Some(CausalWitness::MonsterAi) {
+        let mut ai_active = prepare(12, MonsterAiKind::ChaseVisiblePlayer);
+        let mut ai_control = prepare(12, MonsterAiKind::Stationary);
+        let ai_active_before = CausalProjection::from_session(&ai_active);
+        let ai_control_before = CausalProjection::from_session(&ai_control);
+        assert!(ai_active.submit(CommandIntent::Wait).accepted);
+        assert!(ai_control.submit(CommandIntent::Wait).accepted);
+        summary.observe_monster_ai_pair(
+            &ai_active_before,
+            &CausalProjection::from_session(&ai_active),
+            &ai_control_before,
+            &CausalProjection::from_session(&ai_control),
+            EntityId(2),
+        );
+    }
+
+    if omitted != Some(CausalWitness::MonsterDifficultyEconomy) {
+        let prepare_economy = || {
+            let mut session = GameSession::new_for_playing(seed);
+            aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+                world.saved().entities.set_alive(EntityId(3), false);
+                world.set_player_pos(aihack::core::Pos { x: 5, y: 5 });
+                let saved = world.saved();
+                let current_level = saved.current_level;
+                saved.entities.set_actor_location(
+                    EntityId(2),
+                    current_level,
+                    aihack::core::Pos { x: 6, y: 5 },
+                );
+                let jackal = saved.entities.actor_stats_mut(EntityId(2)).unwrap();
+                jackal.hp = 1;
+                jackal.ai_kind = Some(MonsterAiKind::Stationary);
+                let player = saved.entities.actor_stats_mut(saved.player_id).unwrap();
+                player.hit_bonus = 100;
+            });
+            session
+        };
+        let mut active = prepare_economy();
+        let mut control = prepare_economy();
+        let active_before = CausalProjection::from_session(&active);
+        let control_before = CausalProjection::from_session(&control);
+        assert!(active.submit(CommandIntent::Move(Direction::East)).accepted);
+        assert!(control.submit(CommandIntent::Wait).accepted);
+        summary.observe_monster_difficulty_pair(
+            &active_before,
+            &CausalProjection::from_session(&active),
+            &control_before,
+            &CausalProjection::from_session(&control),
+            EntityId(2),
+        );
+    }
 }
 
 fn submit_and_observe(

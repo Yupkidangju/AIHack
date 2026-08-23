@@ -10,15 +10,16 @@ pub trait DeathScoreView {
 
 /// 현재 death score 계산식이다.
 pub fn death_score(world: &impl DeathScoreView, turn: u64) -> i32 {
-    world.gold_amount() as i32
-        + world.kill_count() as i32 * 10
-        + world.current_level_depth() as i32 * 100
-        + world.inventory_value() as i32
-        - (turn / 10) as i32
+    let score = i128::from(world.gold_amount())
+        + i128::from(world.kill_count()) * 10
+        + i128::from(world.current_level_depth()) * 100
+        + i128::from(world.inventory_value())
+        - i128::from(turn / 10);
+    score.clamp(i128::from(i32::MIN), i128::from(i32::MAX)) as i32
 }
 
 pub fn apply_luck(base: i16, luck: i16) -> i16 {
-    base + luck
+    base.saturating_add(luck)
 }
 
 /// 환각은 simulation state가 아니라 표시 문자열만 바꾼다.

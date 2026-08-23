@@ -115,7 +115,7 @@ fn validate_exception_gate(
     }
     let approved = date_days(exception["approved_on"].as_str().ok_or("approved_on")?)?;
     let expires = date_days(exception["expires_on"].as_str().ok_or("expires_on")?)?;
-    if expires < today || expires <= approved || expires - approved > 90 {
+    if approved > today || expires < today || expires <= approved || expires - approved > 90 {
         return Err("exception expired or exceeds the 90-day budget".to_string());
     }
 
@@ -283,4 +283,19 @@ allow = ["MIT"]
         date_days("2026-03-15").unwrap(),
     )
     .is_err());
+
+    let mut future_approval: serde_json::Value =
+        serde_json::from_str(&project_file("dependency-exceptions.json")).unwrap();
+    future_approval["exceptions"][0]["approved_on"] = serde_json::json!("2026-09-01");
+    future_approval["exceptions"][0]["expires_on"] = serde_json::json!("2026-10-31");
+    assert!(
+        validate_exception_gate(
+            &future_approval,
+            &project_file("deny.toml"),
+            &graph,
+            date_days("2026-08-24").unwrap(),
+        )
+        .is_err(),
+        "감사일보다 미래인 approval date를 허용하면 안 됩니다"
+    );
 }

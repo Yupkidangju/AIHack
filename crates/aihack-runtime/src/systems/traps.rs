@@ -45,7 +45,7 @@ pub fn trigger_player_trap(world: &mut GameWorld) -> Vec<GameEvent> {
     }
     let player_id = world.player_id;
     if let Some(stats) = world.state_mut().entities.actor_stats_mut(player_id) {
-        stats.hp -= PHASE7_PIT_DAMAGE;
+        stats.hp = stats.hp.saturating_sub(PHASE7_PIT_DAMAGE);
     }
     events.push(GameEvent::TrapTriggered {
         entity: world.player_id,

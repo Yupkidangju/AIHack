@@ -6,7 +6,7 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implementation contract, `audit_report_25.md` TUI production path same-SHA Verified; independent re-audit pending
+문서 상태: active implementation contract, `audit_report_26.md` production gap remediation in progress; program/publication HOLD
 작성일: 2026-07-15
 최근 동기화: 2026-08-24
 기준: `spec.md`
@@ -257,7 +257,7 @@ The attempt is plausible, but no core rule effect is applied.
 | core message | `GameEvent::Message` projection |
 | narrative/suggestion/verdict | `LlmPresentationState` |
 | request status | `LlmUiStatus` |
-| hover/focus/overlay | `UiState` |
+| hover/focus/overlay와 Inspect CTA | `UiState`가 만든 단일 `InspectPresentation` |
 
 UI가 `GameWorld`의 field를 직접 읽으면 R2/R5 실패다.
 
@@ -293,6 +293,8 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - invariant error: core error panel을 최상위로 표시하며 LLM 결과 숨김
 - save/load error: typed error 요약과 경로만 표시하며 secret/path traversal detail 숨김
 - TUI quick-save: `TuiApp`이 실행별 임시 directory handle, `ArtifactStore`, relative `quick-save.json`을 함께 소유한다. renderer/input caller는 absolute path나 parent를 전달할 수 없으며 `ArtifactStore`의 no-follow·single-link·atomic replace 경계를 우회하지 않는다.
+- Inventory, storage error, soft judgment input과 core blocking state가 활성화된 동안 mouse는 underlying map/status/inspect/command/footer candidate를 만들지 않는다. 별도 modal CTA geometry가 없는 layer의 mouse click/hover는 명시적으로 무시한다.
+- Inspect 영역은 `Inventory`, `Hover`, `Decision` presentation을 한 번 계산해 renderer와 hit-test가 공유한다. Inventory presentation에 표시된 CTA만 command candidate가 될 수 있고 hover/decision/soft-input presentation에서는 숨은 inventory candidate를 제공하지 않는다.
 
 ## 11. 접근성
 
@@ -303,7 +305,7 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - focus 순서: map → HUD → inventory/inspect → LLM result → footer
 - suggestion rationale와 verdict를 screen reader 친화적인 한 문장으로 유지한다.
 - status 갱신은 core message를 덮어쓰지 않는다.
-- key repeat는 LLM 요청 중복 생성에 사용하지 않는다.
+- LLM request CTA `G`/`A`/`J`와 retry `R`은 `KeyEventKind::Press`에서만 enqueue 후보가 된다. `Repeat`/`Release`는 cooldown이나 빠른 response 완료 여부와 관계없이 새 request를 만들지 않는다.
 
 ### 11.1 v0.3.0 locale 범위
 
@@ -317,14 +319,14 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - transport future/channel은 TUI app layer에 있고 core crate에 없다.
 - 동시에 같은 종류의 outstanding request는 1개다.
 - response queue 최대 16개; 초과 시 가장 오래된 presentation response를 버리고 core는 유지한다.
-- 같은 CTA의 enqueue cooldown은 250ms이며 key repeat는 새 request를 만들지 않는다.
+- 같은 CTA의 enqueue cooldown은 250ms이며 request key는 `Press` event만 소비한다.
 - endpoint host는 `127.0.0.1`, `localhost`, `[::1]`만 기본 허용한다.
 - user text 240자, narrative 240자, rationale 160자, reason code 32자 제한을 render 이전에 검사한다.
 - prompt injection text는 command로 parse하지 않는다.
 - LLM result에 ANSI escape/control character를 허용하지 않는다.
 - terminal session guard는 alternate screen, raw mode, cursor, mouse capture 활성 상태를 각각 추적한다. setup/draw/read/restore 중 어느 단계가 실패해도 Drop에서 `Show`, `DisableMouseCapture`, raw disable, `LeaveAlternateScreen`을 가능한 항목 모두 best-effort 수행한다.
 - app exit는 terminal을 먼저 복원하고 request sender를 닫은 뒤 worker 종료 확인을 최대 250ms 기다린다. 250ms 안에 확인이 없으면 JoinHandle을 drop하고 process exit를 계속한다.
-- Windows CI는 dev-only `portable-pty 0.9.0`의 native `ConPtySystem`으로 실제 `aihack.exe`를 80x24 pseudoconsole에 실행한다. Enter 1회씩 Title→Creation→Playing, `i` Inventory, Esc 복귀, mouse capture enable/disable sequence, Q clean exit를 byte stream에서 검증한다.
+- Windows CI는 dev-only `portable-pty 0.9.0`의 native `ConPtySystem`으로 실제 `aihack.exe`를 80x24 pseudoconsole에 실행해 Enter 1회씩 Title→Creation→Playing, `i` Inventory, Esc 복귀, 실제 mouse input과 Q clean exit를 검증한다. alternate screen과 cursor enter/leave는 byte stream으로, Windows crossterm mouse/raw 전환은 Console API lifecycle call matrix로 검증한다.
 - in-process one-event/failure-injection unit harness는 ConPTY test와 별도로 setup/restore 각 단계 실패 후 후속 cleanup 시도를 검증한다. Windows Terminal application 자체의 GUI 동작은 ConPTY contract와 구분하며 자동 PASS 범위에 넣지 않는다.
 
 ## 13. 검증
@@ -369,4 +371,4 @@ cargo test --workspace --locked --test llm_soft_adjudication
 | binary | `aihack`, `aihack-headless` | clean worktree의 release build |
 | complete corresponding source | 해당 binary를 만든 동일 commit의 추적 source | `build.sh`/`build.bat`의 `git archive` |
 
-`legacy_nethack_port_reference/`, `target/`, `output/`은 source archive에서 제외한다. release script는 untracked file을 포함해 worktree가 dirty하면 중단하므로 binary와 source commit의 불일치를 허용하지 않는다. 이 packaging 계약의 로컬 PASS는 독립 R8 감사나 외부 게시 승인을 뜻하지 않는다.
+`legacy_nethack_port_reference/`, `target/`, `output/`은 source archive에서 제외한다. release script는 untracked file을 포함해 worktree가 dirty하면 중단하고, workspace 내부의 새 random staging root에서 single-link file만 만든 뒤 verifier PASS 후 directory rename으로 `output/`을 승격한다. 기존 output root의 symlink/junction/reparse와 expected-name hard link는 외부 inode에 쓰지 않으며 verifier가 거부한다. metadata의 `candidate_date`는 exact commit date이고 `MODIFICATIONS.md`의 covered period에 포함되어야 한다. 이 packaging 계약의 로컬 PASS는 독립 R8 감사나 외부 게시 승인을 뜻하지 않는다.

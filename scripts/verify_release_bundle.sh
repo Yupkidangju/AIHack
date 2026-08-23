@@ -4,9 +4,10 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 OUTPUT_DIR=${1:-"$ROOT/output"}
 EXPECTED_COMMIT=${2:-$(git -C "$ROOT" rev-parse HEAD)}
+EXPECTED_CANDIDATE_DATE=${3:-$(git -C "$ROOT" show -s --format=%cs "$EXPECTED_COMMIT")}
 ARCHIVE="$OUTPUT_DIR/aihack-0.3.0-source.tar.gz"
 OWNER_APPROVAL_ID="AIHACK-OWNER-2026-07-20-NGPL-01"
-MODIFICATION_NOTICE_ID="AIHACK-MODIFICATIONS-2026-08-23-02"
+MODIFICATION_NOTICE_ID="AIHACK-MODIFICATIONS-2026-08-24-01"
 
 fail() {
     printf '%s\n' "$1" >&2
@@ -47,11 +48,21 @@ required=(
     SHA256SUMS
     aihack-0.3.0-source.tar.gz
 )
+[[ -d "$OUTPUT_DIR" && ! -L "$OUTPUT_DIR" ]] \
+    || fail 'release output root must be a real directory'
+lexical_output=$(realpath -sm -- "$OUTPUT_DIR")
+physical_output=$(realpath -e -- "$OUTPUT_DIR")
+[[ "$lexical_output" == "$physical_output" ]] \
+    || fail 'release output root must not traverse a symbolic link'
+[[ "$EXPECTED_CANDIDATE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+    || fail 'candidate date must use YYYY-MM-DD'
 for file in "${required[@]}"; do
     [[ -s "$OUTPUT_DIR/$file" ]] || {
         printf 'release artifact missing or empty: %s\n' "$file" >&2
         exit 1
     }
+    [[ $(stat -c '%h' -- "$OUTPUT_DIR/$file") == 1 ]] \
+        || fail "release artifact must have exactly one hard link: $file"
 done
 mapfile -d '' -t actual_entries < <(find "$OUTPUT_DIR" -mindepth 1 -maxdepth 1 -print0)
 [[ "${#actual_entries[@]}" -eq "${#required[@]}" ]] \
@@ -95,6 +106,7 @@ for metadata_label in archive output; do
     require_metadata_value "$metadata" product AIHack "$metadata_label RELEASE-METADATA"
     require_metadata_value "$metadata" version 0.3.0 "$metadata_label RELEASE-METADATA"
     require_metadata_value "$metadata" commit "$EXPECTED_COMMIT" "$metadata_label RELEASE-METADATA"
+    require_metadata_value "$metadata" candidate_date "$EXPECTED_CANDIDATE_DATE" "$metadata_label RELEASE-METADATA"
     require_metadata_value "$metadata" source_license NGPL "$metadata_label RELEASE-METADATA"
     require_metadata_value "$metadata" owner_approval "$OWNER_APPROVAL_ID" "$metadata_label RELEASE-METADATA"
     require_metadata_value "$metadata" modification_notice "$MODIFICATION_NOTICE_ID" "$metadata_label RELEASE-METADATA"
@@ -108,6 +120,14 @@ require_text "$output_modifications" "Notice ID: \`$MODIFICATION_NOTICE_ID\`" "o
     || fail 'PROJECT_OWNER_LICENSE_APPROVAL.md differs between output and source archive'
 [[ "$archive_modifications" == "$output_modifications" ]] \
     || fail 'MODIFICATIONS.md differs between output and source archive'
+period=$(sed -n 's/^Covered change period: `\([0-9][0-9-]*\)\.\.\([0-9][0-9-]*\)`$/\1 \2/p' \
+    <<<"$output_modifications")
+[[ $(wc -l <<<"$period") -eq 1 ]] \
+    || fail 'MODIFICATIONS.md must contain one covered change period'
+read -r period_start period_end <<<"$period"
+[[ ("$period_start" < "$EXPECTED_CANDIDATE_DATE" || "$period_start" == "$EXPECTED_CANDIDATE_DATE") \
+    && ("$EXPECTED_CANDIDATE_DATE" < "$period_end" || "$EXPECTED_CANDIDATE_DATE" == "$period_end") ]] \
+    || fail 'candidate date falls outside the modification period'
 if grep -Fq '$Format:' <<<"$archive_metadata"; then
     printf '%s\n' 'release metadata export substitution did not run' >&2
     exit 1

@@ -1,9 +1,93 @@
 use std::fs;
 use std::path::Path;
 
+use saphyr::{LoadableYamlNode, Yaml};
+
 fn read_project_file(path: &str) -> String {
     fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path))
         .unwrap_or_else(|error| panic!("{path}를 읽을 수 있어야 합니다: {error}"))
+}
+
+fn collect_action_uses(node: &Yaml<'_>, uses: &mut Vec<String>) -> Result<(), String> {
+    match node {
+        Yaml::Mapping(mapping) => {
+            for (key, value) in mapping {
+                if key.as_str() == Some("uses") {
+                    uses.push(
+                        value
+                            .as_str()
+                            .ok_or_else(|| "uses value must be a string".to_string())?
+                            .to_string(),
+                    );
+                }
+                collect_action_uses(value, uses)?;
+            }
+        }
+        Yaml::Sequence(sequence) => {
+            for value in sequence {
+                collect_action_uses(value, uses)?;
+            }
+        }
+        Yaml::Tagged(_, value) => collect_action_uses(value, uses)?,
+        _ => {}
+    }
+    Ok(())
+}
+
+fn action_uses_from_yaml(source: &str) -> Result<Vec<String>, String> {
+    let documents = Yaml::load_from_str(source).map_err(|error| error.to_string())?;
+    let mut uses = Vec::new();
+    for document in &documents {
+        collect_action_uses(document, &mut uses)?;
+    }
+    Ok(uses)
+}
+
+fn github_yaml_files(root: &Path, files: &mut Vec<std::path::PathBuf>) {
+    for entry in fs::read_dir(root).unwrap_or_else(|error| panic!("{}: {error}", root.display())) {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_dir() {
+            github_yaml_files(&path, files);
+        } else if matches!(
+            path.extension().and_then(|extension| extension.to_str()),
+            Some("yml" | "yaml")
+        ) {
+            files.push(path);
+        }
+    }
+}
+
+fn validate_remote_action_reference(action: &str) -> Result<(), String> {
+    if action.starts_with("./") {
+        return Ok(());
+    }
+    if action.starts_with("docker://") {
+        let (_, digest) = action
+            .rsplit_once("@sha256:")
+            .ok_or_else(|| format!("container action digest missing: {action}"))?;
+        if digest.len() != 64
+            || !digest
+                .chars()
+                .all(|character| character.is_ascii_hexdigit())
+        {
+            return Err(format!(
+                "container action digest must be full SHA-256: {action}"
+            ));
+        }
+        return Ok(());
+    }
+    let (_, reference) = action
+        .rsplit_once('@')
+        .ok_or_else(|| format!("action ref missing: {action}"))?;
+    if reference.len() != 40
+        || !reference
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
+    {
+        return Err(format!("action ref must be a full SHA: {action}"));
+    }
+    Ok(())
 }
 
 #[test]
@@ -39,13 +123,24 @@ fn build_scripts_use_locked_commands_and_fail_on_missing_artifacts() {
         );
         assert!(!script.contains("|| true"), "{name}");
         assert!(script.contains("aihack-headless"), "{name}");
+        assert!(script.contains("candidate_date"), "{name}");
     }
+    assert!(linux.contains("mktemp -d"));
+    assert!(linux.contains("release-stage"));
+    assert!(linux.contains("verify_release_bundle.sh\" \"$PACKAGE_DIR"));
+    assert!(windows.contains("release_staging.ps1"));
+    assert!(windows.contains("-Mode Promote"));
+    assert!(read_project_file("scripts/release_staging.ps1").contains(".release-stage-"));
 
     assert!(
         attributes
             .lines()
             .any(|line| line == "legacy_nethack_port_reference export-ignore"),
         "legacy reference directory must be recursively excluded from git archive"
+    );
+    assert!(
+        attributes.lines().any(|line| line == "*.bat text eol=crlf"),
+        "Windows batch entrypoints require deterministic CRLF checkout"
     );
 }
 
@@ -200,34 +295,23 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
     ] {
         assert!(workflow.contains(command), "CI command: {command}");
     }
-    let uses = workflow
-        .lines()
-        .map(str::trim)
-        .filter_map(|line| {
-            line.strip_prefix("- uses:")
-                .or_else(|| line.strip_prefix("uses:"))
-        })
-        .map(str::trim)
-        .collect::<Vec<_>>();
+    let mut yaml_files = Vec::new();
+    github_yaml_files(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join(".github"),
+        &mut yaml_files,
+    );
+    yaml_files.sort();
+    let mut uses = Vec::new();
+    for path in &yaml_files {
+        let source = fs::read_to_string(path).unwrap();
+        uses.extend(action_uses_from_yaml(&source).unwrap());
+    }
     assert!(
         !uses.is_empty(),
-        "workflow must contain action uses entries"
+        ".github YAML must contain action uses entries"
     );
     for action in uses {
-        let (_, reference) = action
-            .rsplit_once('@')
-            .unwrap_or_else(|| panic!("action ref missing: {action}"));
-        assert_eq!(
-            reference.len(),
-            40,
-            "action ref must be a full SHA: {action}"
-        );
-        assert!(
-            reference
-                .chars()
-                .all(|character| character.is_ascii_hexdigit()),
-            "action ref must be a full SHA: {action}"
-        );
+        validate_remote_action_reference(&action).unwrap();
     }
     assert!(workflow.contains("# actions/checkout v4.4.0"));
     assert!(!workflow.contains("# actions/checkout v4.2.2"));
@@ -251,6 +335,41 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
     assert!(deny_config.contains("[sources]"));
     assert!(deny_config.contains("unknown-registry = \"deny\""));
     assert!(deny_config.contains("unknown-git = \"deny\""));
+}
+
+#[test]
+fn yaml_action_pin_gate_rejects_inline_spaced_nested_and_composite_mutable_refs() {
+    let fixture = r#"
+jobs:
+  inline:
+    steps:
+      - { uses: actions/setup-node@v4 }
+      - uses : actions/cache@v4
+      - uses: docker://alpine:3.22
+      - name: nested
+        with:
+          composite:
+            uses: owner/action/path@main
+"#;
+    let uses = action_uses_from_yaml(fixture).unwrap();
+    assert_eq!(uses.len(), 4);
+    for action in uses {
+        assert!(
+            validate_remote_action_reference(&action).is_err(),
+            "mutable ref가 거부되어야 합니다: {action}"
+        );
+    }
+
+    let local_and_pinned = r#"
+runs:
+  steps:
+    - uses: ./local-action
+    - uses: docker://alpine@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    - uses: owner/action@0123456789abcdef0123456789abcdef01234567
+"#;
+    for action in action_uses_from_yaml(local_and_pinned).unwrap() {
+        validate_remote_action_reference(&action).unwrap();
+    }
 }
 
 #[test]

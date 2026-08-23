@@ -303,7 +303,7 @@ impl GameSession {
     }
 
     fn submit_wait(&mut self) -> TurnOutcome {
-        let next_turn = self.turn + 1;
+        let next_turn = self.turn.saturating_add(1);
         self.accept_turn(vec![GameEvent::Waited { turn: next_turn }])
     }
 
@@ -336,7 +336,8 @@ impl GameSession {
                         trap: TrapKind::Pit,
                     },
                 ));
-                self.inner.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
             Err(error) => self.reject(format!("{error}")),
@@ -370,7 +371,7 @@ impl GameSession {
             attacker,
             defender,
         ));
-        self.inner.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+        self.inner.state = death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
         self.accept_turn(events)
     }
 
@@ -390,7 +391,8 @@ impl GameSession {
         let state = &mut self.inner;
         match projectiles::throw_item(&mut state.world, &mut state.rng, item, direction) {
             Ok(events) => {
-                self.inner.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
             Err(error) => self.reject(error),
@@ -439,7 +441,8 @@ impl GameSession {
         let state = &mut self.inner;
         match projectiles::zap_wand(&mut state.world, &mut state.rng, item, direction) {
             Ok(events) => {
-                self.inner.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
             Err(error) => self.reject(error),
@@ -518,7 +521,7 @@ impl GameSession {
     }
 
     fn accept_turn(&mut self, mut events: Vec<GameEvent>) -> TurnOutcome {
-        let next_turn = self.turn + 1;
+        let next_turn = self.turn.saturating_add(1);
         events.insert(0, GameEvent::TurnStarted { turn: next_turn });
         self.inner.turn = next_turn;
         self.inner.world.state_mut().nutrition = self.world.nutrition.saturating_sub(1);

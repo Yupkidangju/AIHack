@@ -1,6 +1,6 @@
 # AIHack Changelog
 
-## [0.3.0] - 2026-08-23
+## [0.3.0] - 2026-08-24
 
 ### Added
 
@@ -23,7 +23,7 @@
 - `SC-CAUSE-01`부터 `SC-CAUSE-07`까지 각 계약을 production 책임 심볼과 정확한 테스트 함수에 개별 매핑했다.
 - save 권한 계약을 Unix mode `0600`과 Windows parent DACL 상속으로 구분해 Windows owner-only 과대주장을 제거했다.
 - headless 기본 policy를 `survival-v1`, `--turns`를 `1..=1,000,000`으로 고정하고 public `DerefMut` mutation 우회를 제거했다.
-- v0.3.0 release modification 범위를 2026-08-23까지 확장하고 CI action을 immutable commit으로 고정했다.
+- v0.3.0 release modification 범위를 2026-08-24 candidate commit까지 확장하고 CI action을 immutable commit으로 고정했다.
 - report 25 재감사에 따라 save read/write 예산, replay path identity, GoldScore production pair, TUI dispatcher/CTA geometry, release output exact-set을 단일 production 계약으로 강화했다.
 - active audit authority를 `docs/audit/audit_report_25.md` HOLD로 전환하고 first final-audit remediation의 broad-green 주장을 partial historical evidence로 분류했다.
 
@@ -41,6 +41,7 @@
 - replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
 - Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.
 - Linux에서 O_PATH 기반 `cap_std::Dir`를 직접 fsync해 atomic save가 EBADF로 실패하던 문제를 capability 아래 `.`의 syncable directory descriptor 재open으로 수정했다.
+- report 26의 malformed scalar/ItemData, Win32 trailing-name alias, modal mouse·hidden Inspect CTA, causal producer-removal, release root/hardlink와 candidate-date 경계를 fail-closed 회귀로 수정했다.
 
 ### 2026-07-20 기준 누적 내역
 

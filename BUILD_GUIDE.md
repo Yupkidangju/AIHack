@@ -19,7 +19,7 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | report 25 implementation `b732c42d62f295f4d8be64480c1d0a5a440fe738`, [run `32650404618`](https://github.com/Yupkidangju/AIHack/actions/runs/32650404618), Ubuntu/Windows quality·platform bundle success | 독립 재감사 전 program HOLD |
+| CI | report 25 SHA `b732c42d`/run `32650404618`은 부분 evidence, report 26 표적 회귀 GREEN | 새 clean same-SHA Ubuntu/Windows actual bundle 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 
@@ -50,6 +50,7 @@ cargo 1.94.1 (...)
 - Bash: Linux script 및 로컬 audit
 - PowerShell 또는 cmd: Windows script
 - Windows test의 실제 ConPTY harness용 dev-only `portable-pty 0.9.0`(runtime/release binary dependency 아님)
+- 전체 GitHub workflow/composite action YAML을 구조 순회하는 dev-only `saphyr 0.0.12`(runtime/release binary dependency 아님)
 - `rg`: 문서·경계 audit
 - `cargo-audit 0.22.1`: RustSec dependency advisory gate
 - `cargo-deny 0.19.4`: license, source, duplicate dependency gate
@@ -144,18 +145,19 @@ cargo check --workspace --all-targets --locked
 3. release면 untracked file을 포함한 Git worktree가 clean인지 확인하고 아니면 중단
 4. debug면 `cargo build --workspace --all-targets --locked`
 5. release면 `cargo build --workspace --release --locked`
-6. host suffix를 계산해 두 binary를 `output/`에 복사
-7. `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`를 `output/`에 복사
-8. release commit이 적힌 `RELEASE-METADATA`와 `git archive` source를 생성
+6. 기존 `output/` root가 symlink/reparse가 아닌 workspace 직계 real directory인지 확인
+7. workspace 내부에 `mktemp`로 예측 불가능한 fresh staging root를 생성하고 두 binary와 필수 문서를 새 file로 복사
+8. exact release commit과 `candidate_date`가 적힌 `RELEASE-METADATA`와 `git archive` source를 staging에 생성
 9. binary, notice, source archive의 `SHA256SUMS`를 생성
-10. `scripts/verify_release_bundle.sh`로 archive 필수 파일, commit expansion, metadata key의 단일성·완전 값, owner/modification ID와 실제 record의 일치, checksum과 legacy 제외를 확인
-11. 하나라도 실패하면 exit code 1, 모두 통과하면 정확한 binary 경로 출력
+10. `scripts/verify_release_bundle.sh`로 root no-follow, expected single-link, archive 필수 파일, commit/date expansion, modification period, metadata exactness, checksum과 legacy 제외를 확인
+11. verifier PASS 뒤 staging directory를 `output/`에 rename 승격하고 검증된 이전 generated output만 정리
+12. 하나라도 실패하면 exit code 1과 staging 정리, 모두 통과하면 정확한 binary 경로 출력
 
 `cp ... || true`와 stderr 폐기는 금지한다.
 
 ### 5.2 Windows
 
-`build.bat [--release] [--test]`은 같은 계약을 수행하며 release source는 ZIP으로 생성한다. 필수 artifact:
+`build.bat [--release] [--test]`은 `scripts/release_staging.ps1`의 GUID fresh root와 directory promotion으로 같은 계약을 수행하며 release source는 ZIP으로 생성한다. 기존 output junction은 stage 생성 전에 실패하고 기존 expected-name hard link는 직접 쓰지 않는다. 필수 artifact:
 
 ```text
 output\aihack.exe
@@ -169,7 +171,7 @@ output\SHA256SUMS
 output\aihack-0.3.0-source.zip
 ```
 
-copy 실패 뒤 성공 메시지를 출력하면 R1 실패다. `scripts/verify_release_bundle.ps1`은 Linux verifier와 같은 fail-closed 항목을 검사한다: required/non-empty artifact, source archive 필수 record, blocked legacy/target/output path, metadata exact value와 중복 key, archive/output approval·modification record의 LF-normalized exact equality, SHA256SUMS의 정확한 file set·중복·hash 재검증이다.
+copy 실패 뒤 성공 메시지를 출력하면 R1 실패다. `scripts/verify_release_bundle.ps1`은 Linux verifier와 같은 fail-closed 항목을 검사한다: output path component reparse 부재, 열린 handle의 `GetFileInformationByHandle` single-link, required/non-empty artifact, source archive 필수 record, blocked legacy/target/output path, metadata exact value와 중복 key, exact candidate date의 modification period 포함, archive/output approval·modification record의 LF-normalized exact equality, SHA256SUMS의 정확한 file set·중복·hash 재검증이다.
 
 Windows negative fixture는 legacy include, metadata mismatch/duplicate, wrong hash, zero-size artifact, duplicate checksum record를 각각 nonzero로 고정한다. 정상 bundle만 exit 0이어야 하며 `build.bat --release`는 checksum 생성 직후 이 verifier를 반드시 호출한다.
 
@@ -224,9 +226,9 @@ CI tool 설치는 `cargo install --locked cargo-audit --version 0.22.1`과 `carg
 
 현재 license exception은 `dependency-exceptions.json`의 `DEP-EXC-0001` 하나이며 `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception`만 허용한다. capability filesystem의 Windows backend에 필요한 shipped dependency이며 owner는 Dependency owner / Release manager, 만료일은 2026-10-31이다. `winx` 또는 `cap-primitives`/`cap-std`/`cap-fs-ext`/`cap-tempfile` version 변경 시 만료일 전이라도 machine checker가 실패한다. 다른 crate에는 이 exception을 확장하지 않는다.
 
-`cargo test --locked -p aihack --test dependency_exception_gate`는 ledger, TOML AST로 parse한 `deny.toml`, exact resolved graph trigger 집합, dependency path와 현재 UTC 날짜를 함께 대조한다. comment decoy, deny table crate swap, trigger key 삭제, invalid calendar date, expiry, version/path drift는 각각 실패해야 하며, 이 gate와 cargo-deny 0.19.4가 함께 PASS해야 dependency license gate가 닫힌다.
+`cargo test --locked -p aihack --test dependency_exception_gate`는 ledger, TOML AST로 parse한 `deny.toml`, exact resolved graph trigger 집합, dependency path와 현재 UTC 날짜를 함께 대조한다. comment decoy, deny table crate swap, trigger key 삭제, invalid calendar date, 미래 approval, expiry, version/path drift는 각각 실패해야 하며, 이 gate와 cargo-deny 0.19.4가 함께 PASS해야 dependency license gate가 닫힌다. `tests/build_contract.rs`는 dev-only `saphyr`로 `.github/**/*.yml|yaml`의 모든 mapping node를 순회해 local/docker action을 제외한 원격 `uses` ref가 40자리 commit인지 검사한다.
 
-`dependency-duplicate-budget.json`은 cargo metadata에서 둘 이상의 version이 해석되는 family를 정확히 기록한다. owner는 Dependency owner / Release manager, shipped scope는 workspace all-target resolved graph이며 platform target/proc-macro와 ConPTY dev dependency도 포함한다. 현재 review date는 2026-08-24이고 dependency/target/dev-tool 변경 trigger를 필수 metadata로 둔다. 현재 budget은 23개 family이며 새 family, version 추가/제거, metadata 누락 또는 budget 초과는 `dependency_duplicate_gate`를 실패시켜 dependency review 없이는 조용히 확장되지 않는다.
+`dependency-duplicate-budget.json`은 cargo metadata에서 둘 이상의 version이 해석되는 family를 정확히 기록한다. owner는 Dependency owner / Release manager, shipped scope는 workspace all-target resolved graph이며 platform target/proc-macro, ConPTY와 YAML parser dev dependency도 포함한다. 현재 review date는 2026-08-24이고 dependency/target/dev-tool 변경 trigger를 필수 metadata로 둔다. 현재 budget은 24개 family이며 새 family, version 추가/제거, metadata 누락 또는 budget 초과는 `dependency_duplicate_gate`를 실패시켜 dependency review 없이는 조용히 확장되지 않는다.
 
 ## 7. R4 headless contract
 
@@ -435,7 +437,7 @@ scripts/r8_checkpoint.sh
 
 R8 checkpoint도 script-relative canonical repository만 검사한다. 승인된 완전 fixture는 PASS(exit 0), R7 approval·0.3.0 version·whole-work NGPL 또는 release metadata가 빠지면 HOLD(exit 1), LICENSE checksum·NOTICE/source packaging 계약·dependency version·archive chain이 손상되면 FAIL(exit 2)다. HOLD/FAIL에서는 release artifact를 게시하지 않는다.
 
-Linux/Windows release verifier는 `output/` top-level actual entry를 선언된 platform binary 2개, `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`, `RELEASE-METADATA`, platform source archive, `SHA256SUMS`의 exact set과 비교한다. extra file/directory, symbolic link 또는 Windows reparse point가 하나라도 있으면 checksum 내용과 무관하게 FAIL이다. build script가 기존 `output/`에 쓴 경우에도 마지막 verifier가 stale entry를 차단한다.
+Linux/Windows release verifier는 fresh staging 또는 승격된 `output/` root와 expected file의 link authority를 먼저 검사하고, top-level actual entry를 선언된 platform binary 2개, `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, `PROJECT_OWNER_LICENSE_APPROVAL.md`, `RELEASE-METADATA`, platform source archive, `SHA256SUMS`의 exact set과 비교한다. extra file/directory, symbolic link, hard link 또는 Windows reparse point가 하나라도 있으면 checksum 내용과 무관하게 FAIL이다. build는 기존 output inode에 쓰지 않고 verifier PASS stage만 directory 단위로 승격한다.
 
 - [x] R1~R7 engineering 단계 완료, R7은 license review가 이관된 `PASS WITH KNOWN RISKS`
 - [x] R8 fail-closed preflight와 canonical-root 회귀 테스트
@@ -456,8 +458,9 @@ Linux/Windows release verifier는 `output/` top-level actual entry를 선언된 
 - [x] 프로젝트 로컬 cargo-deny 0.19.4 `licenses`, `bans`, `sources` 실제 PASS — winx 0.36.4 한정 exception
 - [x] report 20 문서 시정 독립 재감사 PASS — `audit_report_21.md`
 - [x] report 23/24 시정 재감사와 same-SHA CI — `audit_report_24.md`, Actions `32107862171`
-- [x] `docs/audit/audit_report_25.md` 시정 전체 gate·clean same-SHA CI — `b732c42d`, Actions `32650404618`
-- [ ] report 25 시정 독립 재감사 — 외부 게시 HOLD
+- [x] `docs/audit/audit_report_25.md` 시정 전체 gate·clean same-SHA CI — 부분 evidence `b732c42d`, Actions `32650404618`
+- [x] `docs/audit/audit_report_26.md` malformed save/alias/producer/modal/release/date/P1 표적 회귀 GREEN
+- [ ] report 26 시정 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle — 외부 게시 HOLD
 - [x] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171`
 
-기존 R8 문서 시정은 report 21이, report 23/24 시정은 report 24와 Actions `32107862171`이 종결했다. final multi-audit report 1의 첫 시정 주장은 report 25가 재현한 production 결함 때문에 역사적 partial evidence로 강등한다. 현재 authority는 `docs/audit/audit_report_25.md`이며 시정 구현은 SHA `b732c42d`의 Actions `32650404618`에서 양 OS Verified다. 독립 재감사와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
+기존 R8 문서 시정은 report 21이, report 23/24 시정은 report 24와 Actions `32107862171`이 종결했다. report 25 시정과 Actions `32650404618`은 부분 positive evidence다. 현재 authority는 `docs/audit/audit_report_26.md`이며 새 전체 로컬 gate, clean same-SHA 양 OS bundle, 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.

@@ -200,7 +200,7 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
 
     let modifications = project_file("MODIFICATIONS.md");
     for phrase in [
-        "2025-05-20..2026-08-23",
+        "2025-05-20..2026-08-24",
         "src/**",
         "crates/**",
         "apps/**",
@@ -217,8 +217,26 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
     let metadata = project_file("RELEASE-METADATA");
     assert!(metadata.contains("version=0.3.0"));
     assert!(metadata.contains("commit=$Format:%H$"));
+    assert!(metadata.contains("candidate_date=$Format:%cs$"));
     assert!(metadata.contains("owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01"));
-    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-08-23-02"));
+    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-08-24-01"));
+}
+
+#[test]
+fn release_metadata_and_manifest_cover_the_candidate_commit_date() {
+    let metadata = project_file("RELEASE-METADATA");
+    assert!(
+        metadata
+            .lines()
+            .any(|line| line == "candidate_date=$Format:%cs$"),
+        "candidate commit date export placeholder가 필요합니다"
+    );
+
+    let modifications = project_file("MODIFICATIONS.md");
+    assert!(
+        modifications.contains("Covered change period: `2025-05-20..2026-08-24`"),
+        "2026-08-24 candidate를 포함하는 modification period가 필요합니다"
+    );
 }
 
 #[test]
@@ -324,7 +342,7 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     );
     for reference in [
         "owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01",
-        "modification_notice=AIHACK-MODIFICATIONS-2026-08-23-02",
+        "modification_notice=AIHACK-MODIFICATIONS-2026-08-24-01",
     ] {
         assert!(linux.contains(reference), "build.sh 누락: {reference}");
         assert!(windows.contains(reference), "build.bat 누락: {reference}");

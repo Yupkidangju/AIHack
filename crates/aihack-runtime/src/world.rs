@@ -232,7 +232,7 @@ impl GameWorld {
             .entries
             .iter()
             .filter_map(|entry| self.entities.item_data(entry.item).map(|data| data.weight))
-            .sum()
+            .fold(0, i16::saturating_add)
     }
 
     pub fn status(&self) -> Status {
@@ -268,6 +268,10 @@ impl GameWorld {
             registry: registry.clone(),
             corpse_jackal_data,
         })
+    }
+
+    pub(crate) fn content_registry(&self) -> &ContentRegistry {
+        &self.registry
     }
 
     pub(crate) fn corpse_jackal_data(&self) -> aihack_core::domain::item::ItemData {
@@ -327,6 +331,6 @@ impl DeathScoreView for GameWorld {
             .iter()
             .filter_map(|entry| self.entities.item_data(entry.item))
             .map(|data| data.base_price)
-            .sum()
+            .fold(0, u32::saturating_add)
     }
 }

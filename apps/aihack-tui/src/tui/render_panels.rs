@@ -203,17 +203,16 @@ pub fn inspect_lines(
     focused_panel: UiPanel,
     decision_lines: &[String],
 ) -> Vec<String> {
-    if let Some(pos) = hovered {
-        return hovered_inspect_lines(observation, pos);
-    }
-
-    if !decision_lines.is_empty() {
-        let mut lines = decision_lines.iter().take(4).cloned().collect::<Vec<_>>();
-        lines.push(format!("focus {:?}", focused_panel));
-        return lines;
-    }
-
-    let mut lines = inventory_lines(observation);
+    let mut lines = match super::input::inspect_presentation(hovered, decision_lines) {
+        super::input::InspectPresentation::Hover => hovered_inspect_lines(
+            observation,
+            hovered.expect("hover presentation has a position"),
+        ),
+        super::input::InspectPresentation::Decision => {
+            decision_lines.iter().take(4).cloned().collect::<Vec<_>>()
+        }
+        super::input::InspectPresentation::Inventory => inventory_lines(observation),
+    };
     lines.push(format!("focus {:?}", focused_panel));
     lines
 }

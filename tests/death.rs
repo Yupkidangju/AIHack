@@ -55,7 +55,6 @@ fn player_death_enters_game_over() {
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         let stats = world.saved().entities.actor_stats_mut(player).unwrap();
         stats.hp = 1;
-        stats.ac = -20;
         world.saved().entities.set_alive(EntityId(3), false);
     });
 

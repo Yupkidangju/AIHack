@@ -17,6 +17,26 @@ pub enum UiPanel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InspectPresentation {
+    Inventory,
+    Hover,
+    Decision,
+}
+
+pub fn inspect_presentation(
+    hovered: Option<Pos>,
+    decision_lines: &[String],
+) -> InspectPresentation {
+    if hovered.is_some() {
+        InspectPresentation::Hover
+    } else if decision_lines.is_empty() {
+        InspectPresentation::Inventory
+    } else {
+        InspectPresentation::Decision
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiInputEvent {
     Key(CommandIntent),
     MouseHover { column: u16, row: u16 },
@@ -275,6 +295,7 @@ pub fn map_mouse_event(
     layout: TuiLayout,
     viewport: Viewport,
     observation: &Observation,
+    inspect_presentation: InspectPresentation,
 ) -> Option<UiCommandCandidate> {
     match event {
         UiInputEvent::MouseHover { column, row } => viewport
@@ -289,8 +310,14 @@ pub fn map_mouse_event(
                     .map(|direction| UiCommandCandidate::Command(CommandIntent::Move(direction)))
                     .or(Some(UiCommandCandidate::Inspect(pos)))
             } else if contains(layout.inspect, column, row) {
-                inspect_panel_click_candidate(layout.inspect, column, row, observation)
-                    .or(Some(UiCommandCandidate::Focus(UiPanel::Inspect)))
+                inspect_panel_click_candidate(
+                    layout.inspect,
+                    column,
+                    row,
+                    observation,
+                    inspect_presentation,
+                )
+                .or(Some(UiCommandCandidate::Focus(UiPanel::Inspect)))
             } else if contains(layout.status, column, row) {
                 Some(UiCommandCandidate::Focus(UiPanel::Status))
             } else if contains(layout.command, column, row) {
@@ -343,7 +370,11 @@ fn inspect_panel_click_candidate(
     column: u16,
     row: u16,
     observation: &Observation,
+    presentation: InspectPresentation,
 ) -> Option<UiCommandCandidate> {
+    if presentation != InspectPresentation::Inventory {
+        return None;
+    }
     let row_index = row.checked_sub(inspect.y + 1)? as usize;
     let offset = column.checked_sub(inspect.x)? as usize;
     let cta = inventory_panel_ctas(observation).get(row_index)?.clone();
