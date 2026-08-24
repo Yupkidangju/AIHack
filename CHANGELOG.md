@@ -1,6 +1,6 @@
 # AIHack Changelog
 
-## [0.3.0] - 2026-08-24
+## [0.3.0] - 2026-08-25
 
 ### Added
 
@@ -23,7 +23,7 @@
 - `SC-CAUSE-01`부터 `SC-CAUSE-07`까지 각 계약을 production 책임 심볼과 정확한 테스트 함수에 개별 매핑했다.
 - save 권한 계약을 Unix mode `0600`과 Windows parent DACL 상속으로 구분해 Windows owner-only 과대주장을 제거했다.
 - headless 기본 policy를 `survival-v1`, `--turns`를 `1..=1,000,000`으로 고정하고 public `DerefMut` mutation 우회를 제거했다.
-- v0.3.0 release modification 범위를 2026-08-24 candidate commit까지 확장하고 CI action을 immutable commit으로 고정했다.
+- v0.3.0 release modification 범위를 2026-08-25 candidate commit까지 확장하고 CI action을 immutable commit으로 고정했다.
 - report 25 재감사에 따라 save read/write 예산, replay path identity, GoldScore production pair, TUI dispatcher/CTA geometry, release output exact-set을 단일 production 계약으로 강화했다.
 - active audit authority를 `docs/audit/audit_report_25.md` HOLD로 전환하고 first final-audit remediation의 broad-green 주장을 partial historical evidence로 분류했다.
 - report 27 계약에 따라 9종 causal isolation을 command/observer 생략이 없는 field-only active/control pair와 나머지 8개 attribution record equality로 강화했다.
@@ -55,6 +55,8 @@
 - report 30 successor SHA `ed02dbf`의 Actions `32733235414`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
 - report 31이 재현한 implementation summary 1·10·11절 lifecycle 불일치를 시정 대상으로 등록하고, predecessor current 표현과 완료된 predecessor 구현·CI 재개방을 report 번호 기반 generic negative gate로 차단하도록 계약을 강화했다.
 - report 31 successor SHA `8c042d48`의 Actions `32741917348`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+- Report 32에서 Report 31 lifecycle finding과 FIN-F012를 독립 종결하고, current HEAD 날짜가 modification period를 넘긴 R32-DBG-F001/FIN-F015를 새 HOLD로 등록했다.
+- release modification evidence를 `2026-08-25`까지 확장하고 literal self-check를 actual HEAD candidate-date containment regression으로 교체하는 계약을 ADR-0042로 동결했다.
 - inverse inventory owner/index, actor HP/alive와 armor overflow malformed save가 수용되거나 panic하던 경계를 typed `InvalidSave`로 닫고, writer가 self-unloadable 16 MiB 초과 save를 게시하지 않도록 수정했다.
 - replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
 - Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.

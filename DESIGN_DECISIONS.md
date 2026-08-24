@@ -12,9 +12,40 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0042: report 32 current-HEAD modification evidence와 final-SHA CI
+
+Status: Implemented with full local quality gate verified; clean Windows/Linux bundle and final-SHA CI pending (2026-08-25)
+Date: 2026-08-25
+Decision ID: DEC-AUDIT-R32-01
+
+Context:
+
+Report 32는 Report 31 lifecycle finding과 FIN-F012를 독립 종결했다. 그러나 final evidence commit `8045249`의 commit date는 `2026-08-25`이고 bundled modification period와 Notice ID는 `2026-08-24`에 머물러 clean Windows bundle이 source identity 검증 뒤 candidate-date 범위 오류로 실패했다. 기존 `license_compliance`는 실제 HEAD 날짜 대신 literal 2026-08-24만 확인해 이 불일치를 actual bundle 전에는 검출하지 못했다.
+
+Decision:
+
+- 단일 current authority는 `docs/audit/audit_report_32.md`다.
+- Report 31 lifecycle remediation은 historical independent closure로 보존하고 R32-DBG-F001/FIN-F015 및 PROGRAM/PUBLICATION HOLD를 current 상태로 둔다.
+- 배포 modification evidence를 Notice ID `AIHACK-MODIFICATIONS-2026-08-25-01`, covered period `2025-05-20..2026-08-25`로 갱신하고 metadata, build scripts, 양 verifier, R8 checkpoint와 tests에 exact value로 원자 전파한다.
+- candidate date의 source of truth는 wall-clock이 아니라 exact final commit의 `git show -s --format=%cs`다. `license_compliance`는 current HEAD 날짜와 `MODIFICATIONS.md`의 단일 period를 직접 파싱해 `start <= candidate <= end`를 조기 강제한다.
+- Linux/Windows verifier의 strict calendar와 out-of-period fail-closed 경계는 완화하지 않는다. fixture는 period 이전·종료일·다음 날에서 종료일까지 두 값만 허용한다.
+- CI 결과를 기록하려고 final SHA 뒤에 evidence-only commit을 만들지 않는다. remediation과 검증 절차를 포함한 final commit을 먼저 만들고, 그 exact `headSha`의 GitHub Actions completed-success run을 외부 불변 evidence로 사용한다.
+- 전체 local gate, clean Windows bundle과 Ubuntu runner의 clean Linux bundle, 동일 final SHA Ubuntu/Windows CI를 통과해도 후속 독립 감사와 별도 게시 승인 전까지 HOLD를 유지한다.
+
+Alternatives:
+
+- verifier가 manifest 종료일을 자동으로 현재 시각까지 늘림: 배포 증거를 build가 사후 조작하고 stale manifest를 은폐하므로 기각한다.
+- out-of-period를 warning으로 낮춤: complete corresponding source의 modification evidence를 fail-open하므로 기각한다.
+- 기존 2026-08-24 Notice ID만 유지하고 기간만 변경: ID가 가리키는 evidence revision을 숨기므로 새 날짜 ID로 함께 갱신한다.
+- CI 성공 후 결과 문서 commit을 추가하고 predecessor CI를 인용: final HEAD와 검증 SHA가 다시 갈라지는 Report 32 재현을 반복하므로 기각한다.
+
+Consequences:
+
+2026-08-25에 만들어지는 final commit은 bundled manifest 범위에 포함된다. 이후 날짜의 commit은 새 modification evidence revision 없이는 조기 test와 actual verifier에서 실패한다. source/test/document 변경과 RED/GREEN, 전체 gate 및 final-SHA CI 절차는 `docs/audit/audit_report_32_remediation.md`에 기록한다.
+
 ## ADR-0041: report 31 summary lifecycle과 generic predecessor gate
 
-Status: Implemented and clean same-SHA Ubuntu/Windows actual bundles verified; independent re-audit pending (2026-08-25)
+Status: Superseded in active authority by ADR-0042; independently closed by Report 32 (2026-08-25)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R31-01
 

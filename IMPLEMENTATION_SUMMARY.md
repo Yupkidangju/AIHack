@@ -15,13 +15,15 @@
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
-현재 권위는 `docs/audit/audit_report_31.md`다.
+현재 권위는 `docs/audit/audit_report_32.md`다.
 
-Report 31은 Report 30 기술/API 시정을 독립 검증하고 implementation summary 후반 false-green을 다시 열었다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~29 successor 계보는 historical/technical evidence로 보존한다.
+Report 32는 Report 31의 implementation summary 후반 false-green 시정과 FIN-F012를 독립 종결했다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~30 successor 계보는 historical/technical evidence로 보존한다.
 
 report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence로 보존한다. report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 submit-only visibility, external compile, Report 29 regression, 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐고 Report 31이 이 기술/API 경계를 독립 확인했다.
 
-Report 31 시정은 summary 1·10·11절 current exact-one과 predecessor lifecycle generic negative gate를 구현했고 전체 local quality gate 453 tests를 PASS했다. docs evidence successor `8c042d48/32741917348`에서 clean same-SHA Ubuntu/Windows actual bundle, RustSec, cargo-deny 0.19.4와 lockfile 불변까지 Verified됐다. 남은 단계는 후속 독립 PASS와 별도 게시 승인뿐이며 그 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+Report 31 시정은 summary 1·10·11절 current exact-one과 predecessor lifecycle generic negative gate를 구현했고 successor `8c042d48/32741917348`에서 clean same-SHA 양 OS actual bundle까지 Verified된 historical closure다.
+
+Report 32가 current HEAD `8045249`의 commit date `2026-08-25`와 modification period end `2026-08-24` 불일치로 R32-DBG-F001/FIN-F015를 열었다. Notice ID/period, metadata/build/verifier/checkpoint/tests의 2026-08-25 원자 동기화와 actual HEAD-date 조기 gate는 전체 local quality gate 453 tests까지 PASS했다. 남은 작업은 clean Windows/Linux actual bundle과 final same-SHA 양 OS CI다. 후속 독립 PASS와 별도 게시 승인 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -927,7 +929,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/audit/audit_report_31.md` 시정의 후속 독립 재감사와 별도 사용자 게시 승인이다. ADR-0041 generic gate, 전체 local quality gate 453 tests와 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle은 PASS했다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `docs/audit/audit_report_32.md` 시정의 clean candidate Windows actual bundle과 final SHA Ubuntu/Windows CI다. ADR-0042 modification evidence, actual HEAD `%cs` containment regression과 전체 local quality gate 453 tests는 PASS했다. Ubuntu actual bundle이 Linux 권위 실행이며 Report 31 lifecycle finding은 independent closure로 다시 열지 않는다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 Report 30 technical successor `ed02dbf/32733235414`의 ADR-0040 public visibility, Report 29 기술 회귀와 양 OS actual bundle은 완료된 Verified evidence이며 lifecycle을 재개방하지 않는다.
 
@@ -939,9 +941,9 @@ DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.
 
 역사 기록 (2026-08-18~24): R9 causal field-only A/B와 나머지 8개 record equality는 report 27 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했고 `9725c378/32694375654`에서 해당 시정도 양 OS Verified됐다. report 29 technical successor `a91a9c7/32706869079`는 content/allocator/TUI/archive 회귀를, report 30 technical successor `ed02dbf/32733235414`는 submit-only public visibility와 전체 gate를 양 OS Verified했다.
 
-현재 authority는 `docs/audit/audit_report_31.md`다.
+현재 authority는 `docs/audit/audit_report_32.md`다.
 
-Report 31이 R9/Report 29 기술 회귀와 Report 30 public visibility를 Verified했고, summary lifecycle generic negative gate와 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle도 PASS했다. 남은 current 작업은 후속 독립 재감사이며 그 전에는 전체 program PASS를 선언하지 않는다.
+Report 31은 R9/Report 29 기술 회귀, Report 30 public visibility와 summary lifecycle generic gate를 독립 종결했다. Report 32의 current release-date HOLD는 R9 closure를 재개방하지 않는다. ADR-0042와 전체 local quality gate는 PASS했지만 R32-DBG-F001/FIN-F015의 clean actual bundle, final same-SHA CI와 후속 독립 PASS 전에는 전체 program PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 

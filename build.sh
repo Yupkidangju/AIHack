@@ -107,7 +107,7 @@ done
 if [ "$BUILD_TYPE" = "release" ]; then
     release_commit=$(git rev-parse HEAD)
     candidate_date=$(git show -s --format=%cs HEAD)
-    printf 'product=AIHack\nversion=0.3.0\ncommit=%s\ncandidate_date=%s\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n' \
+    printf 'product=AIHack\nversion=0.3.0\ncommit=%s\ncandidate_date=%s\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-25-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n' \
         "$release_commit" "$candidate_date" >"$PACKAGE_DIR/RELEASE-METADATA"
     source_archive="$PACKAGE_DIR/aihack-0.3.0-source.tar.gz"
     git archive --format=tar.gz --output="$source_archive" HEAD

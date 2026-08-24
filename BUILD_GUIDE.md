@@ -20,7 +20,8 @@
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
 | CI technical baseline | report 30 technical successor `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`, [run `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414), Ubuntu/Windows 각 19 success step과 actual platform bundle success 및 Report 31 독립 API 검증 | Verified |
-| CI current remediation | report 31 summary lifecycle generic gate; successor `8c042d48/32741917348` clean same-SHA Ubuntu/Windows actual bundle success | 후속 독립 PASS 전 program HOLD |
+| CI historical closure | report 31 summary lifecycle/FIN-F012; successor `8c042d48/32741917348` clean same-SHA 양 OS actual success | Report 32 independent Closed |
+| CI current remediation | report 32 R32-DBG-F001/FIN-F015; 2026-08-25 Notice ID/period와 full local 453 tests PASS | clean actual bundle, final same-SHA 양 OS evidence와 후속 독립 PASS 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 
@@ -473,4 +474,6 @@ Linux/Windows release verifier는 fresh staging 또는 승격된 `output/` root�
 
 기존 report 21~29 계보는 historical/technical evidence로 보존한다. report 30 technical successor `ed02dbf/32733235414`의 전체 gate와 clean same-SHA 양 OS actual bundle 및 Report 31 public visibility 검증은 완료됐다.
 
-현재 authority는 `docs/audit/audit_report_31.md`다. summary lifecycle generic negative gate와 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle은 Verified됐다. 후속 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
+Report 31 summary lifecycle/FIN-F012는 successor `8c042d48/32741917348`와 Report 32에서 independent Closed로 종결됐다.
+
+현재 authority는 `docs/audit/audit_report_32.md`다. R32-DBG-F001/FIN-F015에 따라 final commit `%cs`가 `AIHACK-MODIFICATIONS-2026-08-25-01`의 `2025-05-20..2026-08-25` period 안인지 test와 양 verifier에서 확인한다. final same-SHA 양 OS evidence, 후속 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.

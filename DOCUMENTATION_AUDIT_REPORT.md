@@ -269,9 +269,15 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - ADR-0040과 `docs/audit/audit_report_30_remediation.md`가 문서 우선 계약, external compile RED/GREEN과 새 gate를 추적한다.
 - ADR-0040 successor `ed02dbf/32733235414`의 전체 gate와 clean same-SHA Ubuntu/Windows actual bundle 및 Report 31 독립 API 검증은 Verified됐다.
 
-### 10.18 `docs/audit/audit_report_31.md` 현재 상태 (2026-08-24)
+### 10.18 `docs/audit/audit_report_31.md` 역사적 independent closure (2026-08-25)
 
-- report 31이 implementation summary 1·10·11절 lifecycle과 document regression source의 단일 현재 권위다.
+- report 31은 implementation summary 1·10·11절 lifecycle과 document regression source를 시정한 predecessor다.
 - ADR-0041과 `docs/audit/audit_report_31_remediation.md`가 report 번호 기반 predecessor current/completed-work generic negative gate의 RED/GREEN을 추적한다.
 - Report 30 public visibility와 Report 29 기술 회귀는 독립 Verified다.
-- Report 31 시정의 전체 local quality gate 453 tests와 successor `8c042d48/32741917348` clean same-SHA Ubuntu/Windows actual bundle은 Verified됐다. 후속 독립 PASS와 별도 게시 승인 전까지 program/publication HOLD다.
+- Report 31 시정의 전체 local quality gate 453 tests와 successor `8c042d48/32741917348` clean same-SHA Ubuntu/Windows actual bundle은 Verified됐고 Report 32가 FIN-F012와 함께 independent Closed로 종결했다.
+
+### 10.19 `docs/audit/audit_report_32.md` 현재 상태 (2026-08-25)
+
+- report 32가 current HEAD release candidate date와 modification evidence lifecycle의 단일 현재 권위다.
+- ADR-0042와 `docs/audit/audit_report_32_remediation.md`가 R32-DBG-F001/FIN-F015의 Notice ID/period, actual HEAD-date 조기 gate와 final-SHA bundle을 추적한다.
+- current HEAD `8045249` date `2026-08-25`가 bundled period end `2026-08-24` 밖이어서 actual Windows bundle은 fail-closed했다. ADR-0042의 2026-08-25 Notice ID/period, actual HEAD-date 조기 regression과 전체 local quality gate 453 tests는 PASS했다. clean actual bundle, final same-SHA 양 OS evidence와 후속 독립 PASS 및 별도 게시 승인 전까지 program/publication HOLD다.

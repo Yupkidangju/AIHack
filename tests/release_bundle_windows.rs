@@ -8,7 +8,7 @@ use std::{
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
-const CANDIDATE_DATE: &str = "2026-08-24";
+const CANDIDATE_DATE: &str = "2026-08-25";
 
 #[derive(Clone, Copy, Debug)]
 enum Fault {
@@ -43,6 +43,7 @@ enum Fault {
     YearZeroCalendar,
     MinimumYearCalendar,
     MaximumYearCalendar,
+    CandidateBeforePeriodEnd,
 }
 
 struct Fixture {
@@ -80,10 +81,11 @@ impl Fixture {
             Fault::YearZeroCalendar => "0000-06-15",
             Fault::MinimumYearCalendar => "0001-06-15",
             Fault::MaximumYearCalendar => "9999-06-15",
+            Fault::CandidateBeforePeriodEnd => "2026-08-24",
             _ => CANDIDATE_DATE,
         };
         let metadata = format!(
-            "product=AIHack\nversion=0.3.0\ncommit=$Format:%H$\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
+            "product=AIHack\nversion=0.3.0\ncommit=$Format:%H$\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-25-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
         );
         fs::write(source.join("RELEASE-METADATA"), &metadata).unwrap();
         fs::write(
@@ -95,8 +97,8 @@ impl Fixture {
             let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
                 .unwrap()
                 .replace(
+                    "Covered change period: `2025-05-20..2026-08-25`",
                     "Covered change period: `2025-05-20..2026-08-24`",
-                    "Covered change period: `2025-05-20..2026-08-23`",
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
         }
@@ -117,7 +119,7 @@ impl Fixture {
             let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
                 .unwrap()
                 .replace(
-                    "Covered change period: `2025-05-20..2026-08-24`",
+                    "Covered change period: `2025-05-20..2026-08-25`",
                     replacement,
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
@@ -132,7 +134,7 @@ impl Fixture {
             let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
                 .unwrap()
                 .replace(
-                    "Covered change period: `2025-05-20..2026-08-24`",
+                    "Covered change period: `2025-05-20..2026-08-25`",
                     edge_period,
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
@@ -169,8 +171,8 @@ impl Fixture {
         }
         let status = Command::new("git")
             .args(["commit", "-qm", "release fixture"])
-            .env("GIT_AUTHOR_DATE", "2026-08-24T12:00:00+09:00")
-            .env("GIT_COMMITTER_DATE", "2026-08-24T12:00:00+09:00")
+            .env("GIT_AUTHOR_DATE", "2026-08-25T12:00:00+09:00")
+            .env("GIT_COMMITTER_DATE", "2026-08-25T12:00:00+09:00")
             .current_dir(&source)
             .status()
             .unwrap();
@@ -363,6 +365,7 @@ fn windows_verifier_accepts_complete_bundle_normal_similar_name_and_calendar_edg
         Fault::SimilarLegacyName,
         Fault::MinimumYearCalendar,
         Fault::MaximumYearCalendar,
+        Fault::CandidateBeforePeriodEnd,
     ] {
         let fixture = Fixture::new(fault);
         let output = fixture.verify();

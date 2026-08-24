@@ -200,8 +200,8 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
 
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
-    assert!(compatibility.contains("current authority `docs/audit/audit_report_31.md`"));
-    assert!(compatibility.contains("report 30 technical successor"));
+    assert!(compatibility.contains("current authority `docs/audit/audit_report_32.md`"));
+    assert!(compatibility.contains("report 31 lifecycle/FIN-F012 independently Closed"));
 }
 
 #[test]
@@ -240,7 +240,8 @@ fn r8_documentation_self_check_is_current_without_rewriting_the_r0_audit() {
     assert!(report.contains("audit_report_28.md` 역사적 predecessor 상태"));
     assert!(report.contains("audit_report_29.md` 역사적 technical predecessor 상태"));
     assert!(report.contains("audit_report_30.md` 역사적 technical predecessor 상태"));
-    assert!(report.contains("audit_report_31.md` 현재 상태"));
+    assert!(report.contains("audit_report_31.md` 역사적 independent closure"));
+    assert!(report.contains("audit_report_32.md` 현재 상태"));
 
     for phrase in [
         "Cargo/README/CHANGELOG 0.3.0",
@@ -271,8 +272,8 @@ fn r8_documentation_self_check_is_current_without_rewriting_the_r0_audit() {
 }
 
 #[test]
-fn active_document_sections_have_one_report_31_authority_and_reject_predecessors() {
-    const CURRENT: &str = "docs/audit/audit_report_31.md";
+fn active_document_sections_have_one_report_32_authority_and_reject_predecessors() {
+    const CURRENT: &str = "docs/audit/audit_report_32.md";
     const STALE: &[&str] = &[
         "report 28 remediation `9725c378/32694375654` same-SHA verified",
         "문서 계약 동결 완료 / 구현·검증 진행 중",
@@ -290,12 +291,12 @@ fn active_document_sections_have_one_report_31_authority_and_reject_predecessors
             .unwrap_or_else(|error| panic!("README {heading}: {error}"));
     }
     let implementation_order = markdown_section(&readme, "### 구현 순서", "### 문서");
-    assert!(implementation_order.contains("audit_report_31.md"));
+    assert!(implementation_order.contains("audit_report_32.md"));
     assert!(!implementation_order.contains("audit_report_26.md` 시정"));
     let document_links = markdown_section(&readme, "### 문서", "## English");
-    assert!(document_links.contains("[Current re-audit](docs/audit/audit_report_31.md)"));
+    assert!(document_links.contains("[Current re-audit](docs/audit/audit_report_32.md)"));
     assert!(
-        document_links.contains("[current remediation](docs/audit/audit_report_31_remediation.md)")
+        document_links.contains("[current remediation](docs/audit/audit_report_32_remediation.md)")
     );
 
     let summary = project_file("IMPLEMENTATION_SUMMARY.md");
@@ -324,15 +325,15 @@ fn active_document_sections_have_one_report_31_authority_and_reject_predecessors
 
     let decisions = project_file("DESIGN_DECISIONS.md");
     validate_current_authority(
-        markdown_section(&decisions, "## ADR-0041:", "## ADR-0040:"),
+        markdown_section(&decisions, "## ADR-0042:", "## ADR-0041:"),
         CURRENT,
         STALE,
     )
     .unwrap();
-    assert!(decisions.contains("Status: Superseded in active authority by ADR-0041"));
+    assert!(decisions.contains("Status: Superseded in active authority by ADR-0042"));
 
     let documentation = project_file("DOCUMENTATION_AUDIT_REPORT.md");
-    let current_documentation = &documentation[documentation.find("### 10.18").unwrap()..];
+    let current_documentation = &documentation[documentation.find("### 10.19").unwrap()..];
     validate_current_authority(current_documentation, CURRENT, STALE).unwrap();
 
     let roadmap = project_file("audit_roadmap.md");
@@ -341,7 +342,7 @@ fn active_document_sections_have_one_report_31_authority_and_reject_predecessors
         roadmap_current_start + roadmap[roadmap_current_start..].find("```bash").unwrap();
     let roadmap_current = &roadmap[roadmap_current_start..roadmap_current_end];
     validate_current_authority(roadmap_current, CURRENT, STALE).unwrap();
-    assert!(roadmap_current.contains("successor `ed02dbf/32733235414`"));
+    assert!(roadmap_current.contains("report 31 successor `8c042d48/32741917348`"));
     let roadmap_final = &roadmap[roadmap.find("현재 구현 판정:").unwrap()..];
     validate_current_authority(roadmap_final, CURRENT, STALE).unwrap();
 
@@ -356,39 +357,43 @@ fn active_document_sections_have_one_report_31_authority_and_reject_predecessors
     let designs = project_file("designs.md");
     let designs_header = &designs[..designs.find("## 1. 경험 목표").unwrap()];
     validate_current_authority(designs_header, CURRENT, STALE).unwrap();
-    assert!(designs_header.contains(
-        "report 30 technical successor `ed02dbf/32733235414` clean same-SHA 양 OS actual bundle과 public visibility independent Verified"
-    ));
+    assert!(designs_header
+        .contains("report 31 lifecycle/FIN-F012 independently Closed with `8c042d48/32741917348`"));
 
     let compatibility = project_file("docs/compatibility/README.md");
     let compatibility_header = &compatibility[..compatibility.find("## 1. 목적").unwrap()];
     validate_current_authority(compatibility_header, CURRENT, STALE).unwrap();
-    assert!(compatibility_header.contains(
-        "report 30 technical successor `ed02dbf/32733235414` feature-gated C010/public visibility와 양 OS actual bundle independent Verified"
-    ));
+    assert!(compatibility_header
+        .contains("report 31 lifecycle/FIN-F012 independently Closed with `8c042d48/32741917348`"));
 
     let report_29_remediation = project_file("docs/audit/audit_report_29_remediation.md");
     let report_29_header = &report_29_remediation[..report_29_remediation
         .find("## 1. Finding 대조와 결정")
         .unwrap()];
     validate_current_authority(report_29_header, CURRENT, STALE).unwrap();
-    assert!(report_29_header.contains(
-        "REPORT 30 `ed02dbf/32733235414` clean same-SHA 양 OS actual·independent Verified"
-    ));
+    assert!(report_29_header.contains("REPORT 31 lifecycle/FIN-F012 independently Closed"));
 
     let report_30_remediation = project_file("docs/audit/audit_report_30_remediation.md");
     let report_30_header = &report_30_remediation[..report_30_remediation
         .find("## 1. Finding 대조와 결정")
         .unwrap()];
     validate_current_authority(report_30_header, CURRENT, STALE).unwrap();
-    assert!(report_30_header.contains("REPORT 31 implementation-summary lifecycle remediation"));
+    assert!(report_30_header
+        .contains("REPORT 31 implementation-summary lifecycle/FIN-F012 independently Closed"));
 
     let report_31_remediation = project_file("docs/audit/audit_report_31_remediation.md");
     let report_31_header = &report_31_remediation[..report_31_remediation
         .find("## 1. Finding 대조와 결정")
         .unwrap()];
     validate_current_authority(report_31_header, CURRENT, STALE).unwrap();
-    assert!(report_31_header.contains("Report 30 public visibility"));
+    assert!(report_31_header.contains("R29-DOC-F002 Re-audit #3 / FIN-F012 independently Closed"));
+
+    let report_32_remediation = project_file("docs/audit/audit_report_32_remediation.md");
+    let report_32_header = &report_32_remediation[..report_32_remediation
+        .find("## 1. Finding 대조와 결정")
+        .unwrap()];
+    validate_current_authority(report_32_header, CURRENT, STALE).unwrap();
+    assert!(report_32_header.contains("R32-DBG-F001·FIN-F015"));
 
     let valid = format!("현재 권위는 `{CURRENT}`다.");
     assert!(validate_current_authority(&valid, CURRENT, STALE).is_ok());
@@ -406,6 +411,11 @@ fn active_document_sections_have_one_report_31_authority_and_reject_predecessors
         "現在の権威は `docs/audit/audit_report_30.md` です。",
         "目前權威是 `docs/audit/audit_report_30.md`。",
         "当前权威是 `docs/audit/audit_report_30.md`。",
+        "현재 권위는 `docs/audit/audit_report_31.md`다.",
+        "The current authority is `docs/audit/audit_report_31.md`.",
+        "現在の権威は `docs/audit/audit_report_31.md` です。",
+        "目前權威是 `docs/audit/audit_report_31.md`。",
+        "当前权威是 `docs/audit/audit_report_31.md`。",
         "현재 권위는 미정이다.",
     ] {
         let mutation = format!("{valid}\n{stale_current}");
@@ -414,7 +424,7 @@ fn active_document_sections_have_one_report_31_authority_and_reject_predecessors
             "predecessor current mutation was accepted: {stale_current}"
         );
     }
-    assert!(validate_current_authority(&valid.replace("31", "30"), CURRENT, STALE).is_err());
+    assert!(validate_current_authority(&valid.replace("32", "31"), CURRENT, STALE).is_err());
 }
 
 #[test]
@@ -422,7 +432,7 @@ fn active_release_sections_reject_known_stale_statuses() {
     let summary = project_file("IMPLEMENTATION_SUMMARY.md");
     let baseline = markdown_section(&summary, "## 1. 현재 기준과 목표", "## 2. 전체 런타임 흐름");
     assert!(baseline.contains("report 23/24 finding"));
-    assert!(baseline.contains("audit_report_31.md"));
+    assert!(baseline.contains("audit_report_32.md"));
     assert!(baseline.contains("partial evidence"));
     for stale in [
         "다음 release 범위는 아직 완료되지 않았다",
@@ -466,9 +476,11 @@ fn active_release_sections_reject_known_stale_statuses() {
         );
     }
     let final_gap = gap_row(&gaps, "G-FINAL-001");
-    assert!(final_gap.contains("report 30"));
     assert!(final_gap.contains("report 31"));
+    assert!(final_gap.contains("report 32"));
     assert!(!final_gap.ends_with("| Closed |"));
+    assert!(gap_row(&gaps, "G-DOC-009").ends_with("| Closed |"));
+    assert!(gap_row(&gaps, "G-BUILD-007").ends_with("| Implemented |"));
     for active in [
         "G-CORE-005",
         "G-DATA-003",
@@ -525,9 +537,9 @@ fn active_r9_status_requires_field_only_pairs_and_new_ci() {
 
 #[test]
 fn lifecycle_gate_rejects_predecessor_current_and_completed_work_reopen() {
-    const CURRENT: &str = "docs/audit/audit_report_31.md";
+    const CURRENT: &str = "docs/audit/audit_report_32.md";
     let valid = format!(
-        "현재 권위는 `{CURRENT}`다.\nreport 30 successor `ed02dbf/32733235414`는 양 OS Verified다."
+        "현재 권위는 `{CURRENT}`다.\nreport 31 successor `8c042d48/32741917348`는 independently Closed다."
     );
     assert!(validate_current_authority(&valid, CURRENT, &[]).is_ok());
 
@@ -535,6 +547,7 @@ fn lifecycle_gate_rejects_predecessor_current_and_completed_work_reopen() {
         "report 29가 현재 authority이며 ADR-0039 시정 전이다.",
         "다음 단계는 `docs/audit/audit_report_30.md`의 ADR-0040 구현이다.",
         "report 30 local gate와 clean same-SHA 양 OS CI는 pending이다.",
+        "다음 단계는 `docs/audit/audit_report_31.md` lifecycle 구현과 CI다.",
     ] {
         let mutated = format!("{valid}\n{mutation}");
         assert!(
@@ -554,17 +567,18 @@ fn implementation_summary_does_not_reopen_completed_predecessor_work() {
     );
     let r9 = &summary[summary.find("## 11. R9 콘텐츠 인과 폐쇄 Task").unwrap()..];
 
-    assert!(implementation_order.contains("audit_report_31.md"));
+    assert!(implementation_order.contains("audit_report_32.md"));
     assert!(!implementation_order
         .contains("audit_report_27.md` 시정의 전체 local gate와 새 clean same-SHA 양 OS CI"));
     assert!(!implementation_order.contains("다음 단계는 `docs/audit/audit_report_28.md`"));
     assert!(!implementation_order.contains("다음 단계는 `docs/audit/audit_report_30.md`"));
+    assert!(!implementation_order.contains("다음 단계는 `docs/audit/audit_report_31.md`"));
     assert!(!implementation_order.contains("ADR-0040 구현, 전체 local gate"));
     assert!(!r9.contains("새 CI와 독립 재감사 전에는 R9 최종 PASS"));
     assert!(!r9.contains("report 28 시정의 새 CI와 독립 재감사 전"));
     assert!(!r9.contains("report 29가 현재 authority"));
-    assert!(r9.contains("report 30 technical successor"));
-    assert!(r9.contains("audit_report_31.md"));
+    assert!(r9.contains("Report 31은 R9/Report 29 기술 회귀"));
+    assert!(r9.contains("audit_report_32.md"));
 }
 
 #[test]

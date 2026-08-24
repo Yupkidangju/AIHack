@@ -6,11 +6,12 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implementation contract; current authority `docs/audit/audit_report_31.md`; PROGRAM/PUBLICATION HOLD
+문서 상태: active implementation contract; current authority `docs/audit/audit_report_32.md`; PROGRAM/PUBLICATION HOLD
 기술 증거: report 30 technical successor `ed02dbf/32733235414` clean same-SHA 양 OS actual bundle과 public visibility independent Verified
-현재 시정: report 31 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle Verified; independent re-audit pending
+historical closure: report 31 lifecycle/FIN-F012 independently Closed with `8c042d48/32741917348`
+현재 시정: report 32 R32-DBG-F001/FIN-F015 current-HEAD modification evidence와 final same-SHA 양 OS bundle
 작성일: 2026-07-15
-최근 동기화: 2026-08-24
+최근 동기화: 2026-08-25
 기준: `spec.md`
 관련 Task: R2-1, R5-2, R6-1..R6-3
 

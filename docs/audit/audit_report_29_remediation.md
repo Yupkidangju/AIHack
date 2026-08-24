@@ -1,12 +1,13 @@
 # AIHack 감사 보고서 29 시정 기록
 
 - 기준 독립 감사: `docs/audit/audit_report_29.md`
-- 현재 독립 권위: `docs/audit/audit_report_31.md`
+- 현재 독립 권위: `docs/audit/audit_report_32.md`
 - 기준 HEAD: `d9c0f8eb673e641f2a23b17f99a9327e90899628`
 - 작업 브랜치: `codex/audit-report-29-remediation`
 - 작업 일자: 2026-08-24
 - 기술 판정: **REPORT 29 TECHNICAL VERIFIED (`a91a9c7/32706869079`) / REPORT 30 `ed02dbf/32733235414` clean same-SHA 양 OS actual·independent Verified**
-- 현재 판정: **REPORT 31 `8c042d48/32741917348` clean same-SHA 양 OS actual Verified / independent re-audit pending / PROGRAM·PUBLICATION HOLD**
+- historical 판정: **REPORT 31 lifecycle/FIN-F012 independently Closed (`8c042d48/32741917348`)**
+- 현재 판정: **REPORT 32 R32-DBG-F001/FIN-F015 Needs Fix / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. 이 문서는 계약 선행 변경, 수정 전 adversarial RED, production 구현, 표적 GREEN, 전체 local gate와 clean same-SHA Ubuntu/Windows actual bundle을 시간순으로 기록한다. 구현이나 CI가 끝나기 전에는 해당 단계를 PASS로 표시하지 않는다.
 

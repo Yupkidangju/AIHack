@@ -1,8 +1,9 @@
 # NetHack 3.6.7 Compatibility Records
 
-문서 상태: NH367-C001..C010 engineering/provenance closed; current authority `docs/audit/audit_report_31.md`
+문서 상태: NH367-C001..C010 engineering/provenance closed; current authority `docs/audit/audit_report_32.md`
 기술 증거: report 30 technical successor `ed02dbf/32733235414` feature-gated C010/public visibility와 양 OS actual bundle independent Verified
-현재 시정: report 31 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle Verified; independent re-audit pending
+historical closure: report 31 lifecycle/FIN-F012 independently Closed with `8c042d48/32741917348`
+현재 시정: report 32 R32-DBG-F001/FIN-F015 release-date HOLD
 작성일: 2026-07-15 (2026-07-18 R7 구현 갱신)
 관련 Task: R7-2
 기준: `../../spec.md` 13절, `../../PROVENANCE.md`

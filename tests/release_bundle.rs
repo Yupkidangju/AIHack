@@ -9,8 +9,8 @@ use std::{
 
 static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 const OWNER_APPROVAL_ID: &str = "AIHACK-OWNER-2026-07-20-NGPL-01";
-const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-08-24-01";
-const CANDIDATE_DATE: &str = "2026-08-24";
+const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-08-25-01";
+const CANDIDATE_DATE: &str = "2026-08-25";
 
 fn project_path(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(path)
@@ -34,6 +34,7 @@ enum BundleCase {
     SimilarLegacyName,
     MinimumYearCalendar,
     MaximumYearCalendar,
+    CandidateBeforePeriodEnd,
     StaleModificationPeriod,
 }
 
@@ -100,13 +101,14 @@ impl BundleFixture {
         if matches!(case, BundleCase::StaleModificationPeriod) {
             replace_in_file(
                 &root.join("MODIFICATIONS.md"),
+                "Covered change period: `2025-05-20..2026-08-25`",
                 "Covered change period: `2025-05-20..2026-08-24`",
-                "Covered change period: `2025-05-20..2026-08-23`",
             );
         }
         let candidate_date = match case {
             BundleCase::MinimumYearCalendar => "0001-06-15",
             BundleCase::MaximumYearCalendar => "9999-06-15",
+            BundleCase::CandidateBeforePeriodEnd => "2026-08-24",
             _ => CANDIDATE_DATE,
         };
         let edge_period = match case {
@@ -117,9 +119,16 @@ impl BundleFixture {
         if let Some(period) = edge_period {
             replace_in_file(
                 &root.join("MODIFICATIONS.md"),
-                "2025-05-20..2026-08-24",
+                "2025-05-20..2026-08-25",
                 period,
             );
+            replace_in_file(
+                &root.join("RELEASE-METADATA"),
+                "candidate_date=$Format:%cs$",
+                &format!("candidate_date={candidate_date}"),
+            );
+        }
+        if matches!(case, BundleCase::CandidateBeforePeriodEnd) {
             replace_in_file(
                 &root.join("RELEASE-METADATA"),
                 "candidate_date=$Format:%cs$",
@@ -185,8 +194,8 @@ impl BundleFixture {
         }
         let status = Command::new("git")
             .args(["commit", "-qm", "release fixture"])
-            .env("GIT_AUTHOR_DATE", "2026-08-24T12:00:00+09:00")
-            .env("GIT_COMMITTER_DATE", "2026-08-24T12:00:00+09:00")
+            .env("GIT_AUTHOR_DATE", "2026-08-25T12:00:00+09:00")
+            .env("GIT_COMMITTER_DATE", "2026-08-25T12:00:00+09:00")
             .current_dir(&root)
             .status()
             .unwrap();
@@ -337,7 +346,7 @@ impl BundleFixture {
         let output = self.root.join("output");
         replace_in_file(
             &output.join("MODIFICATIONS.md"),
-            "Covered change period: `2025-05-20..2026-08-24`",
+            "Covered change period: `2025-05-20..2026-08-25`",
             &format!("Covered change period: `{start}..{end}`"),
         );
         replace_in_file(
@@ -360,7 +369,7 @@ impl BundleFixture {
             .success());
         replace_in_file(
             &unpacked.join("MODIFICATIONS.md"),
-            "Covered change period: `2025-05-20..2026-08-24`",
+            "Covered change period: `2025-05-20..2026-08-25`",
             &format!("Covered change period: `{start}..{end}`"),
         );
         replace_in_file(
@@ -594,6 +603,20 @@ fn verifier_accepts_minimum_and_maximum_supported_calendar_years() {
         assert!(
             output.status.success(),
             "supported calendar edge rejected: {candidate}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn verifier_accepts_candidate_before_and_on_the_modification_period_end() {
+    for case in [BundleCase::CandidateBeforePeriodEnd, BundleCase::Complete] {
+        let fixture = BundleFixture::new(case);
+        let output = fixture.verify();
+        assert!(
+            output.status.success(),
+            "candidate before/on period end rejected: stdout={} stderr={}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );

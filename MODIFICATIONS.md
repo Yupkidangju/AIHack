@@ -1,22 +1,22 @@
 # AIHack Modification Manifest
 
-Notice ID: `AIHACK-MODIFICATIONS-2026-08-24-01`
-Covered change period: `2025-05-20..2026-08-24`
+Notice ID: `AIHACK-MODIFICATIONS-2026-08-25-01`
+Covered change period: `2025-05-20..2026-08-25`
 Release version: `0.3.0`
 
 AIHack is an AI-assisted semantic rewrite derivative of NetHack 3.6.7. The following path scopes were newly created or changed for the AIHack Rust rewrite during the covered change period.
 
 | Distributed path scope | Change date | Modification notice |
 | --- | --- | --- |
-| `src/**` | 2025-05-20..2026-08-24 | Rust compatibility facade and project entry library |
-| `crates/**` | 2025-05-20..2026-08-24 | Deterministic core, content, AI contracts, LLM adapter and runtime rewrite |
-| `apps/**` | 2025-05-20..2026-08-24 | TUI and headless application adapters |
-| `tests/**` | 2025-05-20..2026-08-24 | AIHack behavior, compatibility, security and release verification |
-| `scripts/**` | 2025-05-20..2026-08-24 | Build, checkpoint, deterministic fixture and PTY verification tooling |
-| `docs/**` | 2025-05-20..2026-08-24 | Compatibility, provenance and implementation documentation |
-| `.archive/**` | 2025-05-20..2026-08-24 | Immutable AIHack planning and design snapshots |
-| root Cargo/build/config files | 2025-05-20..2026-08-24 | Rust workspace, dependency, CI and release configuration |
-| root project documents | 2025-05-20..2026-08-24 | Specification, decisions, provenance, license and release guidance |
+| `src/**` | 2025-05-20..2026-08-25 | Rust compatibility facade and project entry library |
+| `crates/**` | 2025-05-20..2026-08-25 | Deterministic core, content, AI contracts, LLM adapter and runtime rewrite |
+| `apps/**` | 2025-05-20..2026-08-25 | TUI and headless application adapters |
+| `tests/**` | 2025-05-20..2026-08-25 | AIHack behavior, compatibility, security and release verification |
+| `scripts/**` | 2025-05-20..2026-08-25 | Build, checkpoint, deterministic fixture and PTY verification tooling |
+| `docs/**` | 2025-05-20..2026-08-25 | Compatibility, provenance and implementation documentation |
+| `.archive/**` | 2025-05-20..2026-08-25 | Immutable AIHack planning and design snapshots |
+| root Cargo/build/config files | 2025-05-20..2026-08-25 | Rust workspace, dependency, CI and release configuration |
+| root project documents | 2025-05-20..2026-08-25 | Specification, decisions, provenance, license and release guidance |
 
 The exact file set covered by each scope is the tree identified by the expanded commit in `RELEASE-METADATA`. This manifest is carried inside the source archive and alongside released binaries, so modification evidence does not depend on distributed Git history or a `.git/` directory.
 

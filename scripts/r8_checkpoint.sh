@@ -129,7 +129,7 @@ if ((${#ERRORS[@]} == 0)); then
             || error "NOTICE required phrase missing: $phrase"
     done
     for script in build.sh build.bat; do
-        for phrase in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA SHA256SUMS 'git status --porcelain' 'git archive' 'aihack-0.3.0-source' 'candidate_date' 'owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01' 'modification_notice=AIHACK-MODIFICATIONS-2026-08-24-01'; do
+        for phrase in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA SHA256SUMS 'git status --porcelain' 'git archive' 'aihack-0.3.0-source' 'candidate_date' 'owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01' 'modification_notice=AIHACK-MODIFICATIONS-2026-08-25-01'; do
             grep -Fq -- "$phrase" "$ROOT/$script" \
                 || error "$script release packaging contract missing: $phrase"
         done
@@ -171,7 +171,7 @@ if ((${#ERRORS[@]} == 0)); then
             || error "project-owner approval record missing: $phrase"
     done
     for phrase in \
-        '2025-05-20..2026-08-24' \
+        '2025-05-20..2026-08-25' \
         'does not depend on distributed Git history'; do
         grep -Fq -- "$phrase" "$ROOT/MODIFICATIONS.md" \
             || error "modification manifest missing: $phrase"

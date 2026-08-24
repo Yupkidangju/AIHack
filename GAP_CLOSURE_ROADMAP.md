@@ -66,14 +66,15 @@
 | G-DOC-006 | P2 | implementation summary 후반 stale next-step | report 28 current lifecycle과 section 1/10/11 negative regression, Actions `32694375654` | report 28 시정 | FIN-F012 | Verified |
 | G-DOC-007 | P0 | active 문서 current-authority false-green 재발 | report 29 단일 authority와 README/ADR/roadmap/summary/build/gap section-scoped predecessor mutation, `1fa6d90` local gate GREEN | report 29 시정 | R29-DOC-F001, R29-DOC-F002 | Verified |
 | G-DOC-008 | P0 | designs/compatibility/remediation/roadmap active lifecycle 누락 | report 30 단일 authority/common negative gate와 `ed02dbf/32733235414` 양 OS GREEN | report 30 시정 | R29-DOC-F002 Re-audit #1, FIN-F012 | Verified |
-| G-DOC-009 | P0 | implementation summary 10·11절 predecessor current/completed-work false-green | ADR-0041, summary 1·10·11 exact-one, generic mutation RED/GREEN과 `8c042d48/32741917348` 양 OS GREEN | report 31 시정 | R29-DOC-F002 Re-audit #2, FIN-F012 | Verified |
+| G-DOC-009 | P0 | implementation summary 10·11절 predecessor current/completed-work false-green | Report 32 independent closure, ADR-0041과 `8c042d48/32741917348` 양 OS GREEN | report 31 시정 | R29-DOC-F002 Re-audit #3, FIN-F012 | Closed |
+| G-BUILD-007 | P0 | current HEAD candidate date가 bundled modification period 밖임 | 2026-08-25 Notice ID/period와 actual HEAD-date early regression 표적 GREEN | report 32 시정 | R32-DBG-F001, FIN-F015 | Implemented |
 | G-SEC-001 | P0 | artifact link/root/ambient/archive 경계 | Windows alias/staging/link와 archive canonical alias·strict calendar 및 actual 양 OS bundle `32683076204` | report 27 시정 | SEC-F001, FIN-F004, FIN-F014 | Verified |
 | G-SEC-003 | P0 | archive Windows component alias와 year 0000 parity | case/trailing/reserved/collision 및 year 0000/0001/9999와 actual 양 OS bundle `32694375654` | report 28 시정 | FIN-F014, FIN-F015 | Verified |
 | G-UI-002 | P0 | control-key Repeat state crossing과 F9 실제 경로 evidence | Esc/Enter/F9/Q Press-only sequence와 actual F9 handler regression, Actions `32694375654` | report 28 시정 | FIN-F008, FIN-F009, FIN-F016 | Verified |
 | G-SEC-004 | P0 | archive raw type/extraction 및 `ExpectedCommit` complete tree 미결합 | format-aware common validator, safe extraction, independent `git archive` identity와 `1fa6d90` clean Windows actual bundle GREEN | report 29 시정 | R29-SEC-F001, R29-SEC-F002 | Verified |
 | G-UI-003 | P0 | 동등 transition과 Release 없는 연속 Press state crossing | 합성 Release 비신뢰·500ms quiet+2 idle gate, constructed/actual ConPTY와 `1fa6d90` local gate GREEN | report 29 시정 | R29-DBG-F001 | Verified |
 | G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | report 24와 Actions `32107862171`이 Unix 0600/Windows parent DACL 계약을 종결 | report 24 시정 | SEC-F003 | Closed |
-| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 31 문서 재감사 HOLD | report 30 기술/API·독립 Verified; report 31 `8c042d48/32741917348` 전체 gate·clean same-SHA 양 OS actual Verified | report 31 remediation | R29-DOC-F002 Re-audit #2, FIN-F001..F018 | Verified |
+| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 32 release-date HOLD | report 31 lifecycle/FIN-F012 Closed; R32 date contract Implemented, full gate/bundle/CI pending | report 32 remediation | R32-DBG-F001, FIN-F001..F018 | Implemented |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -272,4 +273,6 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 R0~R8 기존 remediation과 report 23/24는 역사적으로 종결됐다. report 25는 partial, report 26~29는 historical/technical evidence로 보존한다. report 30의 G-CORE-006/G-DOC-008은 `ed02dbf/32733235414` clean same-SHA 양 OS actual bundle과 Report 31 독립 검증으로 Verified다.
 
-현재 authority는 `docs/audit/audit_report_31.md`다. G-DOC-009/G-FINAL-001은 successor `8c042d48/32741917348` 전체 gate와 clean same-SHA 양 OS actual bundle로 Verified됐다. 후속 독립 감사와 별도 게시 승인 전까지 Closed 및 program/publication PASS로 올리지 않는다.
+Report 31 G-DOC-009/FIN-F012는 successor `8c042d48/32741917348`와 Report 32 independent closure로 Closed다.
+
+현재 authority는 `docs/audit/audit_report_32.md`다. G-BUILD-007/G-FINAL-001은 R32-DBG-F001/FIN-F015의 Notice ID/period, actual HEAD-date gate와 final same-SHA 양 OS evidence가 끝날 때까지 Open이며, 후속 독립 감사와 별도 게시 승인 전까지 Closed 및 program/publication PASS로 올리지 않는다.

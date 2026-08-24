@@ -1,12 +1,13 @@
 # AIHack 감사 보고서 30 시정 기록
 
 - 기준 독립 감사: `docs/audit/audit_report_30.md`
-- 현재 독립 권위: `docs/audit/audit_report_31.md`
+- 현재 독립 권위: `docs/audit/audit_report_32.md`
 - 기준 HEAD: `1d6e6669c74ba04263e450ac821b443e4bdc053c`
 - 작업 브랜치: `codex/audit-report-30-remediation`
 - 작업 일자: 2026-08-24
 - 기술 판정: **successor `ed02dbf/32733235414` clean same-SHA 양 OS actual·independent Verified**
-- 현재 판정: **REPORT 31 implementation-summary lifecycle remediation `8c042d48/32741917348` clean same-SHA 양 OS actual Verified / independent re-audit pending / PROGRAM·PUBLICATION HOLD**
+- historical 판정: **REPORT 31 implementation-summary lifecycle/FIN-F012 independently Closed (`8c042d48/32741917348`)**
+- 현재 판정: **REPORT 32 R32-DBG-F001/FIN-F015 Needs Fix / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. report 29 기술 successor `a91a9c7/32706869079`의 evidence는 보존하되, report 30의 active authority와 public Rust visibility를 별도 RED/GREEN 및 새 same-SHA 양 OS bundle로 검증한다.
 

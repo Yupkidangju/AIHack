@@ -385,9 +385,9 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 [Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)은 Ubuntu/Windows test, canonical R7/R8, release build/bundle, cargo-audit, cargo-deny와 lockfile 불변을 모두 PASS했다.
 
-final multi-audit report 1과 report 25~29는 historical/technical evidence로 보존한다. report 30 technical successor `ed02dbf/32733235414`는 전체 gate와 clean same-SHA 양 OS actual bundle 및 Report 31 public visibility 독립 검증까지 완료했다.
+final multi-audit report 1과 report 25~30은 historical/technical evidence로 보존한다. report 31 successor `8c042d48/32741917348`의 summary lifecycle/FIN-F012는 Report 32에서 independent Closed로 종결됐다.
 
-현재 최상위 권위는 `docs/audit/audit_report_31.md`다. ADR-0041의 summary 1·10·11 exact-one과 predecessor current/completed-work generic negative gate, 전체 local quality gate 453 tests와 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle은 Verified됐다. 후속 독립 PASS 전에는 전체 program PASS로 전환하지 않는다.
+현재 최상위 권위는 `docs/audit/audit_report_32.md`다. R32-DBG-F001/FIN-F015의 current HEAD `%cs`, modification Notice ID/period, release metadata와 양 verifier를 2026-08-25 revision으로 정렬했고 actual HEAD-date early gate와 전체 local quality gate 453 tests는 PASS했다. clean actual bundle과 final same-SHA 양 OS CI 및 후속 독립 PASS 전에는 전체 program PASS로 전환하지 않는다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -464,6 +464,8 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐고 Report 31이 public visibility와 Report 29 기술 회귀를 독립 확인했다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 구현 판정: report 31 successor `8c042d48/32741917348`까지의 기술·문서 회귀는 Verified되고 FIN-F012는 independent Closed다. current HEAD date가 manifest period 밖인 R32-DBG-F001/FIN-F015 때문에 release/program은 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
 
-현재 문서 감사 판정: 단일 current authority는 `docs/audit/audit_report_31.md`이며 current remediation은 `docs/audit/audit_report_31_remediation.md`다. summary 1·10·11과 기존 active 문서 범위의 generic lifecycle negative gate, 전체 local quality gate와 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle은 Verified됐다. 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.
+현재 문서 감사 판정: 단일 current authority는 `docs/audit/audit_report_32.md`이며 current remediation은 `docs/audit/audit_report_32_remediation.md`다.
+
+Report 31 lifecycle finding은 Closed로 보존한다. R32-DBG-F001/FIN-F015의 local quality gate는 PASS했으며 clean release bundle과 final same-SHA 양 OS CI가 완료된 뒤에만 Verified로 갱신한다. 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.

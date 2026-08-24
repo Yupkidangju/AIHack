@@ -200,7 +200,7 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
 
     let modifications = project_file("MODIFICATIONS.md");
     for phrase in [
-        "2025-05-20..2026-08-24",
+        "2025-05-20..2026-08-25",
         "src/**",
         "crates/**",
         "apps/**",
@@ -219,7 +219,7 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
     assert!(metadata.contains("commit=$Format:%H$"));
     assert!(metadata.contains("candidate_date=$Format:%cs$"));
     assert!(metadata.contains("owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01"));
-    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-08-24-01"));
+    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-08-25-01"));
 }
 
 #[test]
@@ -232,10 +232,52 @@ fn release_metadata_and_manifest_cover_the_candidate_commit_date() {
         "candidate commit date export placeholder가 필요합니다"
     );
 
-    let modifications = project_file("MODIFICATIONS.md");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new("git")
+        .args(["show", "-s", "--format=%cs", "HEAD"])
+        .current_dir(root)
+        .output()
+        .expect("current HEAD candidate date 조회 실패");
     assert!(
-        modifications.contains("Covered change period: `2025-05-20..2026-08-24`"),
-        "2026-08-24 candidate를 포함하는 modification period가 필요합니다"
+        output.status.success(),
+        "current HEAD candidate date 조회 실패"
+    );
+    let candidate = String::from_utf8(output.stdout)
+        .expect("candidate date UTF-8 변환 실패")
+        .trim()
+        .to_owned();
+    assert_eq!(candidate.len(), 10, "candidate date canonical 길이");
+    assert_eq!(candidate.as_bytes()[4], b'-', "candidate date year 구분자");
+    assert_eq!(candidate.as_bytes()[7], b'-', "candidate date month 구분자");
+    assert!(
+        candidate
+            .bytes()
+            .enumerate()
+            .all(|(index, byte)| matches!(index, 4 | 7) || byte.is_ascii_digit()),
+        "candidate date는 canonical ASCII digit이어야 합니다: {candidate}"
+    );
+
+    let modifications = project_file("MODIFICATIONS.md");
+    let period_lines = modifications
+        .lines()
+        .filter(|line| line.starts_with("Covered change period: `"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        period_lines.len(),
+        1,
+        "modification period는 정확히 하나여야 합니다"
+    );
+    let period_line = period_lines[0];
+    let period = period_line
+        .strip_prefix("Covered change period: `")
+        .and_then(|value| value.strip_suffix('`'))
+        .expect("modification period 형식 오류");
+    let (start, end) = period
+        .split_once("..")
+        .expect("modification period 구분자 누락");
+    assert!(
+        start <= candidate.as_str() && candidate.as_str() <= end,
+        "current HEAD candidate date가 modification period 밖입니다: {start} <= {candidate} <= {end}"
     );
 }
 
@@ -355,7 +397,7 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     );
     for reference in [
         "owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01",
-        "modification_notice=AIHACK-MODIFICATIONS-2026-08-24-01",
+        "modification_notice=AIHACK-MODIFICATIONS-2026-08-25-01",
     ] {
         assert!(linux.contains(reference), "build.sh 누락: {reference}");
         assert!(windows.contains(reference), "build.bat 누락: {reference}");

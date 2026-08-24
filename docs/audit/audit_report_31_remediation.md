@@ -5,11 +5,13 @@
 - 작업 브랜치: `codex/audit-report-31-remediation`
 - 작업 일자: 2026-08-24
 - predecessor 기술 판정: **Report 30/29 표적 회귀 PASS**
-- 현재 판정: **successor `8c042d48/32741917348` clean same-SHA 양 OS actual Verified / independent re-audit pending / PROGRAM·PUBLICATION HOLD**
+- 현재 독립 권위: `docs/audit/audit_report_32.md`
+- 종결 판정: **R29-DOC-F002 Re-audit #3 / FIN-F012 independently Closed; successor `8c042d48/32741917348` historical Verified**
+- 현재 판정: **REPORT 32 R32-DBG-F001/FIN-F015 Needs Fix / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. Report 30 public visibility와 technical successor `ed02dbf/32733235414`, Report 29의 content/allocator/TUI/archive 기술 증거는 역사적 Verified로 보존한다.
 
-현재 권위는 `docs/audit/audit_report_31.md`이며 이번 시정은 implementation summary lifecycle과 document regression source에 한정한다.
+이 문서의 시정 범위는 implementation summary lifecycle과 document regression source에 한정하며 Report 32가 independent closure를 부여했다.
 
 ## 1. Finding 대조와 결정
 
@@ -118,10 +120,10 @@ output은 binary 2, license/notice/modification/approval/metadata 문서 5, sour
 
 양 job은 checkout SHA `8c042d48...`에서 metadata/fmt/clippy/all-target tests, external compile contracts, dependency exception/duplicate, R7/R8, release all-target build, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변을 모두 통과했다.
 
-이 결과로 report 31 시정 lifecycle은 `Verified`다. 다만 `Closed`, 전체 PROGRAM PASS와 외부 게시 허가는 새 독립 재감사 및 별도 사용자 승인 전까지 HOLD다.
+이 결과로 report 31 시정 lifecycle은 `Verified`였고 Report 32가 `Closed`로 종결했다. 현재 PROGRAM/PUBLICATION HOLD는 R32-DBG-F001/FIN-F015 release-date finding과 별도 사용자 승인에 속한다.
 
 ## 8. 잔여 경계
 
-- report 31 후속 독립 재감사 전에는 finding을 `Closed` 또는 전체 PROGRAM PASS로 올리지 않는다.
+- Report 31 finding은 independent Closed이며 다시 열지 않는다.
 - actual provider, Windows Terminal GUI, physical key-hold, signing/attestation과 외부 게시 승인은 이번 문서 시정 범위 밖이다.
 - CI Info: pinned `actions/checkout`이 Node.js 20 deprecation annotation을 냈지만 runner가 Node.js 24로 강제 실행했고 양 job은 success였다. workflow pin 갱신은 이번 finding과 분리된 유지보수 항목이다.
