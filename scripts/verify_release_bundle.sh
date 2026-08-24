@@ -37,6 +37,35 @@ require_metadata_value() {
         || fail "$label $key mismatched: expected $expected, got $value"
 }
 
+require_calendar_date() {
+    local value=$1 label=$2 parsed
+    [[ "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+        || fail "$label must use YYYY-MM-DD"
+    parsed=$(date -u -d "$value" '+%F' 2>/dev/null) \
+        || fail "$label is not a Gregorian calendar date"
+    [[ "$parsed" == "$value" ]] \
+        || fail "$label is not a canonical Gregorian calendar date"
+}
+
+validate_archive_entry() {
+    local entry=$1 canonical component first=''
+    [[ -n "$entry" && "$entry" != /* && "$entry" != *:* && "$entry" != *\\* && "$entry" != *//* ]] \
+        || fail "source archive contains an unsafe path: $entry"
+    canonical=${entry%/}
+    [[ -n "$canonical" ]] || fail 'source archive contains an empty path'
+    IFS='/' read -r -a components <<<"$canonical"
+    for component in "${components[@]}"; do
+        [[ -n "$component" && "$component" != '.' && "$component" != '..' ]] \
+            || fail "source archive contains a non-canonical path: $entry"
+        [[ -n "$first" ]] || first=$component
+    done
+    case "$first" in
+        legacy_nethack_port_reference|target|output)
+            fail "release source archive contains an excluded path: $entry"
+            ;;
+    esac
+}
+
 required=(
     aihack
     aihack-headless
@@ -54,8 +83,7 @@ lexical_output=$(realpath -sm -- "$OUTPUT_DIR")
 physical_output=$(realpath -e -- "$OUTPUT_DIR")
 [[ "$lexical_output" == "$physical_output" ]] \
     || fail 'release output root must not traverse a symbolic link'
-[[ "$EXPECTED_CANDIDATE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
-    || fail 'candidate date must use YYYY-MM-DD'
+require_calendar_date "$EXPECTED_CANDIDATE_DATE" 'candidate date'
 for file in "${required[@]}"; do
     [[ -s "$OUTPUT_DIR/$file" ]] || {
         printf 'release artifact missing or empty: %s\n' "$file" >&2
@@ -87,10 +115,9 @@ done
 
 archive_listing=$(tar -tzf "$ARCHIVE") \
     || fail 'source archive listing failed'
-if grep -Eq '^(legacy_nethack_port_reference|target|output)/' <<<"$archive_listing"; then
-    printf '%s\n' 'release source archive contains an excluded path' >&2
-    exit 1
-fi
+while IFS= read -r archive_entry; do
+    validate_archive_entry "$archive_entry"
+done <<<"$archive_listing"
 
 archive_metadata=$(tar -xOzf "$ARCHIVE" RELEASE-METADATA)
 archive_approval=$(tar -xOzf "$ARCHIVE" PROJECT_OWNER_LICENSE_APPROVAL.md)
@@ -127,6 +154,10 @@ period=$(sed -n 's/^Covered change period: `\([0-9][0-9-]*\)\.\.\([0-9][0-9-]*\)
 [[ $(wc -l <<<"$period") -eq 1 ]] \
     || fail 'MODIFICATIONS.md must contain one covered change period'
 read -r period_start period_end <<<"$period"
+require_calendar_date "$period_start" 'modification period start'
+require_calendar_date "$period_end" 'modification period end'
+[[ "$period_start" < "$period_end" || "$period_start" == "$period_end" ]] \
+    || fail 'modification period start is after its end'
 [[ ("$period_start" < "$EXPECTED_CANDIDATE_DATE" || "$period_start" == "$EXPECTED_CANDIDATE_DATE") \
     && ("$EXPECTED_CANDIDATE_DATE" < "$period_end" || "$EXPECTED_CANDIDATE_DATE" == "$period_end") ]] \
     || fail 'candidate date falls outside the modification period'

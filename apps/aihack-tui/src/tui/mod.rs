@@ -1305,14 +1305,7 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
     // 이 패널은 UI-only이며 snapshot hash에 영향을 주지 않는다.
     if app.debug_observation_visible {
         let debug_lines = render_panels::debug_observation_lines(&observation);
-        let debug_height = debug_lines.len() as u16 + 2;
-        // 80x28에서도 표시되도록 맵 우측 상단에 작게 배치
-        let debug_area = Rect {
-            x: layout.map.x + layout.map.width.saturating_sub(40),
-            y: layout.map.y,
-            width: 40,
-            height: debug_height.min(layout.map.height),
-        };
+        let debug_area = debug_observation_area(layout, &observation);
         frame.render_widget(
             render_panels::ThemedTextPanel {
                 title: "DEBUG OBS",
@@ -1363,6 +1356,24 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
             overlay_area,
         );
     }
+}
+
+/// renderer와 mouse dispatcher가 공유하는 F9 observation panel 영역이다.
+pub fn debug_observation_area(layout: TuiLayout, observation: &Observation) -> Rect {
+    let debug_height = render_panels::debug_observation_lines(observation).len() as u16 + 2;
+    Rect {
+        x: layout.map.x + layout.map.width.saturating_sub(40),
+        y: layout.map.y,
+        width: 40.min(layout.map.width),
+        height: debug_height.min(layout.map.height),
+    }
+}
+
+fn rect_contains(rect: Rect, column: u16, row: u16) -> bool {
+    column >= rect.x
+        && column < rect.x.saturating_add(rect.width)
+        && row >= rect.y
+        && row < rect.y.saturating_add(rect.height)
 }
 
 fn render_game_over_screen(
@@ -1546,6 +1557,15 @@ pub fn runtime_event_to_candidate(
         return match input_event {
             Event::Mouse(mouse) => {
                 let layout = compute_layout(width, height);
+                if app.debug_observation_visible
+                    && rect_contains(
+                        debug_observation_area(layout, &app.observation()),
+                        mouse.column,
+                        mouse.row,
+                    )
+                {
+                    return None;
+                }
                 let viewport = app.viewport_for_observation(layout);
                 let input = match mouse.kind {
                     MouseEventKind::Moved => UiInputEvent::MouseHover {
@@ -1564,10 +1584,6 @@ pub fn runtime_event_to_candidate(
         };
     };
     if key.kind == KeyEventKind::Release {
-        return None;
-    }
-    if key.kind == KeyEventKind::Repeat && matches!(key.code, KeyCode::Char('G' | 'A' | 'J' | 'R'))
-    {
         return None;
     }
     if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
@@ -1590,6 +1606,10 @@ pub fn runtime_event_to_candidate(
             KeyCode::Char(character) => Some(UiCommandCandidate::LlmInput(character)),
             _ => None,
         };
+    }
+    if key.kind == KeyEventKind::Repeat && matches!(key.code, KeyCode::Char('G' | 'A' | 'J' | 'R'))
+    {
+        return None;
     }
 
     let state = app.run_state();

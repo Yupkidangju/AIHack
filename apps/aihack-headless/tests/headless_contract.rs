@@ -117,7 +117,7 @@ fn replay_input_and_curdir_output_alias_are_rejected_without_mutating_input() {
 #[test]
 fn production_headless_rejects_consumer_unsafe_malformed_saves_before_running() {
     let root = fixture_root("malformed-consumer");
-    let cases: [(&str, SaveMutator); 4] = [
+    let cases: [(&str, SaveMutator); 7] = [
         (
             "unequipped-ac.json",
             Box::new(|value| {
@@ -138,6 +138,35 @@ fn production_headless_rejects_consumer_unsafe_malformed_saves_before_running() 
             Box::new(|value| {
                 value["world"]["entities"]["entities"][4]["payload"]["Item"]["data"]
                     ["base_price"] = serde_json::json!(u32::MAX);
+            }),
+        ),
+        (
+            "allocator-exhausted.json",
+            Box::new(|value| {
+                value["world"]["entities"]["next_id"] = serde_json::json!(u32::MAX);
+            }),
+        ),
+        (
+            "level-depth-max.json",
+            Box::new(|value| {
+                value["world"]["levels"]["levels"][0]["id"]["depth"] = serde_json::json!(i16::MAX);
+                value["world"]["current_level"]["depth"] = serde_json::json!(i16::MAX);
+                value["world"]["entities"]["entities"][0]["payload"]["Actor"]["location"]
+                    ["OnMap"]["level"]["depth"] = serde_json::json!(i16::MAX);
+            }),
+        ),
+        (
+            "wand-charge-shape.json",
+            Box::new(|value| {
+                let wand = value["world"]["entities"]["entities"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .find(|entity| {
+                        entity["payload"]["Item"]["kind"] == serde_json::json!("WandMagicMissile")
+                    })
+                    .unwrap();
+                wand["payload"]["Item"]["charges"] = serde_json::Value::Null;
             }),
         ),
     ];

@@ -239,8 +239,14 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - `docs/audit/audit_report_25.md`는 inverse save relation, writer budget, replay alias, paired score, production TUI/terminal, release actual-set과 active lifecycle을 HOLD했고 해당 시정의 RED/GREEN 및 SHA `b732c42d` Actions `32650404618` clean same-SHA Ubuntu/Windows CI는 유효한 부분 evidence다.
 - report 26 독립 재감사가 열거되지 않은 production gap을 재개방했으므로 report 25를 현재 최상위 권위나 전체 closure로 사용하지 않는다.
 
-### 10.13 `docs/audit/audit_report_26.md` 현재 상태 (2026-08-24)
+### 10.13 `docs/audit/audit_report_26.md` 역사적 최종 상태 (2026-08-24)
 
-- 현재 권위는 malformed scalar/ItemData, Win32 trailing-name alias, actual causal producer removal, modal/Inspect mouse, release staging root/hardlink/candidate date와 네 P1 범위를 재현한 `docs/audit/audit_report_26.md`다.
+- report 26은 malformed scalar/ItemData, Win32 trailing-name alias, actual causal producer removal, modal/Inspect mouse, release staging root/hardlink/candidate date와 네 P1 범위를 재현한 역사적 predecessor다.
 - ADR-0036, active spec/design/gap과 `docs/audit/audit_report_26_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
-- report 26 시정은 전체 local gate와 implementation SHA `fc01ec12bac522e601bc56bced06b0908f5873b0`의 Actions `32658658526` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.
+- `fc01ec12/32658658526`은 부분 evidence, `a9a39d8/32660221745`는 Linux pipefail failure이며 최종 verifier fix SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`의 Actions `32660514315`에서 clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다.
+
+### 10.14 `docs/audit/audit_report_27.md` 현재 상태 (2026-08-24)
+
+- 현재 권위는 save allocator/level/charge, unsafe custom registry, field-only causal A/B, archive canonical path, strict calendar, debug mouse, Judge repeat와 local action recursion을 재현한 `docs/audit/audit_report_27.md`다.
+- ADR-0037, active spec/design/gap과 `docs/audit/audit_report_27_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
+- 전체 local gate와 새 clean same-SHA Ubuntu/Windows actual bundle은 pending이다. 완료 후에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.

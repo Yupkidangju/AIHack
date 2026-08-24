@@ -204,6 +204,36 @@ fn semantic_validator_rejects_consumer_unsafe_scalars_unequipped_ac_and_forged_i
 }
 
 #[test]
+fn semantic_validator_rejects_allocator_level_and_charge_consumer_traps() {
+    let cases = [
+        malformed_save(|value| {
+            value["world"]["entities"]["next_id"] = serde_json::json!(u32::MAX);
+        }),
+        malformed_save(|value| {
+            value["world"]["levels"]["levels"][0]["id"]["depth"] = serde_json::json!(i16::MAX);
+            value["world"]["current_level"]["depth"] = serde_json::json!(i16::MAX);
+            value["world"]["entities"]["entities"][0]["payload"]["Actor"]["location"]["OnMap"]
+                ["level"]["depth"] = serde_json::json!(i16::MAX);
+        }),
+        malformed_save(|value| {
+            let wand = value["world"]["entities"]["entities"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|entity| {
+                    entity["payload"]["Item"]["kind"] == serde_json::json!("WandMagicMissile")
+                })
+                .expect("wand fixture must exist");
+            wand["payload"]["Item"]["charges"] = serde_json::Value::Null;
+        }),
+    ];
+
+    for save in cases {
+        assert_typed_invalid_without_panic(save);
+    }
+}
+
+#[test]
 fn persisted_text_accepts_the_byte_limit_and_rejects_control_or_limit_plus_one() {
     let mut exact = GameSession::new_for_playing(42).to_save_data();
     exact.event_log = vec![GameEvent::Message {

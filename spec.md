@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 26 시정 SHA `fc01ec12bac522e601bc56bced06b0908f5873b0`, Actions `32658658526` clean same-SHA Ubuntu/Windows Verified, 독립 재감사 pending(PROGRAM HOLD)
+현재 코드 기준: Cargo package 0.3.0, report 26 최종 verifier 시정 SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`, Actions `32660514315` clean same-SHA Ubuntu/Windows Verified. `docs/audit/audit_report_27.md` 독립 재감사 finding 시정 중이며 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
@@ -92,7 +92,7 @@ SC-LICENSE-01은 외부 배포를 시작하기 전 R8 최종 런칭 게이트다
 | DEC-LLM-02 | LLM 소프트 판정은 presentation-only verdict이며 core effect 없음 |
 | DEC-RNG-01 | 모든 난수는 `GameRng`을 통과 |
 | DEC-SAVE-01 | v0.3.0은 JSON `SaveDataV1`과 replay JSONL v1 유지 |
-| DEC-CONTENT-01 | embedded TOML을 시작 시 한 번 파싱해 immutable registry 생성 |
+| DEC-CONTENT-01 | embedded TOML을 시작 시 한 번 파싱해 consumer-safe immutable registry 생성 |
 | DEC-WORKSPACE-01 | core, content, AI contract, LLM adapter, TUI/headless app 경계로 분리 |
 | DEC-LICENSE-01 | 출처 상태가 `Approved`가 아닌 NetHack 자산은 런타임에 포함 금지 |
 
@@ -639,13 +639,14 @@ v0.3.0의 artifact 입력은 신뢰하지 않는다. decoder와 `GameSession::fr
 | persisted message/rejection text | 512 UTF-8 bytes | C0/C1/DEL control 문자 또는 `+1` byte부터 `InvalidSave(InvalidText)` |
 | headless target | `1..=1,000,000` accepted turns | Clap parse 단계에서 범위 밖 값을 거절 |
 
-semantic validator는 최소한 schema, save seed와 RNG seed 일치, consumer-safe turn·score 산술, current level 존재, unique entity ID와 allocator 진행값, player 존재·종류·위치·map bounds, actor stat 범위, item 위치, inventory owner/중복/letter/location, equipped item의 class/location/derived AC, event text를 검사한다. persisted `ItemData`는 복원에 전달된 immutable `ContentRegistry`가 같은 `ItemKind`에 제공하는 typed 값과 정확히 일치해야 한다. 실패는 panic이나 임의 문자열 성공이 아니라 typed `GameError::InvalidSave`다. injected content를 사용하는 복원은 같은 registry를 명시적으로 전달하며, v1 wire에는 registry 자체를 새 필드로 추가하지 않는다.
+semantic validator는 최소한 schema, save seed와 RNG seed 일치, consumer-safe turn·score 산술, current level 존재, unique entity ID와 allocator 진행값, player 존재·종류·위치·map bounds, actor stat 범위, item 위치, inventory owner/중복/letter/location, equipped item의 class/location/derived AC, event text를 검사한다. persisted `ItemData`는 복원에 전달된 immutable `ContentRegistry`가 같은 `ItemKind`에 제공하는 typed 값과 정확히 일치해야 한다. allocator `next_id`는 기존 모든 ID보다 크고 `u32::MAX`보다 작아 다음 spawn이 가능해야 한다. persisted level ID 집합은 active registry의 `Main` depth 집합과 같아야 하며 registry depth는 `1..=i16::MAX-1`이다. stairs target depth는 checked arithmetic으로 계산한다. item의 dynamic `charges`와 registry `max_charges`는 optional shape가 같고, 값이 있으면 `charges <= max_charges`여야 한다. 실패는 panic이나 임의 문자열 성공이 아니라 typed `GameError::InvalidSave`다. injected content를 사용하는 복원은 같은 registry를 명시적으로 전달하며, v1 wire에는 registry 자체를 새 필드로 추가하지 않는다.
 
 actor와 inventory의 저장 불변조건은 다음처럼 닫는다.
 
 - 모든 actor는 `max_hp > 0`, `hp <= max_hp`, `alive == (hp > 0)`을 만족한다. `GameOver`가 아닌 save의 player는 살아 있어야 하며, 죽은 player는 `GameOver`여야 한다. 현재 `Quit`은 `DeathCause::Combat { attacker: EntityId(0) }` sentinel을 사용하는 호환 경로이므로 이 경우에만 살아 있는 player의 `GameOver`를 허용한다.
 - 모든 `EntityLocation::Inventory { owner }` item은 `owner == player_id`이고 inventory index에 정확히 한 번 존재해야 한다. 반대로 모든 inventory entry는 동일 item location과 letter를 가리켜야 한다. v1은 monster/다른 actor inventory를 지원하지 않는다.
 - persisted item의 class, glyph, weight, base price, AC/attack/effect/charge/nutrition 데이터는 복원 registry와 일치해야 한다. armor 적용 후 AC는 넓은 정수형의 checked arithmetic으로 계산하고 `i16` 범위와 persisted player AC가 모두 일치해야 한다. body armor를 착용하지 않은 player AC도 adventurer base AC와 정확히 일치해야 한다.
+- `ContentRegistry::from_toml_sources`는 runtime consumer보다 먼저 item kind별 shape와 numeric 범위를 검증한다. weight와 price는 음수가 아니어야 하고, food/corpse nutrition은 `1..=10,000`, armor AC bonus는 `0..=10,000`, level depth는 `1..=i16::MAX-1`이다. wand만 positive `charges`와 wand effect를 가지며, armor·food/corpse 외 kind가 해당 전용 필드를 갖는 입력은 거부한다. accepted armor는 adventurer base AC에서 직접 derive하고 unequip/drop은 같은 base AC로 재계산하여 Wear→Drop→save가 가역적이어야 한다.
 - `turn`, gold, kill count, inventory value와 score 조합은 다음 정상 command·observation·Quit에서 좁은 정수 overflow나 wraparound를 만들지 않는 범위여야 한다. runtime의 turn 증가, kill count 증가, 전투·회복·무게·점수 산술도 malformed state가 내부 경계를 통과하더라도 wrapping하지 않는 widening 또는 saturating 정책을 사용한다.
 - writer는 `to_save_data` 결과를 같은 semantic validator로 검사하고 pretty JSON을 16 MiB capped buffer에 직렬화한 뒤에만 destination을 원자 교체한다. 성공한 write는 같은 version loader로 즉시 읽을 수 있어야 하며, validation/byte 초과 실패는 기존 destination을 바꾸지 않는다.
 
@@ -794,7 +795,7 @@ release `output/` directory 전체가 게시 bundle이다. build는 workspace �
 
 작성일 2026-08-17 기준 최신 사용자 요구에 따라, v0.3.0 릴리스 기준을 훼손하지 않는 후속 구현 단계 R9를 추가한다. 현재 Cargo version은 R9 완료와 릴리스 결정 전까지 0.3.0을 유지한다.
 
-진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프를 구현했고 report 25 시정에서 동일 world/turn의 gold/no-gold production score pair까지 완료했다. report 26이 재개방한 사후 label 삭제 negative는 speed/AI/difficulty production pair와 9종 actual producer-removal full-run matrix로 교체했고, SHA `fc01ec12`의 Actions `32658658526`에서 양 OS Verified됐다. 독립 재감사 전까지 전체 R9/program은 HOLD다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
+진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프를 구현했고 report 25 시정에서 동일 world/turn의 gold/no-gold production score pair까지 완료했다. report 26의 최종 predecessor는 SHA `1e84a94`/Actions `32660514315`다. report 27이 omission branch가 command/observer를 생략한 점을 재개방하여, 9종 모두 동일 flow에서 대상 field/state만 neutralize하고 나머지 8개 full record equality를 검사하는 matrix로 교체했다. 새 전체 gate와 clean same-SHA CI 완료 전까지 시정 진행 중이며, 후속 독립 재감사 전까지 전체 R9/program은 HOLD다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
 
 ### 19.1 목표
 
@@ -832,7 +833,7 @@ release `output/` directory 전체가 게시 bundle이다. build는 workspace �
 | SC-CAUSE-06 | 각 seed를 3회 실행한 witness summary와 final hash가 모두 동일 |
 | SC-CAUSE-07 | causal regression은 event-only 또는 turn-only 변화에서 실패 |
 
-`SC-CAUSE-05..07`의 필수 typed witness 집합은 `FoodNutrition`, `CorpseNutrition`, `ArmorDefense`, `MonsterSpeed`, `MonsterAi`, `MonsterPassive`, `MonsterDifficultyEconomy`, `PrayerLuckCombat`, `GoldScore` 9개다. 일반 사용자 정책 `survival-v1`은 변경하지 않고, 테스트 전용 deterministic `causal-v1` fixture가 같은 `GameSession::submit` 경로에서 각 원인 명령과 downstream delta를 만든 뒤 absolute turn 1000까지 진행하고 마지막 score projection을 닫는다. 각 witness record는 scenario ID, producer entity/item, 원인 content field와 before/after value, consumer delta를 보유한다. `MonsterSpeed`는 speed budget에 의해 실행 기회가 달라진 경우에만, `MonsterAi`는 동일 speed에서 AI 선택이 달라진 경우에만 기록한다. `GoldScore`는 동일 world/turn에서 gold만 제거한 paired score와 실제 final score의 차이가 정확히 gold와 같을 때만 기록한다. witness는 명령·event 이름만으로 기록하지 않으며 command 전후 `CausalProjection`의 실제 semantic field가 함께 변한 경우에만 집계한다.
+`SC-CAUSE-05..07`의 필수 typed witness 집합은 `FoodNutrition`, `CorpseNutrition`, `ArmorDefense`, `MonsterSpeed`, `MonsterAi`, `MonsterPassive`, `MonsterDifficultyEconomy`, `PrayerLuckCombat`, `GoldScore` 9개다. 일반 사용자 정책 `survival-v1`은 변경하지 않고, 테스트 전용 deterministic `causal-v1` fixture가 같은 `GameSession::submit` 경로에서 각 원인 명령과 downstream delta를 만든 뒤 absolute turn 1000까지 진행하고 마지막 score projection을 닫는다. 각 witness record는 scenario ID, producer entity/item, 원인 content field와 before/after value, consumer delta를 보유한다. 9개 isolation 회귀는 active/control 양쪽에서 동일 producer command, consumer command와 observer를 실행하고 대상 content field 또는 producer state 하나만 변경한다. omission은 observer 호출이나 Eat/Wear/Pray/attack/kill/Quit 명령을 생략해서 만들지 않는다. difficulty pair도 양쪽에서 같은 kill을 수행하고 difficulty 차이와 gold delta 차이를 대조한다. 각 omission run은 정확히 대상 witness 하나만 잃고 나머지 8개 record의 전체 attribution 값이 complete run과 같아야 한다. `MonsterSpeed`는 speed budget에 의해 실행 기회가 달라진 경우에만, `MonsterAi`는 동일 speed에서 AI 선택이 달라진 경우에만 기록한다. `GoldScore`는 동일 world/turn에서 gold만 제거한 paired score와 실제 final score의 차이가 정확히 gold와 같을 때만 기록한다. witness는 명령·event 이름만으로 기록하지 않으며 command 전후 `CausalProjection`의 실제 semantic field가 함께 변한 경우에만 집계한다.
 
 각 seed의 완료 증거는 9개 witness count map과 final hash다. seed 42, 7, 1234를 각각 3회 반복했을 때 두 값이 모두 같아야 한다. 동일 projection을 전후 값으로 넣은 event-only fixture와 turn만 증가한 projection은 실패해야 한다. 누락 negative는 완성 summary의 record/count를 사후 삭제하지 않고 각 producer command, content field 또는 paired production scenario를 실행 전에 하나씩 제거한 9-case full run이어야 하며, 해당 witness만 빠지고 나머지 required witness가 유지되는지를 검증한다.
 

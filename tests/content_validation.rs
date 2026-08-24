@@ -157,6 +157,19 @@ fn causal_numeric_content_rejects_invalid_ranges() {
         ),
         Err(ContentError::Parse { .. })
     ));
+
+    let irreversible_armor = format!(
+        "{ITEMS}\n[[item]]\nid = \"item.armor.leather\"\nkind = \"armor\"\nglyph = \"[\"\nweight = 15\nslot = \"body\"\nac_bonus = {}\nbase_price = 8\n",
+        i16::MIN
+    );
+    assert!(matches!(
+        registry(
+            &irreversible_armor,
+            MONSTERS,
+            &[("one", LEVEL_1), ("two", LEVEL_2)]
+        ),
+        Err(ContentError::Parse { .. })
+    ));
 }
 
 #[test]

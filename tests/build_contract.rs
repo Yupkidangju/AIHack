@@ -1,5 +1,6 @@
+use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use saphyr::{LoadableYamlNode, Yaml};
 
@@ -60,7 +61,9 @@ fn github_yaml_files(root: &Path, files: &mut Vec<std::path::PathBuf>) {
 
 fn validate_remote_action_reference(action: &str) -> Result<(), String> {
     if action.starts_with("./") {
-        return Ok(());
+        return Err(format!(
+            "local action requires repository graph resolution: {action}"
+        ));
     }
     if action.starts_with("docker://") {
         let (_, digest) = action
@@ -86,6 +89,107 @@ fn validate_remote_action_reference(action: &str) -> Result<(), String> {
             .all(|character| character.is_ascii_hexdigit())
     {
         return Err(format!("action ref must be a full SHA: {action}"));
+    }
+    Ok(())
+}
+
+fn local_action_metadata(repo_root: &Path, action: &str) -> Result<PathBuf, String> {
+    let relative = Path::new(action);
+    if !action.starts_with("./")
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(format!("local action escapes repository root: {action}"));
+    }
+    let action_dir = repo_root.join(relative);
+    let canonical_root = fs::canonicalize(repo_root)
+        .map_err(|error| format!("repository root cannot be resolved: {error}"))?;
+    let canonical_action = fs::canonicalize(&action_dir)
+        .map_err(|error| format!("local action is missing: {action}: {error}"))?;
+    if !canonical_action.starts_with(&canonical_root) {
+        return Err(format!("local action escapes repository root: {action}"));
+    }
+    if canonical_action.is_file()
+        && matches!(
+            canonical_action
+                .extension()
+                .and_then(|extension| extension.to_str()),
+            Some("yml" | "yaml")
+        )
+    {
+        return Ok(canonical_action);
+    }
+    if !canonical_action.is_dir() {
+        return Err(format!(
+            "local action is not a metadata directory: {action}"
+        ));
+    }
+    let candidates = [
+        canonical_action.join("action.yml"),
+        canonical_action.join("action.yaml"),
+    ]
+    .into_iter()
+    .filter(|path| path.is_file())
+    .collect::<Vec<_>>();
+    match candidates.as_slice() {
+        [metadata] => Ok(metadata.clone()),
+        [] => Err(format!("local action metadata is missing: {action}")),
+        _ => Err(format!("local action metadata is ambiguous: {action}")),
+    }
+}
+
+fn validate_action_file(
+    repo_root: &Path,
+    yaml_path: &Path,
+    visiting: &mut HashSet<PathBuf>,
+    validated: &mut HashSet<PathBuf>,
+) -> Result<(), String> {
+    let canonical = fs::canonicalize(yaml_path)
+        .map_err(|error| format!("{} cannot be resolved: {error}", yaml_path.display()))?;
+    let canonical_root = fs::canonicalize(repo_root)
+        .map_err(|error| format!("repository root cannot be resolved: {error}"))?;
+    if !canonical.starts_with(&canonical_root) {
+        return Err(format!(
+            "local action metadata escapes repository root: {}",
+            canonical.display()
+        ));
+    }
+    if validated.contains(&canonical) {
+        return Ok(());
+    }
+    if !visiting.insert(canonical.clone()) {
+        return Err(format!(
+            "local action cycle detected: {}",
+            canonical.display()
+        ));
+    }
+    let source = fs::read_to_string(&canonical)
+        .map_err(|error| format!("{} cannot be read: {error}", canonical.display()))?;
+    for action in action_uses_from_yaml(&source)? {
+        if action.starts_with("./") {
+            let metadata = local_action_metadata(repo_root, &action)?;
+            validate_action_file(repo_root, &metadata, visiting, validated)?;
+        } else {
+            validate_remote_action_reference(&action)?;
+        }
+    }
+    visiting.remove(&canonical);
+    validated.insert(canonical);
+    Ok(())
+}
+
+fn validate_repository_action_graph(
+    repo_root: &Path,
+    yaml_files: &[PathBuf],
+) -> Result<(), String> {
+    let mut visiting = HashSet::new();
+    let mut validated = HashSet::new();
+    for path in yaml_files {
+        validate_action_file(repo_root, path, &mut visiting, &mut validated)?;
     }
     Ok(())
 }
@@ -301,18 +405,8 @@ fn ci_and_dependency_policy_run_the_same_locked_gates() {
         &mut yaml_files,
     );
     yaml_files.sort();
-    let mut uses = Vec::new();
-    for path in &yaml_files {
-        let source = fs::read_to_string(path).unwrap();
-        uses.extend(action_uses_from_yaml(&source).unwrap());
-    }
-    assert!(
-        !uses.is_empty(),
-        ".github YAML must contain action uses entries"
-    );
-    for action in uses {
-        validate_remote_action_reference(&action).unwrap();
-    }
+    assert!(!yaml_files.is_empty(), ".github YAML files must exist");
+    validate_repository_action_graph(Path::new(env!("CARGO_MANIFEST_DIR")), &yaml_files).unwrap();
     assert!(workflow.contains("# actions/checkout v4.4.0"));
     assert!(!workflow.contains("# actions/checkout v4.2.2"));
     assert!(!workflow.contains("actions/checkout@v4"));
@@ -360,16 +454,87 @@ jobs:
         );
     }
 
-    let local_and_pinned = r#"
+    let pinned = r#"
 runs:
   steps:
-    - uses: ./local-action
     - uses: docker://alpine@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     - uses: owner/action@0123456789abcdef0123456789abcdef01234567
 "#;
-    for action in action_uses_from_yaml(local_and_pinned).unwrap() {
+    for action in action_uses_from_yaml(pinned).unwrap() {
         validate_remote_action_reference(&action).unwrap();
     }
+}
+
+#[test]
+fn repository_root_local_action_graph_rejects_mutable_cycle_missing_and_escape_refs() {
+    let root = std::env::temp_dir().join(format!(
+        "aihack-action-graph-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let workflow = root.join(".github/workflows/ci.yml");
+    let outer = root.join("actions/outer/action.yml");
+    let inner = root.join("actions/inner/action.yaml");
+    fs::create_dir_all(workflow.parent().unwrap()).unwrap();
+    fs::create_dir_all(outer.parent().unwrap()).unwrap();
+    fs::create_dir_all(inner.parent().unwrap()).unwrap();
+    fs::write(
+        &workflow,
+        "jobs:\n  gate:\n    steps:\n      - uses: ./actions/outer\n",
+    )
+    .unwrap();
+    fs::write(
+        &outer,
+        "runs:\n  using: composite\n  steps:\n    - uses: ./actions/inner\n",
+    )
+    .unwrap();
+
+    fs::write(
+        &inner,
+        "runs:\n  using: composite\n  steps:\n    - uses: owner/action@main\n",
+    )
+    .unwrap();
+    assert!(validate_repository_action_graph(&root, std::slice::from_ref(&workflow)).is_err());
+
+    fs::write(
+        &inner,
+        "runs:\n  using: composite\n  steps:\n    - uses: ./actions/outer\n",
+    )
+    .unwrap();
+    assert!(validate_repository_action_graph(&root, std::slice::from_ref(&workflow)).is_err());
+
+    fs::write(
+        &outer,
+        "runs:\n  using: composite\n  steps:\n    - uses: ./actions/missing\n",
+    )
+    .unwrap();
+    assert!(validate_repository_action_graph(&root, std::slice::from_ref(&workflow)).is_err());
+
+    fs::write(
+        &outer,
+        "runs:\n  using: composite\n  steps:\n    - uses: ./../outside\n",
+    )
+    .unwrap();
+    assert!(validate_repository_action_graph(&root, std::slice::from_ref(&workflow)).is_err());
+
+    fs::write(
+        &outer,
+        "runs:\n  using: composite\n  steps:\n    - uses: ./actions/inner\n",
+    )
+    .unwrap();
+    fs::write(
+        &inner,
+        "runs:\n  using: composite\n  steps:\n    - uses: owner/action@0123456789abcdef0123456789abcdef01234567\n",
+    )
+    .unwrap();
+    validate_repository_action_graph(&root, std::slice::from_ref(&workflow)).unwrap();
+
+    let canonical_root = fs::canonicalize(&root).unwrap();
+    assert!(canonical_root.starts_with(fs::canonicalize(std::env::temp_dir()).unwrap()));
+    fs::remove_dir_all(&canonical_root).unwrap();
 }
 
 #[test]

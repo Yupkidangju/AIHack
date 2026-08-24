@@ -12,9 +12,40 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0037: report 27 field-only causal 및 consumer canonical 경계
+
+Status: Accepted; implementation and new same-SHA CI pending (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R27-01
+
+Context:
+
+`docs/audit/audit_report_27.md`는 report 26 최종 verifier 시정 SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`와 Actions `32660514315`의 양 OS success를 확인했지만, save allocator/level/charge, unsafe injected armor, omission-by-skipping causal harness, archive path alias, Linux calendar, debug panel mouse, Judge text repeat와 repository-root local action recursion을 production entrypoint에서 재현했다. broad green은 열거하지 않은 consumer와 verifier alias를 증명하지 않는다.
+
+Decision:
+
+- SaveDataV1은 다음 spawn이 가능한 allocator headroom, active registry와 동일한 level ID 집합, checked stairs target과 dynamic/max charge optional shape를 load 전에 검증한다.
+- ContentRegistry는 item kind별 numeric/field shape를 consumer-safe 범위로 제한한다. armor AC는 adventurer base에서 직접 derive하고 unequip/drop도 base로 재계산하여 accepted registry의 장비 lifecycle을 가역적으로 만든다.
+- 9종 causal isolation은 active/control 양쪽에서 같은 producer·consumer command와 observer를 실행하고 대상 field/state 하나만 neutralize한다. difficulty 양쪽은 같은 kill을 수행하며 omission마다 나머지 8개 full attribution record가 complete run과 같아야 한다.
+- source archive entry는 raw prefix가 아니라 canonical component로 검사한다. absolute, dot/parent, 빈 component, backslash와 excluded first component를 Linux/Windows 모두 fail-closed로 거부한다. candidate/period 날짜는 strict Gregorian calendar와 ordered containment를 만족해야 한다.
+- F9 debug panel은 비모달이지만 visible rect의 mouse authority를 소유한다. Judge editor에서는 character Repeat를 허용하되 일반 Playing LLM request Repeat는 계속 차단한다.
+- action pin gate는 repository-root local action을 resolve해 `action.yml` 또는 `action.yaml`의 transitive `uses`를 cycle-safe 재귀 검사하며 missing, root escape, mutable remote와 invalid Docker ref를 거부한다.
+- report 27이 현재 독립 authority다. 시정과 새 clean same-SHA Ubuntu/Windows bundle 후에도 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- allocator/stairs에서 panic만 catch: 성공 load의 consumer-safe 계약을 충족하지 않아 기각한다.
+- saturating Wear/Drop 유지: inverse가 아니며 정상 session을 unsaveable하게 만들 수 있어 base-derived 재계산을 선택한다.
+- omission branch에서 command/observer 생략: field 인과성을 증명하지 못하므로 동일 flow field-only A/B를 선택한다.
+- archive entry raw prefix만 확장: 새로운 lexical alias를 계속 놓치므로 component canonical validation을 선택한다.
+
+Consequences:
+
+wire schema v1은 유지하지만 이전에 수용되던 malformed allocator/level/charge save와 unsafe custom content는 typed error가 된다. debug panel 아래 map click은 더 이상 turn을 만들지 않고 Judge text repeat는 정상 입력된다. local composite action chain과 release archive/date fixture가 양 OS gate에 추가된다. 수정 전 실패 fixture, 전체 local gate와 새 clean same-SHA CI를 `docs/audit/audit_report_27_remediation.md`에 보존한다.
+
 ## ADR-0036: report 26 consumer-safe artifact와 presentation/release authority 경계
 
-Status: Implemented and same-SHA verified; independent re-audit pending (2026-08-24)
+Status: Superseded in part by ADR-0037; final report 26 evidence retained (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R26-01
 
@@ -30,7 +61,7 @@ Decision:
 - TUI는 modal/overlay guard를 event kind보다 먼저 적용한다. Inspect renderer와 mouse hit-test는 같은 `InspectPresentation`을 소비하며 LLM request key는 Press만 허용한다.
 - release build는 workspace 내부 random fresh directory에서 create-new staging하고 검증된 directory rename으로 승격한다. verifier는 root reparse/symlink와 expected file hard link를 거부한다. Windows link count는 열린 handle의 `GetFileInformationByHandle` 결과를 사용한다.
 - release metadata는 exact candidate commit에서 파생한 `candidate_date`를 포함하고 modification manifest 기간과 자동 교차 검증한다. dependency exception은 미래 approval을 거부하며 action pin gate는 `.github/**/*.yml|yaml`을 YAML node로 구조 순회한다.
-- report 26이 현재 authority다. 12건의 로컬 RED→GREEN, 전체 gate와 새 clean same-SHA 양 OS bundle 뒤에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD를 유지한다.
+- 이 결정 당시 report 26을 authority로 두었다. 12건의 로컬 RED→GREEN, 전체 gate와 새 clean same-SHA 양 OS bundle 뒤에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD를 유지한다. 현재 authority는 ADR-0037과 report 27이 대체한다.
 
 Alternatives:
 
@@ -43,7 +74,7 @@ Consequences:
 
 wire schema version은 1로 유지하지만 registry와 소비 산술에 맞지 않는 과거 malformed save 및 Windows 비정규 artifact name은 typed error가 된다. release metadata에 새 필수 key가 추가되고 build/verifier 호출은 candidate date를 함께 전달한다. 각 경계는 수정 전 실패 fixture를 보존하고 새 clean commit의 Ubuntu/Windows actual bundle까지 통과해야 Verified가 된다.
 
-Verification update: implementation SHA `fc01ec12bac522e601bc56bced06b0908f5873b0`의 Actions `32658658526`에서 Ubuntu/Windows 각 19개 step, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success다. 이 evidence는 구현을 Verified로 올리지만 독립 재감사나 외부 게시 승인을 대신하지 않는다.
+Verification update: `fc01ec12bac522e601bc56bced06b0908f5873b0`/Actions `32658658526`은 후속 pipefail 재현 전의 부분 evidence이고, `a9a39d87235109c0fb1d1ea7a31ea3751fd37a30`/Actions `32660221745`는 Ubuntu failure evidence다. 최종 verifier fix SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`의 Actions `32660514315`에서 Ubuntu/Windows 각 19개 step, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success다. 이 evidence는 report 26 구현을 Verified로 올리지만 report 27 독립 finding이나 외부 게시 승인을 대신하지 않는다.
 
 ## ADR-0035: report 25 production 경계와 exact-set 재시정
 
@@ -463,7 +494,7 @@ Consequences:
 
 ## ADR-0030: NetHack 3.6.7 파생물 분류와 whole-work NGPL 배포
 
-Status: Implemented; report 21 and report 24 historical closure retained, report 25 current HOLD
+Status: Implemented; report 21/24/25/26 historical closure retained, report 27 current HOLD
 Date: 2026-07-20
 Decision ID: DEC-LICENSE-03
 

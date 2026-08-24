@@ -123,12 +123,40 @@ function Assert-Metadata([string]$Content, [hashtable]$Expected, [string]$Label)
     }
 }
 
+function ConvertFrom-CalendarDate([string]$Value, [string]$Label) {
+    $parsed = [datetime]::MinValue
+    $valid = [datetime]::TryParseExact(
+        $Value,
+        'yyyy-MM-dd',
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::None,
+        [ref]$parsed
+    )
+    if (-not $valid -or $parsed.ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture) -cne $Value) {
+        Fail "$Label is not a canonical Gregorian calendar date: $Value"
+    }
+    return $parsed
+}
+
+function Assert-CanonicalArchiveEntry([string]$Entry) {
+    if ([string]::IsNullOrEmpty($Entry) -or $Entry.StartsWith('/') -or $Entry.Contains(':') -or $Entry.Contains('\') -or $Entry.Contains('//')) {
+        Fail "source archive contains an unsafe path: $Entry"
+    }
+    $canonical = $Entry.TrimEnd('/')
+    if ([string]::IsNullOrEmpty($canonical)) {
+        Fail 'source archive contains an empty path'
+    }
+    $components = $canonical.Split('/')
+    if ($components | Where-Object { [string]::IsNullOrEmpty($_) -or $_ -eq '.' -or $_ -eq '..' }) {
+        Fail "source archive contains a non-canonical path: $Entry"
+    }
+    if (@('legacy_nethack_port_reference', 'target', 'output') -ccontains $components[0]) {
+        Fail "release source archive contains an excluded path: $Entry"
+    }
+}
+
 $ResolvedOutput = Assert-NoReparsePath $OutputDir
-$candidateDate = [datetime]::ParseExact(
-    $ExpectedCandidateDate,
-    'yyyy-MM-dd',
-    [System.Globalization.CultureInfo]::InvariantCulture
-)
+$candidateDate = ConvertFrom-CalendarDate $ExpectedCandidateDate 'candidate date'
 $Archive = Join-Path $ResolvedOutput $ArchiveName
 $Required = @($ChecksumNames + 'SHA256SUMS')
 foreach ($name in $Required) {
@@ -165,8 +193,8 @@ foreach ($name in @('LICENSE', 'NOTICE', 'MODIFICATIONS.md', 'PROJECT_OWNER_LICE
         Fail "source archive required entry missing: $name"
     }
 }
-if ($archiveEntries | Where-Object { $_ -match '^(legacy_nethack_port_reference|target|output)(/|$)' }) {
-    Fail 'release source archive contains an excluded path'
+foreach ($entry in $archiveEntries) {
+    Assert-CanonicalArchiveEntry $entry
 }
 
 $ExpectedMetadata = @{
@@ -204,8 +232,11 @@ $periodMatches = [regex]::Matches($outputModifications, $periodPattern)
 if ($periodMatches.Count -ne 1) {
     Fail 'MODIFICATIONS.md must contain one covered change period'
 }
-$periodStart = [datetime]::ParseExact($periodMatches[0].Groups['start'].Value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
-$periodEnd = [datetime]::ParseExact($periodMatches[0].Groups['end'].Value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+$periodStart = ConvertFrom-CalendarDate $periodMatches[0].Groups['start'].Value 'modification period start'
+$periodEnd = ConvertFrom-CalendarDate $periodMatches[0].Groups['end'].Value 'modification period end'
+if ($periodStart -gt $periodEnd) {
+    Fail 'modification period start is after its end'
+}
 if ($candidateDate -lt $periodStart -or $candidateDate -gt $periodEnd) {
     Fail 'candidate date falls outside the modification period'
 }

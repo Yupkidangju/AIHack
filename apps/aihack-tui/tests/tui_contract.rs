@@ -291,6 +291,61 @@ fn llm_request_key_repeat_never_creates_a_new_candidate() {
 }
 
 #[test]
+fn judge_editor_accepts_character_repeat_but_release_never_adds_text() {
+    let mut app = TuiApp::new_with_llm_enabled(
+        GameSession::new_for_playing(42),
+        UiRuntimeConfig::default(),
+        true,
+    );
+    app.handle_candidate_owned(UiCommandCandidate::LlmJudge)
+        .unwrap();
+
+    for character in ['G', 'A', 'J', 'R'] {
+        for kind in [
+            KeyEventKind::Press,
+            KeyEventKind::Repeat,
+            KeyEventKind::Release,
+        ] {
+            let event = Event::Key(KeyEvent::new_with_kind(
+                KeyCode::Char(character),
+                KeyModifiers::NONE,
+                kind,
+            ));
+            if let Some(candidate) = runtime_event_to_candidate(event, 80, 24, &app) {
+                app.handle_candidate_owned(candidate).unwrap();
+            }
+        }
+    }
+
+    assert_eq!(app.soft_input(), Some("GGAAJJRR"));
+}
+
+#[test]
+fn visible_debug_panel_consumes_mouse_while_hidden_panel_preserves_map_hit_testing() {
+    let mut app = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    let layout = compute_layout(80, 24);
+    let event = || {
+        Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: layout.map.x + layout.map.width / 2 + 1,
+            row: layout.map.y + layout.map.height / 2,
+            modifiers: KeyModifiers::NONE,
+        })
+    };
+
+    assert!(matches!(
+        runtime_event_to_candidate(event(), 80, 24, &app),
+        Some(UiCommandCandidate::Command(CommandIntent::Move(
+            Direction::East
+        )))
+    ));
+    let revision = app.revision();
+    app.debug_observation_visible = true;
+    assert_eq!(runtime_event_to_candidate(event(), 80, 24, &app), None);
+    assert_eq!(app.revision(), revision);
+}
+
+#[test]
 fn terminal_lifecycle_routes_setup_and_loop_failures_through_one_restore_boundary() {
     let source = include_str!("../src/tui/mod.rs");
     assert!(source.contains("setup_terminal_state"));

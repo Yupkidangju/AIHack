@@ -457,6 +457,62 @@ fn armor_drop_restores_ac_and_rewear_does_not_stack_across_save_load() {
 }
 
 #[test]
+fn accepted_custom_armor_registry_keeps_wear_drop_and_save_round_trip_reversible() {
+    let custom_items = ITEMS_TOML.replacen("ac_bonus=1", "ac_bonus=7", 1);
+    let registry = aihack::data::ContentRegistry::from_toml_sources(
+        1,
+        &custom_items,
+        MONSTERS_TOML,
+        &[("main_1.toml", LEVEL_1_TOML), ("main_2.toml", LEVEL_2_TOML)],
+    )
+    .unwrap();
+    let session = GameSession::try_new_for_playing_with_registry(7, &registry).unwrap();
+    let mut save = session.to_save_data();
+    save.world.entities.clear_monsters();
+    let mut session = GameSession::from_save_data_with_registry(save, &registry).unwrap();
+
+    assert!(
+        session
+            .submit(CommandIntent::Move(Direction::East))
+            .accepted
+    );
+    assert!(
+        session
+            .submit(CommandIntent::Move(Direction::East))
+            .accepted
+    );
+    assert!(session.submit(CommandIntent::Pickup).accepted);
+    let armor = inventory_item(&session, ItemKind::ArmorLeather);
+    let base_ac = session
+        .world()
+        .entities()
+        .actor_stats(session.world().player_id())
+        .unwrap()
+        .ac;
+    assert!(session.submit(CommandIntent::Wear { item: armor }).accepted);
+    assert_eq!(
+        session
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac - 7
+    );
+    assert!(session.submit(CommandIntent::Drop { item: armor }).accepted);
+    assert_eq!(
+        session
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac
+    );
+    assert!(GameSession::from_save_data_with_registry(session.to_save_data(), &registry).is_ok());
+}
+
+#[test]
 fn injected_registry_survives_save_restore_and_drives_runtime_created_corpse() {
     let custom_items = ITEMS_TOML.replacen("nutrition=50", "nutrition=500", 1);
     let registry = aihack::data::ContentRegistry::from_toml_sources(

@@ -24,10 +24,21 @@ enum Fault {
     ExtraDirectory,
     ExtraJunction,
     StaleModificationPeriod,
+    DotLegacyAlias,
+    RepeatedDotLegacyAlias,
+    ParentLegacyAlias,
+    AbsoluteLegacyAlias,
+    BackslashLegacyAlias,
+    InvalidCalendarPeriod,
+    InvalidCalendarDay,
+    InvalidLeapDay,
+    ReverseCalendarPeriod,
+    InvalidCandidateDate,
 }
 
 struct Fixture {
     root: PathBuf,
+    candidate_date: String,
 }
 
 impl Fixture {
@@ -50,8 +61,13 @@ impl Fixture {
         ] {
             fs::copy(project_path(name), source.join(name)).unwrap();
         }
+        let candidate_date = if matches!(fault, Fault::InvalidCandidateDate) {
+            "2026-02-30"
+        } else {
+            CANDIDATE_DATE
+        };
         let metadata = format!(
-            "product=AIHack\nversion=0.3.0\ncommit={COMMIT}\ncandidate_date={CANDIDATE_DATE}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
+            "product=AIHack\nversion=0.3.0\ncommit={COMMIT}\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
         );
         fs::write(source.join("RELEASE-METADATA"), &metadata).unwrap();
         if matches!(fault, Fault::StaleModificationPeriod) {
@@ -60,6 +76,28 @@ impl Fixture {
                 .replace(
                     "Covered change period: `2025-05-20..2026-08-24`",
                     "Covered change period: `2025-05-20..2026-08-23`",
+                );
+            fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
+        }
+        if matches!(
+            fault,
+            Fault::InvalidCalendarPeriod
+                | Fault::InvalidCalendarDay
+                | Fault::InvalidLeapDay
+                | Fault::ReverseCalendarPeriod
+        ) {
+            let replacement = match fault {
+                Fault::InvalidCalendarPeriod => "Covered change period: `2026-00-00..2026-99-99`",
+                Fault::InvalidCalendarDay => "Covered change period: `2026-02-30..2026-12-31`",
+                Fault::InvalidLeapDay => "Covered change period: `2025-02-29..2026-08-24`",
+                Fault::ReverseCalendarPeriod => "Covered change period: `2026-08-25..2026-08-24`",
+                _ => unreachable!(),
+            };
+            let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
+                .unwrap()
+                .replace(
+                    "Covered change period: `2025-05-20..2026-08-24`",
+                    replacement,
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
         }
@@ -91,6 +129,24 @@ impl Fixture {
             .status()
             .unwrap();
         assert!(status.success());
+        let archive_alias = match fault {
+            Fault::DotLegacyAlias => Some("./legacy_nethack_port_reference/probe.txt"),
+            Fault::RepeatedDotLegacyAlias => Some("././legacy_nethack_port_reference/probe.txt"),
+            Fault::ParentLegacyAlias => Some("a/../legacy_nethack_port_reference/probe.txt"),
+            Fault::AbsoluteLegacyAlias => Some("/legacy_nethack_port_reference/probe.txt"),
+            Fault::BackslashLegacyAlias => Some("legacy_nethack_port_reference\\probe.txt"),
+            _ => None,
+        };
+        if let Some(archive_alias) = archive_alias {
+            let script = r#"Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip=[System.IO.Compression.ZipFile]::Open($env:AIHACK_ARCHIVE,[System.IO.Compression.ZipArchiveMode]::Update); try { $entry=$zip.CreateEntry($env:AIHACK_ARCHIVE_ALIAS); $writer=[System.IO.StreamWriter]::new($entry.Open()); try { $writer.Write('blocked') } finally { $writer.Dispose() } } finally { $zip.Dispose() }"#;
+            let status = Command::new("powershell")
+                .args(["-NoProfile", "-Command", script])
+                .env("AIHACK_ARCHIVE", &archive)
+                .env("AIHACK_ARCHIVE_ALIAS", archive_alias)
+                .status()
+                .unwrap();
+            assert!(status.success());
+        }
 
         for name in [
             "LICENSE",
@@ -151,7 +207,10 @@ impl Fixture {
                 .unwrap();
             assert!(status.success());
         }
-        Self { root }
+        Self {
+            root,
+            candidate_date: candidate_date.to_string(),
+        }
     }
 
     fn verify(&self) -> std::process::Output {
@@ -169,7 +228,7 @@ impl Fixture {
                 "-ExpectedCommit",
                 COMMIT,
                 "-ExpectedCandidateDate",
-                CANDIDATE_DATE,
+                &self.candidate_date,
             ])
             .output()
             .unwrap()
@@ -246,6 +305,16 @@ fn windows_verifier_rejects_legacy_metadata_record_hash_size_and_checksum_faults
         Fault::ExtraDirectory,
         Fault::ExtraJunction,
         Fault::StaleModificationPeriod,
+        Fault::DotLegacyAlias,
+        Fault::RepeatedDotLegacyAlias,
+        Fault::ParentLegacyAlias,
+        Fault::AbsoluteLegacyAlias,
+        Fault::BackslashLegacyAlias,
+        Fault::InvalidCalendarPeriod,
+        Fault::InvalidCalendarDay,
+        Fault::InvalidLeapDay,
+        Fault::ReverseCalendarPeriod,
+        Fault::InvalidCandidateDate,
     ] {
         let fixture = Fixture::new(fault);
         let output = fixture.verify();

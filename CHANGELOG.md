@@ -26,6 +26,9 @@
 - v0.3.0 release modification 범위를 2026-08-24 candidate commit까지 확장하고 CI action을 immutable commit으로 고정했다.
 - report 25 재감사에 따라 save read/write 예산, replay path identity, GoldScore production pair, TUI dispatcher/CTA geometry, release output exact-set을 단일 production 계약으로 강화했다.
 - active audit authority를 `docs/audit/audit_report_25.md` HOLD로 전환하고 first final-audit remediation의 broad-green 주장을 partial historical evidence로 분류했다.
+- report 27 계약에 따라 9종 causal isolation을 command/observer 생략이 없는 field-only active/control pair와 나머지 8개 attribution record equality로 강화했다.
+- F9 debug panel이 visible rect의 mouse authority를 갖도록 정하고 Judge editor의 문자 Repeat와 일반 LLM request Repeat를 분리했다.
+- CI action pin gate가 repository-root local composite action의 metadata를 cycle-safe 재귀 검사하도록 확장했다.
 
 ### Fixed
 
@@ -42,6 +45,9 @@
 - Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.
 - Linux에서 O_PATH 기반 `cap_std::Dir`를 직접 fsync해 atomic save가 EBADF로 실패하던 문제를 capability 아래 `.`의 syncable directory descriptor 재open으로 수정했다.
 - report 26의 malformed scalar/ItemData, Win32 trailing-name alias, modal mouse·hidden Inspect CTA, causal producer-removal, release root/hardlink와 candidate-date 경계를 fail-closed 회귀로 수정했다.
+- report 26 Linux verifier의 `tar | grep -q` SIGPIPE false-green을 전체 listing 선캡처로 수정하고 최종 SHA `1e84a94`/Actions `32660514315` 계보를 복구했다.
+- report 27의 allocator exhaustion, registry level/charge shape, 비가역 custom armor를 load/import 전에 typed reject하고 Wear/Drop AC를 base-derived 가역 계산으로 수정했다.
+- source archive의 dot/parent/absolute/backslash alias와 불가능한 Gregorian candidate/period 날짜가 양 OS verifier를 우회하던 경계를 canonical component/strict calendar 검사로 닫았다.
 
 ### 2026-07-20 기준 누적 내역
 

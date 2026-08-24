@@ -45,7 +45,8 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
 
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
-    assert!(compatibility.contains("audit report 26 remediation same-SHA verified"));
+    assert!(compatibility.contains("report 26 final predecessor `1e84a94/32660514315`"));
+    assert!(compatibility.contains("audit report 27 remediation in progress"));
 }
 
 #[test]
@@ -79,7 +80,8 @@ fn r8_documentation_self_check_is_current_without_rewriting_the_r0_audit() {
     assert!(report.contains("**R8 Documentation Self-check: PASS**"));
     assert!(report.contains("audit_report_21.md` 종결 상태"));
     assert!(report.contains("audit_report_23.md` 역사적 상태"));
-    assert!(report.contains("audit_report_26.md` 현재 상태"));
+    assert!(report.contains("audit_report_26.md` 역사적 최종 상태"));
+    assert!(report.contains("audit_report_27.md` 현재 상태"));
 
     for phrase in [
         "Cargo/README/CHANGELOG 0.3.0",
@@ -139,10 +141,10 @@ fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
         "DESIGN_DECISIONS.md",
     ] {
         let content = project_file(document);
-        for phrase in ["fc01ec12", "32658658526"] {
+        for phrase in ["1e84a94", "32660514315"] {
             assert!(
                 content.contains(phrase),
-                "{document} report 26 evidence 누락: {phrase}"
+                "{document} report 26 final predecessor 누락: {phrase}"
             );
         }
     }
@@ -173,19 +175,19 @@ fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
     ] {
         let content = project_file(document);
         assert!(
-            content.contains("docs/audit/audit_report_26.md"),
+            content.contains("docs/audit/audit_report_27.md"),
             "{document} current authority 누락"
         );
     }
 
     let summary = project_file("IMPLEMENTATION_SUMMARY.md");
     assert!(summary.contains("report 23/24 finding"));
-    assert!(summary.contains("현재 권위는 report 25 same-SHA 구현을"));
-    assert!(summary.contains("audit_report_26.md"));
+    assert!(summary.contains("현재 권위는 report 26 최종 SHA"));
+    assert!(summary.contains("audit_report_27.md"));
 
     let guide = project_file("BUILD_GUIDE.md");
     assert!(guide.contains("report 20 문서 시정 독립 재감사 PASS"));
-    assert!(guide.contains("docs/audit/audit_report_26.md` malformed save"));
+    assert!(guide.contains("docs/audit/audit_report_27.md` allocator/registry"));
     assert!(!guide.contains("| CI | Linux/Windows workflow 구성, 원격 green 대기 |"));
 }
 
@@ -194,7 +196,7 @@ fn active_release_sections_reject_known_stale_statuses() {
     let summary = project_file("IMPLEMENTATION_SUMMARY.md");
     let baseline = markdown_section(&summary, "## 1. 현재 기준과 목표", "## 2. 전체 런타임 흐름");
     assert!(baseline.contains("report 23/24 finding"));
-    assert!(baseline.contains("audit_report_26.md"));
+    assert!(baseline.contains("audit_report_27.md"));
     assert!(baseline.contains("partial evidence"));
     for stale in [
         "다음 release 범위는 아직 완료되지 않았다",
@@ -227,11 +229,11 @@ fn active_release_sections_reject_known_stale_statuses() {
     assert!(documentation.ends_with("| Closed |"));
     for verified in ["G-BUILD-006", "G-TEST-003", "G-DOC-004", "G-SEC-001"] {
         assert!(
-            gap_row(&gaps, verified).ends_with("| Verified |"),
+            gap_row(&gaps, verified).ends_with("| In Progress |"),
             "{verified} 현재 상태 불일치"
         );
     }
-    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Verified |"));
+    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| In Progress |"));
     for row in gaps.lines().filter(|line| line.starts_with("| G-")) {
         assert!(
             !row.contains("Closed /"),
@@ -262,11 +264,11 @@ fn active_release_sections_reject_known_stale_statuses() {
 }
 
 #[test]
-fn active_r9_status_separates_completed_gold_score_pair_from_producer_removal_work() {
+fn active_r9_status_requires_field_only_pairs_and_new_ci() {
     let spec = project_file("spec.md");
     let r9 = markdown_section(&spec, "## 19. R9 후속 목표", "### 19.1 목표");
-    assert!(r9.contains("9종 actual producer-removal full-run matrix로 교체"));
-    assert!(r9.contains("Actions `32658658526`에서 양 OS Verified"));
+    assert!(r9.contains("9종 모두 동일 flow에서 대상 field/state만 neutralize"));
+    assert!(r9.contains("새 전체 gate와 clean same-SHA CI 완료 전까지 시정 진행 중"));
     assert!(!r9.contains("gold/no-gold production pair와 독립 negative matrix를 시정 중"));
     assert!(!r9.contains("actual producer-removal matrix는 시정 중"));
 }
@@ -312,7 +314,12 @@ fn sc_cause_contract_ids_map_to_code_and_tests() {
         "pub struct CausalWitnessRecord",
         "pub fn observe_monster_speed_pair",
         "pub fn observe_monster_ai_pair",
+        "pub fn observe_item_nutrition_pair",
+        "pub fn observe_armor_defense_pair",
+        "pub fn observe_monster_passive_pair",
         "pub fn observe_monster_difficulty_pair",
+        "pub fn observe_prayer_luck_pair",
+        "pub fn observe_gold_score_pair",
         "pub fn validate_required",
     ] {
         assert!(
@@ -343,7 +350,7 @@ fn sc_cause_contract_ids_map_to_code_and_tests() {
         "causal_fixture_covers_every_required_witness_for_each_seed",
         "causal_witness_multiset_and_final_hash_are_stable_across_three_runs",
         "causal_validator_rejects_event_only_and_turn_only_changes",
-        "causal_actual_producer_removal_loses_exactly_one_required_witness",
+        "causal_field_only_ab_loses_exactly_one_witness_and_preserves_other_records",
         "gold_score_witness_uses_a_paired_production_score",
     ] {
         assert!(

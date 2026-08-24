@@ -243,13 +243,109 @@ impl BundleFixture {
     }
 
     fn verify(&self) -> std::process::Output {
+        self.verify_with_candidate(CANDIDATE_DATE)
+    }
+
+    fn verify_with_candidate(&self, candidate_date: &str) -> std::process::Output {
         Command::new("bash")
             .arg(project_path("scripts/verify_release_bundle.sh"))
             .arg(self.root.join("output"))
             .arg(&self.commit)
-            .arg(CANDIDATE_DATE)
+            .arg(candidate_date)
             .output()
             .unwrap()
+    }
+
+    fn rewrite_archive_with_path_alias(&self, alias: &str) {
+        let unpacked = self.root.join("archive-rewrite");
+        fs::create_dir_all(&unpacked).unwrap();
+        let archive = self.root.join("output/aihack-0.3.0-source.tar.gz");
+        let extract = Command::new("tar")
+            .args([
+                "-xzf",
+                archive.to_str().unwrap(),
+                "-C",
+                unpacked.to_str().unwrap(),
+            ])
+            .status()
+            .unwrap();
+        assert!(extract.success());
+        fs::write(unpacked.join("blocked-probe"), "blocked\n").unwrap();
+        let transform = format!("s,^blocked-probe$,{},", alias.replace('\\', "\\\\"));
+        let create = Command::new("tar")
+            .args([
+                "-czf",
+                archive.to_str().unwrap(),
+                "--transform",
+                &transform,
+                "-C",
+                unpacked.to_str().unwrap(),
+                "LICENSE",
+                "NOTICE",
+                "MODIFICATIONS.md",
+                "PROJECT_OWNER_LICENSE_APPROVAL.md",
+                "RELEASE-METADATA",
+                "Cargo.toml",
+                "blocked-probe",
+            ])
+            .status()
+            .unwrap();
+        assert!(create.success());
+        rewrite_checksums(&self.root.join("output"));
+    }
+
+    fn rewrite_calendar(&self, candidate_date: &str, start: &str, end: &str) {
+        let output = self.root.join("output");
+        replace_in_file(
+            &output.join("MODIFICATIONS.md"),
+            "Covered change period: `2025-05-20..2026-08-24`",
+            &format!("Covered change period: `{start}..{end}`"),
+        );
+        replace_in_file(
+            &output.join("RELEASE-METADATA"),
+            &format!("candidate_date={CANDIDATE_DATE}"),
+            &format!("candidate_date={candidate_date}"),
+        );
+        let unpacked = self.root.join("calendar-rewrite");
+        fs::create_dir_all(&unpacked).unwrap();
+        let archive = output.join("aihack-0.3.0-source.tar.gz");
+        assert!(Command::new("tar")
+            .args([
+                "-xzf",
+                archive.to_str().unwrap(),
+                "-C",
+                unpacked.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success());
+        replace_in_file(
+            &unpacked.join("MODIFICATIONS.md"),
+            "Covered change period: `2025-05-20..2026-08-24`",
+            &format!("Covered change period: `{start}..{end}`"),
+        );
+        replace_in_file(
+            &unpacked.join("RELEASE-METADATA"),
+            &format!("candidate_date={CANDIDATE_DATE}"),
+            &format!("candidate_date={candidate_date}"),
+        );
+        assert!(Command::new("tar")
+            .args([
+                "-czf",
+                archive.to_str().unwrap(),
+                "-C",
+                unpacked.to_str().unwrap(),
+                "LICENSE",
+                "NOTICE",
+                "MODIFICATIONS.md",
+                "PROJECT_OWNER_LICENSE_APPROVAL.md",
+                "RELEASE-METADATA",
+                "Cargo.toml",
+            ])
+            .status()
+            .unwrap()
+            .success());
+        rewrite_checksums(&output);
     }
 }
 
@@ -385,6 +481,48 @@ fn verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree() {
     let output = fixture.verify();
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("excluded path"));
+}
+
+#[test]
+fn verifier_rejects_canonical_aliases_of_blocked_archive_paths() {
+    for alias in [
+        "./legacy_nethack_port_reference/probe.txt",
+        "././legacy_nethack_port_reference/probe.txt",
+        "a/../legacy_nethack_port_reference/probe.txt",
+        "/legacy_nethack_port_reference/probe.txt",
+        "legacy_nethack_port_reference\\probe.txt",
+    ] {
+        let fixture = BundleFixture::new(BundleCase::Complete);
+        fixture.rewrite_archive_with_path_alias(alias);
+        let output = fixture.verify();
+        assert!(
+            !output.status.success(),
+            "blocked archive alias was accepted: alias={alias} stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn verifier_rejects_non_calendar_candidate_and_period_matrix() {
+    for (candidate, start, end) in [
+        ("2026-13-01", "2025-05-20", "2026-12-31"),
+        ("2026-02-30", "2025-05-20", "2026-12-31"),
+        ("2025-02-29", "2025-01-01", "2025-12-31"),
+        ("2026-08-24", "2026-00-00", "2026-99-99"),
+        ("2026-08-24", "2026-08-25", "2026-08-24"),
+    ] {
+        let fixture = BundleFixture::new(BundleCase::Complete);
+        fixture.rewrite_calendar(candidate, start, end);
+        let output = fixture.verify_with_candidate(candidate);
+        assert!(
+            !output.status.success(),
+            "invalid calendar tuple was accepted: {start} <= {candidate} <= {end}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
 #[test]

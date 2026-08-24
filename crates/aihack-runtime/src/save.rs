@@ -14,6 +14,7 @@ use aihack_core::{
     },
     error::{GameError, SaveValidationError},
     event::GameEvent,
+    ids::LevelId,
     meta::GameMeta,
     rng::GameRng,
     run_state::RunState,
@@ -507,6 +508,13 @@ fn validate_saved_world_inner(
             .checked_add(expected)
             .ok_or_else(|| invalid_world_error("total map tile count overflow"))?;
     }
+    let expected_level_ids = registry
+        .levels()
+        .map(|level| LevelId::main(level.depth))
+        .collect::<HashSet<_>>();
+    if level_ids != expected_level_ids {
+        return invalid_world("persisted level IDs do not match the active registry".to_string());
+    }
     validate_count("map tiles", total_tiles, MAX_TOTAL_MAP_TILES)?;
     if !world.levels.contains(world.current_level) {
         return invalid_world("current level is missing".to_string());
@@ -552,7 +560,11 @@ fn validate_saved_world_inner(
                         entity.id.0
                     ));
                 }
-                if charges.is_some_and(|value| data.max_charges.is_none_or(|max| value > max)) {
+                if charges.is_some() != data.max_charges.is_some()
+                    || charges
+                        .zip(data.max_charges)
+                        .is_some_and(|(value, max)| value > max)
+                {
                     return invalid_world(format!("item {} has invalid charges", entity.id.0));
                 }
                 if matches!(location, EntityLocation::OnMap { .. }) {
@@ -561,7 +573,10 @@ fn validate_saved_world_inner(
             }
         }
     }
-    if world.entities.next_id() == 0 || world.entities.next_id() <= max_id {
+    if world.entities.next_id() == 0
+        || world.entities.next_id() <= max_id
+        || world.entities.next_id() == u32::MAX
+    {
         return invalid_world("entity allocator next_id collides with persisted IDs".to_string());
     }
     if player_count != 1 {

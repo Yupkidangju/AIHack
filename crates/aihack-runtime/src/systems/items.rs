@@ -7,6 +7,7 @@ use aihack_core::{
             PHASE5_LEVEL1_ID, PHASE5_LEVEL1_STAIRS_DOWN, PHASE5_LEVEL2_ID,
             PHASE5_LEVEL2_STAIRS_UP_POS,
         },
+        player::adventurer_template,
     },
     event::GameEvent,
     ids::EntityId,
@@ -80,14 +81,21 @@ pub fn wear(world: &mut GameWorld, item: EntityId) -> Result<Option<GameEvent>, 
         return Err("item is not armor".to_string());
     }
     let ac_bonus = data.ac_bonus;
+    let derived_ac = adventurer_template()
+        .ac
+        .checked_sub(ac_bonus)
+        .ok_or_else(|| "armor AC exceeds the supported range".to_string())?;
     if let Some(previous) = world.inventory.equipped_body {
         unequip_body(world, previous)?;
     }
     world.state_mut().inventory.equip_body(item);
     let player_id = world.player_id;
-    if let Some(stats) = world.state_mut().entities.actor_stats_mut(player_id) {
-        stats.ac = stats.ac.saturating_sub(ac_bonus);
-    }
+    let stats = world
+        .state_mut()
+        .entities
+        .actor_stats_mut(player_id)
+        .ok_or_else(|| "player actor stats are missing".to_string())?;
+    stats.ac = derived_ac;
     Ok(Some(GameEvent::ItemEquipped {
         entity: world.player_id,
         item,
@@ -280,11 +288,10 @@ fn remove_inventory_item(world: &mut GameWorld, item: EntityId) -> Result<(), St
 }
 
 fn unequip_body(world: &mut GameWorld, item: EntityId) -> Result<(), String> {
-    let ac_bonus = world
+    world
         .entities
         .item_data(item)
         .filter(|data| data.class == ItemClass::Armor)
-        .map(|data| data.ac_bonus)
         .ok_or_else(|| "equipped body item is not armor".to_string())?;
     let player_id = world.player_id;
     let stats = world
@@ -292,7 +299,7 @@ fn unequip_body(world: &mut GameWorld, item: EntityId) -> Result<(), String> {
         .entities
         .actor_stats_mut(player_id)
         .ok_or_else(|| "player actor stats are missing".to_string())?;
-    stats.ac = stats.ac.saturating_add(ac_bonus);
+    stats.ac = adventurer_template().ac;
     world.state_mut().inventory.equipped_body = None;
     Ok(())
 }

@@ -12,9 +12,13 @@ pub fn descend(world: &mut GameWorld) -> Result<GameEvent, String> {
         Err(error) => return Err(format!("cannot inspect stairs down tile: {error}")),
     }
 
+    let target_depth = from
+        .depth
+        .checked_add(1)
+        .ok_or_else(|| "target level depth overflows".to_string())?;
     let to = LevelId {
         branch: from.branch,
-        depth: from.depth + 1,
+        depth: target_depth,
     };
     if !world.levels.contains(to) {
         return Err("target level for stairs down does not exist".to_string());
@@ -44,9 +48,13 @@ pub fn ascend(world: &mut GameWorld) -> Result<GameEvent, String> {
     if from.depth <= 1 {
         return Err("cannot ascend above main:1".to_string());
     }
+    let target_depth = from
+        .depth
+        .checked_sub(1)
+        .ok_or_else(|| "target level depth underflows".to_string())?;
     let to = LevelId {
         branch: from.branch,
-        depth: from.depth - 1,
+        depth: target_depth,
     };
     if !world.levels.contains(to) {
         return Err("target level for stairs up does not exist".to_string());

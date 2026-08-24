@@ -314,6 +314,118 @@ impl CausalSummary {
         &self.records
     }
 
+    pub fn observe_item_nutrition_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_after: &CausalProjection,
+        item: EntityId,
+    ) {
+        let (
+            Some(active_item),
+            Some(active_after_item),
+            Some(control_item),
+            Some(control_after_item),
+        ) = (
+            active_before.entity(item),
+            active_after.entity(item),
+            control_before.entity(item),
+            control_after.entity(item),
+        )
+        else {
+            return;
+        };
+        let (Some(active_nutrition), Some(control_nutrition)) =
+            (active_item.nutrition, control_item.nutrition)
+        else {
+            return;
+        };
+        let active_delta = i32::from(active_after.nutrition) - i32::from(active_before.nutrition);
+        let control_delta =
+            i32::from(control_after.nutrition) - i32::from(control_before.nutrition);
+        if active_item.kind != control_item.kind
+            || active_nutrition == control_nutrition
+            || active_after_item.location != Some(EntityLocation::Consumed)
+            || control_after_item.location != Some(EntityLocation::Consumed)
+            || active_delta - control_delta
+                != i32::from(active_nutrition) - i32::from(control_nutrition)
+        {
+            return;
+        }
+        let (witness, scenario) = match active_item.kind {
+            EntityKind::Item(ItemKind::FoodRation) => (
+                CausalWitness::FoodNutrition,
+                CausalScenario::FoodConsumption,
+            ),
+            EntityKind::Item(ItemKind::CorpseJackal) if self.corpse_produced => (
+                CausalWitness::CorpseNutrition,
+                CausalScenario::CorpseConsumption,
+            ),
+            _ => return,
+        };
+        self.record(CausalWitnessRecord {
+            witness,
+            scenario,
+            producer: Some(item),
+            field: CausalField::ItemNutrition,
+            source_before: CausalValue::Signed(i64::from(control_nutrition)),
+            source_after: CausalValue::Signed(i64::from(active_nutrition)),
+            consumer: CausalConsumer::Nutrition,
+            consumer_before: CausalValue::Signed(i64::from(control_delta)),
+            consumer_after: CausalValue::Signed(i64::from(active_delta)),
+        });
+    }
+
+    pub fn observe_armor_defense_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_after: &CausalProjection,
+        item: EntityId,
+    ) {
+        let (Some(active_item), Some(control_item)) =
+            (active_before.entity(item), control_before.entity(item))
+        else {
+            return;
+        };
+        let (Some(active_bonus), Some(control_bonus)) =
+            (active_item.ac_bonus, control_item.ac_bonus)
+        else {
+            return;
+        };
+        if active_item.kind != control_item.kind
+            || active_item.kind != EntityKind::Item(ItemKind::ArmorLeather)
+            || active_bonus == control_bonus
+            || active_before.inventory.equipped_body == Some(item)
+            || control_before.inventory.equipped_body == Some(item)
+            || active_after.inventory.equipped_body != Some(item)
+            || control_after.inventory.equipped_body != Some(item)
+            || active_before
+                .player_ac
+                .checked_sub(active_bonus)
+                .is_none_or(|derived| active_after.player_ac != derived)
+            || control_before
+                .player_ac
+                .checked_sub(control_bonus)
+                .is_none_or(|derived| control_after.player_ac != derived)
+        {
+            return;
+        }
+        self.record(CausalWitnessRecord {
+            witness: CausalWitness::ArmorDefense,
+            scenario: CausalScenario::ArmorWear,
+            producer: Some(item),
+            field: CausalField::ArmorAcBonus,
+            source_before: CausalValue::Signed(i64::from(control_bonus)),
+            source_after: CausalValue::Signed(i64::from(active_bonus)),
+            consumer: CausalConsumer::PlayerAc,
+            consumer_before: CausalValue::Signed(i64::from(control_after.player_ac)),
+            consumer_after: CausalValue::Signed(i64::from(active_after.player_ac)),
+        });
+    }
+
     pub fn observe_monster_speed_pair(
         &mut self,
         active_before: &CausalProjection,
@@ -411,6 +523,46 @@ impl CausalSummary {
         });
     }
 
+    pub fn observe_monster_passive_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_after: &CausalProjection,
+        entity: EntityId,
+    ) {
+        let (Some(active_entity), Some(control_entity)) =
+            (active_before.entity(entity), control_before.entity(entity))
+        else {
+            return;
+        };
+        let active_delta = active_after
+            .paralysis_turns
+            .saturating_sub(active_before.paralysis_turns);
+        let control_delta = control_after
+            .paralysis_turns
+            .saturating_sub(control_before.paralysis_turns);
+        if active_entity.kind != control_entity.kind
+            || active_entity.passive == control_entity.passive
+            || active_entity.passive.is_none()
+            || control_entity.passive.is_some()
+            || active_delta <= control_delta
+        {
+            return;
+        }
+        self.record(CausalWitnessRecord {
+            witness: CausalWitness::MonsterPassive,
+            scenario: CausalScenario::PassiveCombat,
+            producer: Some(entity),
+            field: CausalField::MonsterPassive,
+            source_before: CausalValue::None,
+            source_after: CausalValue::Text(format!("{:?}", active_entity.passive)),
+            consumer: CausalConsumer::ParalysisTurns,
+            consumer_before: CausalValue::Unsigned(u64::from(control_delta)),
+            consumer_after: CausalValue::Unsigned(u64::from(active_delta)),
+        });
+    }
+
     pub fn observe_monster_difficulty_pair(
         &mut self,
         active_before: &CausalProjection,
@@ -429,20 +581,27 @@ impl CausalSummary {
         else {
             return;
         };
-        let Some(difficulty) = active_before_entity.difficulty else {
+        let (Some(active_difficulty), Some(control_difficulty)) = (
+            active_before_entity.difficulty,
+            control_before_entity.difficulty,
+        ) else {
             return;
         };
         let active_gold_delta = active_after.gold.checked_sub(active_before.gold);
+        let control_gold_delta = control_after.gold.checked_sub(control_before.gold);
         if active_before_entity.kind != control_before_entity.kind
-            || control_before_entity.difficulty != Some(difficulty)
+            || active_difficulty == control_difficulty
             || active_before_entity.alive != Some(true)
             || control_before_entity.alive != Some(true)
             || active_after_entity.alive != Some(false)
-            || control_after_entity.alive != Some(true)
+            || control_after_entity.alive != Some(false)
             || active_after.kill_count != active_before.kill_count.saturating_add(1)
-            || control_after.kill_count != control_before.kill_count
-            || active_gold_delta != Some(u32::from(difficulty))
-            || control_after.gold != control_before.gold
+            || control_after.kill_count != control_before.kill_count.saturating_add(1)
+            || active_gold_delta != Some(u32::from(active_difficulty))
+            || control_gold_delta != Some(u32::from(control_difficulty))
+            || i64::from(active_gold_delta.unwrap_or_default())
+                - i64::from(control_gold_delta.unwrap_or_default())
+                != i64::from(active_difficulty) - i64::from(control_difficulty)
         {
             return;
         }
@@ -451,11 +610,102 @@ impl CausalSummary {
             scenario: CausalScenario::DifficultyEconomy,
             producer: Some(entity),
             field: CausalField::MonsterDifficulty,
-            source_before: CausalValue::Unsigned(0),
-            source_after: CausalValue::Unsigned(u64::from(difficulty)),
+            source_before: CausalValue::Unsigned(u64::from(control_difficulty)),
+            source_after: CausalValue::Unsigned(u64::from(active_difficulty)),
             consumer: CausalConsumer::Gold,
-            consumer_before: CausalValue::Unsigned(u64::from(active_before.gold)),
-            consumer_after: CausalValue::Unsigned(u64::from(active_after.gold)),
+            consumer_before: CausalValue::Unsigned(u64::from(
+                control_gold_delta.unwrap_or_default(),
+            )),
+            consumer_after: CausalValue::Unsigned(u64::from(active_gold_delta.unwrap_or_default())),
+        });
+    }
+
+    pub fn observe_prayer_luck_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_outcome: &TurnOutcome,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_outcome: &TurnOutcome,
+        control_after: &CausalProjection,
+    ) {
+        let attack_roll = |outcome: &TurnOutcome, player: EntityId| {
+            outcome.events.iter().find_map(|event| match event {
+                GameEvent::AttackResolved {
+                    attacker,
+                    attack_roll,
+                    ..
+                } if *attacker == player => Some(*attack_roll),
+                _ => None,
+            })
+        };
+        let (Some(active_roll), Some(control_roll)) = (
+            attack_roll(active_outcome, active_before.player_id),
+            attack_roll(control_outcome, control_before.player_id),
+        ) else {
+            return;
+        };
+        if !active_outcome.accepted
+            || !control_outcome.accepted
+            || active_before.luck == control_before.luck
+            || i32::from(active_roll) - i32::from(control_roll)
+                != i32::from(active_before.luck) - i32::from(control_before.luck)
+            || active_after.luck != active_before.luck
+            || control_after.luck != control_before.luck
+        {
+            return;
+        }
+        self.record(CausalWitnessRecord {
+            witness: CausalWitness::PrayerLuckCombat,
+            scenario: CausalScenario::PrayerCombat,
+            producer: Some(active_before.player_id),
+            field: CausalField::PlayerLuck,
+            source_before: CausalValue::Signed(i64::from(control_before.luck)),
+            source_after: CausalValue::Signed(i64::from(active_before.luck)),
+            consumer: CausalConsumer::AttackRoll,
+            consumer_before: CausalValue::Signed(i64::from(control_roll)),
+            consumer_after: CausalValue::Signed(i64::from(active_roll)),
+        });
+    }
+
+    pub fn observe_gold_score_pair(
+        &mut self,
+        active_before: &CausalProjection,
+        active_after: &CausalProjection,
+        control_before: &CausalProjection,
+        control_after: &CausalProjection,
+    ) {
+        let (
+            RunState::GameOver {
+                final_score: active_score,
+                ..
+            },
+            RunState::GameOver {
+                final_score: control_score,
+                ..
+            },
+        ) = (active_after.run_state, control_after.run_state)
+        else {
+            return;
+        };
+        if active_before.gold == control_before.gold
+            || active_after.gold != active_before.gold
+            || control_after.gold != control_before.gold
+            || i64::from(active_score) - i64::from(control_score)
+                != i64::from(active_before.gold) - i64::from(control_before.gold)
+        {
+            return;
+        }
+        self.record(CausalWitnessRecord {
+            witness: CausalWitness::GoldScore,
+            scenario: CausalScenario::GoldScoreProjection,
+            producer: Some(active_before.player_id),
+            field: CausalField::Gold,
+            source_before: CausalValue::Unsigned(u64::from(control_before.gold)),
+            source_after: CausalValue::Unsigned(u64::from(active_before.gold)),
+            consumer: CausalConsumer::FinalScore,
+            consumer_before: CausalValue::Signed(i64::from(control_score)),
+            consumer_after: CausalValue::Signed(i64::from(active_score)),
         });
     }
 
