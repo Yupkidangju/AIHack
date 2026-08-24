@@ -9,7 +9,8 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 30 successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 [Actions `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414) clean same-SHA Ubuntu/Windows actual bundle Verified. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 코드 기준: Cargo package 0.3.0, report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 [Actions `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414) clean same-SHA Ubuntu/Windows actual bundle Verified.
+현재 독립 감사 권위는 `docs/audit/audit_report_31.md`다. implementation summary lifecycle 회귀와 generic negative gate는 전체 local quality gate까지 Verified됐으며, 새 clean same-SHA 양 OS 증거 및 후속 독립 PASS 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
@@ -20,6 +21,7 @@
 - 계약 변경은 이 문서를 먼저 수정하고 `DESIGN_DECISIONS.md`에 새 ADR을 추가한다.
 - 완료 표시는 `audit_roadmap.md`의 명령과 산출물 증거가 모두 통과한 뒤에만 변경한다.
 - 현재 구현과 목표 구현을 같은 문장에서 완료로 표현하지 않는다.
+- active 문서 구간은 현재 감사 보고서를 정확히 한 번 가리켜야 한다. predecessor를 현재 권위로 표현하거나 이미 Verified된 predecessor의 구현·로컬 gate·CI를 다음 단계 또는 pending으로 다시 여는 문장은 report 번호에서 파생하는 공통 negative gate로 거부한다. 역사 문맥은 명시적으로 구분된 historical 구간에서만 허용한다.
 - `legacy_nethack_port_reference/`의 코드, 데이터, 문자열을 출처 기록 없이 복사하지 않는다.
 - UI와 LLM은 `GameSession` 또는 `GameWorld`의 내부 상태를 직접 변경하지 않는다.
 - LLM 출력은 신뢰하지 않으며, 현재 turn과 snapshot hash를 재검증한다.

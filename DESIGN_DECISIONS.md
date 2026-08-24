@@ -12,9 +12,37 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0041: report 31 summary lifecycle과 generic predecessor gate
+
+Status: Implemented and full local quality gate verified; clean same-SHA bundle/CI pending (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R31-01
+
+Context:
+
+Report 31은 ADR-0040 public Rust visibility와 report 29 기술 회귀, `ed02dbf/32733235414` 양 OS actual bundle을 Verified했다. 그러나 `IMPLEMENTATION_SUMMARY.md` 1절은 완료 증거를 기록하면서 10절은 완료 이전 실행 계획을 유지했고, 11절은 report 29를 현재 문서로 잘못 가리켰다. 기존 `r8_documentation`은 특정 report 27/28 문구와 선택된 header만 검사해 이 active 후반 회귀를 놓쳤다.
+
+Decision:
+
+- 단일 current authority는 `docs/audit/audit_report_31.md`다. implementation summary 1·10·11절을 각각 독립 active section으로 검사하며 모두 현재 report marker를 정확히 한 번 포함해야 한다.
+- current-authority 검사는 report 29/30 같은 개별 stale 문자열을 계속 나열하지 않는다. active line에서 current/현재 권위를 선언한 모든 `audit_report_N.md` 또는 `report N`을 추출하고, N이 현재 report 번호와 다르면 공통 규칙으로 거부한다.
+- 완료된 predecessor의 lifecycle 재개방도 공통 규칙으로 거부한다. predecessor report를 `다음 단계`, `시정 중`, `구현·검증 진행 중`, 구현/local gate/same-SHA/CI `pending`과 결합한 active line은 실패한다. successor가 Verified라는 역사 사실은 허용한다.
+- 기존 README 5개 locale, spec, ADR, summary, documentation audit, roadmap, build/gap, designs, compatibility 및 remediation header 검사는 유지하고 report 31 remediation header와 summary 10·11절을 coverage에 추가한다.
+- report 30 public visibility와 report 29 기술 회귀, 전체 local gate 및 새 clean same-SHA Ubuntu/Windows actual bundle을 다시 통과해도 report 31 후속 독립 PASS와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- report 29 current와 report 30 pending 문구만 exact string으로 추가: 표현이 조금만 달라져도 같은 false-green이 반복되므로 기각한다.
+- implementation summary 전체 파일에서 predecessor 문자열을 전면 금지: 11절의 검증된 기술 이력까지 지워 감사 계보를 잃으므로 active section별 의미 검사로 한정한다.
+- 상단 1절만 current marker로 검사: 10·11절의 실행 지시가 다시 부패한 이번 재현을 막지 못하므로 기각한다.
+
+Consequences:
+
+문서 gate는 현재 report 번호와 predecessor lifecycle 상태를 구조적으로 해석한다. summary의 현재 기준, 다음 작업과 R9 이력은 서로 다른 문장이어도 하나의 lifecycle을 가리키며, 완료된 Report 30 기술 증거는 역사적 Verified로만 남는다. RED/GREEN, 전체 gate와 CI 증거는 `docs/audit/audit_report_31_remediation.md`에 기록한다.
+
 ## ADR-0040: report 30 active authority와 submit-only visibility 강제
 
-Status: Implemented and clean same-SHA Ubuntu/Windows actual bundles verified; independent re-audit pending (2026-08-24)
+Status: Superseded in active authority by ADR-0041; historical technical implementation and independent verification complete (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R30-01
 

@@ -15,9 +15,13 @@
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
-현재 권위는 report 29 technical successor/current docs를 adversarial probe로 다시 HOLD한 `docs/audit/audit_report_30.md`다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~29 successor 계보는 historical/technical evidence로 보존한다. report 29 시정은 content/allocator/TUI/archive와 projectile/monster 축소를 `a91a9c7/32706869079`에서 양 OS Verified했지만 report 30이 active document scope와 broader public mutation을 다시 열었다.
+현재 권위는 `docs/audit/audit_report_31.md`다.
 
-report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence로 보존한다. report 30 successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 document-wide authority, submit-only visibility, external compile, Report 29 regression, 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐다. 후속 독립 감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+Report 31은 Report 30 기술/API 시정을 독립 검증하고 implementation summary 후반 false-green을 다시 열었다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~29 successor 계보는 historical/technical evidence로 보존한다.
+
+report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence로 보존한다. report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 submit-only visibility, external compile, Report 29 regression, 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐고 Report 31이 이 기술/API 경계를 독립 확인했다.
+
+Report 31 시정은 summary 1·10·11절 current exact-one과 predecessor lifecycle generic negative gate를 구현했고 전체 local quality gate 453 tests를 Verified했다. 남은 단계는 새 clean same-SHA 양 OS actual bundle과 후속 독립 PASS이며, 별도 게시 승인 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -923,7 +927,9 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/audit/audit_report_30.md`의 ADR-0040 구현, 전체 local gate와 새 clean same-SHA 양 OS actual bundle이다. `a91a9c7/32706869079`는 report 29 technical evidence로 유지하며 외부 게시는 report 30 시정의 independent PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `docs/audit/audit_report_31.md` 시정의 clean commit Windows actual bundle과 같은 successor SHA의 Ubuntu/Windows CI actual bundle이다. ADR-0041 generic gate와 전체 local quality gate 453 tests는 PASS했다. Report 31 후속 independent PASS와 별도 사용자 승인까지 외부 게시는 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+
+Report 30 technical successor `ed02dbf/32733235414`의 ADR-0040 public visibility, Report 29 기술 회귀와 양 OS actual bundle은 완료된 Verified evidence이며 lifecycle을 재개방하지 않는다.
 
 2026-08-18 `audit_report_23.md` 시정은 문서 우선으로 시작한다. 첫 slice인 SEC-F001은 ADR-0032와 `spec.md` 14·16절을 구현 권한으로 삼아 `ArtifactStore` capability root, no-follow/single-link open, `create_new` save temp, 실행별 TUI quick-save 경계를 구현한다. 회귀 기준은 사전 배치 temp hard link와 replay symlink/hard link가 외부 victim을 바꾸지 않고, 기존 save 보존과 정상 save/load/replay가 함께 통과하는 것이다. 완료 표시는 표적 테스트와 workspace 검증 후에만 갱신한다.
 
@@ -931,7 +937,11 @@ DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.
 
 ## 11. R9 콘텐츠 인과 폐쇄 Task
 
-역사 기록 (2026-08-18~24): R9 causal field-only A/B와 나머지 8개 record equality는 report 27 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했고 `9725c378/32694375654`에서 해당 시정도 양 OS Verified됐다. report 29가 현재 authority이며 ADR-0039 시정과 후속 독립 재감사 전에는 전체 program PASS를 선언하지 않는다.
+역사 기록 (2026-08-18~24): R9 causal field-only A/B와 나머지 8개 record equality는 report 27 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했고 `9725c378/32694375654`에서 해당 시정도 양 OS Verified됐다. report 29 technical successor `a91a9c7/32706869079`는 content/allocator/TUI/archive 회귀를, report 30 technical successor `ed02dbf/32733235414`는 submit-only public visibility와 전체 gate를 양 OS Verified했다.
+
+현재 authority는 `docs/audit/audit_report_31.md`다.
+
+Report 31이 R9/Report 29 기술 회귀와 Report 30 public visibility를 Verified했고, summary lifecycle generic negative gate와 전체 local quality gate도 PASS했다. 남은 current 작업은 새 clean same-SHA 양 OS evidence이며, 후속 독립 PASS 전에는 전체 program PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 
