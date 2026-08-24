@@ -29,6 +29,8 @@
 - report 27 계약에 따라 9종 causal isolation을 command/observer 생략이 없는 field-only active/control pair와 나머지 8개 attribution record equality로 강화했다.
 - F9 debug panel이 visible rect의 mouse authority를 갖도록 정하고 Judge editor의 문자 Repeat와 일반 LLM request Repeat를 분리했다.
 - CI action pin gate가 repository-root local composite action의 metadata를 cycle-safe 재귀 검사하도록 확장했다.
+- entity spawn API를 checked/fallible allocation으로 전환하고 rejected transaction이 working state를 commit하지 않도록 강화했다.
+- TUI text-edit Repeat와 Esc/Enter/F9/Q transition control-key의 Press-only 정책을 분리했다.
 
 ### Fixed
 
@@ -49,6 +51,8 @@
 - report 27의 allocator exhaustion, registry level/charge shape, 비가역 custom armor를 load/import 전에 typed reject하고 Wear/Drop AC를 base-derived 가역 계산으로 수정했다.
 - source archive의 dot/parent/absolute/backslash alias와 불가능한 Gregorian candidate/period 날짜가 양 OS verifier를 우회하던 경계를 canonical component/strict calendar 검사로 닫았다.
 - report 27 시정 SHA `ea7822a5`/Actions `32683076204`에서 437 tests, R7/R8, actual 양 OS bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+- report 28의 allocator headroom, hp 0 custom monster, armor Wear→Throw derived AC와 F9 실제 경로를 fail-closed 회귀로 수정했다.
+- archive component의 Windows case/trailing/reserved/collision alias와 Linux year 0000 calendar parity를 양 verifier에서 거부하도록 수정했다.
 
 ### 2026-07-20 기준 누적 내역
 

@@ -12,6 +12,38 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0038: report 28 allocator·registry·input·archive 동등 경계
+
+Status: Accepted; implementation and new same-SHA CI pending (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R28-01
+
+Context:
+
+`docs/audit/audit_report_28.md`는 report 27 구현/문서 SHA의 양 OS success를 인정했지만 `next_id=u32::MAX-1`, hp 0 custom monster, damage armor의 Wear→Throw, Windows archive component alias를 production/adversarial 경계에서 재현했다. Esc/Enter control-key Repeat 정책, Linux year 0000, F9 실제 toggle 증거와 implementation summary 후반 상태도 열려 있다.
+
+Decision:
+
+- persisted allocator는 `next_id == max_entity_id.checked_add(1)`을 요구하고 core/runtime spawn은 fallible allocation을 사용한다. allocation failure를 포함한 rejected command는 working transaction을 commit하지 않고 원본 RNG/hash/world를 보존한다.
+- content registry는 live monster hp와 item kind별 complete required/forbidden field table을 검증한다. custom registry session은 반환 전 save/persisted invariant를 통과해야 한다.
+- armor는 damage/hit bonus를 가질 수 없다. Drop, Throw, consume/read를 포함한 inventory removal은 공통 fallible unequip helper를 거쳐 equipment pointer와 derived AC를 원자적으로 복원한다.
+- TUI soft-input의 문자/Backspace Repeat는 허용하지만 Esc, Enter, F9와 Quit `q/Q`는 Press-only다. Repeat가 state 전환 뒤 새 state의 종료·confirm·toggle 후보가 되는 동작을 금지한다. constructed crossterm event→production dispatcher→handler를 필수 회귀 범위로 두고 실제 물리 key-hold 도달성은 주장하지 않는다.
+- source archive의 모든 component는 Windows-compatible fail-closed rule을 따른다. ASCII case-insensitive 이름, trailing dot/space, reserved device basename과 extraction collision을 거부하고 excluded root도 같은 canonical first component로 비교한다.
+- candidate/period 날짜는 양 OS 공통 year `0001..9999`와 Gregorian round-trip을 요구한다.
+- F9 regression은 실제 Press candidate와 handler return/flag/revision/hash를 검사하고 active implementation summary의 다음 단계는 report 28 시정과 독립 재감사로 갱신한다.
+- report 28이 current authority다. 시정과 clean same-SHA actual bundle 후에도 새 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- save에서 `MAX-1`만 추가 차단: live allocator의 unchecked panic 경계를 남겨 기각한다.
+- schema reject만 하고 Throw removal을 유지: future equipment-capable item이 같은 우회를 재발시켜 공통 lifecycle을 선택한다.
+- 모든 key Repeat 전역 차단: movement와 text editing의 정상 hold 입력까지 잃으므로 destructive transition/control key만 Press-only로 분리한다.
+- Windows verifier만 alias 강화: cross-platform source archive의 추출 의미가 달라지므로 양 verifier 공통 rule을 선택한다.
+
+Consequences:
+
+wire schema v1은 유지하지만 allocator gap, invalid live monster와 forbidden item shape save/custom registry는 더 일찍 typed reject된다. 공개 spawn API는 fallible해지고 caller가 오류를 처리해야 한다. TUI control-key Repeat와 F9 evidence, archive/calendar parity가 양 OS regression matrix에 추가된다. 수정 전 RED와 전체 검증은 `docs/audit/audit_report_28_remediation.md`에 기록한다.
+
 ## ADR-0037: report 27 field-only causal 및 consumer canonical 경계
 
 Status: Implemented and same-SHA verified; independent re-audit pending (2026-08-24)

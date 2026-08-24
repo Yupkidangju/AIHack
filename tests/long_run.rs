@@ -270,6 +270,7 @@ fn run_causal_fixture(seed: u64) -> (CausalSummary, SnapshotHash, u64) {
             .saved()
             .entities
             .spawn_monster(MonsterKind::FloatingEye, aihack::core::Pos { x: 6, y: 5 })
+            .unwrap()
     });
     submit_and_observe(
         &mut session,

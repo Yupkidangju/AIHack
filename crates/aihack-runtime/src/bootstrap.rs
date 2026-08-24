@@ -16,13 +16,22 @@ use crate::domain::{
     monster::try_monster_template_from_registry,
 };
 
+fn allocation_content_error(error: aihack_core::error::EntityAllocationError) -> ContentError {
+    ContentError::Parse {
+        file: "world bootstrap".to_owned(),
+        message: error.to_string(),
+    }
+}
+
 fn spawn_item(
     entities: &mut EntityStore,
     registry: &ContentRegistry,
     kind: ItemKind,
     location: EntityLocation,
 ) -> Result<EntityId, ContentError> {
-    Ok(entities.spawn_item_with_data(kind, try_item_data_from_registry(kind, registry)?, location))
+    entities
+        .spawn_item_with_data(kind, try_item_data_from_registry(kind, registry)?, location)
+        .map_err(allocation_content_error)
 }
 
 /// Embedded content에서 초기 월드 상태를 만든다. session/UI는 이 경계에 관여하지 않는다.
@@ -34,18 +43,22 @@ pub fn initial_world(registry: &ContentRegistry) -> Result<WorldState<EntityStor
             owner: "world bootstrap".to_owned(),
             target: "main:1".to_owned(),
         })?;
-    let player_id = entities.spawn_player(Pos {
-        x: level.player_start[0],
-        y: level.player_start[1],
-    });
+    let player_id = entities
+        .spawn_player(Pos {
+            x: level.player_start[0],
+            y: level.player_start[1],
+        })
+        .map_err(allocation_content_error)?;
     for spawn in aihack_content::level_spawns(level)? {
         match spawn {
             aihack_content::LevelSpawn::Monster { kind, pos } => {
-                entities.spawn_monster_with_template(
-                    kind,
-                    try_monster_template_from_registry(kind, registry)?,
-                    pos,
-                );
+                entities
+                    .spawn_monster_with_template(
+                        kind,
+                        try_monster_template_from_registry(kind, registry)?,
+                        pos,
+                    )
+                    .map_err(allocation_content_error)?;
             }
             aihack_content::LevelSpawn::Item { kind, pos } => {
                 spawn_item(

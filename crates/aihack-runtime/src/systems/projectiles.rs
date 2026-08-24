@@ -12,7 +12,7 @@ use aihack_core::{
 };
 
 use crate::{
-    systems::{combat, death},
+    systems::{combat, death, items},
     world::GameWorld,
 };
 
@@ -42,7 +42,7 @@ pub fn throw_item(
 
     let from = world.player_pos();
     let outcome = trace_path(world, from, direction);
-    world.state_mut().inventory.remove(item);
+    items::remove_inventory_item(world, item)?;
     let level = world.current_level();
     world.state_mut().entities.set_item_location(
         item,
@@ -68,7 +68,7 @@ pub fn throw_item(
                 world,
                 world.player_id,
                 target,
-            ));
+            )?);
         }
     }
     Ok(events)
@@ -119,7 +119,7 @@ pub fn zap_wand(
                 world,
                 world.player_id,
                 target,
-            ));
+            )?);
         }
     }
     Ok(events)
@@ -166,5 +166,63 @@ fn trace_path(world: &GameWorld, from: Pos, direction: Direction) -> ProjectileO
             };
         }
         current = next;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use aihack_core::{
+        domain::{
+            combat::{AttackProfile, DamageRoll},
+            entity::EntityLocation,
+            item::ItemKind,
+        },
+        position::{Direction, Pos},
+        rng::GameRng,
+    };
+
+    use super::throw_item;
+    use crate::{domain::item::item_data, systems::items, world::GameWorld};
+
+    #[test]
+    fn throwing_an_equipped_body_item_uses_the_common_unequip_lifecycle() {
+        let mut world = GameWorld::fixture_without_monsters();
+        let owner = world.player_id();
+        let mut armor_data = item_data(ItemKind::ArmorLeather);
+        armor_data.attack_profile = Some(AttackProfile::natural("fixture", DamageRoll::new(1, 4)));
+        let armor = world
+            .state_mut()
+            .entities
+            .spawn_item_with_data(
+                ItemKind::ArmorLeather,
+                armor_data,
+                EntityLocation::Inventory { owner },
+            )
+            .unwrap();
+        let letter = world
+            .state_mut()
+            .inventory
+            .add_existing_with_next_letter(armor)
+            .unwrap();
+        assert!(world.state_mut().entities.set_item_letter(armor, letter));
+        assert!(items::wear(&mut world, armor).unwrap().is_some());
+        assert_eq!(
+            world.entities.actor_stats(owner).unwrap().ac,
+            -armor_data.ac_bonus
+        );
+
+        let mut rng = GameRng::new(42);
+        throw_item(&mut world, &mut rng, armor, Direction::East).unwrap();
+
+        assert_eq!(world.inventory.equipped_body, None);
+        assert_eq!(world.entities.actor_stats(owner).unwrap().ac, 0);
+        assert!(!world.inventory.contains(armor));
+        assert_eq!(
+            world.entities.item_location(armor),
+            Some(EntityLocation::OnMap {
+                level: world.current_level(),
+                pos: Pos { x: 9, y: 5 },
+            })
+        );
     }
 }

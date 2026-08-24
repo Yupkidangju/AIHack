@@ -26,6 +26,10 @@ impl TurnTransaction {
         self.inner.working().world().validate_invariants()
     }
 
+    pub(crate) fn was_aborted(&self) -> bool {
+        self.inner.working().transaction_aborted
+    }
+
     pub(crate) fn commit(self) -> GameSession {
         self.inner.commit()
     }

@@ -275,7 +275,7 @@ pub fn inventory_letter(world: &GameWorld, item: EntityId) -> Option<InventoryLe
     world.inventory.letter_for(item)
 }
 
-fn remove_inventory_item(world: &mut GameWorld, item: EntityId) -> Result<(), String> {
+pub(crate) fn remove_inventory_item(world: &mut GameWorld, item: EntityId) -> Result<(), String> {
     if world.inventory.equipped_body == Some(item) {
         unequip_body(world, item)?;
     }

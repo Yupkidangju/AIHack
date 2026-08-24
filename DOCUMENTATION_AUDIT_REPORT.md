@@ -245,8 +245,14 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - ADR-0036, active spec/design/gap과 `docs/audit/audit_report_26_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
 - `fc01ec12/32658658526`은 부분 evidence, `a9a39d8/32660221745`는 Linux pipefail failure이며 최종 verifier fix SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`의 Actions `32660514315`에서 clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다.
 
-### 10.14 `docs/audit/audit_report_27.md` 현재 상태 (2026-08-24)
+### 10.14 `docs/audit/audit_report_27.md` 역사적 predecessor 상태 (2026-08-24)
 
-- 현재 권위는 save allocator/level/charge, unsafe custom registry, field-only causal A/B, archive canonical path, strict calendar, debug mouse, Judge repeat와 local action recursion을 재현한 `docs/audit/audit_report_27.md`다.
+- report 27은 save allocator/level/charge, unsafe custom registry, field-only causal A/B, archive canonical path, strict calendar, debug mouse, Judge repeat와 local action recursion을 재현한 predecessor다.
 - ADR-0037, active spec/design/gap과 `docs/audit/audit_report_27_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
 - report 27 시정은 전체 local gate와 implementation SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`의 Actions `32683076204` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. 완료 후에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.
+
+### 10.15 `docs/audit/audit_report_28.md` 현재 상태 (2026-08-24)
+
+- 현재 권위는 allocator MAX-1, invalid custom monster/equipment removal, control-key Repeat/F9 실제 경로, Windows archive component alias, year 0000 parity와 stale summary를 재현한 `docs/audit/audit_report_28.md`다.
+- ADR-0038과 `docs/audit/audit_report_28_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
+- 전체 local gate와 새 clean same-SHA Ubuntu/Windows actual bundle은 pending이며 후속 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.

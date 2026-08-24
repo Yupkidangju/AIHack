@@ -433,7 +433,8 @@ fn nh367_c010_player_death_records_cause_and_game_over_state() {
     let mut world = aihack::core::GameWorld::from_depleted_saved_world(saved).unwrap();
 
     let events =
-        aihack::systems::death::collect_death_events_after_attack(&mut world, attacker, player);
+        aihack::systems::death::collect_death_events_after_attack(&mut world, attacker, player)
+            .unwrap();
     let state = aihack::systems::death::state_after_deaths(&world);
 
     assert!(events.iter().any(|event| matches!(

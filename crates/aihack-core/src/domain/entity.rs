@@ -8,9 +8,12 @@ use crate::{
         monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
         player::adventurer_template,
     },
+    error::EntityAllocationError,
     ids::{EntityId, LevelId},
     position::Pos,
 };
+
+pub const MAX_ABSOLUTE_ACTOR_STAT: i32 = 10_000;
 
 /// Actor payload 내부 종류다. Item은 별도 payload로 분리한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -308,7 +311,7 @@ impl EntityStore {
         }
     }
 
-    pub fn spawn_player(&mut self, pos: Pos) -> EntityId {
+    pub fn spawn_player(&mut self, pos: Pos) -> Result<EntityId, EntityAllocationError> {
         let template = adventurer_template();
         self.spawn_actor(
             ActorKind::Player,
@@ -336,7 +339,7 @@ impl EntityStore {
         kind: MonsterKind,
         template: MonsterTemplate,
         pos: Pos,
-    ) -> EntityId {
+    ) -> Result<EntityId, EntityAllocationError> {
         self.spawn_actor(
             ActorKind::Monster(kind),
             Faction::Hostile,
@@ -364,8 +367,8 @@ impl EntityStore {
         faction: Faction,
         pos: Pos,
         stats: ActorStats,
-    ) -> EntityId {
-        let id = self.next_entity_id();
+    ) -> Result<EntityId, EntityAllocationError> {
+        let id = self.next_entity_id()?;
         self.entities.push(Entity {
             id,
             payload: EntityPayload::Actor {
@@ -376,7 +379,7 @@ impl EntityStore {
                 alive: true,
             },
         });
-        id
+        Ok(id)
     }
 
     pub fn spawn_item_with_data(
@@ -384,8 +387,8 @@ impl EntityStore {
         kind: ItemKind,
         data: ItemData,
         location: EntityLocation,
-    ) -> EntityId {
-        let id = self.next_entity_id();
+    ) -> Result<EntityId, EntityAllocationError> {
+        let id = self.next_entity_id()?;
         self.entities.push(Entity {
             id,
             payload: EntityPayload::Item {
@@ -396,7 +399,7 @@ impl EntityStore {
                 charges: data.max_charges,
             },
         });
-        id
+        Ok(id)
     }
 
     pub fn get(&self, id: EntityId) -> Option<&Entity> {
@@ -612,9 +615,34 @@ impl EntityStore {
         }
     }
 
-    fn next_entity_id(&mut self) -> EntityId {
+    fn next_entity_id(&mut self) -> Result<EntityId, EntityAllocationError> {
         let id = EntityId(self.next_id);
-        self.next_id += 1;
-        id
+        let next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or(EntityAllocationError::Exhausted)?;
+        self.next_id = next_id;
+        Ok(id)
+    }
+}
+
+#[cfg(test)]
+mod allocation_tests {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    use super::EntityStore;
+    use crate::{error::EntityAllocationError, position::Pos};
+
+    #[test]
+    fn exhausted_allocator_returns_without_panicking_or_mutating_the_store() {
+        let mut store = EntityStore::new();
+        store.next_id = u32::MAX;
+        let before = store.clone();
+
+        let result = catch_unwind(AssertUnwindSafe(|| store.spawn_player(Pos { x: 1, y: 1 })));
+
+        assert!(result.is_ok(), "allocator exhaustion must be a typed error");
+        assert_eq!(result.unwrap(), Err(EntityAllocationError::Exhausted));
+        assert_eq!(store, before, "failed allocation must not mutate the store");
     }
 }

@@ -29,6 +29,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct GameSession {
     pub(crate) inner: SessionState<GameWorld>,
+    pub(crate) transaction_aborted: bool,
 }
 
 impl Deref for GameSession {
@@ -49,7 +50,7 @@ impl GameSession {
         seed: u64,
         registry: &ContentRegistry,
     ) -> Result<Self, ContentError> {
-        Ok(Self {
+        let session = Self {
             inner: SessionState {
                 meta: GameMeta { seed },
                 rng: GameRng::new(seed),
@@ -58,7 +59,15 @@ impl GameSession {
                 world: GameWorld::try_fixture_phase5_with_registry(registry)?,
                 event_log: Vec::new(),
             },
-        })
+            transaction_aborted: false,
+        };
+        crate::save::validate_save_data_with_registry(&session.to_save_data(), registry).map_err(
+            |error| ContentError::Parse {
+                file: "world bootstrap".to_owned(),
+                message: error.to_string(),
+            },
+        )?;
+        Ok(session)
     }
 
     pub fn try_new_for_playing(seed: u64) -> Result<Self, ContentError> {
@@ -84,6 +93,7 @@ impl GameSession {
                 world: GameWorld::fixture_phase4(),
                 event_log: Vec::new(),
             },
+            transaction_aborted: false,
         }
     }
 
@@ -123,6 +133,17 @@ impl GameSession {
     pub fn submit(&mut self, intent: CommandIntent) -> TurnOutcome {
         let mut transaction = crate::transaction::TurnTransaction::prepare(self);
         let outcome = transaction.apply(intent);
+        if transaction.was_aborted() {
+            let reason = outcome
+                .events
+                .iter()
+                .find_map(|event| match event {
+                    GameEvent::CommandRejected { reason } => Some(reason.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| "command rejected".to_string());
+            return self.reject(reason);
+        }
         let report = transaction.validate();
         if !report.is_valid() {
             return self.reject(crate::transaction::TurnTransaction::invariant_reason(
@@ -329,13 +350,17 @@ impl GameSession {
                 }];
                 events.extend(traps::trigger_player_trap(&mut self.inner.world));
                 let player_id = self.world.player_id();
-                events.extend(death::collect_death_events_if_hp_depleted(
+                let death_events = match death::collect_death_events_if_hp_depleted(
                     &mut self.inner.world,
                     player_id,
                     DeathCause::Trap {
                         trap: TrapKind::Pit,
                     },
-                ));
+                ) {
+                    Ok(events) => events,
+                    Err(error) => return self.abort_transaction(error),
+                };
+                events.extend(death_events);
                 self.inner.state =
                     death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
@@ -366,11 +391,15 @@ impl GameSession {
                 target: attacker,
             });
         }
-        events.extend(death::collect_death_events_after_attack(
+        let death_events = match death::collect_death_events_after_attack(
             &mut self.inner.world,
             attacker,
             defender,
-        ));
+        ) {
+            Ok(events) => events,
+            Err(error) => return self.abort_transaction(error),
+        };
+        events.extend(death_events);
         self.inner.state = death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
         self.accept_turn(events)
     }
@@ -395,7 +424,7 @@ impl GameSession {
                     death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
-            Err(error) => self.reject(error),
+            Err(error) => self.abort_transaction(error),
         }
     }
 
@@ -445,7 +474,7 @@ impl GameSession {
                     death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
-            Err(error) => self.reject(error),
+            Err(error) => self.abort_transaction(error),
         }
     }
 
@@ -531,12 +560,16 @@ impl GameSession {
         }
         if !matches!(self.state, RunState::GameOver { .. }) {
             let state = &mut self.inner;
-            events.extend(monster_ai::run_monster_turn(
+            let monster_events = match monster_ai::run_monster_turn(
                 &mut state.world,
                 &mut state.rng,
                 &mut state.state,
                 next_turn,
-            ));
+            ) {
+                Ok(events) => events,
+                Err(error) => return self.abort_transaction(error),
+            };
+            events.extend(monster_events);
         }
         self.inner.event_log.extend(events.clone());
 
@@ -569,6 +602,11 @@ impl GameSession {
             next_state: self.state,
         }
     }
+
+    fn abort_transaction(&mut self, reason: String) -> TurnOutcome {
+        self.transaction_aborted = true;
+        self.reject(reason)
+    }
 }
 
 impl crate::client::GameClient for GameSession {
@@ -589,5 +627,38 @@ impl crate::client::GameClient for GameSession {
 
     fn submit(&mut self, intent: CommandIntent) -> TurnOutcome {
         GameSession::submit(self, intent)
+    }
+}
+
+#[cfg(test)]
+mod allocation_transaction_tests {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    use aihack_core::{action::CommandIntent, ids::EntityId, position::Direction};
+
+    use super::GameSession;
+
+    #[test]
+    fn corpse_allocation_exhaustion_rejects_without_panicking_or_committing_partial_state() {
+        let mut session = GameSession::new_for_playing(42);
+        let state = session.inner.world.state_mut();
+        state.entities.set_alive(EntityId(3), false);
+        let jackal = state.entities.actor_stats_mut(EntityId(2)).unwrap();
+        jackal.hp = 1;
+        let player = state.entities.actor_stats_mut(state.player_id).unwrap();
+        player.hit_bonus = 100;
+        let mut entities = serde_json::to_value(&state.entities).unwrap();
+        entities["next_id"] = serde_json::json!(u32::MAX);
+        state.entities = serde_json::from_value(entities).unwrap();
+        let before = session.to_save_data();
+
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            session.submit(CommandIntent::Move(Direction::East))
+        }));
+
+        assert!(result.is_ok(), "allocation exhaustion must not panic");
+        let outcome = result.unwrap();
+        assert!(!outcome.accepted);
+        assert_eq!(session.to_save_data(), before);
     }
 }

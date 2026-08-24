@@ -35,11 +35,11 @@ pub fn run_monster_turn(
     rng: &mut GameRng,
     state: &mut RunState,
     turn: u64,
-) -> Vec<GameEvent> {
+) -> Result<Vec<GameEvent>, String> {
     let plan = collect_monster_turn_at(world, rng, turn);
-    let events = apply_monster_turn(world, rng, &plan);
+    let events = apply_monster_turn(world, rng, &plan)?;
     *state = death::state_after_deaths_at(world, turn);
-    events
+    Ok(events)
 }
 
 pub fn collect_monster_turn(world: &GameWorld, rng: &mut GameRng) -> MonsterTurnPlan {
@@ -60,7 +60,7 @@ pub fn apply_monster_turn(
     world: &mut GameWorld,
     rng: &mut GameRng,
     plan: &MonsterTurnPlan,
-) -> Vec<GameEvent> {
+) -> Result<Vec<GameEvent>, String> {
     let mut events = Vec::new();
     for intent in &plan.intents {
         if !world.player_alive() {
@@ -92,11 +92,11 @@ pub fn apply_monster_turn(
                 events.push(combat::attack_event(&resolution));
                 events.extend(death::collect_death_events_after_attack(
                     world, attacker, defender,
-                ));
+                )?);
             }
         }
     }
-    events
+    Ok(events)
 }
 
 fn decide_monster_intent(

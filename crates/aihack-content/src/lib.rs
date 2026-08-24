@@ -15,7 +15,7 @@ use std::sync::OnceLock;
 pub use schema::{
     ContentRegistry, DoorData, HiddenDoorData, HiddenTrapData, ItemData, LevelData, LevelItemData,
     LevelMonsterData, MonsterData, WallData, CONTENT_SCHEMA_VERSION, MAX_CONTENT_ARMOR_AC_BONUS,
-    MAX_CONTENT_BASE_PRICE, MAX_CONTENT_NUTRITION,
+    MAX_CONTENT_BASE_PRICE, MAX_CONTENT_MONSTER_HP, MAX_CONTENT_NUTRITION,
 };
 
 use aihack_core::domain::map::MapLayout;

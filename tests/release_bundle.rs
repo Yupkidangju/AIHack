@@ -491,6 +491,12 @@ fn verifier_rejects_canonical_aliases_of_blocked_archive_paths() {
         "a/../legacy_nethack_port_reference/probe.txt",
         "/legacy_nethack_port_reference/probe.txt",
         "legacy_nethack_port_reference\\probe.txt",
+        "LEGACY_NETHACK_PORT_REFERENCE/probe.txt",
+        "Legacy_NetHack_Port_Reference/probe.txt",
+        "legacy_nethack_port_reference./probe.txt",
+        "legacy_nethack_port_reference /probe.txt",
+        "CON/probe.txt",
+        "license",
     ] {
         let fixture = BundleFixture::new(BundleCase::Complete);
         fixture.rewrite_archive_with_path_alias(alias);
@@ -505,6 +511,19 @@ fn verifier_rejects_canonical_aliases_of_blocked_archive_paths() {
 }
 
 #[test]
+fn verifier_accepts_a_normal_similar_archive_name() {
+    let fixture = BundleFixture::new(BundleCase::Complete);
+    fixture.rewrite_archive_with_path_alias("legacy_nethack_port_reference_backup/probe.txt");
+    let output = fixture.verify();
+    assert!(
+        output.status.success(),
+        "normal similar archive name was rejected: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn verifier_rejects_non_calendar_candidate_and_period_matrix() {
     for (candidate, start, end) in [
         ("2026-13-01", "2025-05-20", "2026-12-31"),
@@ -512,6 +531,7 @@ fn verifier_rejects_non_calendar_candidate_and_period_matrix() {
         ("2025-02-29", "2025-01-01", "2025-12-31"),
         ("2026-08-24", "2026-00-00", "2026-99-99"),
         ("2026-08-24", "2026-08-25", "2026-08-24"),
+        ("0000-06-15", "0000-01-01", "0000-12-31"),
     ] {
         let fixture = BundleFixture::new(BundleCase::Complete);
         fixture.rewrite_calendar(candidate, start, end);
@@ -519,6 +539,24 @@ fn verifier_rejects_non_calendar_candidate_and_period_matrix() {
         assert!(
             !output.status.success(),
             "invalid calendar tuple was accepted: {start} <= {candidate} <= {end}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn verifier_accepts_minimum_and_maximum_supported_calendar_years() {
+    for (candidate, start, end) in [
+        ("0001-06-15", "0001-01-01", "0001-12-31"),
+        ("9999-06-15", "9999-01-01", "9999-12-31"),
+    ] {
+        let fixture = BundleFixture::new(BundleCase::Complete);
+        fixture.rewrite_calendar(candidate, start, end);
+        let output = fixture.verify_with_candidate(candidate);
+        assert!(
+            output.status.success(),
+            "supported calendar edge rejected: {candidate}; stdout={} stderr={}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );

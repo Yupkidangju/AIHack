@@ -234,6 +234,15 @@ fn semantic_validator_rejects_allocator_level_and_charge_consumer_traps() {
 }
 
 #[test]
+fn semantic_validator_requires_the_exact_allocator_successor_without_headroom_gaps() {
+    for next_id in [u32::MAX - 1, 100] {
+        assert_typed_invalid_without_panic(malformed_save(|value| {
+            value["world"]["entities"]["next_id"] = serde_json::json!(next_id);
+        }));
+    }
+}
+
+#[test]
 fn persisted_text_accepts_the_byte_limit_and_rejects_control_or_limit_plus_one() {
     let mut exact = GameSession::new_for_playing(42).to_save_data();
     exact.event_log = vec![GameEvent::Message {

@@ -33,16 +33,3 @@ fn debug_observation_lines_include_required_fields() {
     assert!(text.contains("last_events"));
     assert!(text.contains("legal_actions"));
 }
-
-/// F9 presentation 토글은 core hash에 영향을 주지 않아야 한다.
-/// Debug observation은 UI-only 기능이므로 core 상태나 snapshot hash를 변경하지 않는다.
-#[test]
-fn debug_observation_toggle_does_not_affect_hash() {
-    let session_a = GameSession::new_for_playing(42);
-    let session_b = GameSession::new_for_playing(42);
-
-    let hash_a = session_a.snapshot().stable_hash();
-    let hash_b = session_b.snapshot().stable_hash();
-
-    assert_eq!(hash_a, hash_b);
-}

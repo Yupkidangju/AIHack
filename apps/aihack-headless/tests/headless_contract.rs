@@ -117,7 +117,7 @@ fn replay_input_and_curdir_output_alias_are_rejected_without_mutating_input() {
 #[test]
 fn production_headless_rejects_consumer_unsafe_malformed_saves_before_running() {
     let root = fixture_root("malformed-consumer");
-    let cases: [(&str, SaveMutator); 7] = [
+    let cases: [(&str, SaveMutator); 8] = [
         (
             "unequipped-ac.json",
             Box::new(|value| {
@@ -144,6 +144,12 @@ fn production_headless_rejects_consumer_unsafe_malformed_saves_before_running() 
             "allocator-exhausted.json",
             Box::new(|value| {
                 value["world"]["entities"]["next_id"] = serde_json::json!(u32::MAX);
+            }),
+        ),
+        (
+            "allocator-headroom-gap.json",
+            Box::new(|value| {
+                value["world"]["entities"]["next_id"] = serde_json::json!(u32::MAX - 1);
             }),
         ),
         (

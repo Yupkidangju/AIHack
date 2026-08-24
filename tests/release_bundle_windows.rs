@@ -29,11 +29,21 @@ enum Fault {
     ParentLegacyAlias,
     AbsoluteLegacyAlias,
     BackslashLegacyAlias,
+    UppercaseLegacyAlias,
+    MixedCaseLegacyAlias,
+    TrailingDotLegacyAlias,
+    TrailingSpaceLegacyAlias,
+    ReservedDeviceAlias,
+    CaseCollisionAlias,
+    SimilarLegacyName,
     InvalidCalendarPeriod,
     InvalidCalendarDay,
     InvalidLeapDay,
     ReverseCalendarPeriod,
     InvalidCandidateDate,
+    YearZeroCalendar,
+    MinimumYearCalendar,
+    MaximumYearCalendar,
 }
 
 struct Fixture {
@@ -61,10 +71,12 @@ impl Fixture {
         ] {
             fs::copy(project_path(name), source.join(name)).unwrap();
         }
-        let candidate_date = if matches!(fault, Fault::InvalidCandidateDate) {
-            "2026-02-30"
-        } else {
-            CANDIDATE_DATE
+        let candidate_date = match fault {
+            Fault::InvalidCandidateDate => "2026-02-30",
+            Fault::YearZeroCalendar => "0000-06-15",
+            Fault::MinimumYearCalendar => "0001-06-15",
+            Fault::MaximumYearCalendar => "9999-06-15",
+            _ => CANDIDATE_DATE,
         };
         let metadata = format!(
             "product=AIHack\nversion=0.3.0\ncommit={COMMIT}\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
@@ -98,6 +110,21 @@ impl Fixture {
                 .replace(
                     "Covered change period: `2025-05-20..2026-08-24`",
                     replacement,
+                );
+            fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
+        }
+        let edge_period = match fault {
+            Fault::YearZeroCalendar => Some("Covered change period: `0000-01-01..0000-12-31`"),
+            Fault::MinimumYearCalendar => Some("Covered change period: `0001-01-01..0001-12-31`"),
+            Fault::MaximumYearCalendar => Some("Covered change period: `9999-01-01..9999-12-31`"),
+            _ => None,
+        };
+        if let Some(edge_period) = edge_period {
+            let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
+                .unwrap()
+                .replace(
+                    "Covered change period: `2025-05-20..2026-08-24`",
+                    edge_period,
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
         }
@@ -135,6 +162,13 @@ impl Fixture {
             Fault::ParentLegacyAlias => Some("a/../legacy_nethack_port_reference/probe.txt"),
             Fault::AbsoluteLegacyAlias => Some("/legacy_nethack_port_reference/probe.txt"),
             Fault::BackslashLegacyAlias => Some("legacy_nethack_port_reference\\probe.txt"),
+            Fault::UppercaseLegacyAlias => Some("LEGACY_NETHACK_PORT_REFERENCE/probe.txt"),
+            Fault::MixedCaseLegacyAlias => Some("Legacy_NetHack_Port_Reference/probe.txt"),
+            Fault::TrailingDotLegacyAlias => Some("legacy_nethack_port_reference./probe.txt"),
+            Fault::TrailingSpaceLegacyAlias => Some("legacy_nethack_port_reference /probe.txt"),
+            Fault::ReservedDeviceAlias => Some("CON/probe.txt"),
+            Fault::CaseCollisionAlias => Some("license"),
+            Fault::SimilarLegacyName => Some("legacy_nethack_port_reference_backup/probe.txt"),
             _ => None,
         };
         if let Some(archive_alias) = archive_alias {
@@ -281,15 +315,22 @@ fn write_checksums(output: &Path) {
 }
 
 #[test]
-fn windows_verifier_accepts_the_complete_commit_bound_bundle() {
-    let fixture = Fixture::new(Fault::None);
-    let output = fixture.verify();
-    assert!(
-        output.status.success(),
-        "stdout={} stderr={}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+fn windows_verifier_accepts_complete_bundle_normal_similar_name_and_calendar_edges() {
+    for fault in [
+        Fault::None,
+        Fault::SimilarLegacyName,
+        Fault::MinimumYearCalendar,
+        Fault::MaximumYearCalendar,
+    ] {
+        let fixture = Fixture::new(fault);
+        let output = fixture.verify();
+        assert!(
+            output.status.success(),
+            "positive fixture rejected: {fault:?}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
 #[test]
@@ -310,11 +351,18 @@ fn windows_verifier_rejects_legacy_metadata_record_hash_size_and_checksum_faults
         Fault::ParentLegacyAlias,
         Fault::AbsoluteLegacyAlias,
         Fault::BackslashLegacyAlias,
+        Fault::UppercaseLegacyAlias,
+        Fault::MixedCaseLegacyAlias,
+        Fault::TrailingDotLegacyAlias,
+        Fault::TrailingSpaceLegacyAlias,
+        Fault::ReservedDeviceAlias,
+        Fault::CaseCollisionAlias,
         Fault::InvalidCalendarPeriod,
         Fault::InvalidCalendarDay,
         Fault::InvalidLeapDay,
         Fault::ReverseCalendarPeriod,
         Fault::InvalidCandidateDate,
+        Fault::YearZeroCalendar,
     ] {
         let fixture = Fixture::new(fault);
         let output = fixture.verify();

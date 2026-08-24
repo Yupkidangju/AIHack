@@ -1530,7 +1530,7 @@ pub fn runtime_event_to_candidate(
     if !app.supports_terminal_size(width, height) {
         return match &input_event {
             Event::Key(key)
-                if key.kind != KeyEventKind::Release
+                if key.kind == KeyEventKind::Press
                     && matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc) =>
             {
                 Some(UiCommandCandidate::Quit)
@@ -1584,6 +1584,12 @@ pub fn runtime_event_to_candidate(
         };
     };
     if key.kind == KeyEventKind::Release {
+        return None;
+    }
+    if key.kind == KeyEventKind::Repeat
+        && (matches!(key.code, KeyCode::Esc | KeyCode::Enter | KeyCode::F(9))
+            || (app.soft_input().is_none() && matches!(key.code, KeyCode::Char('q' | 'Q'))))
+    {
         return None;
     }
     if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {

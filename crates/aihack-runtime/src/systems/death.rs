@@ -16,7 +16,7 @@ pub fn collect_death_events_after_attack(
     world: &mut GameWorld,
     attacker: EntityId,
     defender: EntityId,
-) -> Vec<GameEvent> {
+) -> Result<Vec<GameEvent>, String> {
     collect_death_events_if_hp_depleted(world, defender, DeathCause::Combat { attacker })
 }
 
@@ -24,9 +24,9 @@ pub fn collect_death_events_if_hp_depleted(
     world: &mut GameWorld,
     entity: EntityId,
     cause: DeathCause,
-) -> Vec<GameEvent> {
+) -> Result<Vec<GameEvent>, String> {
     let Some(stats) = world.entities.actor_stats(entity).copied() else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let alive = world
         .entities
@@ -34,7 +34,7 @@ pub fn collect_death_events_if_hp_depleted(
         .and_then(|entity| entity.actor().map(|(_, _, _, _, _, alive)| alive))
         .unwrap_or(false);
     if !alive || stats.hp > 0 {
-        return Vec::new();
+        return Ok(Vec::new());
     }
 
     let location = world.entities.actor_location(entity);
@@ -45,6 +45,17 @@ pub fn collect_death_events_if_hp_depleted(
         .get(entity)
         .and_then(|entity| entity.monster_difficulty())
         .unwrap_or_default();
+    if let (Some((level, pos)), Some(EntityKind::Monster(MonsterKind::Jackal))) = (location, kind) {
+        world
+            .state_mut()
+            .entities
+            .spawn_item_with_data(
+                ItemKind::CorpseJackal,
+                corpse_jackal_data,
+                EntityLocation::OnMap { level, pos },
+            )
+            .map_err(|error| error.to_string())?;
+    }
     world.state_mut().entities.set_alive(entity, false);
     if entity == world.player_id {
         world.state_mut().last_death_cause = Some(cause);
@@ -53,15 +64,7 @@ pub fn collect_death_events_if_hp_depleted(
         state.kill_count = state.kill_count.saturating_add(1);
         state.gold = state.gold.saturating_add(u32::from(difficulty));
     }
-    let events = vec![GameEvent::EntityDied { entity, cause }];
-    if let (Some((level, pos)), Some(EntityKind::Monster(MonsterKind::Jackal))) = (location, kind) {
-        world.state_mut().entities.spawn_item_with_data(
-            ItemKind::CorpseJackal,
-            corpse_jackal_data,
-            EntityLocation::OnMap { level, pos },
-        );
-    }
-    events
+    Ok(vec![GameEvent::EntityDied { entity, cause }])
 }
 
 pub fn state_after_deaths(world: &GameWorld) -> RunState {

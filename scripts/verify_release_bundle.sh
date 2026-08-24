@@ -38,9 +38,12 @@ require_metadata_value() {
 }
 
 require_calendar_date() {
-    local value=$1 label=$2 parsed
+    local value=$1 label=$2 parsed year
     [[ "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
         || fail "$label must use YYYY-MM-DD"
+    year=${value%%-*}
+    ((10#$year >= 1 && 10#$year <= 9999)) \
+        || fail "$label year must be in 0001..9999"
     parsed=$(date -u -d "$value" '+%F' 2>/dev/null) \
         || fail "$label is not a Gregorian calendar date"
     [[ "$parsed" == "$value" ]] \
@@ -48,7 +51,7 @@ require_calendar_date() {
 }
 
 validate_archive_entry() {
-    local entry=$1 canonical component first=''
+    local entry=$1 canonical component lowered basename first='' key=''
     [[ -n "$entry" && "$entry" != /* && "$entry" != *:* && "$entry" != *\\* && "$entry" != *//* ]] \
         || fail "source archive contains an unsafe path: $entry"
     canonical=${entry%/}
@@ -57,13 +60,24 @@ validate_archive_entry() {
     for component in "${components[@]}"; do
         [[ -n "$component" && "$component" != '.' && "$component" != '..' ]] \
             || fail "source archive contains a non-canonical path: $entry"
-        [[ -n "$first" ]] || first=$component
+        [[ ! "$component" =~ [\.\ ]$ ]] \
+            || fail "source archive contains a Windows trailing-name alias: $entry"
+        lowered=$(tr '[:upper:]' '[:lower:]' <<<"$component")
+        basename=${lowered%%.*}
+        case "$basename" in
+            con|prn|aux|nul|com[1-9]|lpt[1-9])
+                fail "source archive contains a Windows reserved device name: $entry"
+                ;;
+        esac
+        [[ -n "$first" ]] || first=$lowered
+        key+="${key:+/}$lowered"
     done
     case "$first" in
         legacy_nethack_port_reference|target|output)
             fail "release source archive contains an excluded path: $entry"
             ;;
     esac
+    ARCHIVE_CANONICAL_KEY=$key
 }
 
 required=(
@@ -115,8 +129,12 @@ done
 
 archive_listing=$(tar -tzf "$ARCHIVE") \
     || fail 'source archive listing failed'
+declare -A archive_canonical_entries=()
 while IFS= read -r archive_entry; do
     validate_archive_entry "$archive_entry"
+    [[ -z ${archive_canonical_entries["$ARCHIVE_CANONICAL_KEY"]+present} ]] \
+        || fail "source archive contains a Windows extraction collision: $archive_entry"
+    archive_canonical_entries["$ARCHIVE_CANONICAL_KEY"]=1
 done <<<"$archive_listing"
 
 archive_metadata=$(tar -xOzf "$ARCHIVE" RELEASE-METADATA)

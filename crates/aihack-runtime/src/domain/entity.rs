@@ -5,6 +5,7 @@ use aihack_core::{
         item::ItemKind,
         monster::{MonsterKind, MonsterTemplate},
     },
+    error::EntityAllocationError,
     ids::EntityId,
     position::Pos,
 };
@@ -33,7 +34,11 @@ impl EntityStore {
         &mut self.0
     }
 
-    pub fn spawn_monster(&mut self, kind: MonsterKind, pos: Pos) -> EntityId {
+    pub fn spawn_monster(
+        &mut self,
+        kind: MonsterKind,
+        pos: Pos,
+    ) -> Result<EntityId, EntityAllocationError> {
         self.0.spawn_monster_with_template(
             kind,
             crate::domain::monster::monster_template(kind),
@@ -41,7 +46,11 @@ impl EntityStore {
         )
     }
 
-    pub fn spawn_item(&mut self, kind: ItemKind, location: EntityLocation) -> EntityId {
+    pub fn spawn_item(
+        &mut self,
+        kind: ItemKind,
+        location: EntityLocation,
+    ) -> Result<EntityId, EntityAllocationError> {
         self.0
             .spawn_item_with_data(kind, crate::domain::item::item_data(kind), location)
     }
@@ -52,7 +61,7 @@ impl EntityStore {
         faction: Faction,
         pos: Pos,
         stats: ActorStats,
-    ) -> EntityId {
+    ) -> Result<EntityId, EntityAllocationError> {
         match kind {
             EntityKind::Player => self.0.spawn_actor(ActorKind::Player, faction, pos, stats),
             EntityKind::Monster(kind) => {
@@ -63,7 +72,7 @@ impl EntityStore {
         }
     }
 
-    pub fn spawn_player(&mut self, pos: Pos) -> EntityId {
+    pub fn spawn_player(&mut self, pos: Pos) -> Result<EntityId, EntityAllocationError> {
         self.0.spawn_player(pos)
     }
 
@@ -72,7 +81,7 @@ impl EntityStore {
         kind: MonsterKind,
         template: MonsterTemplate,
         pos: Pos,
-    ) -> EntityId {
+    ) -> Result<EntityId, EntityAllocationError> {
         self.0.spawn_monster_with_template(kind, template, pos)
     }
 
@@ -81,7 +90,7 @@ impl EntityStore {
         kind: ItemKind,
         data: aihack_core::domain::item::ItemData,
         location: EntityLocation,
-    ) -> EntityId {
+    ) -> Result<EntityId, EntityAllocationError> {
         self.0.spawn_item_with_data(kind, data, location)
     }
 

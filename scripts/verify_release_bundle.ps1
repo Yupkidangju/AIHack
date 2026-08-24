@@ -150,9 +150,20 @@ function Assert-CanonicalArchiveEntry([string]$Entry) {
     if ($components | Where-Object { [string]::IsNullOrEmpty($_) -or $_ -eq '.' -or $_ -eq '..' }) {
         Fail "source archive contains a non-canonical path: $Entry"
     }
-    if (@('legacy_nethack_port_reference', 'target', 'output') -ccontains $components[0]) {
+    $canonicalComponents = foreach ($component in $components) {
+        if ($component.EndsWith('.') -or $component.EndsWith(' ')) {
+            Fail "source archive contains a Windows trailing-name alias: $Entry"
+        }
+        $baseName = $component.Split('.')[0]
+        if ($baseName -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$') {
+            Fail "source archive contains a Windows reserved device name: $Entry"
+        }
+        $component.ToLowerInvariant()
+    }
+    if (@('legacy_nethack_port_reference', 'target', 'output') -contains $canonicalComponents[0]) {
         Fail "release source archive contains an excluded path: $Entry"
     }
+    return ($canonicalComponents -join '/')
 }
 
 $ResolvedOutput = Assert-NoReparsePath $OutputDir
@@ -193,8 +204,12 @@ foreach ($name in @('LICENSE', 'NOTICE', 'MODIFICATIONS.md', 'PROJECT_OWNER_LICE
         Fail "source archive required entry missing: $name"
     }
 }
+$archiveCanonicalEntries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($entry in $archiveEntries) {
-    Assert-CanonicalArchiveEntry $entry
+    $canonicalEntry = Assert-CanonicalArchiveEntry $entry
+    if (-not $archiveCanonicalEntries.Add($canonicalEntry)) {
+        Fail "source archive contains a Windows extraction collision: $entry"
+    }
 }
 
 $ExpectedMetadata = @{

@@ -7,7 +7,9 @@ use aihack_runtime::domain::{
 #[test]
 fn runtime_entity_store_builds_a_content_backed_monster() {
     let mut entities = EntityStore::new();
-    let monster = entities.spawn_monster(MonsterKind::Jackal, Pos { x: 6, y: 5 });
+    let monster = entities
+        .spawn_monster(MonsterKind::Jackal, Pos { x: 6, y: 5 })
+        .unwrap();
 
     let entity = entities.get(monster).expect("spawned monster must exist");
     let stats = entities

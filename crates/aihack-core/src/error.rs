@@ -5,6 +5,12 @@ use crate::{
     position::Pos,
 };
 
+#[derive(Debug, Clone, Copy, Error, PartialEq, Eq)]
+pub enum EntityAllocationError {
+    #[error("entity ID allocator is exhausted")]
+    Exhausted,
+}
+
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SaveValidationError {
     #[error("resource limit exceeded for {resource}: limit {limit}, actual {actual}")]

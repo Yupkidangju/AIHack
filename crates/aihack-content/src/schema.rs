@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use aihack_core::domain::entity::MAX_ABSOLUTE_ACTOR_STAT;
 use serde::{Deserialize, Serialize};
 
 use crate::core::error::ContentError;
@@ -8,6 +9,7 @@ pub const CONTENT_SCHEMA_VERSION: u16 = 1;
 pub const MAX_CONTENT_ARMOR_AC_BONUS: i16 = 10_000;
 pub const MAX_CONTENT_NUTRITION: i16 = 10_000;
 pub const MAX_CONTENT_BASE_PRICE: i32 = 1_000_000;
+pub const MAX_CONTENT_MONSTER_HP: i16 = MAX_ABSOLUTE_ACTOR_STAT as i16;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ItemData {
@@ -245,6 +247,12 @@ fn validate(
         }
     }
     for monster in monsters.values() {
+        if !(1..=MAX_CONTENT_MONSTER_HP).contains(&monster.hp) {
+            return Err(ContentError::Parse {
+                file: "monsters.toml".to_owned(),
+                message: format!("{} hp must be in 1..={MAX_CONTENT_MONSTER_HP}", monster.id),
+            });
+        }
         if !(0..=12).contains(&monster.speed) {
             return Err(ContentError::Parse {
                 file: "monsters.toml".to_owned(),
@@ -313,40 +321,57 @@ fn item_contract_error(item: &ItemData, message: &str) -> Result<(), ContentErro
 fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
     let dedicated_fields_valid = match item.kind.as_str() {
         "weapon" => {
-            item.damage.is_some()
+            item.slot.as_deref() == Some("melee")
+                && item.hit_bonus.is_some()
+                && item.damage.is_some()
                 && item.effect.is_none()
                 && item.charges.is_none()
                 && item.nutrition.is_none()
                 && item.ac_bonus.is_none()
         }
         "food" | "corpse" => {
-            item.nutrition.is_some()
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.nutrition.is_some()
                 && item.effect.is_none()
                 && item.charges.is_none()
                 && item.ac_bonus.is_none()
         }
         "potion" => {
-            item.effect.as_deref() == Some("heal_1d8_plus_4")
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.effect.as_deref() == Some("heal_1d8_plus_4")
                 && item.charges.is_none()
                 && item.nutrition.is_none()
                 && item.ac_bonus.is_none()
         }
         "wand" => {
-            item.effect.as_deref() == Some("magic_missile")
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.effect.as_deref() == Some("magic_missile")
                 && item.charges.is_some_and(|charges| charges > 0)
                 && item.nutrition.is_none()
                 && item.ac_bonus.is_none()
         }
         "scroll" => {
-            matches!(
-                item.effect.as_deref(),
-                Some("reveal" | "identify" | "teleport")
-            ) && item.charges.is_none()
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && matches!(
+                    item.effect.as_deref(),
+                    Some("reveal" | "identify" | "teleport")
+                )
+                && item.charges.is_none()
                 && item.nutrition.is_none()
                 && item.ac_bonus.is_none()
         }
         "armor" => {
             item.slot.as_deref() == Some("body")
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
                 && item.ac_bonus.is_some()
                 && item.effect.is_none()
                 && item.charges.is_none()

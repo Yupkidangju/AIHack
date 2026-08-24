@@ -45,9 +45,8 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
 
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
-    assert!(
-        compatibility.contains("report 27 remediation `ea7822a5/32683076204` same-SHA verified")
-    );
+    assert!(compatibility.contains("report 27 predecessor `ea7822a5/32683076204`"));
+    assert!(compatibility.contains("audit report 28 remediation in progress"));
 }
 
 #[test]
@@ -82,7 +81,8 @@ fn r8_documentation_self_check_is_current_without_rewriting_the_r0_audit() {
     assert!(report.contains("audit_report_21.md` 종결 상태"));
     assert!(report.contains("audit_report_23.md` 역사적 상태"));
     assert!(report.contains("audit_report_26.md` 역사적 최종 상태"));
-    assert!(report.contains("audit_report_27.md` 현재 상태"));
+    assert!(report.contains("audit_report_27.md` 역사적 predecessor 상태"));
+    assert!(report.contains("audit_report_28.md` 현재 상태"));
 
     for phrase in [
         "Cargo/README/CHANGELOG 0.3.0",
@@ -176,19 +176,19 @@ fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
     ] {
         let content = project_file(document);
         assert!(
-            content.contains("docs/audit/audit_report_27.md"),
+            content.contains("docs/audit/audit_report_28.md"),
             "{document} current authority 누락"
         );
     }
 
     let summary = project_file("IMPLEMENTATION_SUMMARY.md");
     assert!(summary.contains("report 23/24 finding"));
-    assert!(summary.contains("현재 권위는 report 26 최종 SHA"));
-    assert!(summary.contains("audit_report_27.md"));
+    assert!(summary.contains("현재 권위는 report 27 구현"));
+    assert!(summary.contains("audit_report_28.md"));
 
     let guide = project_file("BUILD_GUIDE.md");
     assert!(guide.contains("report 20 문서 시정 독립 재감사 PASS"));
-    assert!(guide.contains("docs/audit/audit_report_27.md` allocator/registry"));
+    assert!(guide.contains("docs/audit/audit_report_28.md` allocator/registry"));
     assert!(!guide.contains("| CI | Linux/Windows workflow 구성, 원격 green 대기 |"));
 }
 
@@ -197,7 +197,7 @@ fn active_release_sections_reject_known_stale_statuses() {
     let summary = project_file("IMPLEMENTATION_SUMMARY.md");
     let baseline = markdown_section(&summary, "## 1. 현재 기준과 목표", "## 2. 전체 런타임 흐름");
     assert!(baseline.contains("report 23/24 finding"));
-    assert!(baseline.contains("audit_report_27.md"));
+    assert!(baseline.contains("audit_report_28.md"));
     assert!(baseline.contains("partial evidence"));
     for stale in [
         "다음 release 범위는 아직 완료되지 않았다",
@@ -234,7 +234,13 @@ fn active_release_sections_reject_known_stale_statuses() {
             "{verified} 현재 상태 불일치"
         );
     }
-    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Verified |"));
+    for in_progress in ["G-CORE-004", "G-DOC-006", "G-SEC-003", "G-UI-002"] {
+        assert!(
+            gap_row(&gaps, in_progress).ends_with("| In Progress |"),
+            "{in_progress} 현재 상태 불일치"
+        );
+    }
+    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| In Progress |"));
     for row in gaps.lines().filter(|line| line.starts_with("| G-")) {
         assert!(
             !row.contains("Closed /"),
@@ -272,6 +278,22 @@ fn active_r9_status_requires_field_only_pairs_and_new_ci() {
     assert!(r9.contains("SHA `ea7822a5`/Actions `32683076204`"));
     assert!(!r9.contains("gold/no-gold production pair와 독립 negative matrix를 시정 중"));
     assert!(!r9.contains("actual producer-removal matrix는 시정 중"));
+}
+
+#[test]
+fn implementation_summary_does_not_reopen_completed_report_27_ci() {
+    let summary = project_file("IMPLEMENTATION_SUMMARY.md");
+    let implementation_order = markdown_section(
+        &summary,
+        "## 10. 구현 시작 순서",
+        "## 11. R9 콘텐츠 인과 폐쇄 Task",
+    );
+    let r9 = &summary[summary.find("## 11. R9 콘텐츠 인과 폐쇄 Task").unwrap()..];
+
+    assert!(implementation_order.contains("audit_report_28.md"));
+    assert!(!implementation_order
+        .contains("audit_report_27.md` 시정의 전체 local gate와 새 clean same-SHA 양 OS CI"));
+    assert!(!r9.contains("새 CI와 독립 재감사 전에는 R9 최종 PASS"));
 }
 
 #[test]

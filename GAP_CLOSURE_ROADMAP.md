@@ -45,6 +45,7 @@
 | G-CORE-001 | P0 | session/world mutable field 공개 | private state, read accessor, fixture boundary와 `audit_report_3.md` independent verification | R2-1, R2-2 | SC-CORE-01 | Closed |
 | G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy transaction과 no-commit regression, `audit_report_3.md` independent verification | R2-3 | SC-CORE-02 | Closed |
 | G-CORE-003 | P1 | invariant가 타입으로 검증되지 않음 | 6종 invariant/no-commit regression과 `audit_report_3.md` independent verification | R2-2 | SC-CORE-02 | Closed |
+| G-CORE-004 | P0 | allocator/custom registry/equipment removal consumer 불변식 | exact successor/fallible spawn, bootstrap saveability와 common removal 표적 GREEN; report 28 전체 CI pending | report 28 시정 | FIN-F001, FIN-F007 | In Progress |
 | G-DATA-001 | P1 | TOML loader가 runtime과 분리 | runtime ContentRegistry factory/level construction과 `audit_report_3.md` independent verification | R3-1..R3-3 | SC-DATA-01 | Closed |
 | G-DATA-002 | P1 | invalid embedded content가 session bootstrap에서 panic 가능 | fallible TUI/headless bootstrap, injected missing level/item regression, `audit_report_3.md` independent verification | R3-1, R3-4 | SC-DATA-01 | Closed |
 | G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | policy runner 조기 실패 처리와 3 seed accepted turn 1000, `audit_report_6.md` 재감사 | R4-1, R4-2 | SC-TEST-01 | Closed |
@@ -59,9 +60,12 @@
 | G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | 0.3.0 동기화와 report 20 active-status/false-green 시정을 `audit_report_21.md`가 Verified | R8-1 | SC-DOC-01 | Closed |
 | G-DOC-004 | P0 | 과거 finding과 현재 권한 상태 혼재 | report 26 최종 `1e84a94/32660514315` 계보 복구와 report 27 `ea7822a5/32683076204` current authority 동기화 | report 27 시정 | SC-DOC-01 | Verified |
 | G-DOC-005 | P2 | SC-CAUSE-01..07 개별 ID mapping | report 24와 same-SHA Actions `32107862171`이 종결 | report 24 시정 | SC-CAUSE-01..07 | Closed |
+| G-DOC-006 | P2 | implementation summary 후반 stale next-step | report 28 current lifecycle과 section 1/10/11 negative regression 동기화; 전체 CI pending | report 28 시정 | FIN-F012 | In Progress |
 | G-SEC-001 | P0 | artifact link/root/ambient/archive 경계 | Windows alias/staging/link와 archive canonical alias·strict calendar 및 actual 양 OS bundle `32683076204` | report 27 시정 | SEC-F001, FIN-F004, FIN-F014 | Verified |
+| G-SEC-003 | P0 | archive Windows component alias와 year 0000 parity | case/trailing/reserved/collision 및 year 0000/0001/9999 표적 GREEN; report 28 actual 양 OS bundle pending | report 28 시정 | FIN-F014, FIN-F015 | In Progress |
+| G-UI-002 | P0 | control-key Repeat state crossing과 F9 실제 경로 evidence | Esc/Enter/F9/Q Press-only sequence와 actual F9 handler regression GREEN; 전체 CI pending | report 28 시정 | FIN-F008, FIN-F009, FIN-F016 | In Progress |
 | G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | report 24와 Actions `32107862171`이 Unix 0600/Windows parent DACL 계약을 종결 | report 24 시정 | SEC-F003 | Closed |
-| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 27 독립 재감사 HOLD | report 27 RED/GREEN, 전체 local gate와 SHA `ea7822a5` Actions `32683076204` 양 OS success; 독립 재감사 pending | report 27 remediation | report 27 finding과 FIN-F001..F018 | Verified |
+| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 28 독립 재감사 HOLD | report 28 RED/GREEN 완료, 전체 local gate와 새 clean same-SHA 양 OS CI pending | report 28 remediation | report 28 finding과 FIN-F001..F018 | In Progress |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -258,4 +262,4 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0 문서화와 R1~R8의 기존 remediation은 `docs/audit/audit_report_21.md`가 report 20의 `IMP-F016`/`DBG-F008`을 Verified하면서 종결됐다. R6는 `audit_report_11.md`, R8 문서 closure는 `audit_report_21.md`가 종결 권한이다. report 23/24는 implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`와 Actions run `32107862171`로 historical closed다. report 25 시정 SHA `b732c42d`와 Actions `32650404618`은 부분 evidence다. report 26 최종 predecessor는 SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`의 Actions `32660514315`에서 Verified됐다. 현재 authority는 `docs/audit/audit_report_27.md`이며 시정 SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`의 Actions `32683076204`도 clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. child/aggregate 구현 gap은 Verified지만 새 독립 감사와 별도 게시 승인 전까지 program/publication은 HOLD다.
+R0~R8 기존 remediation과 report 23/24는 역사적으로 종결됐다. report 25 `b732c42d/32650404618`은 partial evidence이고 report 26은 partial/failure/final successor 계보로 보존한다. report 27 구현 `ea7822a5/32683076204`와 docs successor `01b2bd3/32684490662`는 양 OS Verified됐다. 현재 authority는 `docs/audit/audit_report_28.md`이며 표적 GREEN 뒤 전체 gate/새 CI가 pending이므로 report 28 child/aggregate gap은 In Progress, program/publication은 HOLD다.

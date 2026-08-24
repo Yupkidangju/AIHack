@@ -6,7 +6,7 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implementation contract, report 27 remediation `ea7822a5/32683076204` same-SHA 양 OS Verified; independent re-audit pending, PROGRAM/PUBLICATION HOLD
+문서 상태: active implementation contract, report 27 predecessor `ea7822a5/32683076204`, `audit_report_28.md` remediation in progress; PROGRAM/PUBLICATION HOLD
 작성일: 2026-07-15
 최근 동기화: 2026-08-24
 기준: `spec.md`
@@ -305,8 +305,8 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - focus 순서: map → HUD → inventory/inspect → LLM result → footer
 - suggestion rationale와 verdict를 screen reader 친화적인 한 문장으로 유지한다.
 - status 갱신은 core message를 덮어쓰지 않는다.
-- LLM request CTA `G`/`A`/`J`와 retry `R`은 일반 Playing 화면의 `KeyEventKind::Press`에서만 enqueue 후보가 된다. `Repeat`/`Release`는 cooldown이나 빠른 response 완료 여부와 관계없이 새 request를 만들지 않는다. 단, Judge soft-input editor가 활성화된 동안 `Press`와 `Repeat`의 문자 `G`/`A`/`J`/`R`은 모두 일반 텍스트로 입력하고 `Release`만 무시한다.
-- F9 debug observation panel은 map 위에 그려지는 비모달 진단 panel이다. panel 바깥의 map mouse는 정상 동작하지만, 보이는 debug panel rect 안의 hover/click/down은 panel이 소비하며 가려진 map에 Move/Inspect/focus candidate를 전달하지 않는다. F9 표시 자체와 소비된 mouse는 core revision/hash를 바꾸지 않는다.
+- LLM request CTA `G`/`A`/`J`와 retry `R`은 일반 Playing 화면의 `KeyEventKind::Press`에서만 enqueue 후보가 된다. `Repeat`/`Release`는 cooldown이나 빠른 response 완료 여부와 관계없이 새 request를 만들지 않는다. Judge soft-input editor가 활성화된 동안 일반 문자와 Backspace의 `Press`/`Repeat`는 편집 입력으로 허용하고 `Release`는 무시한다. Esc·Enter·F9 및 Quit `q/Q` 같은 state transition/control key는 `Press`만 후보를 만들며 `Repeat`/`Release`가 modal을 닫은 뒤 새 state의 Quit/confirm/toggle로 승격되지 않는다. 이 계약은 constructed crossterm event가 production dispatcher와 handler를 통과한 결과까지 검증하며 실제 물리 key-hold 도달성은 별도 주장하지 않는다.
+- F9 debug observation panel은 map 위에 그려지는 비모달 진단 panel이다. panel 바깥의 map mouse는 정상 동작하지만, 보이는 debug panel rect 안의 hover/click/down은 panel이 소비하며 가려진 map에 Move/Inspect/focus candidate를 전달하지 않는다. 실제 F9 `Press`→`ToggleDebug` candidate→handler는 UI flag만 바꾸고 handler return false와 core revision/hash 불변을 보장하며, 두 번째 Press는 원래 flag로 복원한다. F9 `Repeat`/`Release`는 후보를 만들지 않는다.
 
 ### 11.1 v0.3.0 locale 범위
 
@@ -372,4 +372,4 @@ cargo test --workspace --locked --test llm_soft_adjudication
 | binary | `aihack`, `aihack-headless` | clean worktree의 release build |
 | complete corresponding source | 해당 binary를 만든 동일 commit의 추적 source | `build.sh`/`build.bat`의 `git archive` |
 
-`legacy_nethack_port_reference/`, `target/`, `output/`은 source archive에서 제외한다. release script는 untracked file을 포함해 worktree가 dirty하면 중단하고, workspace 내부의 새 random staging root에서 single-link file만 만든 뒤 verifier PASS 후 directory rename으로 `output/`을 승격한다. 기존 output root의 symlink/junction/reparse와 expected-name hard link는 외부 inode에 쓰지 않으며 verifier가 거부한다. verifier는 archive entry를 component 단위 canonical path로 검사하여 absolute path, `.`/`..`, 빈 중간 component, backslash separator와 canonical first component가 excluded tree인 alias를 양 OS에서 모두 거부한다. metadata의 `candidate_date`와 modification period 시작/종료는 strict Gregorian `YYYY-MM-DD`이고 `start <= candidate <= end`여야 한다. 이 packaging 계약의 로컬 PASS는 독립 R8 감사나 외부 게시 승인을 뜻하지 않는다.
+`legacy_nethack_port_reference/`, `target/`, `output/`은 source archive에서 제외한다. release script는 untracked file을 포함해 worktree가 dirty하면 중단하고, workspace 내부의 새 random staging root에서 single-link file만 만든 뒤 verifier PASS 후 directory rename으로 `output/`을 승격한다. 기존 output root의 symlink/junction/reparse와 expected-name hard link는 외부 inode에 쓰지 않으며 verifier가 거부한다. verifier는 archive entry의 모든 component를 Windows-compatible 이름 의미로 검사한다. absolute path, `.`/`..`, 빈 component, colon/backslash, trailing dot/space, reserved device basename과 ASCII case-insensitive extraction collision을 거부하며 excluded first component도 ASCII case-insensitive로 차단한다. metadata의 `candidate_date`와 modification period 시작/종료는 strict Gregorian `YYYY-MM-DD`, year `0001..9999`, `start <= candidate <= end`를 양 OS에서 동일하게 만족해야 한다. 이 packaging 계약의 로컬 PASS는 독립 R8 감사나 외부 게시 승인을 뜻하지 않는다.

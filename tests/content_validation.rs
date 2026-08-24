@@ -9,8 +9,14 @@ id = "item.weapon.dagger"
 kind = "weapon"
 glyph = ")"
 weight = 10
+slot = "melee"
+hit_bonus = 0
 damage = "1d4"
 "#;
+const EMBEDDED_ITEMS: &str = include_str!("../crates/aihack-content/src/data/items.toml");
+const EMBEDDED_MONSTERS: &str = include_str!("../crates/aihack-content/src/data/monsters.toml");
+const EMBEDDED_LEVEL_1: &str = include_str!("../crates/aihack-content/src/data/levels/main_1.toml");
+const EMBEDDED_LEVEL_2: &str = include_str!("../crates/aihack-content/src/data/levels/main_2.toml");
 const MONSTERS: &str = r#"
 [[monster]]
 id = "monster.jackal"
@@ -170,6 +176,51 @@ fn causal_numeric_content_rejects_invalid_ranges() {
         ),
         Err(ContentError::Parse { .. })
     ));
+}
+
+#[test]
+fn registry_rejects_non_live_monster_hp_and_forbidden_armor_projectile_fields() {
+    for hp in [0, -1] {
+        let monsters = MONSTERS.replace("hp = 4", &format!("hp = {hp}"));
+        assert!(matches!(
+            registry(ITEMS, &monsters, &[("one", LEVEL_1), ("two", LEVEL_2)]),
+            Err(ContentError::Parse { .. })
+        ));
+    }
+
+    for forbidden in ["damage=\"1d4\"", "hit_bonus=1"] {
+        let items = EMBEDDED_ITEMS.replacen("ac_bonus=1", &format!("ac_bonus=1\n{forbidden}"), 1);
+        assert!(matches!(
+            registry(
+                &items,
+                EMBEDDED_MONSTERS,
+                &[
+                    ("main_1.toml", EMBEDDED_LEVEL_1),
+                    ("main_2.toml", EMBEDDED_LEVEL_2)
+                ]
+            ),
+            Err(ContentError::Parse { .. })
+        ));
+    }
+}
+
+#[test]
+fn accepted_custom_registry_bootstrap_wait_and_save_round_trip_remain_valid() {
+    let monsters = EMBEDDED_MONSTERS.replacen("hp=4", "hp=5", 1);
+    let registry = ContentRegistry::from_toml_sources(
+        CONTENT_SCHEMA_VERSION,
+        EMBEDDED_ITEMS,
+        &monsters,
+        &[
+            ("main_1.toml", EMBEDDED_LEVEL_1),
+            ("main_2.toml", EMBEDDED_LEVEL_2),
+        ],
+    )
+    .unwrap();
+    let mut session = GameSession::try_new_for_playing_with_registry(42, &registry).unwrap();
+    assert!(GameSession::from_save_data_with_registry(session.to_save_data(), &registry).is_ok());
+    assert!(session.submit(aihack::core::CommandIntent::Wait).accepted);
+    assert!(GameSession::from_save_data_with_registry(session.to_save_data(), &registry).is_ok());
 }
 
 #[test]

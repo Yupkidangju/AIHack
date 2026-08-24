@@ -213,6 +213,7 @@ fn p8_g11_passive_attack_response() {
             .saved()
             .entities
             .spawn_monster(MonsterKind::FloatingEye, Pos { x: 6, y: 5 })
+            .unwrap()
     });
     let outcome = session.submit(CommandIntent::Move(Direction::East));
     assert!(outcome.events.iter().any(
@@ -324,10 +325,14 @@ fn p8_g18_encumbrance_blocks_movement_when_over_threshold() {
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         let owner = world.saved().player_id;
         for _ in 0..4 {
-            let item = world.saved().entities.spawn_item(
-                ItemKind::Rock,
-                aihack::domain::entity::EntityLocation::Inventory { owner },
-            );
+            let item = world
+                .saved()
+                .entities
+                .spawn_item(
+                    ItemKind::Rock,
+                    aihack::domain::entity::EntityLocation::Inventory { owner },
+                )
+                .unwrap();
             let letter = world
                 .saved()
                 .inventory

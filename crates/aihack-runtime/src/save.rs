@@ -8,7 +8,7 @@ use std::{
 use aihack_core::{
     domain::{
         combat::DeathCause,
-        entity::{ActorKind, EntityLocation, EntityPayload},
+        entity::{ActorKind, EntityLocation, EntityPayload, MAX_ABSOLUTE_ACTOR_STAT},
         item::ItemClass,
         player::adventurer_template,
     },
@@ -45,7 +45,6 @@ pub const MAX_RNG_DRAWS: u64 = 1_000_000;
 pub const MAX_PERSISTED_TEXT_BYTES: usize = 512;
 const MAX_SAVE_LEVELS: usize = 64;
 const MAX_TOTAL_MAP_TILES: usize = 1_000_000;
-const MAX_ABSOLUTE_ACTOR_STAT: i32 = 10_000;
 
 /// runtime artifact의 모든 파일 작업을 열린 root directory 아래로 제한한다.
 pub struct ArtifactStore {
@@ -378,11 +377,12 @@ impl GameSession {
                 world: GameWorld::from_saved_world_with_registry(save.world, registry)?,
                 event_log: save.event_log,
             },
+            transaction_aborted: false,
         })
     }
 }
 
-fn validate_save_data_with_registry(
+pub(crate) fn validate_save_data_with_registry(
     save: &SaveDataV1,
     registry: &aihack_content::ContentRegistry,
 ) -> Result<(), GameError> {
@@ -573,11 +573,13 @@ fn validate_saved_world_inner(
             }
         }
     }
-    if world.entities.next_id() == 0
-        || world.entities.next_id() <= max_id
-        || world.entities.next_id() == u32::MAX
-    {
-        return invalid_world("entity allocator next_id collides with persisted IDs".to_string());
+    let expected_next_id = max_id
+        .checked_add(1)
+        .ok_or_else(|| invalid_world_error("entity allocator has no successor ID"))?;
+    if world.entities.next_id() != expected_next_id {
+        return invalid_world(
+            "entity allocator next_id is not the exact persisted ID successor".to_string(),
+        );
     }
     if player_count != 1 {
         return invalid_world(format!("expected exactly one player, found {player_count}"));
