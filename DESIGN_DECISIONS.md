@@ -14,9 +14,9 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0042: report 32 current-HEAD modification evidence와 final-SHA CI
 
-Status: Implemented with full local gate and candidate clean Windows actual bundle verified; final-SHA Linux/Windows CI pending (2026-08-25)
+Status: Implemented with full local gate and candidate clean Windows actual bundle verified; exact-headSha CI is external verification authority; independent re-audit required (2026-08-25)
 
-Local verification: candidate `57d8108a51db08f942aba3218eafd2a94cc011d3` date `2026-08-25`에서 453 named tests, fmt/clippy, release all-target build, RustSec/cargo-deny 0.19.4, R7/R8와 381-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. final document-bearing commit의 clean Windows 재검증과 Ubuntu actual Linux bundle/양 OS CI가 남아 있다.
+Local verification: candidate `57d8108a51db08f942aba3218eafd2a94cc011d3` date `2026-08-25`에서 453 named tests, fmt/clippy, release all-target build, RustSec/cargo-deny 0.19.4, R7/R8와 381-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. final acceptance는 이 문서를 포함한 current final `headSha`의 clean Windows 재검증과 GitHub Actions Ubuntu/Linux·Windows completed-success record로 판정하며 별도 evidence commit을 만들지 않는다.
 Date: 2026-08-25
 Decision ID: DEC-AUDIT-R32-01
 

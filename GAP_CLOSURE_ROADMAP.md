@@ -74,7 +74,7 @@
 | G-SEC-004 | P0 | archive raw type/extraction 및 `ExpectedCommit` complete tree 미결합 | format-aware common validator, safe extraction, independent `git archive` identity와 `1fa6d90` clean Windows actual bundle GREEN | report 29 시정 | R29-SEC-F001, R29-SEC-F002 | Verified |
 | G-UI-003 | P0 | 동등 transition과 Release 없는 연속 Press state crossing | 합성 Release 비신뢰·500ms quiet+2 idle gate, constructed/actual ConPTY와 `1fa6d90` local gate GREEN | report 29 시정 | R29-DBG-F001 | Verified |
 | G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | report 24와 Actions `32107862171`이 Unix 0600/Windows parent DACL 계약을 종결 | report 24 시정 | SEC-F003 | Closed |
-| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 32 release-date HOLD | report 31 lifecycle/FIN-F012 Closed; R32 date contract Implemented, full gate/bundle/CI pending | report 32 remediation | R32-DBG-F001, FIN-F001..F018 | Implemented |
+| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 32 release-date HOLD | report 31 lifecycle/FIN-F012 Closed; R32 date contract Implemented, exact-final-headSha Actions가 external verification authority | report 32 remediation | R32-DBG-F001, FIN-F001..F018 | Implemented |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 

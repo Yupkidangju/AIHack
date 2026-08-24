@@ -5,7 +5,7 @@
 - 작업 브랜치: `codex/audit-report-32-remediation`
 - 작업 일자: 2026-08-25
 - Report 31 판정: **R29-DOC-F002 Re-audit #3 / FIN-F012 independently Closed**
-- 현재 판정: **R32-DBG-F001·FIN-F015 full local·candidate clean Windows actual PASS / final-SHA 양 OS CI pending / PROGRAM·PUBLICATION HOLD**
+- 현재 판정: **R32-DBG-F001·FIN-F015 full local·candidate clean Windows actual PASS / exact-final-headSha Actions external verification / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. Report 31 successor `8c042d48/32741917348`의 lifecycle/public visibility/Report 29 기술 증거는 historical Verified로 보존한다.
 
@@ -91,7 +91,7 @@ PASS Windows release bundle: version=0.3.0 commit=57d8108a51db08f942aba3218eafd2
 output exact entries=9
 ```
 
-final document-bearing commit에서도 clean Windows bundle을 다시 실행하고 동일 SHA의 Ubuntu/Windows CI를 사용한다.
+final document-bearing commit에서도 clean Windows bundle을 다시 실행하고 동일 SHA의 Ubuntu/Windows CI를 사용한다. 이 repository 문서는 미래 run ID를 예측하거나 결과 기록용 successor를 만들지 않으며, current final `headSha`와 일치하는 completed-success Actions record가 canonical result다.
 
 ## 6. clean Windows/Linux actual bundle과 final-SHA CI
 

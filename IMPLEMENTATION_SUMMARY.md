@@ -23,7 +23,7 @@ report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence�
 
 Report 31 시정은 summary 1·10·11절 current exact-one과 predecessor lifecycle generic negative gate를 구현했고 successor `8c042d48/32741917348`에서 clean same-SHA 양 OS actual bundle까지 Verified된 historical closure다.
 
-Report 32가 current HEAD `8045249`의 commit date `2026-08-25`와 modification period end `2026-08-24` 불일치로 R32-DBG-F001/FIN-F015를 열었다. Notice ID/period, metadata/build/verifier/checkpoint/tests의 2026-08-25 원자 동기화와 actual HEAD-date 조기 gate는 전체 local quality gate 453 tests까지 PASS했다. candidate `57d8108a`의 381-entry source ZIP·9-entry clean Windows actual bundle도 PASS했다. 남은 작업은 final document-bearing SHA의 clean Windows 재검증과 Ubuntu actual Linux bundle/양 OS CI다. 후속 독립 PASS와 별도 게시 승인 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+Report 32가 current HEAD `8045249`의 commit date `2026-08-25`와 modification period end `2026-08-24` 불일치로 R32-DBG-F001/FIN-F015를 열었다. Notice ID/period, metadata/build/verifier/checkpoint/tests의 2026-08-25 원자 동기화와 actual HEAD-date 조기 gate는 전체 local quality gate 453 tests까지 PASS했다. candidate `57d8108a`의 381-entry source ZIP·9-entry clean Windows actual bundle도 PASS했다. 최종 verification authority는 이 문서를 포함한 current final `headSha`의 clean Windows 결과와 동일 SHA GitHub Actions Ubuntu/Linux·Windows completed-success record다. 후속 독립 PASS와 별도 게시 승인 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -929,7 +929,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/audit/audit_report_32.md` 시정 final document-bearing SHA의 clean Windows actual bundle 재검증과 동일 SHA Ubuntu/Windows CI다. ADR-0042 modification evidence, actual HEAD `%cs` containment regression, 전체 local quality gate 453 tests와 candidate `57d8108a` Windows bundle은 PASS했다. Ubuntu actual bundle이 Linux 권위 실행이며 Report 31 lifecycle finding은 independent closure로 다시 열지 않는다. 실제 model provider smoke는 비차단 고려 대상이다.
+`docs/audit/audit_report_32.md` 시정의 release evidence gate는 final document-bearing `headSha`의 clean Windows actual bundle과 동일 SHA Ubuntu/Linux·Windows Actions completed-success다. 이 외부 gate가 충족된 뒤 다음 단계는 R32-DBG-F001/FIN-F015 후속 독립 재감사와 별도 사용자 게시 승인이다. ADR-0042, actual HEAD `%cs` containment regression, 전체 local quality gate 453 tests와 candidate `57d8108a` Windows bundle은 PASS했으며 Report 31 lifecycle finding은 independent closure로 다시 열지 않는다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 Report 30 technical successor `ed02dbf/32733235414`의 ADR-0040 public visibility, Report 29 기술 회귀와 양 OS actual bundle은 완료된 Verified evidence이며 lifecycle을 재개방하지 않는다.
 
