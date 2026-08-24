@@ -126,7 +126,16 @@ output은 binary 2, `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, approval record, me
 
 ## 6. clean same-SHA Ubuntu/Windows actual bundle
 
-implementation/local evidence를 기록한 docs successor commit의 push와 CI가 pending이다. 해당 clean SHA의 Ubuntu/Windows actual bundle job이 모두 success한 뒤 run/job ID와 step 수를 기록한다.
+첫 docs successor SHA `1a68f76a30ec62204895168b68f2b122860f0f52`의 Actions `32706287953`에서 Ubuntu job `97367988636`은 test step에서 FAIL 101이었다. production verifier 결함은 아니며 Unix-only `tests/release_bundle.rs`의 세 fixture가 complete identity 도입 뒤에도 commit 후 archive를 재압축한 원인이었다.
+
+```text
+verifier_accepts_a_normal_similar_archive_name ... FAILED
+verifier_accepts_minimum_and_maximum_supported_calendar_years ... FAILED
+  source archive is not byte-identical to git archive ExpectedCommit
+verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree ... assertion text mismatch
+```
+
+유사 이름과 year 0001/9999 positive는 temp Git commit 전에 source/metadata/period를 구성하고 실제 `git archive`를 사용하도록 고쳤다. blocked legacy negative는 공통 validator의 더 구체적인 `excluded or absolute path` 문구와 맞췄다. 새 clean successor SHA의 Ubuntu/Windows actual bundle job이 모두 success한 뒤 run/job ID와 step 수를 기록한다.
 
 ## 7. 잔여 경계
 

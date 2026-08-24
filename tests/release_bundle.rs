@@ -19,6 +19,7 @@ fn project_path(path: &str) -> PathBuf {
 struct BundleFixture {
     root: PathBuf,
     commit: String,
+    candidate_date: String,
 }
 
 #[derive(Clone, Copy)]
@@ -30,6 +31,9 @@ enum BundleCase {
     MissingModificationMetadata,
     MismatchedModificationRecord,
     IncludedLegacy,
+    SimilarLegacyName,
+    MinimumYearCalendar,
+    MaximumYearCalendar,
     StaleModificationPeriod,
 }
 
@@ -100,6 +104,28 @@ impl BundleFixture {
                 "Covered change period: `2025-05-20..2026-08-23`",
             );
         }
+        let candidate_date = match case {
+            BundleCase::MinimumYearCalendar => "0001-06-15",
+            BundleCase::MaximumYearCalendar => "9999-06-15",
+            _ => CANDIDATE_DATE,
+        };
+        let edge_period = match case {
+            BundleCase::MinimumYearCalendar => Some("0001-01-01..0001-12-31"),
+            BundleCase::MaximumYearCalendar => Some("9999-01-01..9999-12-31"),
+            _ => None,
+        };
+        if let Some(period) = edge_period {
+            replace_in_file(
+                &root.join("MODIFICATIONS.md"),
+                "2025-05-20..2026-08-24",
+                period,
+            );
+            replace_in_file(
+                &root.join("RELEASE-METADATA"),
+                "candidate_date=$Format:%cs$",
+                &format!("candidate_date={candidate_date}"),
+            );
+        }
         if matches!(case, BundleCase::MissingOwnerMetadata) {
             remove_line_containing(&root.join("RELEASE-METADATA"), "owner_approval=");
         }
@@ -127,6 +153,14 @@ impl BundleFixture {
             "must not ship\n",
         )
         .unwrap();
+        if matches!(case, BundleCase::SimilarLegacyName) {
+            fs::create_dir_all(root.join("legacy_nethack_port_reference_backup")).unwrap();
+            fs::write(
+                root.join("legacy_nethack_port_reference_backup/probe.txt"),
+                "allowed similar name\n",
+            )
+            .unwrap();
+        }
 
         for args in [
             &["init", "-q"][..],
@@ -192,7 +226,7 @@ impl BundleFixture {
         }
         output_metadata = output_metadata
             .replace("$Format:%H$", &commit)
-            .replace("$Format:%cs$", CANDIDATE_DATE);
+            .replace("$Format:%cs$", candidate_date);
         fs::write(output.join("RELEASE-METADATA"), output_metadata).unwrap();
         let archive = output.join("aihack-0.3.0-source.tar.gz");
         let status = Command::new("git")
@@ -239,11 +273,15 @@ impl BundleFixture {
         assert!(hashes.status.success());
         fs::write(output.join("SHA256SUMS"), hashes.stdout).unwrap();
 
-        Self { root, commit }
+        Self {
+            root,
+            commit,
+            candidate_date: candidate_date.to_owned(),
+        }
     }
 
     fn verify(&self) -> std::process::Output {
-        self.verify_with_candidate(CANDIDATE_DATE)
+        self.verify_with_candidate(&self.candidate_date)
     }
 
     fn verify_with_candidate(&self, candidate_date: &str) -> std::process::Output {
@@ -481,7 +519,7 @@ fn verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree() {
     let fixture = BundleFixture::new(BundleCase::IncludedLegacy);
     let output = fixture.verify();
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("excluded path"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("excluded"));
 }
 
 #[test]
@@ -513,8 +551,7 @@ fn verifier_rejects_canonical_aliases_of_blocked_archive_paths() {
 
 #[test]
 fn verifier_accepts_a_normal_similar_archive_name() {
-    let fixture = BundleFixture::new(BundleCase::Complete);
-    fixture.rewrite_archive_with_path_alias("legacy_nethack_port_reference_backup/probe.txt");
+    let fixture = BundleFixture::new(BundleCase::SimilarLegacyName);
     let output = fixture.verify();
     assert!(
         output.status.success(),
@@ -548,13 +585,12 @@ fn verifier_rejects_non_calendar_candidate_and_period_matrix() {
 
 #[test]
 fn verifier_accepts_minimum_and_maximum_supported_calendar_years() {
-    for (candidate, start, end) in [
-        ("0001-06-15", "0001-01-01", "0001-12-31"),
-        ("9999-06-15", "9999-01-01", "9999-12-31"),
+    for (case, candidate) in [
+        (BundleCase::MinimumYearCalendar, "0001-06-15"),
+        (BundleCase::MaximumYearCalendar, "9999-06-15"),
     ] {
-        let fixture = BundleFixture::new(BundleCase::Complete);
-        fixture.rewrite_calendar(candidate, start, end);
-        let output = fixture.verify_with_candidate(candidate);
+        let fixture = BundleFixture::new(case);
+        let output = fixture.verify();
         assert!(
             output.status.success(),
             "supported calendar edge rejected: {candidate}; stdout={} stderr={}",
