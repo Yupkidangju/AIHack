@@ -70,7 +70,7 @@
 | G-SEC-004 | P0 | archive raw type/extraction 및 `ExpectedCommit` complete tree 미결합 | format-aware common validator, safe extraction, independent `git archive` identity와 `1fa6d90` clean Windows actual bundle GREEN | report 29 시정 | R29-SEC-F001, R29-SEC-F002 | Verified |
 | G-UI-003 | P0 | 동등 transition과 Release 없는 연속 Press state crossing | 합성 Release 비신뢰·500ms quiet+2 idle gate, constructed/actual ConPTY와 `1fa6d90` local gate GREEN | report 29 시정 | R29-DBG-F001 | Verified |
 | G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | report 24와 Actions `32107862171`이 Unix 0600/Windows parent DACL 계약을 종결 | report 24 시정 | SEC-F003 | Closed |
-| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 29 독립 재감사 HOLD | report 29 9개 finding, `1fa6d90` 전체 local gate와 clean Windows actual bundle Verified; 새 양 OS CI·독립 감사 pending | report 29 remediation | report 29 finding과 FIN-F001..F018 | Verified |
+| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 29 독립 재감사 HOLD | report 29 9개 finding, `a91a9c7` Actions `32706869079` clean same-SHA 양 OS actual bundle Verified; 독립 감사 pending | report 29 remediation | report 29 finding과 FIN-F001..F018 | Verified |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -267,4 +267,4 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0~R8 기존 remediation과 report 23/24는 역사적으로 종결됐다. report 25 `b732c42d/32650404618`은 partial evidence이고 report 26~28 successor 계보는 보존한다. 현재 authority는 `docs/audit/audit_report_29.md`이며 G-CORE-005/G-DATA-003/G-DOC-007/G-SEC-004/G-UI-003와 G-FINAL-001은 `1fa6d90` 전체 local gate와 clean Windows actual bundle로 Verified다. 새 same-SHA 양 OS CI·독립 감사와 별도 게시 승인 전까지 Closed 및 program/publication PASS로 올리지 않는다.
+R0~R8 기존 remediation과 report 23/24는 역사적으로 종결됐다. report 25 `b732c42d/32650404618`은 partial evidence이고 report 26~28 successor 계보는 보존한다. 현재 authority는 `docs/audit/audit_report_29.md`이며 G-CORE-005/G-DATA-003/G-DOC-007/G-SEC-004/G-UI-003와 G-FINAL-001은 `a91a9c7/32706869079` 전체 gate와 clean same-SHA 양 OS actual bundle로 Verified다. 독립 감사와 별도 게시 승인 전까지 Closed 및 program/publication PASS로 올리지 않는다.

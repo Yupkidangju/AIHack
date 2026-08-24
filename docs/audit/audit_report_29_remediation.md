@@ -135,7 +135,18 @@ verifier_accepts_minimum_and_maximum_supported_calendar_years ... FAILED
 verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree ... assertion text mismatch
 ```
 
-유사 이름과 year 0001/9999 positive는 temp Git commit 전에 source/metadata/period를 구성하고 실제 `git archive`를 사용하도록 고쳤다. blocked legacy negative는 공통 validator의 더 구체적인 `excluded or absolute path` 문구와 맞췄다. 새 clean successor SHA의 Ubuntu/Windows actual bundle job이 모두 success한 뒤 run/job ID와 step 수를 기록한다.
+유사 이름과 year 0001/9999 positive는 temp Git commit 전에 source/metadata/period를 구성하고 실제 `git archive`를 사용하도록 고쳤다. blocked legacy negative는 공통 validator의 더 구체적인 `excluded or absolute path` 문구와 맞췄다. 첫 run의 Windows job은 Ubuntu 확정 실패 뒤 successor queue를 열기 위해 취소했다.
+
+최종 기술 evidence successor는 `a91a9c70523288bf2d5289bb35c9d1f1e5565a33`이며 [Actions `32706869079`](https://github.com/Yupkidangju/AIHack/actions/runs/32706869079)가 completed/success다.
+
+| Job | ID | 결과 | 시간 | step |
+| --- | ---: | --- | ---: | --- |
+| `ubuntu-latest quality gate` | `97369721441` | PASS | 9m17s | 19 success, Windows bundle 1 skip |
+| `windows-latest quality gate` | `97369721295` | PASS | 24m29s | 19 success, Linux bundle 1 skip |
+
+양 job은 checkout SHA `a91a9c7...`에서 metadata/fmt/clippy/all-target tests, dependency exception/duplicate, R7/R8, release all-target build, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변을 모두 통과했다. 실제 Linux TAR와 Windows ZIP은 각 verifier의 raw/type/extraction 및 `ExpectedCommit` byte identity를 통과했다.
+
+이 결과로 report 29 시정 lifecycle은 `Verified`다. 다만 `Closed`, 전체 PROGRAM PASS와 외부 게시 허가는 새 독립 재감사 및 별도 사용자 승인 전까지 HOLD다.
 
 ## 7. 잔여 경계
 

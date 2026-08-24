@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 29 시정 implementation SHA `1fa6d903ea09170014154c0c64e0fdaf673fcb6c`의 전체 local gate와 clean Windows actual bundle Verified, 새 clean same-SHA Ubuntu/Windows CI pending. `docs/audit/audit_report_29.md`가 연 경계는 ADR-0039 구현과 회귀로 시정했지만 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 코드 기준: Cargo package 0.3.0, report 29 시정 successor SHA `a91a9c70523288bf2d5289bb35c9d1f1e5565a33`의 [Actions `32706869079`](https://github.com/Yupkidangju/AIHack/actions/runs/32706869079) clean same-SHA Ubuntu/Windows actual bundle Verified. `docs/audit/audit_report_29.md`가 연 경계는 ADR-0039 구현과 회귀로 시정했지만 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙

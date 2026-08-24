@@ -462,5 +462,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: report 29 시정 implementation SHA `1fa6d903ea09170014154c0c64e0fdaf673fcb6c`의 전체 local gate와 clean Windows actual bundle은 Verified이며 새 same-SHA 양 OS CI가 pending이다. 후속 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
-현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 역사적으로 종결했다. 단일 current authority는 `docs/audit/audit_report_29.md`이며 current remediation은 `docs/audit/audit_report_29_remediation.md`다. predecessor report/SHA/run은 명시적 historical section에서만 허용하고 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.
+현재 구현 판정: report 29 시정 successor SHA `a91a9c70523288bf2d5289bb35c9d1f1e5565a33`의 Actions `32706869079`에서 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐다. 후속 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 역사적으로 종결했다. 단일 current authority는 `docs/audit/audit_report_29.md`이며 current remediation은 `docs/audit/audit_report_29_remediation.md`다. `a91a9c7/32706869079` 기술 evidence를 확보했지만 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.
