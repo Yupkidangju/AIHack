@@ -8,7 +8,7 @@
 
 문서 상태: active implementation contract; current authority `docs/audit/audit_report_31.md`; PROGRAM/PUBLICATION HOLD
 기술 증거: report 30 technical successor `ed02dbf/32733235414` clean same-SHA 양 OS actual bundle과 public visibility independent Verified
-현재 시정: report 31 summary lifecycle remediation/new CI pending
+현재 시정: report 31 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle Verified; independent re-audit pending
 작성일: 2026-07-15
 최근 동기화: 2026-08-24
 기준: `spec.md`

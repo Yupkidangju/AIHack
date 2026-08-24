@@ -21,7 +21,7 @@ Report 31은 Report 30 기술/API 시정을 독립 검증하고 implementation s
 
 report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence로 보존한다. report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 submit-only visibility, external compile, Report 29 regression, 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐고 Report 31이 이 기술/API 경계를 독립 확인했다.
 
-Report 31 시정은 summary 1·10·11절 current exact-one과 predecessor lifecycle generic negative gate를 구현했고 전체 local quality gate 453 tests 및 candidate `f3a7aa6`의 clean Windows actual bundle을 Verified했다. 남은 단계는 docs evidence successor의 same-SHA Ubuntu/Windows actual bundle과 후속 독립 PASS이며, 별도 게시 승인 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+Report 31 시정은 summary 1·10·11절 current exact-one과 predecessor lifecycle generic negative gate를 구현했고 전체 local quality gate 453 tests를 PASS했다. docs evidence successor `8c042d48/32741917348`에서 clean same-SHA Ubuntu/Windows actual bundle, RustSec, cargo-deny 0.19.4와 lockfile 불변까지 Verified됐다. 남은 단계는 후속 독립 PASS와 별도 게시 승인뿐이며 그 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -927,7 +927,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/audit/audit_report_31.md` 시정 evidence successor의 clean Windows 재검증과 같은 SHA의 Ubuntu/Windows CI actual bundle이다. ADR-0041 generic gate, 전체 local quality gate 453 tests와 candidate `f3a7aa6` Windows bundle은 PASS했다. Report 31 후속 independent PASS와 별도 사용자 승인까지 외부 게시는 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `docs/audit/audit_report_31.md` 시정의 후속 독립 재감사와 별도 사용자 게시 승인이다. ADR-0041 generic gate, 전체 local quality gate 453 tests와 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle은 PASS했다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 Report 30 technical successor `ed02dbf/32733235414`의 ADR-0040 public visibility, Report 29 기술 회귀와 양 OS actual bundle은 완료된 Verified evidence이며 lifecycle을 재개방하지 않는다.
 
@@ -941,7 +941,7 @@ DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.
 
 현재 authority는 `docs/audit/audit_report_31.md`다.
 
-Report 31이 R9/Report 29 기술 회귀와 Report 30 public visibility를 Verified했고, summary lifecycle generic negative gate, 전체 local quality gate와 candidate `f3a7aa6` clean Windows actual bundle도 PASS했다. 남은 current 작업은 docs evidence successor의 same-SHA 양 OS evidence이며, 후속 독립 PASS 전에는 전체 program PASS를 선언하지 않는다.
+Report 31이 R9/Report 29 기술 회귀와 Report 30 public visibility를 Verified했고, summary lifecycle generic negative gate와 successor `8c042d48/32741917348` clean same-SHA 양 OS actual bundle도 PASS했다. 남은 current 작업은 후속 독립 재감사이며 그 전에는 전체 program PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 

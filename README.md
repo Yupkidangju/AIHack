@@ -21,7 +21,7 @@ AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트�
 - `docs/audit/audit_report_24.md`와 implementation SHA `2519bc8e`의 양 OS CI는 report 23/24 시정을 역사적으로 종결했다. report 23 재감사 대기는 현재 gate가 아니다.
 - 현재 권위는 `docs/audit/audit_report_31.md`다.
 - Report 30 technical successor SHA `ed02dbf`의 [Actions `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414)는 전체 gate와 clean same-SHA Ubuntu/Windows actual bundle을 PASS했고 Report 31이 public visibility와 Report 29 기술 회귀를 독립 확인했다.
-- Report 31 summary lifecycle 시정의 새 양 OS 검증과 후속 독립 PASS 및 별도 게시 승인 전에는 program/외부 게시 HOLD다.
+- Report 31 summary lifecycle 시정 successor SHA `8c042d48`의 [Actions `32741917348`](https://github.com/Yupkidangju/AIHack/actions/runs/32741917348)는 clean same-SHA Ubuntu/Windows actual bundle과 전체 gate를 PASS했다. 후속 독립 PASS 및 별도 게시 승인 전에는 program/외부 게시 HOLD다.
 - Windows all-target test는 dev-only `portable-pty 0.9.0` ConPTY에서 실제 TUI의 one-key state, mouse click, Inventory/Esc와 terminal restore를 검증한다. release binary dependency에는 포함되지 않는다.
 - GitHub YAML action pin gate는 dev-only `saphyr 0.0.12`로 모든 workflow/composite node와 repository-root local action을 재귀 검사하며 release binary dependency에는 포함되지 않는다.
 - R9 콘텐츠 인과 폐쇄는 음식·시체 섭취, 콘텐츠 기반 armor/monster behavior, 가격·난이도·gold·score, 기도·luck 전이를 실제 월드 상태에 연결한다. seed 42/7/1234 장기 테스트는 9종 semantic witness와 1000 accepted turn, 반복 hash를 함께 검증한다.
@@ -89,7 +89,7 @@ AIHack is a Rust roguelike that reimplements observable NetHack 3.6.7 behavior t
 - Report 24 and the two-OS CI for implementation SHA `2519bc8e` historically closed report 23/24 remediation; report 23 is no longer the current pending gate.
 - The current authority is `docs/audit/audit_report_31.md`.
 - Report 30 technical successor SHA `ed02dbf` passed the full gate and clean same-SHA Ubuntu/Windows actual bundles in [Actions `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414), and Report 31 independently verified the public-visibility and Report 29 technical regressions.
-- Program PASS and publication remain blocked until the Report 31 summary-lifecycle remediation has new dual-OS evidence, an independent PASS, and separate publication approval.
+- Report 31 summary-lifecycle remediation successor SHA `8c042d48` passed the full gate and clean same-SHA Ubuntu/Windows actual bundles in [Actions `32741917348`](https://github.com/Yupkidangju/AIHack/actions/runs/32741917348). Program PASS and publication remain blocked until an independent PASS and separate publication approval.
 - Windows all-target tests use dev-only `portable-pty 0.9.0` ConPTY to exercise real TUI one-key states, mouse input, Inventory/Esc, and terminal restoration; it is not a release-binary dependency.
 - The action-pin gate structurally scans every workflow/composite YAML node and recursively resolves repository-root local actions with dev-only `saphyr 0.0.12`; it is not a release-binary dependency.
 - R9 causal closure connects food/corpse consumption, content-driven armor and monster behavior, price/difficulty/gold/score, and prayer/luck to observable world-state changes. Long runs for seeds 42/7/1234 now require all nine semantic witnesses as well as 1,000 accepted turns and repeatable hashes.
@@ -127,7 +127,7 @@ AIHack は、NetHack 3.6.7 の観察可能な挙動を、出典付きシナリ�
 - report 24 と implementation SHA `2519bc8e` の両 OS CI により report 23/24 の修正は履歴上完了し、report 23 は現在の保留 gate ではありません。
 - 現在の権威は `docs/audit/audit_report_31.md` です。
 - Report 30 の technical successor SHA `ed02dbf` は Actions `32733235414` で全 gate と clean same-SHA Ubuntu/Windows 実 bundle を PASS し、Report 31 は public visibility と Report 29 の技術回帰を独立確認しました。
-- Report 31 summary lifecycle 是正の新しい両 OS 証拠、独立 PASS、別途公開承認までは program PASS と外部公開を保留します。
+- Report 31 summary lifecycle 是正の successor SHA `8c042d48` は Actions `32741917348` で全 gate と clean same-SHA Ubuntu/Windows 実 bundle を PASS しました。独立 PASS と別途公開承認までは program PASS と外部公開を保留します。
 - Windows の all-target test は dev-only `portable-pty 0.9.0` ConPTY で実 TUI の一キー遷移、mouse、Inventory/Esc、terminal 復元を検証し、release binary には含めません。
 - action pin gate は dev-only `saphyr 0.0.12` で全 workflow/composite YAML node と repository-root local action を再帰検査し、release binary には含めません。
 
@@ -154,7 +154,7 @@ AIHack 是以具來源追蹤的情境與測試，重新實作 NetHack 3.6.7 可�
 - report 24 與 implementation SHA `2519bc8e` 的雙作業系統 CI 已在歷史上結束 report 23/24 修正；report 23 不再是目前待處理 gate。
 - 目前權威是 `docs/audit/audit_report_31.md`。
 - Report 30 technical successor SHA `ed02dbf` 的 Actions `32733235414` 已通過完整 gate 與 clean same-SHA Ubuntu/Windows 實際 bundle，Report 31 也獨立驗證 public visibility 與 Report 29 技術回歸。
-- Report 31 summary lifecycle 修正取得新的雙 OS 證據、獨立 PASS 與另行發布核准前，program PASS 與對外發布維持暫停。
+- Report 31 summary lifecycle 修正的 successor SHA `8c042d48` 已在 Actions `32741917348` 通過完整 gate 與 clean same-SHA Ubuntu/Windows 實際 bundle。獨立 PASS 與另行發布核准前，program PASS 與對外發布維持暫停。
 - Windows all-target 測試使用僅供開發的 `portable-pty 0.9.0` ConPTY 驗證實際 TUI 的單鍵狀態、滑鼠、Inventory/Esc 與終端復原，不納入 release binary 相依性。
 - action pin gate 使用僅供開發的 `saphyr 0.0.12` 結構化掃描全部 workflow/composite YAML node，並遞迴解析 repository-root local action，不納入 release binary 相依性。
 
@@ -181,7 +181,7 @@ AIHack 是通过带来源追踪的场景和测试，重新实现 NetHack 3.6.7 �
 - report 24 与 implementation SHA `2519bc8e` 的双操作系统 CI 已在历史上结束 report 23/24 修正；report 23 不再是当前待处理 gate。
 - 当前权威是 `docs/audit/audit_report_31.md`。
 - Report 30 technical successor SHA `ed02dbf` 的 Actions `32733235414` 已通过完整 gate 与 clean same-SHA Ubuntu/Windows 实际 bundle，Report 31 也独立验证了 public visibility 与 Report 29 技术回归。
-- Report 31 summary lifecycle 修正取得新的双 OS 证据、独立 PASS 与另行发布批准前，program PASS 和对外发布保持暂停。
+- Report 31 summary lifecycle 修正的 successor SHA `8c042d48` 已在 Actions `32741917348` 通过完整 gate 与 clean same-SHA Ubuntu/Windows 实际 bundle。独立 PASS 与另行发布批准前，program PASS 和对外发布保持暂停。
 - Windows all-target 测试使用仅供开发的 `portable-pty 0.9.0` ConPTY 验证实际 TUI 的单键状态、鼠标、Inventory/Esc 与终端恢复，不纳入 release binary 依赖。
 - action pin gate 使用仅供开发的 `saphyr 0.0.12` 结构化扫描全部 workflow/composite YAML node，并递归解析 repository-root local action，不纳入 release binary 依赖。
 

@@ -10,7 +10,7 @@
 작성일: 2026-07-15
 목표 버전: 0.3.0
 현재 코드 기준: Cargo package 0.3.0, report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 [Actions `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414) clean same-SHA Ubuntu/Windows actual bundle Verified.
-현재 독립 감사 권위는 `docs/audit/audit_report_31.md`다. implementation summary lifecycle 회귀와 generic negative gate는 전체 local quality gate까지 Verified됐으며, 새 clean same-SHA 양 OS 증거 및 후속 독립 PASS 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 독립 감사 권위는 `docs/audit/audit_report_31.md`다. implementation summary lifecycle 회귀와 generic negative gate는 successor SHA `8c042d48df57621e23a9c2a3406cc6fa68bea0af`의 [Actions `32741917348`](https://github.com/Yupkidangju/AIHack/actions/runs/32741917348)에서 전체 gate와 clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. 후속 독립 PASS와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙

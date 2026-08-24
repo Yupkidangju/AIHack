@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0041: report 31 summary lifecycle과 generic predecessor gate
 
-Status: Implemented with full local gate and clean Windows actual bundle verified; same-SHA Ubuntu/Windows CI pending (2026-08-24)
+Status: Implemented and clean same-SHA Ubuntu/Windows actual bundles verified; independent re-audit pending (2026-08-25)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R31-01
 
@@ -40,7 +40,9 @@ Consequences:
 
 문서 gate는 현재 report 번호와 predecessor lifecycle 상태를 구조적으로 해석한다. summary의 현재 기준, 다음 작업과 R9 이력은 서로 다른 문장이어도 하나의 lifecycle을 가리키며, 완료된 Report 30 기술 증거는 역사적 Verified로만 남는다. RED/GREEN, 전체 gate와 CI 증거는 `docs/audit/audit_report_31_remediation.md`에 기록한다.
 
-Local verification: candidate SHA `f3a7aa662d8820b361c674b37264f3246cc2b7ac`에서 453 named tests, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 379-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. docs evidence successor의 same-SHA Ubuntu/Windows CI는 pending이다.
+Local verification: candidate SHA `f3a7aa662d8820b361c674b37264f3246cc2b7ac`에서 453 named tests, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 379-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. docs evidence successor의 same-SHA 양 OS 결과는 다음 CI verification으로 확정했다.
+
+CI verification: docs evidence successor SHA `8c042d48df57621e23a9c2a3406cc6fa68bea0af`의 Actions `32741917348`에서 Ubuntu job `97478142640`과 Windows job `97478143152`이 각 19 success step과 actual platform bundle을 완료했다. cargo-audit, cargo-deny 0.19.4와 lockfile 불변도 모두 success이며 후속 독립 감사와 외부 게시 승인은 별도다.
 
 ## ADR-0040: report 30 active authority와 submit-only visibility 강제
 

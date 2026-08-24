@@ -6,7 +6,7 @@
 - 작업 브랜치: `codex/audit-report-30-remediation`
 - 작업 일자: 2026-08-24
 - 기술 판정: **successor `ed02dbf/32733235414` clean same-SHA 양 OS actual·independent Verified**
-- 현재 판정: **REPORT 31 implementation-summary lifecycle remediation pending / PROGRAM·PUBLICATION HOLD**
+- 현재 판정: **REPORT 31 implementation-summary lifecycle remediation `8c042d48/32741917348` clean same-SHA 양 OS actual Verified / independent re-audit pending / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. report 29 기술 successor `a91a9c7/32706869079`의 evidence는 보존하되, report 30의 active authority와 public Rust visibility를 별도 RED/GREEN 및 새 same-SHA 양 OS bundle로 검증한다.
 

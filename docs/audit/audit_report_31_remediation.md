@@ -5,7 +5,7 @@
 - 작업 브랜치: `codex/audit-report-31-remediation`
 - 작업 일자: 2026-08-24
 - predecessor 기술 판정: **Report 30/29 표적 회귀 PASS**
-- 현재 판정: **regression RED/GREEN·full local quality gate·candidate clean Windows actual bundle PASS / docs successor same-SHA CI pending / PROGRAM·PUBLICATION HOLD**
+- 현재 판정: **successor `8c042d48/32741917348` clean same-SHA 양 OS actual Verified / independent re-audit pending / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. Report 30 public visibility와 technical successor `ed02dbf/32733235414`, Report 29의 content/allocator/TUI/archive 기술 증거는 역사적 Verified로 보존한다.
 
@@ -105,13 +105,23 @@ PASS Windows release bundle: version=0.3.0 commit=f3a7aa662d8820b361c674b37264f3
 output exact entries=9
 ```
 
-output은 binary 2, license/notice/modification/approval/metadata 문서 5, source ZIP, `SHA256SUMS`의 정확히 9개 entry다. docs evidence successor의 clean Windows 재검증과 same-SHA 양 OS CI는 pending이다.
+output은 binary 2, license/notice/modification/approval/metadata 문서 5, source ZIP, `SHA256SUMS`의 정확히 9개 entry다. docs evidence successor `8c042d48...`의 clean Windows 재검증과 same-SHA 양 OS CI도 아래 7절에서 Verified됐다.
 
 ## 7. clean same-SHA Ubuntu/Windows actual bundle
 
-pending
+최종 기술 evidence successor는 `8c042d48df57621e23a9c2a3406cc6fa68bea0af`이며 [Actions `32741917348`](https://github.com/Yupkidangju/AIHack/actions/runs/32741917348)가 completed/success다.
+
+| Job | ID | 결과 | 시간 | step |
+| --- | ---: | --- | ---: | --- |
+| `ubuntu-latest quality gate` | `97478142640` | PASS | 9m58s | 19 success, Windows bundle 1 skip |
+| `windows-latest quality gate` | `97478143152` | PASS | 23m07s | 19 success, Linux bundle 1 skip |
+
+양 job은 checkout SHA `8c042d48...`에서 metadata/fmt/clippy/all-target tests, external compile contracts, dependency exception/duplicate, R7/R8, release all-target build, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변을 모두 통과했다.
+
+이 결과로 report 31 시정 lifecycle은 `Verified`다. 다만 `Closed`, 전체 PROGRAM PASS와 외부 게시 허가는 새 독립 재감사 및 별도 사용자 승인 전까지 HOLD다.
 
 ## 8. 잔여 경계
 
 - report 31 후속 독립 재감사 전에는 finding을 `Closed` 또는 전체 PROGRAM PASS로 올리지 않는다.
 - actual provider, Windows Terminal GUI, physical key-hold, signing/attestation과 외부 게시 승인은 이번 문서 시정 범위 밖이다.
+- CI Info: pinned `actions/checkout`이 Node.js 20 deprecation annotation을 냈지만 runner가 Node.js 24로 강제 실행했고 양 job은 success였다. workflow pin 갱신은 이번 finding과 분리된 유지보수 항목이다.

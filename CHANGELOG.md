@@ -54,6 +54,7 @@
 - default runtime의 mutating World/system surface를 crate-private로 축소하고 C010 direct-death fixture를 opt-in `testing` feature로 격리했으며 external compile pass/fail 회귀를 추가했다.
 - report 30 successor SHA `ed02dbf`의 Actions `32733235414`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
 - report 31이 재현한 implementation summary 1·10·11절 lifecycle 불일치를 시정 대상으로 등록하고, predecessor current 표현과 완료된 predecessor 구현·CI 재개방을 report 번호 기반 generic negative gate로 차단하도록 계약을 강화했다.
+- report 31 successor SHA `8c042d48`의 Actions `32741917348`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
 - inverse inventory owner/index, actor HP/alive와 armor overflow malformed save가 수용되거나 panic하던 경계를 typed `InvalidSave`로 닫고, writer가 self-unloadable 16 MiB 초과 save를 게시하지 않도록 수정했다.
 - replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
 - Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.

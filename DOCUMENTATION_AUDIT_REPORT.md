@@ -274,4 +274,4 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - report 31이 implementation summary 1·10·11절 lifecycle과 document regression source의 단일 현재 권위다.
 - ADR-0041과 `docs/audit/audit_report_31_remediation.md`가 report 번호 기반 predecessor current/completed-work generic negative gate의 RED/GREEN을 추적한다.
 - Report 30 public visibility와 Report 29 기술 회귀는 독립 Verified다.
-- Report 31 시정의 전체 local quality gate 453 tests와 candidate `f3a7aa6` clean Windows actual bundle은 PASS했다. docs evidence successor의 same-SHA Ubuntu/Windows actual bundle은 pending이며 별도 게시 승인 전까지 program/publication HOLD다.
+- Report 31 시정의 전체 local quality gate 453 tests와 successor `8c042d48/32741917348` clean same-SHA Ubuntu/Windows actual bundle은 Verified됐다. 후속 독립 PASS와 별도 게시 승인 전까지 program/publication HOLD다.
