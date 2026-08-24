@@ -42,10 +42,6 @@ pub fn run_monster_turn(
     Ok(events)
 }
 
-pub fn collect_monster_turn(world: &GameWorld, rng: &mut GameRng) -> MonsterTurnPlan {
-    collect_monster_turn_at(world, rng, 1)
-}
-
 pub fn collect_monster_turn_at(world: &GameWorld, rng: &mut GameRng, turn: u64) -> MonsterTurnPlan {
     MonsterTurnPlan {
         intents: world
@@ -209,4 +205,24 @@ fn melee_intent_is_still_valid(world: &GameWorld, attacker: EntityId, defender: 
 fn manhattan_distance(from: Pos, to: Pos) -> i16 {
     let delta = from.delta_to(to);
     delta.dx.abs() + delta.dy.abs()
+}
+
+#[cfg(test)]
+mod tests {
+    use aihack_core::rng::GameRng;
+
+    use super::collect_monster_turn_at;
+    use crate::world::GameWorld;
+
+    #[test]
+    fn monster_plan_is_seed_deterministic_inside_the_transaction_boundary() {
+        let world = GameWorld::fixture_phase5();
+        let mut first = GameRng::new(42);
+        let mut second = GameRng::new(42);
+
+        assert_eq!(
+            collect_monster_turn_at(&world, &mut first, 1),
+            collect_monster_turn_at(&world, &mut second, 1)
+        );
+    }
 }

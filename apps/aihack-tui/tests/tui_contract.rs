@@ -172,7 +172,7 @@ fn production_dispatcher_prioritizes_game_over_new_run_over_llm_dismiss() {
         Event::Key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE)),
         80,
         24,
-        &app,
+        &mut app,
     );
     assert_eq!(candidate, Some(UiCommandCandidate::NewRun));
 }
@@ -246,7 +246,7 @@ fn inspect_hover_and_decision_presentations_do_not_expose_hidden_inventory_comma
         .unwrap();
     assert!(
         !matches!(
-            runtime_event_to_candidate(click(), 80, 24, &hover),
+            runtime_event_to_candidate(click(), 80, 24, &mut hover),
             Some(UiCommandCandidate::Command(_))
         ),
         "hover presentation must not expose an inventory command"
@@ -265,7 +265,7 @@ fn inspect_hover_and_decision_presentations_do_not_expose_hidden_inventory_comma
     decision.set_decision_suggestion(suggestion, Some(false));
     assert!(
         !matches!(
-            runtime_event_to_candidate(click(), 80, 24, &decision),
+            runtime_event_to_candidate(click(), 80, 24, &mut decision),
             Some(UiCommandCandidate::Command(_))
         ),
         "decision presentation must not expose an inventory command"
@@ -274,7 +274,7 @@ fn inspect_hover_and_decision_presentations_do_not_expose_hidden_inventory_comma
 
 #[test]
 fn llm_request_key_repeat_never_creates_a_new_candidate() {
-    let app = TuiApp::new_with_llm_enabled(
+    let mut app = TuiApp::new_with_llm_enabled(
         GameSession::new_for_playing(42),
         UiRuntimeConfig::default(),
         true,
@@ -283,7 +283,7 @@ fn llm_request_key_repeat_never_creates_a_new_candidate() {
         let repeat =
             KeyEvent::new_with_kind(KeyCode::Char(key), KeyModifiers::NONE, KeyEventKind::Repeat);
         assert_eq!(
-            runtime_event_to_candidate(Event::Key(repeat), 80, 24, &app),
+            runtime_event_to_candidate(Event::Key(repeat), 80, 24, &mut app),
             None,
             "key={key}"
         );
@@ -311,7 +311,7 @@ fn judge_editor_accepts_character_repeat_but_release_never_adds_text() {
                 KeyModifiers::NONE,
                 kind,
             ));
-            if let Some(candidate) = runtime_event_to_candidate(event, 80, 24, &app) {
+            if let Some(candidate) = runtime_event_to_candidate(event, 80, 24, &mut app) {
                 app.handle_candidate_owned(candidate).unwrap();
             }
         }
@@ -324,7 +324,7 @@ fn judge_editor_accepts_character_repeat_but_release_never_adds_text() {
 fn control_key_repeat_does_not_cross_state_boundaries() {
     let key = |code, kind| Event::Key(KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind));
     let dispatch =
-        |app: &TuiApp, code, kind| runtime_event_to_candidate(key(code, kind), 80, 24, app);
+        |app: &mut TuiApp, code, kind| runtime_event_to_candidate(key(code, kind), 80, 24, app);
 
     let mut judge = TuiApp::new_with_llm_enabled(
         GameSession::new_for_playing(42),
@@ -334,20 +334,26 @@ fn control_key_repeat_does_not_cross_state_boundaries() {
     judge
         .handle_candidate_owned(UiCommandCandidate::LlmJudge)
         .unwrap();
-    let cancel = dispatch(&judge, KeyCode::Esc, KeyEventKind::Press).unwrap();
+    let cancel = dispatch(&mut judge, KeyCode::Esc, KeyEventKind::Press).unwrap();
     assert!(!judge.handle_candidate_owned(cancel).unwrap());
     assert_eq!(judge.run_state(), RunState::Playing);
-    assert_eq!(dispatch(&judge, KeyCode::Esc, KeyEventKind::Repeat), None);
-    assert_eq!(dispatch(&judge, KeyCode::Esc, KeyEventKind::Release), None);
+    assert_eq!(
+        dispatch(&mut judge, KeyCode::Esc, KeyEventKind::Repeat),
+        None
+    );
+    assert_eq!(
+        dispatch(&mut judge, KeyCode::Esc, KeyEventKind::Release),
+        None
+    );
 
     let mut inventory = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
     inventory
         .handle_candidate_owned(UiCommandCandidate::Command(CommandIntent::ShowInventory))
         .unwrap();
-    let close = dispatch(&inventory, KeyCode::Esc, KeyEventKind::Press).unwrap();
+    let close = dispatch(&mut inventory, KeyCode::Esc, KeyEventKind::Press).unwrap();
     assert!(!inventory.handle_candidate_owned(close).unwrap());
     assert_eq!(
-        dispatch(&inventory, KeyCode::Esc, KeyEventKind::Repeat),
+        dispatch(&mut inventory, KeyCode::Esc, KeyEventKind::Repeat),
         None
     );
 
@@ -355,9 +361,12 @@ fn control_key_repeat_does_not_cross_state_boundaries() {
     storage
         .handle_candidate_owned(UiCommandCandidate::Load)
         .unwrap();
-    let close = dispatch(&storage, KeyCode::Esc, KeyEventKind::Press).unwrap();
+    let close = dispatch(&mut storage, KeyCode::Esc, KeyEventKind::Press).unwrap();
     assert!(!storage.handle_candidate_owned(close).unwrap());
-    assert_eq!(dispatch(&storage, KeyCode::Esc, KeyEventKind::Repeat), None);
+    assert_eq!(
+        dispatch(&mut storage, KeyCode::Esc, KeyEventKind::Repeat),
+        None
+    );
 
     let mut save = GameSession::new_for_playing(42).to_save_data();
     save.run_state = RunState::MorePrompt;
@@ -365,37 +374,184 @@ fn control_key_repeat_does_not_cross_state_boundaries() {
         GameSession::from_save_data(save).unwrap(),
         UiRuntimeConfig::default(),
     );
-    let acknowledge = dispatch(&more, KeyCode::Esc, KeyEventKind::Press).unwrap();
+    let acknowledge = dispatch(&mut more, KeyCode::Esc, KeyEventKind::Press).unwrap();
     assert!(!more.handle_candidate_owned(acknowledge).unwrap());
     assert_eq!(more.run_state(), RunState::Playing);
-    assert_eq!(dispatch(&more, KeyCode::Esc, KeyEventKind::Repeat), None);
+    assert_eq!(
+        dispatch(&mut more, KeyCode::Esc, KeyEventKind::Repeat),
+        None
+    );
 
     let mut creation = TuiApp::new(
         GameSession::try_new(42).unwrap(),
         UiRuntimeConfig::default(),
     );
-    let enter = dispatch(&creation, KeyCode::Enter, KeyEventKind::Press).unwrap();
+    let enter = dispatch(&mut creation, KeyCode::Enter, KeyEventKind::Press).unwrap();
     assert!(!creation.handle_candidate_owned(enter).unwrap());
     assert_eq!(creation.run_state(), RunState::CharacterCreation);
     assert_eq!(
-        dispatch(&creation, KeyCode::Enter, KeyEventKind::Repeat),
+        dispatch(&mut creation, KeyCode::Enter, KeyEventKind::Repeat),
         None
     );
-    let back = dispatch(&creation, KeyCode::Esc, KeyEventKind::Press).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(550));
+    creation.release_transition_gesture_on_idle();
+    creation.release_transition_gesture_on_idle();
+    let back = dispatch(&mut creation, KeyCode::Esc, KeyEventKind::Press).unwrap();
     assert!(!creation.handle_candidate_owned(back).unwrap());
     assert_eq!(creation.run_state(), RunState::Title);
     assert_eq!(
-        dispatch(&creation, KeyCode::Esc, KeyEventKind::Repeat),
+        dispatch(&mut creation, KeyCode::Esc, KeyEventKind::Repeat),
         None
     );
 
-    let undersized = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    let mut undersized = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
     for code in [KeyCode::Esc, KeyCode::Char('q'), KeyCode::Char('Q')] {
         assert_eq!(
-            runtime_event_to_candidate(key(code, KeyEventKind::Repeat), 40, 10, &undersized),
+            runtime_event_to_candidate(key(code, KeyEventKind::Repeat), 40, 10, &mut undersized,),
             None
         );
     }
+}
+
+#[test]
+fn equivalent_transition_keys_do_not_cross_state_on_repeat_or_adjacent_press() {
+    let event = |code, kind| Event::Key(KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind));
+    let dispatch =
+        |app: &mut TuiApp, code, kind| runtime_event_to_candidate(event(code, kind), 80, 24, app);
+
+    let mut load = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    load.quick_save().unwrap();
+    load.handle_candidate_owned(UiCommandCandidate::BackToTitle)
+        .unwrap();
+    let candidate = dispatch(&mut load, KeyCode::Char('l'), KeyEventKind::Press).unwrap();
+    load.handle_candidate_owned(candidate).unwrap();
+    assert_eq!(load.run_state(), RunState::Playing);
+    let revision = load.revision();
+    assert_eq!(
+        dispatch(&mut load, KeyCode::Char('l'), KeyEventKind::Repeat),
+        None
+    );
+    assert_eq!(
+        dispatch(&mut load, KeyCode::Char('l'), KeyEventKind::Press),
+        None
+    );
+    assert_eq!(load.revision(), revision);
+    load.release_transition_gesture_on_idle();
+    assert_eq!(
+        dispatch(&mut load, KeyCode::Char('l'), KeyEventKind::Press),
+        None
+    );
+    std::thread::sleep(std::time::Duration::from_millis(550));
+    load.release_transition_gesture_on_idle();
+    load.release_transition_gesture_on_idle();
+    assert!(matches!(
+        dispatch(&mut load, KeyCode::Char('l'), KeyEventKind::Press),
+        Some(UiCommandCandidate::Command(CommandIntent::Move(
+            Direction::East
+        )))
+    ));
+
+    let mut inventory = TuiApp::new(GameSession::new_for_playing(42), UiRuntimeConfig::default());
+    let candidate = dispatch(&mut inventory, KeyCode::Char('i'), KeyEventKind::Press).unwrap();
+    inventory.handle_candidate_owned(candidate).unwrap();
+    assert_eq!(
+        dispatch(&mut inventory, KeyCode::Char('i'), KeyEventKind::Repeat),
+        None
+    );
+    assert_eq!(
+        dispatch(&mut inventory, KeyCode::Char('i'), KeyEventKind::Press),
+        None
+    );
+
+    let mut save = GameSession::new_for_playing(42).to_save_data();
+    save.run_state = RunState::MorePrompt;
+    let mut more = TuiApp::new(
+        GameSession::from_save_data(save).unwrap(),
+        UiRuntimeConfig::default(),
+    );
+    let candidate = dispatch(&mut more, KeyCode::Char('i'), KeyEventKind::Press).unwrap();
+    more.handle_candidate_owned(candidate).unwrap();
+    assert_eq!(more.run_state(), RunState::Playing);
+    assert_eq!(
+        dispatch(&mut more, KeyCode::Char('i'), KeyEventKind::Repeat),
+        None
+    );
+
+    let mut selection = GameSession::new_for_playing(42).to_save_data();
+    selection.run_state = RunState::AwaitingInventorySelection {
+        action: InventoryAction::Drop,
+    };
+    let mut selection = TuiApp::new(
+        GameSession::from_save_data(selection).unwrap(),
+        UiRuntimeConfig::default(),
+    );
+    let candidate = dispatch(&mut selection, KeyCode::Char('b'), KeyEventKind::Press).unwrap();
+    selection.handle_candidate_owned(candidate).unwrap();
+    assert_eq!(selection.run_state(), RunState::Playing);
+    assert_eq!(
+        dispatch(&mut selection, KeyCode::Char('b'), KeyEventKind::Repeat),
+        None
+    );
+
+    let mut direction = GameSession::new_for_playing(42).to_save_data();
+    direction.run_state = RunState::AwaitingDirection {
+        action: aihack_ai_contract::DirectionalAction::Open,
+    };
+    let mut direction = TuiApp::new(
+        GameSession::from_save_data(direction).unwrap(),
+        UiRuntimeConfig::default(),
+    );
+    let candidate = dispatch(&mut direction, KeyCode::Char('l'), KeyEventKind::Press).unwrap();
+    direction.handle_candidate_owned(candidate).unwrap();
+    assert_eq!(direction.run_state(), RunState::Playing);
+    assert_eq!(
+        dispatch(&mut direction, KeyCode::Char('l'), KeyEventKind::Repeat),
+        None
+    );
+
+    let mut llm = TuiApp::new_with_llm_enabled(
+        GameSession::new_for_playing(42),
+        UiRuntimeConfig::default(),
+        true,
+    );
+    let candidate = dispatch(&mut llm, KeyCode::Char('G'), KeyEventKind::Press).unwrap();
+    llm.handle_candidate_owned(candidate).unwrap();
+    assert_eq!(
+        dispatch(&mut llm, KeyCode::Char('G'), KeyEventKind::Repeat),
+        None
+    );
+    assert_eq!(
+        dispatch(&mut llm, KeyCode::Char('G'), KeyEventKind::Press),
+        None
+    );
+
+    let mut game_over_session = GameSession::new_for_playing(42);
+    assert!(game_over_session.submit(CommandIntent::Quit).accepted);
+    let mut game_over = TuiApp::new(game_over_session, UiRuntimeConfig::default());
+    let quit = dispatch(&mut game_over, KeyCode::Char('q'), KeyEventKind::Press).unwrap();
+    assert!(game_over.handle_candidate_owned(quit).unwrap());
+    assert_eq!(
+        dispatch(&mut game_over, KeyCode::Char('q'), KeyEventKind::Repeat),
+        None
+    );
+
+    let mut creation = TuiApp::new(
+        GameSession::try_new(42).unwrap(),
+        UiRuntimeConfig::default(),
+    );
+    let first = dispatch(&mut creation, KeyCode::Enter, KeyEventKind::Press).unwrap();
+    creation.handle_candidate_owned(first).unwrap();
+    assert_eq!(creation.run_state(), RunState::CharacterCreation);
+    assert_eq!(
+        dispatch(&mut creation, KeyCode::Enter, KeyEventKind::Release),
+        None
+    );
+    std::thread::sleep(std::time::Duration::from_millis(550));
+    creation.release_transition_gesture_on_idle();
+    creation.release_transition_gesture_on_idle();
+    let second = dispatch(&mut creation, KeyCode::Enter, KeyEventKind::Press).unwrap();
+    creation.handle_candidate_owned(second).unwrap();
+    assert_eq!(creation.run_state(), RunState::Playing);
 }
 
 #[test]
@@ -410,21 +566,24 @@ fn f9_press_uses_the_actual_dispatch_and_handler_without_changing_core_revision(
         ))
     };
 
-    let candidate = runtime_event_to_candidate(f9(KeyEventKind::Press), 80, 24, &app);
+    let candidate = runtime_event_to_candidate(f9(KeyEventKind::Press), 80, 24, &mut app);
     assert_eq!(candidate, Some(UiCommandCandidate::ToggleDebug));
     assert!(!app.handle_candidate_owned(candidate.unwrap()).unwrap());
     assert!(app.debug_observation_visible);
     assert_eq!(app.revision(), before);
     assert_eq!(
-        runtime_event_to_candidate(f9(KeyEventKind::Repeat), 80, 24, &app),
+        runtime_event_to_candidate(f9(KeyEventKind::Repeat), 80, 24, &mut app),
         None
     );
     assert_eq!(
-        runtime_event_to_candidate(f9(KeyEventKind::Release), 80, 24, &app),
+        runtime_event_to_candidate(f9(KeyEventKind::Release), 80, 24, &mut app),
         None
     );
 
-    let candidate = runtime_event_to_candidate(f9(KeyEventKind::Press), 80, 24, &app).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(550));
+    app.release_transition_gesture_on_idle();
+    app.release_transition_gesture_on_idle();
+    let candidate = runtime_event_to_candidate(f9(KeyEventKind::Press), 80, 24, &mut app).unwrap();
     assert!(!app.handle_candidate_owned(candidate).unwrap());
     assert!(!app.debug_observation_visible);
     assert_eq!(app.revision(), before);
@@ -444,14 +603,14 @@ fn visible_debug_panel_consumes_mouse_while_hidden_panel_preserves_map_hit_testi
     };
 
     assert!(matches!(
-        runtime_event_to_candidate(event(), 80, 24, &app),
+        runtime_event_to_candidate(event(), 80, 24, &mut app),
         Some(UiCommandCandidate::Command(CommandIntent::Move(
             Direction::East
         )))
     ));
     let revision = app.revision();
     app.debug_observation_visible = true;
-    assert_eq!(runtime_event_to_candidate(event(), 80, 24, &app), None);
+    assert_eq!(runtime_event_to_candidate(event(), 80, 24, &mut app), None);
     assert_eq!(app.revision(), revision);
 }
 

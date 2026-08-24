@@ -5,6 +5,7 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 OUTPUT_DIR=${1:-"$ROOT/output"}
 EXPECTED_COMMIT=${2:-$(git -C "$ROOT" rev-parse HEAD)}
 EXPECTED_CANDIDATE_DATE=${3:-$(git -C "$ROOT" show -s --format=%cs "$EXPECTED_COMMIT")}
+REPOSITORY_ROOT=${4:-$ROOT}
 ARCHIVE="$OUTPUT_DIR/aihack-0.3.0-source.tar.gz"
 OWNER_APPROVAL_ID="AIHACK-OWNER-2026-07-20-NGPL-01"
 MODIFICATION_NOTICE_ID="AIHACK-MODIFICATIONS-2026-08-24-01"
@@ -13,6 +14,14 @@ fail() {
     printf '%s\n' "$1" >&2
     exit 1
 }
+
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON=python3
+elif command -v python >/dev/null 2>&1; then
+    PYTHON=python
+else
+    fail 'Python 3 is required for source archive verification'
+fi
 
 require_text() {
     local content=$1 needle=$2 label=$3
@@ -126,6 +135,13 @@ done
 for file in LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md RELEASE-METADATA Cargo.toml; do
     tar -tzf "$ARCHIVE" "$file" >/dev/null
 done
+
+"$PYTHON" "$ROOT/scripts/verify_source_archive.py" \
+    --archive "$ARCHIVE" \
+    --format tar.gz \
+    --repository-root "$REPOSITORY_ROOT" \
+    --expected-commit "$EXPECTED_COMMIT" \
+    || fail 'source archive raw/type/extraction/ExpectedCommit verification failed'
 
 archive_listing=$(tar -tzf "$ARCHIVE") \
     || fail 'source archive listing failed'

@@ -31,6 +31,8 @@
 - CI action pin gate가 repository-root local composite action의 metadata를 cycle-safe 재귀 검사하도록 확장했다.
 - entity spawn API를 checked/fallible allocation으로 전환하고 rejected transaction이 working state를 commit하지 않도록 강화했다.
 - TUI text-edit Repeat와 Esc/Enter/F9/Q transition control-key의 Press-only 정책을 분리했다.
+- report 29 계약에 따라 item ID가 canonical declared kind/class를 강제하도록 결정하고, public mutation API를 atomic `GameSession::submit`으로 한정했다.
+- transition 입력을 key blocklist가 아닌 Release/queue-idle gesture lifecycle로, corresponding source를 metadata 문자열이 아닌 `ExpectedCommit` complete archive identity로 검증하도록 계약을 강화했다.
 
 ### Fixed
 
@@ -42,6 +44,10 @@
 - malformed save panic/모호한 entity 수용, forged replay 성공, injected registry corpse drift와 armor drop AC 누적을 수정했다.
 - TUI quick-save ambient path, dead inventory affordance, 전역 Esc quit, theme/mouse 미연결과 terminal cleanup short-circuit를 수정했다.
 - Windows bundle의 legacy include, metadata/record 불일치, zero-size, duplicate/wrong checksum fail-open 경로를 수정했다.
+- report 29가 재현한 TUI 동등 transition, archive raw component/type/extraction, complete-source substitution과 document-wide current-authority false-green을 시정 대상으로 등록했다.
+- transition gesture를 합성 Release 비신뢰·500ms quiet+2 idle gate로 구현하고 Load/Inventory/MorePrompt/selection/LLM/GameOver/F9와 actual ConPTY repeated-byte 회귀를 추가했다.
+- ZIP/TAR 공통 raw name/type/prefix validator, safe temporary extraction과 `ExpectedCommit` 독립 `git archive` byte identity를 양 release verifier에 연결했다.
+- known item ID-kind mismatch와 empty/multi-scalar glyph를 registry에서 거부하고 projectile/monster mutating system을 crate 내부 transaction primitive로 축소했다.
 - inverse inventory owner/index, actor HP/alive와 armor overflow malformed save가 수용되거나 panic하던 경계를 typed `InvalidSave`로 닫고, writer가 self-unloadable 16 MiB 초과 save를 게시하지 않도록 수정했다.
 - replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
 - Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.

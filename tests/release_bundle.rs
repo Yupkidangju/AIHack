@@ -252,6 +252,7 @@ impl BundleFixture {
             .arg(self.root.join("output"))
             .arg(&self.commit)
             .arg(candidate_date)
+            .arg(&self.root)
             .output()
             .unwrap()
     }

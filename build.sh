@@ -127,7 +127,7 @@ if [ "$BUILD_TYPE" = "release" ]; then
             RELEASE-METADATA \
             "${source_archive##*/}" >SHA256SUMS
     )
-    "$ROOT/scripts/verify_release_bundle.sh" "$PACKAGE_DIR" "$release_commit" "$candidate_date"
+    "$ROOT/scripts/verify_release_bundle.sh" "$PACKAGE_DIR" "$release_commit" "$candidate_date" "$ROOT"
 
     if [[ -d "$ROOT/$OUTPUT_DIR" ]]; then
         BACKUP_DIR="$ROOT/.release-old.$RANDOM.$RANDOM"

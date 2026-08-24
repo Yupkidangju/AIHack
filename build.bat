@@ -116,7 +116,7 @@ if "!BUILD_TYPE!"=="release" (
     if errorlevel 1 goto build_fail
     powershell -NoProfile -Command "function Hash([string]$path){$stream=[IO.File]::OpenRead($path);try{$sha=[Security.Cryptography.SHA256]::Create();try{return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose()}}finally{$stream.Dispose()}}; $names=@('aihack.exe','aihack-headless.exe','LICENSE','NOTICE','MODIFICATIONS.md','PROJECT_OWNER_LICENSE_APPROVAL.md','RELEASE-METADATA','aihack-0.3.0-source.zip'); $lines=foreach($name in $names){(Hash (Join-Path '!PACKAGE_DIR!' $name))+'  '+$name}; Set-Content -Encoding Ascii (Join-Path '!PACKAGE_DIR!' 'SHA256SUMS') $lines"
     if errorlevel 1 goto build_fail
-    powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\verify_release_bundle.ps1" -OutputDir "!PACKAGE_DIR!" -ExpectedCommit "!RELEASE_COMMIT!" -ExpectedCandidateDate "!CANDIDATE_DATE!"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\verify_release_bundle.ps1" -OutputDir "!PACKAGE_DIR!" -ExpectedCommit "!RELEASE_COMMIT!" -ExpectedCandidateDate "!CANDIDATE_DATE!" -RepositoryRoot "%CD%"
     if errorlevel 1 goto build_fail
     powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\release_staging.ps1" -Mode Promote -Root "%CD%" -OutputDir "%OUTPUT_DIR%" -Stage "!STAGING_DIR!"
     if errorlevel 1 goto build_fail

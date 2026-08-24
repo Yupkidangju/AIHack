@@ -385,7 +385,7 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 [Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)은 Ubuntu/Windows test, canonical R7/R8, release build/bundle, cargo-audit, cargo-deny와 lockfile 불변을 모두 PASS했다.
 
-final multi-audit report 1은 역사적 근거이고 report 25 `b732c42d/32650404618`은 partial evidence, report 26은 successor 계보로 보존한다. report 27 predecessor `ea7822a5/32683076204`는 양 OS Verified됐다. 현재 최상위 권위는 allocator/custom registry/equipment removal, control-key/F9 evidence, Windows archive alias와 year parity를 재현한 `docs/audit/audit_report_28.md`다. report 28 표적 RED/GREEN은 `docs/audit/audit_report_28_remediation.md`에 보존하며 전체 gate/새 CI와 독립 감사 전에는 전체 program PASS로 전환하지 않는다.
+final multi-audit report 1은 역사적 근거이고 report 25 `b732c42d/32650404618`은 partial evidence, report 26~28은 successor 계보로 보존한다. report 28 시정 `9725c378/32694375654`는 당시 전체 gate와 양 OS actual bundle이 Verified됐지만, 현재 최상위 권위 `docs/audit/audit_report_29.md`가 TUI 동등 transition, archive raw type/extraction, `ExpectedCommit` complete tree, document-wide authority, item ID-kind/glyph, allocator fixture와 public atomicity를 재개방했다. ADR-0039 계약과 표적 RED/GREEN은 `docs/audit/audit_report_29_remediation.md`에 기록하며 전체 local gate, 새 clean same-SHA CI와 독립 감사 전에는 전체 program PASS로 전환하지 않는다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -462,5 +462,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: report 28 시정 SHA `9725c378/32694375654`까지 전체 local gate와 clean same-SHA 양 OS actual bundle이 Verified됐다. 후속 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
-현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 종결했다. current authority는 `docs/audit/audit_report_28.md`이며 `docs/audit/audit_report_28_remediation.md`가 `9725c378/32694375654` evidence를 기록한다. 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.
+현재 구현 판정: report 28 시정 SHA `9725c378/32694375654`까지의 역사적 gate는 Verified다. report 29 finding은 ADR-0039 구현과 표적 GREEN까지 완료했고 전체 local gate·새 CI는 pending이다. 후속 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 역사적으로 종결했다. 단일 current authority는 `docs/audit/audit_report_29.md`이며 current remediation은 `docs/audit/audit_report_29_remediation.md`다. predecessor report/SHA/run은 명시적 historical section에서만 허용하고 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.

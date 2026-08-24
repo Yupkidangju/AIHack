@@ -15,9 +15,9 @@
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
-현재 권위는 report 27 구현 `ea7822a5/32683076204`와 docs successor `01b2bd3/32684490662`를 adversarial probe로 다시 HOLD한 `docs/audit/audit_report_28.md`다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26 successor 계보는 historical evidence로 보존한다. report 28 시정은 allocator exact successor/fallible spawn, custom registry/equipment removal, TUI control-key/F9, Windows-compatible archive component와 year parity를 ADR-0038 계약에 따라 정렬했고 구현 SHA는 `9725c37896a8d149be5c500cdd26da154ab0a3fa`다.
+현재 권위는 report 28 시정/current docs SHA를 adversarial probe로 다시 HOLD한 `docs/audit/audit_report_29.md`다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~28 successor 계보는 historical evidence로 보존한다. report 28 시정은 allocator exact successor/fallible spawn, custom registry/equipment removal, 명시 control-key/F9, classic Windows archive alias와 year parity를 ADR-0038에 따라 구현했고 SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`/Actions `32694375654`에서 양 OS Verified됐지만 report 29가 동등 transition, complete-source와 문서 권위를 다시 열었다.
 
-report 27 evidence는 `docs/audit/audit_report_27_remediation.md`에 보존한다. report 28의 adversarial RED, 두 번의 전체 local run과 SHA `9725c378`의 Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle은 `docs/audit/audit_report_28_remediation.md`에 기록했다. 구현은 Verified지만 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+report 27/28 evidence는 각 remediation 문서에 역사적으로 보존한다. report 29 시정은 ADR-0039에 따라 transition gesture, format-aware archive/extraction과 `ExpectedCommit` complete identity, document-wide authority, canonical item ID-kind/glyph, allocator valid-exhaustion과 public atomic boundary를 구현하고 표적 GREEN까지 완료했다. `docs/audit/audit_report_29_remediation.md`에 RED/GREEN과 새 SHA/CI를 기록하며 현재 전체 local gate와 CI는 pending이므로 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -55,11 +55,11 @@ LLM은 마지막 presentation branch에서만 호출한다. core turn은 LLM 응
 | 경로 | 현재 책임 |
 | --- | --- |
 | `crates/aihack-core/src/*` | 순수 domain, 결정론 규칙, generic state/save/transaction primitive |
-| `crates/aihack-content/src/*` | embedded schema, TOML asset, registry 검증 |
+| `crates/aihack-content/src/*` | embedded schema, canonical item ID-kind/glyph, TOML asset, registry 검증 |
 | `crates/aihack-ai-contract/src/*` | read-only Observation/ActionSpace/ClientRevision 계약 |
 | `crates/aihack-llm/src/*` | loopback transport, strict response validation, bounded worker, provider fallback와 R6 decision scaffold |
-| `crates/aihack-runtime/src/*` | content-aware world/session/system, production score pair, projection, bounded save/replay `ArtifactStore` I/O |
-| `apps/aihack-tui/src/*` | Observation render, 단일 state-aware event dispatcher, render-derived CTA geometry, terminal lifecycle, `aihack` binary |
+| `crates/aihack-runtime/src/*` | content-aware world/session, crate-internal mutating system primitive, public atomic submit, production score pair, projection, bounded save/replay `ArtifactStore` I/O |
+| `apps/aihack-tui/src/*` | Observation render, 합성 Release 비신뢰·500ms quiet+2회 연속 queue-idle transition gesture dispatcher, render-derived CTA geometry, terminal lifecycle, `aihack` binary |
 | `apps/aihack-headless/src/*` | policy 실행, normalized/file-identity replay guard, report/replay CLI, `aihack-headless` binary |
 | `src/*` | 기존 public module path를 유지하는 root compatibility facade |
 | `tests/support/*` | 공개 필드 대입을 대체하는 fixture builder |
@@ -923,7 +923,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/audit/audit_report_28.md` 시정의 새 독립 재감사다. 전체 local gate와 clean same-SHA 양 OS actual bundle은 `9725c378/32694375654`에서 Verified됐다. report 27 predecessor와 project-owner NGPL approval은 유지되며 외부 게시는 새 independent PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `docs/audit/audit_report_29.md`의 ADR-0039 구현, 전체 local gate와 새 clean same-SHA 양 OS actual bundle이다. `9725c378/32694375654`는 report 28 historical evidence로 유지하며 외부 게시는 report 29 시정의 independent PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 2026-08-18 `audit_report_23.md` 시정은 문서 우선으로 시작한다. 첫 slice인 SEC-F001은 ADR-0032와 `spec.md` 14·16절을 구현 권한으로 삼아 `ArtifactStore` capability root, no-follow/single-link open, `create_new` save temp, 실행별 TUI quick-save 경계를 구현한다. 회귀 기준은 사전 배치 temp hard link와 replay symlink/hard link가 외부 victim을 바꾸지 않고, 기존 save 보존과 정상 save/load/replay가 함께 통과하는 것이다. 완료 표시는 표적 테스트와 workspace 검증 후에만 갱신한다.
 
@@ -931,7 +931,7 @@ DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.
 
 ## 11. R9 콘텐츠 인과 폐쇄 Task
 
-역사 기록 (2026-08-18~24): R9 causal field-only A/B와 나머지 8개 record equality는 report 27 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했고 `9725c378/32694375654`에서 해당 시정도 양 OS Verified됐다. 후속 독립 재감사 전에는 전체 program PASS를 선언하지 않는다.
+역사 기록 (2026-08-18~24): R9 causal field-only A/B와 나머지 8개 record equality는 report 27 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했고 `9725c378/32694375654`에서 해당 시정도 양 OS Verified됐다. report 29가 현재 authority이며 ADR-0039 시정과 후속 독립 재감사 전에는 전체 program PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 

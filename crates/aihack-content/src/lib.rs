@@ -184,14 +184,17 @@ pub fn item_data_from_registry(
             })
         }
     };
-    let glyph = definition
-        .glyph
-        .chars()
-        .next()
-        .ok_or_else(|| ContentError::Parse {
+    let mut glyphs = definition.glyph.chars();
+    let glyph = glyphs.next().ok_or_else(|| ContentError::Parse {
+        file: id.to_owned(),
+        message: "glyph must contain exactly one Unicode scalar".to_owned(),
+    })?;
+    if glyphs.next().is_some() {
+        return Err(ContentError::Parse {
             file: id.to_owned(),
-            message: "glyph must contain one character".to_owned(),
-        })?;
+            message: "glyph must contain exactly one Unicode scalar".to_owned(),
+        });
+    }
     let attack_profile = definition
         .damage
         .as_deref()

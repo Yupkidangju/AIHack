@@ -5,7 +5,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ExpectedCommit,
     [Parameter(Mandatory = $true)]
-    [string]$ExpectedCandidateDate
+    [string]$ExpectedCandidateDate,
+    [string]$RepositoryRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +23,9 @@ $ChecksumNames = @(
     'RELEASE-METADATA',
     $ArchiveName
 )
+if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
+    $RepositoryRoot = Split-Path -Parent $PSScriptRoot
+}
 
 function Fail([string]$Message) {
     throw $Message
@@ -203,6 +207,21 @@ foreach ($name in @('LICENSE', 'NOTICE', 'MODIFICATIONS.md', 'PROJECT_OWNER_LICE
     if ($archiveEntries -cnotcontains $name) {
         Fail "source archive required entry missing: $name"
     }
+}
+$python = Get-Command python -ErrorAction SilentlyContinue
+if ($null -eq $python) {
+    $python = Get-Command python3 -ErrorAction SilentlyContinue
+}
+if ($null -eq $python) {
+    Fail 'Python 3 is required for source archive verification'
+}
+& $python.Source (Join-Path $PSScriptRoot 'verify_source_archive.py') `
+    --archive $Archive `
+    --format zip `
+    --repository-root $RepositoryRoot `
+    --expected-commit $ExpectedCommit
+if ($LASTEXITCODE -ne 0) {
+    Fail 'source archive raw/type/extraction/ExpectedCommit verification failed'
 }
 $archiveCanonicalEntries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($entry in $archiveEntries) {

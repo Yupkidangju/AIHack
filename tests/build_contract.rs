@@ -232,8 +232,22 @@ fn build_scripts_use_locked_commands_and_fail_on_missing_artifacts() {
     assert!(linux.contains("mktemp -d"));
     assert!(linux.contains("release-stage"));
     assert!(linux.contains("verify_release_bundle.sh\" \"$PACKAGE_DIR"));
+    assert!(linux.contains("\"$ROOT/scripts/verify_release_bundle.sh\" \"$PACKAGE_DIR\" \"$release_commit\" \"$candidate_date\" \"$ROOT\""));
     assert!(windows.contains("release_staging.ps1"));
     assert!(windows.contains("-Mode Promote"));
+    assert!(windows.contains("-RepositoryRoot \"%CD%\""));
+    let source_validator = read_project_file("scripts/verify_source_archive.py");
+    for boundary in [
+        "canonical_entry_name",
+        "safe_extraction_check",
+        "verify_expected_commit",
+        "byte-identical",
+    ] {
+        assert!(
+            source_validator.contains(boundary),
+            "archive boundary 누락: {boundary}"
+        );
+    }
     assert!(read_project_file("scripts/release_staging.ps1").contains(".release-stage-"));
 
     assert!(

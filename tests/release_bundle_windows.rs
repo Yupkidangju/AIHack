@@ -8,7 +8,6 @@ use std::{
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
-const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
 const CANDIDATE_DATE: &str = "2026-08-24";
 
 #[derive(Clone, Copy, Debug)]
@@ -49,6 +48,7 @@ enum Fault {
 struct Fixture {
     root: PathBuf,
     candidate_date: String,
+    commit: String,
 }
 
 impl Fixture {
@@ -70,6 +70,10 @@ impl Fixture {
             "Cargo.toml",
         ] {
             fs::copy(project_path(name), source.join(name)).unwrap();
+            let normalized = fs::read_to_string(source.join(name))
+                .unwrap()
+                .replace("\r\n", "\n");
+            fs::write(source.join(name), normalized).unwrap();
         }
         let candidate_date = match fault {
             Fault::InvalidCandidateDate => "2026-02-30",
@@ -79,9 +83,14 @@ impl Fixture {
             _ => CANDIDATE_DATE,
         };
         let metadata = format!(
-            "product=AIHack\nversion=0.3.0\ncommit={COMMIT}\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
+            "product=AIHack\nversion=0.3.0\ncommit=$Format:%H$\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-24-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
         );
         fs::write(source.join("RELEASE-METADATA"), &metadata).unwrap();
+        fs::write(
+            source.join(".gitattributes"),
+            "* text eol=lf\nRELEASE-METADATA export-subst\n",
+        )
+        .unwrap();
         if matches!(fault, Fault::StaleModificationPeriod) {
             let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
                 .unwrap()
@@ -136,22 +145,52 @@ impl Fixture {
             )
             .unwrap();
         }
-
-        let mut archive_names = vec![
-            "LICENSE",
-            "NOTICE",
-            "MODIFICATIONS.md",
-            "PROJECT_OWNER_LICENSE_APPROVAL.md",
-            "RELEASE-METADATA",
-            "Cargo.toml",
-        ];
-        if matches!(fault, Fault::IncludedLegacy) {
-            archive_names.push("legacy_nethack_port_reference");
+        if matches!(fault, Fault::SimilarLegacyName) {
+            fs::create_dir_all(source.join("legacy_nethack_port_reference_backup")).unwrap();
+            fs::write(
+                source.join("legacy_nethack_port_reference_backup/probe.txt"),
+                "allowed similar name\n",
+            )
+            .unwrap();
         }
+
+        for args in [
+            &["init", "-q"][..],
+            &["config", "user.name", "AIHack release test"][..],
+            &["config", "user.email", "release-test@invalid"][..],
+            &["add", "."][..],
+        ] {
+            let status = Command::new("git")
+                .args(args)
+                .current_dir(&source)
+                .status()
+                .unwrap();
+            assert!(status.success(), "git fixture command failed: {args:?}");
+        }
+        let status = Command::new("git")
+            .args(["commit", "-qm", "release fixture"])
+            .env("GIT_AUTHOR_DATE", "2026-08-24T12:00:00+09:00")
+            .env("GIT_COMMITTER_DATE", "2026-08-24T12:00:00+09:00")
+            .current_dir(&source)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let commit = String::from_utf8(
+            Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&source)
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_owned();
         let archive = output.join("aihack-0.3.0-source.zip");
-        let status = Command::new("tar")
-            .args(["-a", "-cf", archive.to_str().unwrap()])
-            .args(&archive_names)
+        let status = Command::new("git")
+            .args(["archive", "--format=zip"])
+            .arg(format!("--output={}", archive.display()))
+            .arg("HEAD")
             .current_dir(&source)
             .status()
             .unwrap();
@@ -168,7 +207,6 @@ impl Fixture {
             Fault::TrailingSpaceLegacyAlias => Some("legacy_nethack_port_reference /probe.txt"),
             Fault::ReservedDeviceAlias => Some("CON/probe.txt"),
             Fault::CaseCollisionAlias => Some("license"),
-            Fault::SimilarLegacyName => Some("legacy_nethack_port_reference_backup/probe.txt"),
             _ => None,
         };
         if let Some(archive_alias) = archive_alias {
@@ -190,7 +228,8 @@ impl Fixture {
         ] {
             fs::copy(source.join(name), output.join(name)).unwrap();
         }
-        fs::write(output.join("RELEASE-METADATA"), &metadata).unwrap();
+        let output_metadata = metadata.replace("$Format:%H$", &commit);
+        fs::write(output.join("RELEASE-METADATA"), &output_metadata).unwrap();
         fs::write(output.join("aihack.exe"), "fixture tui\n").unwrap();
         fs::write(output.join("aihack-headless.exe"), "fixture headless\n").unwrap();
 
@@ -198,7 +237,7 @@ impl Fixture {
             Fault::DuplicateMetadata => {
                 fs::write(
                     output.join("RELEASE-METADATA"),
-                    format!("{metadata}owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"),
+                    format!("{output_metadata}owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"),
                 )
                 .unwrap();
             }
@@ -244,6 +283,7 @@ impl Fixture {
         Self {
             root,
             candidate_date: candidate_date.to_string(),
+            commit,
         }
     }
 
@@ -260,9 +300,11 @@ impl Fixture {
                 "-OutputDir",
                 self.root.join("output").to_str().unwrap(),
                 "-ExpectedCommit",
-                COMMIT,
+                &self.commit,
                 "-ExpectedCandidateDate",
                 &self.candidate_date,
+                "-RepositoryRoot",
+                self.root.join("source").to_str().unwrap(),
             ])
             .output()
             .unwrap()

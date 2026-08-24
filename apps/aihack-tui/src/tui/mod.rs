@@ -7,7 +7,8 @@ use std::{
 use crossterm::{
     cursor,
     event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseEventKind,
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+        MouseEventKind,
     },
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -120,6 +121,48 @@ pub use viewport::Viewport;
 
 pub const MIN_TERMINAL_WIDTH: u16 = 60;
 pub const MIN_TERMINAL_HEIGHT: u16 = 24;
+const TRANSITION_GESTURE_QUIET_WINDOW: Duration = Duration::from_millis(500);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct KeyGesture {
+    code: KeyCode,
+}
+
+impl KeyGesture {
+    fn from_event(event: &KeyEvent) -> Self {
+        Self { code: event.code }
+    }
+
+    fn matches(&self, event: &KeyEvent) -> bool {
+        logical_key_codes_match(self.code, event.code)
+    }
+}
+
+fn logical_key_codes_match(left: KeyCode, right: KeyCode) -> bool {
+    if left == right {
+        return true;
+    }
+    matches!(
+        (left, right),
+        (
+            KeyCode::Enter | KeyCode::Char('\r' | '\n'),
+            KeyCode::Enter | KeyCode::Char('\r' | '\n')
+        ) | (
+            KeyCode::Esc | KeyCode::Char('\u{1b}'),
+            KeyCode::Esc | KeyCode::Char('\u{1b}')
+        ) | (
+            KeyCode::Backspace | KeyCode::Char('\u{7f}'),
+            KeyCode::Backspace | KeyCode::Char('\u{7f}')
+        )
+    )
+}
+
+#[derive(Debug, Default)]
+struct TransitionGestureGate {
+    blocked: Option<KeyGesture>,
+    consecutive_idle_polls: u8,
+    blocked_until: Option<Duration>,
+}
 
 pub fn terminal_size_supported(width: u16, height: u16) -> bool {
     width >= MIN_TERMINAL_WIDTH && height >= MIN_TERMINAL_HEIGHT
@@ -207,6 +250,7 @@ pub struct TuiApp {
     /// 마지막으로 라벨을 업데이트한 턴 번호다.
     /// 턴이 진행될 때만 새 라벨을 수집한다.
     pub last_label_update_turn: u64,
+    transition_gesture: TransitionGestureGate,
 }
 
 impl TuiApp {
@@ -270,6 +314,7 @@ impl TuiApp {
             debug_observation_visible: false,
             active_labels: Vec::new(),
             last_label_update_turn: 0,
+            transition_gesture: TransitionGestureGate::default(),
         }
     }
 
@@ -914,6 +959,85 @@ impl TuiApp {
             }
         }
     }
+
+    /// 합성 Release를 독립 gesture로 신뢰할 수 없는 transport에서 quiet/drain을 종료 조건으로 쓴다.
+    pub fn release_transition_gesture_on_idle(&mut self) {
+        if self.transition_gesture.blocked.is_none() {
+            self.transition_gesture.consecutive_idle_polls = 0;
+            return;
+        }
+        self.transition_gesture.consecutive_idle_polls = self
+            .transition_gesture
+            .consecutive_idle_polls
+            .saturating_add(1);
+        let quiet_window_elapsed = self
+            .transition_gesture
+            .blocked_until
+            .is_some_and(|deadline| self.clock.now() >= deadline);
+        if self.transition_gesture.consecutive_idle_polls >= 2 && quiet_window_elapsed {
+            self.transition_gesture.blocked = None;
+            self.transition_gesture.consecutive_idle_polls = 0;
+            self.transition_gesture.blocked_until = None;
+        }
+    }
+
+    fn filter_keyboard_candidate(
+        &mut self,
+        key: &KeyEvent,
+        candidate: Option<UiCommandCandidate>,
+    ) -> Option<UiCommandCandidate> {
+        if key.kind == KeyEventKind::Release {
+            return None;
+        }
+
+        let candidate_repeat_safe = candidate
+            .as_ref()
+            .is_some_and(|candidate| self.candidate_is_repeat_safe(candidate));
+        if let Some(blocked) = self.transition_gesture.blocked.as_ref() {
+            if blocked.matches(key) || !candidate_repeat_safe {
+                self.transition_gesture.consecutive_idle_polls = 0;
+                self.transition_gesture.blocked_until =
+                    Some(self.clock.now() + TRANSITION_GESTURE_QUIET_WINDOW);
+                return None;
+            }
+            self.transition_gesture.blocked = None;
+            self.transition_gesture.consecutive_idle_polls = 0;
+            self.transition_gesture.blocked_until = None;
+        }
+
+        let candidate = candidate?;
+        let repeat_safe = self.candidate_is_repeat_safe(&candidate);
+        if key.kind == KeyEventKind::Repeat && !repeat_safe {
+            return None;
+        }
+        if key.kind == KeyEventKind::Press && !repeat_safe {
+            self.transition_gesture.blocked = Some(KeyGesture::from_event(key));
+            self.transition_gesture.consecutive_idle_polls = 0;
+            self.transition_gesture.blocked_until =
+                Some(self.clock.now() + TRANSITION_GESTURE_QUIET_WINDOW);
+        }
+        Some(candidate)
+    }
+
+    fn candidate_is_repeat_safe(&self, candidate: &UiCommandCandidate) -> bool {
+        match candidate {
+            UiCommandCandidate::LlmInput(_) | UiCommandCandidate::LlmBackspace => {
+                self.soft_input.is_some()
+            }
+            UiCommandCandidate::Focus(_)
+            | UiCommandCandidate::FocusNext
+            | UiCommandCandidate::FocusPrevious => true,
+            UiCommandCandidate::Command(
+                aihack_ai_contract::CommandIntent::Move(_)
+                | aihack_ai_contract::CommandIntent::Wait,
+            ) => {
+                self.overlay == UiOverlay::None
+                    && self.soft_input.is_none()
+                    && self.run_state() == RunState::Playing
+            }
+            _ => false,
+        }
+    }
 }
 
 fn llm_kind_index(kind: &LlmRequestKind) -> Option<usize> {
@@ -1164,13 +1288,15 @@ fn run_tui_with_service(
                 if event::poll(Duration::from_millis(50))? {
                     let input_event = event::read()?;
                     let candidate =
-                        runtime_event_to_candidate(input_event, size.width, size.height, &app);
+                        runtime_event_to_candidate(input_event, size.width, size.height, &mut app);
                     if let Some(candidate) = candidate {
                         if app.handle_candidate_owned(candidate)? {
                             break;
                         }
                         app.dispatch_llm_request(&llm_service);
                     }
+                } else {
+                    app.release_transition_gesture_on_idle();
                 }
             }
             Ok(())
@@ -1525,15 +1651,15 @@ pub fn runtime_event_to_candidate(
     input_event: Event,
     width: u16,
     height: u16,
-    app: &TuiApp,
+    app: &mut TuiApp,
 ) -> Option<UiCommandCandidate> {
     if !app.supports_terminal_size(width, height) {
-        return match &input_event {
-            Event::Key(key)
-                if key.kind == KeyEventKind::Press
-                    && matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc) =>
-            {
-                Some(UiCommandCandidate::Quit)
+        return match input_event {
+            Event::Key(key) => {
+                let candidate = (key.kind == KeyEventKind::Press
+                    && matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc))
+                .then_some(UiCommandCandidate::Quit);
+                app.filter_keyboard_candidate(&key, candidate)
             }
             _ => None,
         };
@@ -1553,88 +1679,74 @@ pub fn runtime_event_to_candidate(
     {
         return None;
     }
-    let Event::Key(key) = &input_event else {
-        return match input_event {
-            Event::Mouse(mouse) => {
-                let layout = compute_layout(width, height);
-                if app.debug_observation_visible
-                    && rect_contains(
-                        debug_observation_area(layout, &app.observation()),
-                        mouse.column,
-                        mouse.row,
-                    )
-                {
-                    return None;
-                }
-                let viewport = app.viewport_for_observation(layout);
-                let input = match mouse.kind {
-                    MouseEventKind::Moved => UiInputEvent::MouseHover {
-                        column: mouse.column,
-                        row: mouse.row,
-                    },
-                    MouseEventKind::Down(_) => UiInputEvent::MouseClick {
-                        column: mouse.column,
-                        row: mouse.row,
-                    },
-                    _ => UiInputEvent::FocusPanel(UiPanel::Map),
-                };
-                map_mouse_event_for_state(input, layout, viewport, app)
+    let key = match input_event {
+        Event::Key(key) => key,
+        Event::Mouse(mouse) => {
+            let layout = compute_layout(width, height);
+            if app.debug_observation_visible
+                && rect_contains(
+                    debug_observation_area(layout, &app.observation()),
+                    mouse.column,
+                    mouse.row,
+                )
+            {
+                return None;
             }
-            _ => None,
-        };
+            let viewport = app.viewport_for_observation(layout);
+            let input = match mouse.kind {
+                MouseEventKind::Moved => UiInputEvent::MouseHover {
+                    column: mouse.column,
+                    row: mouse.row,
+                },
+                MouseEventKind::Down(_) => UiInputEvent::MouseClick {
+                    column: mouse.column,
+                    row: mouse.row,
+                },
+                _ => UiInputEvent::FocusPanel(UiPanel::Map),
+            };
+            return map_mouse_event_for_state(input, layout, viewport, app);
+        }
+        _ => return None,
     };
-    if key.kind == KeyEventKind::Release {
-        return None;
-    }
-    if key.kind == KeyEventKind::Repeat
-        && (matches!(key.code, KeyCode::Esc | KeyCode::Enter | KeyCode::F(9))
-            || (app.soft_input().is_none() && matches!(key.code, KeyCode::Char('q' | 'Q'))))
-    {
-        return None;
-    }
-    if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
-        return Some(UiCommandCandidate::CloseOverlay);
-    }
-    if app.ui_overlay() == &UiOverlay::Inventory {
-        return match key.code {
+    let candidate = if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
+        Some(UiCommandCandidate::CloseOverlay)
+    } else if app.ui_overlay() == &UiOverlay::Inventory {
+        match key.code {
             KeyCode::Esc | KeyCode::Char('i' | 'I') => Some(UiCommandCandidate::CloseOverlay),
             KeyCode::Char(letter) => Some(UiCommandCandidate::InventoryLetter(letter)),
             KeyCode::Tab => Some(UiCommandCandidate::FocusNext),
             KeyCode::BackTab => Some(UiCommandCandidate::FocusPrevious),
             _ => None,
-        };
-    }
-    if app.soft_input().is_some() {
-        return match key.code {
+        }
+    } else if app.soft_input().is_some() {
+        match key.code {
             KeyCode::Enter => Some(UiCommandCandidate::LlmSubmitInput),
             KeyCode::Backspace => Some(UiCommandCandidate::LlmBackspace),
             KeyCode::Esc => Some(UiCommandCandidate::LlmCancelInput),
             KeyCode::Char(character) => Some(UiCommandCandidate::LlmInput(character)),
             _ => None,
-        };
-    }
-    if key.kind == KeyEventKind::Repeat && matches!(key.code, KeyCode::Char('G' | 'A' | 'J' | 'R'))
-    {
-        return None;
-    }
-
-    let state = app.run_state();
-    if matches!(
-        state,
-        RunState::AwaitingDirection { .. }
-            | RunState::AwaitingInventorySelection { .. }
-            | RunState::MorePrompt
-            | RunState::GameOver { .. }
-    ) {
-        return runtime_key_to_candidate(key.code, &state, &app.observation());
-    }
-    match key.code {
-        KeyCode::F(9) => Some(UiCommandCandidate::ToggleDebug),
-        KeyCode::Char('N') | KeyCode::Esc if app.has_llm_result() => {
-            Some(UiCommandCandidate::DismissLlmResult)
         }
-        key_code => runtime_key_to_candidate(key_code, &state, &app.observation()),
-    }
+    } else {
+        let state = app.run_state();
+        if matches!(
+            state,
+            RunState::AwaitingDirection { .. }
+                | RunState::AwaitingInventorySelection { .. }
+                | RunState::MorePrompt
+                | RunState::GameOver { .. }
+        ) {
+            runtime_key_to_candidate(key.code, &state, &app.observation())
+        } else {
+            match key.code {
+                KeyCode::F(9) => Some(UiCommandCandidate::ToggleDebug),
+                KeyCode::Char('N') | KeyCode::Esc if app.has_llm_result() => {
+                    Some(UiCommandCandidate::DismissLlmResult)
+                }
+                key_code => runtime_key_to_candidate(key_code, &state, &app.observation()),
+            }
+        }
+    };
+    app.filter_keyboard_candidate(&key, candidate)
 }
 
 fn render_global_overlay(frame: &mut ratatui::Frame, size: Rect, app: &TuiApp) {

@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 28 시정 SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`, Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle Verified. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 코드 기준: Cargo package 0.3.0, report 28 시정 SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`, Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle Verified. `docs/audit/audit_report_29.md`가 transition gesture, source archive complete identity, 문서 권위, item identity와 public mutation 경계를 다시 열었으며 ADR-0039 시정이 진행 중이다. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
@@ -230,7 +230,7 @@ pub struct TurnOutcome {
 }
 ```
 
-현재 공개 getter는 `seed()`, `turn()`, `run_state()`, `event_log()`, `world()`, `snapshot()`, `observation()`이며 `action_space`는 observation의 read-only field다. `submit(&mut self, CommandIntent) -> TurnOutcome`의 `accepted`가 command acceptance를 나타내고, `turn_advanced=true`인 결과만 headless accepted turn에 합산한다. 거절과 invariant failure는 world, RNG, turn, event log를 바꾸지 않는다. `GameSession`, `GameWorld`, runtime `EntityStore`는 외부 crate에 `DerefMut` 또는 동등한 범용 mutable reference를 제공하지 않으며, production mutation은 `submit`과 저장 복원 validator만 통과한다. 테스트 상태 설정은 `aihack::testing::SessionBuilder`만 사용한다.
+현재 공개 getter는 `seed()`, `turn()`, `run_state()`, `event_log()`, `world()`, `snapshot()`, `observation()`이며 `action_space`는 observation의 read-only field다. `submit(&mut self, CommandIntent) -> TurnOutcome`의 `accepted`가 command acceptance를 나타내고, `turn_advanced=true`인 결과만 headless accepted turn에 합산한다. invariant failure와 allocation/projectile/monster/death 처리처럼 mutation 뒤 실패할 수 있어 `transaction_aborted`로 표시한 오류는 working world/RNG/turn/event log/state를 전부 폐기한다. 반면 action-space 내 다단계 입력의 ordinary rejection은 invariant-valid한 `AwaitingDirection`/`AwaitingInventorySelection` 복귀 같은 기존 state transition을 commit할 수 있으며 `accepted=false`만으로 전체 rollback을 뜻하지 않는다. `GameSession`, `GameWorld`, runtime `EntityStore`는 외부 crate에 `DerefMut` 또는 동등한 범용 mutable reference를 제공하지 않으며, production mutation은 `submit`과 저장 복원 validator만 통과한다. mutating `systems::projectiles`와 `systems::monster_ai`는 transaction-managed crate 내부 primitive이고 public API가 아니며, 외부 consumer의 fallible·atomic mutation 경계는 `GameSession::submit` 하나다. 테스트 상태 설정은 `aihack::testing::SessionBuilder`만 사용한다.
 
 `GameClient`, `SessionRevision`, typed `SubmitError`, `ReplayTurnOutcomeV1` projection은 현재 R2 완료 범위가 아니다. R5-2에서 `aihack-runtime`은 content bootstrap·명령 실행·저장 경계를 조합하고, TUI/headless에는 `GameClient` trait만 노출한다. 이 trait의 최소 읽기 계약은 `observation()`, `revision()`, `run_state()`이며 mutation entry는 `submit(CommandIntent) -> TurnOutcome`이다. 저장 I/O와 실제 session 구현은 runtime 내부에 남긴다. R6-2에서 stale-response 판정을 이 revision 계약에 연결한다.
 
@@ -275,7 +275,7 @@ pub enum ContentError {
 }
 ```
 
-`schema_version = 1`. 동일 ID 중복, 존재하지 않는 참조, 맵 밖 좌표는 시작 실패다. production bootstrap에는 panic fallback을 허용하지 않는다.
+`schema_version = 1`. 동일 ID 중복, 존재하지 않는 참조, 맵 밖 좌표는 시작 실패다. production bootstrap에는 panic fallback을 허용하지 않는다. v0.3.0의 알려진 item ID는 wire·TUI·ActionSpace가 공유하는 canonical `ItemKind`를 정하며 각 ID는 고정 declared kind/class와 정확히 일치해야 한다. class-changing custom override는 지원하지 않고 registry 단계에서 typed `ContentError`로 거부한다. item glyph는 core `char`와 같은 정확히 한 Unicode scalar여야 하며 empty, 여러 scalar, 결합문자 sequence를 조용히 축약하지 않는다. monster glyph는 현재 typed runtime consumer에 연결되지 않은 schema 값이므로 이번 item 계약의 완료 근거로 계산하지 않고 후속 orphan 판정으로 분리한다.
 현재 ID 저장·조회는 콘텐츠 파일과의 호환성을 위해 `String`/`&str`를 사용한다. read-only query는 `schema_version()`, `content_hash()`, `item(id)`, `monster(id)`, `level(id)`이며, 검증·diagnostic/import 지원을 위해 `items()`, `monsters()`, `levels()` iterator와 `from_toml_sources(...)` source constructor도 공개한다. 후자는 runtime mutation API가 아니며 동일 validation path를 테스트와 content import에 제공한다.
 
 ### 9.3.1 현재 구현 상태와 R3-4 정렬 조건
@@ -521,6 +521,12 @@ wire JSON은 camelCase field와 UPPER_SNAKE enum을 사용한다.
 - dependency와 public DTO는 한 version만 사용하며 병렬 v1/v2 type을 같은 release에 노출하지 않는다.
 - v2가 필요한 변경은 새 ADR, migration fixture, 한 minor release의 deprecation notice를 먼저 추가한다.
 
+### 9.7 TUI transition gesture
+
+TUI 입력은 key code 열거가 아니라 candidate의 repeat 안전성과 한 gesture의 lifecycle로 판정한다. soft-input의 문자·Backspace와 안정된 `Playing` 상태의 이동/대기처럼 명시된 연속 동작만 `Repeat`를 허용한다. Title/CharacterCreation/GameOver 전환, Load, Inventory open/close/selection, MorePrompt acknowledge, direction selection, LLM request/result/apply, Esc/Enter/F9/Quit 등 state·overlay·soft-input·debug presentation을 바꾸는 candidate는 `Press` 한 번만 소비한다.
+
+`Release` event 자체는 후보를 만들지 않지만 ConPTY가 한 byte마다 합성 `Press/Release`를 만들 수 있으므로 transition quarantine을 즉시 해제하는 authority로 쓰지 않는다. 논리 identity는 modifier 차이를 제외하고 Enter/CR/LF, Esc/ESC, Backspace/DEL alias를 각각 하나로 정규화한다. transition candidate 뒤 같은 논리 key 또는 새 state의 다른 transition/control candidate를 최소 500ms quiet window와 production loop의 50ms poll 두 번 연속 empty가 모두 충족될 때까지 억제한다. 중간에 억제 대상이 도착하면 quiet window와 idle count를 다시 시작한다. 다른 논리 key가 repeat-safe movement/text candidate이면 즉시 새 gesture로 허용한다. 따라서 `Press→Repeat`, Release 없는 즉시 `Press→Press`, 한 transport write가 합성한 빠른 `Press→Release→Press`는 state 경계를 넘지 않으며, Release 뒤에도 quiet/drain을 확인한 독립 Press는 정상 허용된다. physical key-hold를 직접 재현했다는 주장은 backend parser·ConPTY 증거와 분리한다.
+
 ## 10. 동결된 게임 공식
 
 v0.3.0 리팩터링은 아래 공식을 변경하지 않는다.
@@ -755,7 +761,7 @@ NH367-C008 hunger projection은 3.6.7 `newuhs` 경계를 따른다: nutrition `<
 
 R7 provenance validator는 runtime asset과 NH367 scenario의 승인 근거를 판정하며 root `Cargo.toml`의 배포 라이선스는 검사하지 않는다. R8 release gate는 workspace 전체 `NGPL`, version 0.3.0, 공식 `LICENSE` checksum, owner approval ID, `NOTICE`, modification manifest, expanded commit metadata, checksums와 source archive 계약을 최종 검증한다. 라이선스 승인이 완료돼도 R8 기술 감사 PASS 전에는 release artifact를 외부 게시하지 않는다.
 
-release `output/` directory 전체가 게시 bundle이다. build는 workspace 내부의 예측 불가능한 새 staging directory에 create-new 방식으로 bundle을 완성하고 검증한 뒤 directory 단위로 `output/`에 승격한다. 기존 output root가 symbolic link, junction 또는 다른 reparse 경계면 쓰기 전에 실패하며, 기존 expected-name hard link inode를 직접 덮어쓰지 않는다. platform verifier는 no-follow root와 각 expected file의 single-link 상태를 확인하고 top-level actual entry 집합을 선언된 binary, 문서, metadata, source archive, `SHA256SUMS`의 exact set과 비교한다. extra file, directory, symbolic link, hard link 또는 Windows reparse point는 bundle 실패다. `RELEASE-METADATA`의 `candidate_date`는 exact commit에서 생성되고 bundled modification period 안에 포함되어야 한다.
+release `output/` directory 전체가 게시 bundle이다. build는 workspace 내부의 예측 불가능한 새 staging directory에 create-new 방식으로 bundle을 완성하고 검증한 뒤 directory 단위로 `output/`에 승격한다. 기존 output root가 symbolic link, junction 또는 다른 reparse 경계면 쓰기 전에 실패하며, 기존 expected-name hard link inode를 직접 덮어쓰지 않는다. platform verifier는 no-follow root와 각 expected file의 single-link 상태를 확인하고 top-level actual entry 집합을 선언된 binary, 문서, metadata, source archive, `SHA256SUMS`의 exact set과 비교한다. extra file, directory, symbolic link, hard link 또는 Windows reparse point는 bundle 실패다. source archive는 ZIP/TAR를 공통 format-aware parser로 읽어 raw entry name, regular-file/directory type, link target 부재와 extraction prefix를 검사한다. 각 component는 C0/C1/DEL과 Windows 금지문자, trailing dot/space, `CONIN$`/`CONOUT$`, classic 및 superscript COM/LPT device, Unicode normalization·casefold collision을 거부하고 file-vs-directory prefix 충돌과 excluded canonical root를 fail-closed한다. symlink, hardlink, device, FIFO와 알 수 없는 type은 허용하지 않는다. 검증된 entry만 임시 root에 추출해 exact path/content manifest를 대조한다. 최종 archive byte는 `ExpectedCommit`에서 같은 format으로 독립 재생성한 `git archive`와 같아야 하므로 path, mode/type, `export-ignore`, `export-subst`, blob content의 complete set 중 omission·substitution·safe extra도 거부한다. `RELEASE-METADATA`의 `candidate_date`는 exact commit에서 생성되고 bundled modification period 안에 포함되어야 하며 양 OS 모두 year `0001..9999`의 canonical Gregorian date만 수용한다.
 
 ## 16. 보안 및 구현 경계
 

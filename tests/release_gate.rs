@@ -81,6 +81,11 @@ impl ReleaseFixture {
         )
         .unwrap();
         fs::write(
+            root.join("scripts/verify_source_archive.py"),
+            project_file("scripts/verify_source_archive.py"),
+        )
+        .unwrap();
+        fs::write(
             root.join("scripts/release_staging.ps1"),
             project_file("scripts/release_staging.ps1"),
         )

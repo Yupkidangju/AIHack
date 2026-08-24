@@ -69,7 +69,8 @@ for path in \
     "$ROOT/build.sh" \
     "$ROOT/build.bat" \
     "$ROOT/scripts/release_staging.ps1" \
-    "$ROOT/scripts/verify_release_bundle.sh"; do
+    "$ROOT/scripts/verify_release_bundle.sh" \
+    "$ROOT/scripts/verify_source_archive.py"; do
     required_file "$path"
 done
 for manifest in "${MANIFESTS[@]}"; do
@@ -151,6 +152,15 @@ if ((${#ERRORS[@]} == 0)); then
         'Notice ID:'; do
         grep -Fq -- "$phrase" "$ROOT/scripts/verify_release_bundle.sh" \
             || error "release verifier reference-integrity missing: $phrase"
+    done
+    for phrase in \
+        'canonical_entry_name' \
+        'safe_extraction_check' \
+        'verify_expected_commit' \
+        'git archive ExpectedCommit' \
+        'byte-identical'; do
+        grep -Fq -- "$phrase" "$ROOT/scripts/verify_source_archive.py" \
+            || error "source archive validator contract missing: $phrase"
     done
     for phrase in \
         'AIHACK-OWNER-2026-07-20-NGPL-01' \

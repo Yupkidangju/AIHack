@@ -294,6 +294,7 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     let windows = project_file("build.bat");
     let verifier = project_file("scripts/verify_release_bundle.sh");
     let windows_verifier = project_file("scripts/verify_release_bundle.ps1");
+    let source_verifier = project_file("scripts/verify_source_archive.py");
     let attributes = project_file(".gitattributes");
 
     for required in [
@@ -324,6 +325,18 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     );
     assert!(linux.contains("verify_release_bundle.sh"));
     assert!(windows.contains("verify_release_bundle.ps1"));
+    assert!(verifier.contains("verify_source_archive.py"));
+    assert!(windows_verifier.contains("verify_source_archive.py"));
+    for contract in [
+        "safe_extraction_check",
+        "verify_expected_commit",
+        "git archive ExpectedCommit",
+    ] {
+        assert!(
+            source_verifier.contains(contract),
+            "source verifier 누락: {contract}"
+        );
+    }
     for contract in [
         "release source archive contains an excluded path",
         "metadata mismatch or duplicate key",

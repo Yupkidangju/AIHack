@@ -217,6 +217,18 @@ fn validate(
     levels: &BTreeMap<String, LevelData>,
 ) -> Result<(), ContentError> {
     for item in items.values() {
+        let mut glyphs = item.glyph.chars();
+        if glyphs.next().is_none() || glyphs.next().is_some() {
+            return item_contract_error(item, "glyph must contain exactly one Unicode scalar");
+        }
+        if let Some(expected_kind) = canonical_item_kind(&item.id) {
+            if item.kind != expected_kind {
+                return item_contract_error(
+                    item,
+                    &format!("declared kind must be canonical {expected_kind}"),
+                );
+            }
+        }
         if item.weight < 0 {
             return Err(ContentError::Parse {
                 file: "items.toml".to_owned(),
@@ -309,6 +321,19 @@ fn validate(
         }
     }
     Ok(())
+}
+
+fn canonical_item_kind(id: &str) -> Option<&'static str> {
+    match id {
+        "item.weapon.dagger" | "item.weapon.rock" => Some("weapon"),
+        "item.food.ration" => Some("food"),
+        "item.potion.healing" => Some("potion"),
+        "item.wand.magic_missile" => Some("wand"),
+        "item.scroll.reveal" | "item.scroll.identify" | "item.scroll.teleport" => Some("scroll"),
+        "item.armor.leather" => Some("armor"),
+        "item.corpse.jackal" => Some("corpse"),
+        _ => None,
+    }
 }
 
 fn item_contract_error(item: &ItemData, message: &str) -> Result<(), ContentError> {
