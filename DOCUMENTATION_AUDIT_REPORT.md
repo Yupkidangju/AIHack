@@ -249,4 +249,4 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 
 - 현재 권위는 save allocator/level/charge, unsafe custom registry, field-only causal A/B, archive canonical path, strict calendar, debug mouse, Judge repeat와 local action recursion을 재현한 `docs/audit/audit_report_27.md`다.
 - ADR-0037, active spec/design/gap과 `docs/audit/audit_report_27_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
-- 전체 local gate와 새 clean same-SHA Ubuntu/Windows actual bundle은 pending이다. 완료 후에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.
+- report 27 시정은 전체 local gate와 implementation SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`의 Actions `32683076204` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. 완료 후에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.

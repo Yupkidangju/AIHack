@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 26 최종 verifier 시정 SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`, Actions `32660514315` clean same-SHA Ubuntu/Windows Verified. `docs/audit/audit_report_27.md` 독립 재감사 finding 시정 중이며 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 코드 기준: Cargo package 0.3.0, report 27 시정 SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`, Actions `32683076204` clean same-SHA Ubuntu/Windows actual bundle Verified. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
@@ -795,7 +795,7 @@ release `output/` directory 전체가 게시 bundle이다. build는 workspace �
 
 작성일 2026-08-17 기준 최신 사용자 요구에 따라, v0.3.0 릴리스 기준을 훼손하지 않는 후속 구현 단계 R9를 추가한다. 현재 Cargo version은 R9 완료와 릴리스 결정 전까지 0.3.0을 유지한다.
 
-진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프를 구현했고 report 25 시정에서 동일 world/turn의 gold/no-gold production score pair까지 완료했다. report 26의 최종 predecessor는 SHA `1e84a94`/Actions `32660514315`다. report 27이 omission branch가 command/observer를 생략한 점을 재개방하여, 9종 모두 동일 flow에서 대상 field/state만 neutralize하고 나머지 8개 full record equality를 검사하는 matrix로 교체했다. 새 전체 gate와 clean same-SHA CI 완료 전까지 시정 진행 중이며, 후속 독립 재감사 전까지 전체 R9/program은 HOLD다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
+진행 상태: 2026-08-17 R9-1..R9-5 표적 인과 루프를 구현했고 report 25 시정에서 동일 world/turn의 gold/no-gold production score pair까지 완료했다. report 26의 최종 predecessor는 SHA `1e84a94`/Actions `32660514315`다. report 27이 omission branch가 command/observer를 생략한 점을 재개방하여, 9종 모두 동일 flow에서 대상 field/state만 neutralize하고 나머지 8개 full record equality를 검사하는 matrix로 교체했다. SHA `ea7822a5`/Actions `32683076204`에서 전체 gate와 clean same-SHA 양 OS actual bundle까지 Verified됐으며, 후속 독립 재감사 전까지 전체 R9/program은 HOLD다. `hallucinating`은 SaveDataV1 호환성 orphan으로 명시적 제외하며 owner는 Project owner/runtime maintainer, 재검토 시점은 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 때다.
 
 ### 19.1 목표
 

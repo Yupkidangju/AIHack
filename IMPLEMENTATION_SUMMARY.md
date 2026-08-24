@@ -15,9 +15,9 @@
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
-현재 권위는 report 26 최종 SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`/Actions `32660514315`를 production probe로 다시 HOLD한 `docs/audit/audit_report_27.md`다. report 25 SHA `b732c42d`/Actions `32650404618`과 report 26의 `fc01ec12/32658658526`은 역사적 partial evidence로, `a9a39d8/32660221745`는 Linux verifier failure로 보존한다. report 27 시정은 allocator/level/charge, custom registry, field-only causal A/B, archive/calendar, debug/Judge input과 local action recursion을 ADR-0037 계약에 따라 정렬 중이다.
+현재 권위는 report 26 최종 SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`/Actions `32660514315`를 production probe로 다시 HOLD한 `docs/audit/audit_report_27.md`다. report 25 SHA `b732c42d`/Actions `32650404618`과 report 26의 `fc01ec12/32658658526`은 역사적 partial evidence로, `a9a39d8/32660221745`는 Linux verifier failure로 보존한다. report 27 시정은 allocator/level/charge, custom registry, field-only causal A/B, archive/calendar, debug/Judge input과 local action recursion을 ADR-0037 계약에 따라 정렬했고 구현 SHA는 `ea7822a5b32b3bb9ee8224176381c44871037bc4`다.
 
-report 26 최종 successor는 `docs/audit/audit_report_26_remediation.md` 3.7에 기록했다. report 27의 수정 전 RED와 표적 GREEN은 `docs/audit/audit_report_27_remediation.md`에 누적하며 전체 local gate와 새 clean same-SHA CI는 아직 pending이다. 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+report 26 최종 successor는 `docs/audit/audit_report_26_remediation.md` 3.7에 기록했다. report 27의 수정 전 RED, 전체 local gate와 SHA `ea7822a5`의 Actions `32683076204` clean same-SHA Ubuntu/Windows actual bundle은 `docs/audit/audit_report_27_remediation.md`에 기록했다. 구현은 Verified지만 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 

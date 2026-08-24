@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0037: report 27 field-only causal 및 consumer canonical 경계
 
-Status: Accepted; implementation and new same-SHA CI pending (2026-08-24)
+Status: Implemented and same-SHA verified; independent re-audit pending (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R27-01
 
@@ -42,6 +42,8 @@ Alternatives:
 Consequences:
 
 wire schema v1은 유지하지만 이전에 수용되던 malformed allocator/level/charge save와 unsafe custom content는 typed error가 된다. debug panel 아래 map click은 더 이상 turn을 만들지 않고 Judge text repeat는 정상 입력된다. local composite action chain과 release archive/date fixture가 양 OS gate에 추가된다. 수정 전 실패 fixture, 전체 local gate와 새 clean same-SHA CI를 `docs/audit/audit_report_27_remediation.md`에 보존한다.
+
+Verification update: implementation SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`의 Actions `32683076204`에서 Ubuntu/Windows 각 19개 step, 437 tests, R7/R8, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success다. 이 evidence는 구현을 Verified로 올리지만 report 27의 후속 독립 재감사나 외부 게시 승인을 대신하지 않는다.
 
 ## ADR-0036: report 26 consumer-safe artifact와 presentation/release authority 경계
 

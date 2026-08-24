@@ -45,8 +45,9 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
 
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
-    assert!(compatibility.contains("report 26 final predecessor `1e84a94/32660514315`"));
-    assert!(compatibility.contains("audit report 27 remediation in progress"));
+    assert!(
+        compatibility.contains("report 27 remediation `ea7822a5/32683076204` same-SHA verified")
+    );
 }
 
 #[test]
@@ -141,10 +142,10 @@ fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
         "DESIGN_DECISIONS.md",
     ] {
         let content = project_file(document);
-        for phrase in ["1e84a94", "32660514315"] {
+        for phrase in ["ea7822a5", "32683076204"] {
             assert!(
                 content.contains(phrase),
-                "{document} report 26 final predecessor 누락: {phrase}"
+                "{document} report 27 evidence 누락: {phrase}"
             );
         }
     }
@@ -229,11 +230,11 @@ fn active_release_sections_reject_known_stale_statuses() {
     assert!(documentation.ends_with("| Closed |"));
     for verified in ["G-BUILD-006", "G-TEST-003", "G-DOC-004", "G-SEC-001"] {
         assert!(
-            gap_row(&gaps, verified).ends_with("| In Progress |"),
+            gap_row(&gaps, verified).ends_with("| Verified |"),
             "{verified} 현재 상태 불일치"
         );
     }
-    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| In Progress |"));
+    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Verified |"));
     for row in gaps.lines().filter(|line| line.starts_with("| G-")) {
         assert!(
             !row.contains("Closed /"),
@@ -268,7 +269,7 @@ fn active_r9_status_requires_field_only_pairs_and_new_ci() {
     let spec = project_file("spec.md");
     let r9 = markdown_section(&spec, "## 19. R9 후속 목표", "### 19.1 목표");
     assert!(r9.contains("9종 모두 동일 flow에서 대상 field/state만 neutralize"));
-    assert!(r9.contains("새 전체 gate와 clean same-SHA CI 완료 전까지 시정 진행 중"));
+    assert!(r9.contains("SHA `ea7822a5`/Actions `32683076204`"));
     assert!(!r9.contains("gold/no-gold production pair와 독립 negative matrix를 시정 중"));
     assert!(!r9.contains("actual producer-removal matrix는 시정 중"));
 }

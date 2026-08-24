@@ -48,6 +48,7 @@
 - report 26 Linux verifier의 `tar | grep -q` SIGPIPE false-green을 전체 listing 선캡처로 수정하고 최종 SHA `1e84a94`/Actions `32660514315` 계보를 복구했다.
 - report 27의 allocator exhaustion, registry level/charge shape, 비가역 custom armor를 load/import 전에 typed reject하고 Wear/Drop AC를 base-derived 가역 계산으로 수정했다.
 - source archive의 dot/parent/absolute/backslash alias와 불가능한 Gregorian candidate/period 날짜가 양 OS verifier를 우회하던 경계를 canonical component/strict calendar 검사로 닫았다.
+- report 27 시정 SHA `ea7822a5`/Actions `32683076204`에서 437 tests, R7/R8, actual 양 OS bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
 
 ### 2026-07-20 기준 누적 내역
 

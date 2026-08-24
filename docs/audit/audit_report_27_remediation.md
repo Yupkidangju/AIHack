@@ -1,6 +1,6 @@
 # audit report 27 시정 기록
 
-문서 상태: 시정 진행 중
+문서 상태: IMPLEMENTATION SAME-SHA VERIFIED / INDEPENDENT RE-AUDIT PENDING / PROGRAM HOLD
 작성일: 2026-08-24
 감사 기준: `docs/audit/audit_report_27.md`
 현재 권한: 독립 재감사 HOLD
@@ -38,7 +38,7 @@
 | save allocator/level/charge | `semantic_validator_rejects_allocator_level_and_charge_consumer_traps` exit 1 | typed `InvalidSave`, test PASS; headless 7-case exit 2 PASS |
 | custom registry | `causal_numeric_content_rejects_invalid_ranges`가 `ac_bonus=i16::MIN`을 수용해 exit 1 | unsafe registry reject와 `accepted_custom_armor_registry_keeps_wear_drop_and_save_round_trip_reversible` PASS |
 | field-only causal | report 27에서 command/observer omission 재현 | `causal_field_only_ab_loses_exactly_one_witness_and_preserves_other_records` PASS; 9개 동일 trace, exactly-one loss, 나머지 record equality |
-| archive/calendar | Windows dot alias verifier false-green; Linux invalid period은 독립 감사에서 false-green | 양 OS alias/calendar matrix와 verifier 구현 GREEN, Linux matrix는 새 Ubuntu CI에서 최종 확인 예정 |
+| archive/calendar | Windows dot alias verifier false-green; Linux invalid period은 독립 감사에서 false-green | 양 OS alias/calendar matrix와 verifier 구현 GREEN, Ubuntu actual bundle PASS |
 | debug/Judge | visible debug click이 `Inspect` candidate, Judge 결과 `GAJR`로 exit 1 | visible rect candidate None/revision 불변, Judge `GGAAJJRR`, 일반 request Repeat None PASS |
 | local action | local ref terminal trust assertion exit 1 | root local→local→mutable, cycle, missing, escape reject와 pinned chain accept PASS |
 
@@ -57,9 +57,17 @@
 | `cargo audit` | PASS, 318 dependencies, vulnerabilities 0건 |
 | cargo-deny 0.19.4 `licenses bans sources` | PASS |
 | `git diff --exit-code -- Cargo.lock` | PASS |
-| clean Windows release bundle과 same-SHA 양 OS CI | pending |
+| clean Windows `cmd /c build.bat --release` | PASS, 9-entry exact set, commit `ea7822a5b32b3bb9ee8224176381c44871037bc4` |
 
-구현 SHA와 clean same-SHA Ubuntu/Windows Actions run은 전체 GREEN 후 successor evidence로 갱신한다. report 26 계보는 `fc01ec12/32658658526` partial, `a9a39d8/32660221745` Linux failure, `1e84a94/32660514315` final predecessor PASS로 보존한다.
+### 3.3 clean same-SHA Ubuntu/Windows CI
+
+- 구현 SHA: `ea7822a5b32b3bb9ee8224176381c44871037bc4`
+- Actions: [run `32683076204`](https://github.com/Yupkidangju/AIHack/actions/runs/32683076204)
+- Ubuntu job `97303002520`: 19개 step success, 9분 15초. 437 tests, R7/R8, actual Linux bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변 PASS
+- Windows job `97303002290`: 19개 step success, 22분 17초. 437 tests/ConPTY, R7/R8, actual Windows bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변 PASS
+- 두 job의 `headSha`는 모두 `ea7822a5b32b3bb9ee8224176381c44871037bc4`이며 run conclusion은 `success`다.
+
+report 26 계보는 `fc01ec12/32658658526` partial, `a9a39d8/32660221745` Linux failure, `1e84a94/32660514315` final predecessor PASS로 보존한다. report 27 시정 구현은 same-SHA Verified지만 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD다.
 
 ## 4. 종료 조건
 

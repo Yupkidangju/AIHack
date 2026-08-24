@@ -19,7 +19,7 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | report 26 최종 predecessor `1e84a94aa0623b5cee5349b5832992a4682e93a8`, [run `32660514315`](https://github.com/Yupkidangju/AIHack/actions/runs/32660514315), Ubuntu/Windows 각 19-step quality·platform bundle success. report 27 successor CI pending | 독립 재감사 전 program HOLD |
+| CI | report 27 implementation `ea7822a5b32b3bb9ee8224176381c44871037bc4`, [run `32683076204`](https://github.com/Yupkidangju/AIHack/actions/runs/32683076204), Ubuntu/Windows 각 19-step quality·platform bundle success | 독립 재감사 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 
@@ -462,7 +462,7 @@ Linux/Windows release verifier는 fresh staging 또는 승격된 `output/` root�
 - [x] `docs/audit/audit_report_26.md` malformed save/alias/producer/modal/release/date/P1 표적 회귀 GREEN
 - [x] report 26 최종 verifier fix와 clean same-SHA Ubuntu/Windows actual bundle — `1e84a94`, Actions `32660514315`
 - [x] `docs/audit/audit_report_27.md` allocator/registry/causal/archive/calendar/TUI/action 표적 회귀 GREEN
-- [ ] report 27 시정 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle
+- [x] report 27 시정 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle — `ea7822a5`, Actions `32683076204`
 - [x] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171`
 
-기존 R8 문서 시정은 report 21이, report 23/24 시정은 report 24와 Actions `32107862171`이 종결했다. report 25 시정과 Actions `32650404618`은 부분 positive evidence다. report 26 최종 predecessor는 SHA `1e84a94`/Actions `32660514315`에서 양 OS Verified다. 현재 authority는 `docs/audit/audit_report_27.md`이며 새 전체 gate와 same-SHA CI가 pending이다. 새 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
+기존 R8 문서 시정은 report 21이, report 23/24 시정은 report 24와 Actions `32107862171`이 종결했다. report 25 시정과 Actions `32650404618`은 부분 positive evidence다. report 26 최종 predecessor는 SHA `1e84a94`/Actions `32660514315`에서 양 OS Verified다. 현재 authority는 `docs/audit/audit_report_27.md`이며 시정 SHA `ea7822a5`/Actions `32683076204`도 양 OS Verified다. 새 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
