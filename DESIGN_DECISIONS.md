@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0039: report 29 transition·source identity·public boundary 폐쇄
 
-Status: Implemented with targeted regression; full local gate and same-SHA CI pending (2026-08-24)
+Status: Implemented and full local/Windows actual bundle verified; same-SHA CI pending (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R29-01
 
@@ -43,6 +43,8 @@ Alternatives:
 Consequences:
 
 TUI production dispatcher는 mutable gesture state를 소유하고 event-loop idle 신호를 받는다. release 검증에는 Python 3 표준 라이브러리 기반 공통 archive validator가 추가되며 양 script가 같은 정책을 호출한다. custom registry의 이전 ID/class mismatch와 multi-scalar glyph는 시작 단계에서 typed reject된다. `systems::projectiles`와 `systems::monster_ai`의 외부 직접 호출은 더 이상 public contract가 아니다. 수정 전 RED, 구현, 전체 local gate와 양 OS clean same-SHA evidence는 `docs/audit/audit_report_29_remediation.md`에 순차 기록한다.
+
+Verification update: implementation SHA `1fa6d903ea09170014154c0c64e0fdaf673fcb6c`에서 Windows named tests 455개, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 clean Windows 9-entry actual bundle이 PASS했다. 새 same-SHA Ubuntu/Windows CI와 후속 독립 감사는 pending이다.
 
 ## ADR-0038: report 28 allocator·registry·input·archive 동등 경계
 

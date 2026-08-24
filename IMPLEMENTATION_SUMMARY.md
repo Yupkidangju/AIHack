@@ -17,7 +17,7 @@ R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 
 
 현재 권위는 report 28 시정/current docs SHA를 adversarial probe로 다시 HOLD한 `docs/audit/audit_report_29.md`다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~28 successor 계보는 historical evidence로 보존한다. report 28 시정은 allocator exact successor/fallible spawn, custom registry/equipment removal, 명시 control-key/F9, classic Windows archive alias와 year parity를 ADR-0038에 따라 구현했고 SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`/Actions `32694375654`에서 양 OS Verified됐지만 report 29가 동등 transition, complete-source와 문서 권위를 다시 열었다.
 
-report 27/28 evidence는 각 remediation 문서에 역사적으로 보존한다. report 29 시정은 ADR-0039에 따라 transition gesture, format-aware archive/extraction과 `ExpectedCommit` complete identity, document-wide authority, canonical item ID-kind/glyph, allocator valid-exhaustion과 public atomic boundary를 구현하고 표적 GREEN까지 완료했다. `docs/audit/audit_report_29_remediation.md`에 RED/GREEN과 새 SHA/CI를 기록하며 현재 전체 local gate와 CI는 pending이므로 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+report 27/28 evidence는 각 remediation 문서에 역사적으로 보존한다. report 29 시정은 ADR-0039에 따라 transition gesture, format-aware archive/extraction과 `ExpectedCommit` complete identity, document-wide authority, canonical item ID-kind/glyph, allocator valid-exhaustion과 public atomic boundary를 구현했다. implementation SHA `1fa6d903ea09170014154c0c64e0fdaf673fcb6c`의 전체 local gate와 clean Windows actual bundle은 Verified이며 새 same-SHA 양 OS CI가 pending이므로 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 

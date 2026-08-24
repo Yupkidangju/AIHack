@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 28 시정 SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`, Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle Verified. `docs/audit/audit_report_29.md`가 transition gesture, source archive complete identity, 문서 권위, item identity와 public mutation 경계를 다시 열었으며 ADR-0039 시정이 진행 중이다. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 코드 기준: Cargo package 0.3.0, report 29 시정 implementation SHA `1fa6d903ea09170014154c0c64e0fdaf673fcb6c`의 전체 local gate와 clean Windows actual bundle Verified, 새 clean same-SHA Ubuntu/Windows CI pending. `docs/audit/audit_report_29.md`가 연 경계는 ADR-0039 구현과 회귀로 시정했지만 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙

@@ -261,4 +261,4 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 
 - 위 report 29가 TUI 동등 transition, archive raw type/extraction, `ExpectedCommit` complete tree, document-wide authority, item ID-kind/glyph, allocator fixture와 public atomicity의 단일 현재 권위다.
 - ADR-0039와 `docs/audit/audit_report_29_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
-- ADR-0039 구현과 표적 adversarial GREEN은 완료됐고 전체 local gate, 새 clean same-SHA 양 OS actual bundle과 후속 독립 감사는 pending이다. 별도 게시 승인 전까지 program/publication HOLD다.
+- ADR-0039 implementation `1fa6d90`의 전체 local gate와 clean Windows actual bundle은 Verified됐고 새 clean same-SHA 양 OS CI와 후속 독립 감사는 pending이다. 별도 게시 승인 전까지 program/publication HOLD다.

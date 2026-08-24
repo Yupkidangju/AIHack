@@ -114,11 +114,19 @@ clean-worktree actual bundle을 제외한 전체 gate를 단독 실행했다.
 | Git Bash `scripts/r7_checkpoint.sh` | PASS |
 | Git Bash `scripts/r8_checkpoint.sh` | PASS |
 
-`build.bat --release`는 dirty worktree를 의도적으로 거부하므로 implementation commit과 자체 리뷰 뒤 clean 동일 SHA에서 실행한다. 그 결과 전까지 local gate lifecycle은 `Implemented`로 유지한다.
+자체 5축 review와 staged secret/path scan 뒤 implementation commit `1fa6d903ea09170014154c0c64e0fdaf673fcb6c`를 만들고 clean worktree에서 `cmd /d /c build.bat --release`를 실행했다.
+
+```text
+PASS source archive: format=zip entries=385
+PASS Windows release bundle: version=0.3.0 commit=1fa6d903ea09170014154c0c64e0fdaf673fcb6c
+빌드 완료: output\aihack.exe, output\aihack-headless.exe
+```
+
+output은 binary 2, `LICENSE`, `NOTICE`, `MODIFICATIONS.md`, approval record, metadata, source ZIP, `SHA256SUMS`의 9개 exact entry다. checksum record는 8개이며 metadata commit/candidate date는 `1fa6d90...`/`2026-08-24`다. 공통 validator가 source ZIP 385개 raw entry와 safe extraction을 검사하고 fresh `git archive 1fa6d90...`와 byte equality를 확인했다. 이 시점 local lifecycle은 `Verified`, 양 OS CI는 pending이다.
 
 ## 6. clean same-SHA Ubuntu/Windows actual bundle
 
-아직 실행하지 않았다. 구현·문서가 커밋된 clean SHA 하나를 push하고 같은 SHA의 Ubuntu/Windows actual bundle job이 모두 success여야 한다.
+implementation/local evidence를 기록한 docs successor commit의 push와 CI가 pending이다. 해당 clean SHA의 Ubuntu/Windows actual bundle job이 모두 success한 뒤 run/job ID와 step 수를 기록한다.
 
 ## 7. 잔여 경계
 
