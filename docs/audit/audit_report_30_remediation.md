@@ -4,7 +4,7 @@
 - 기준 HEAD: `1d6e6669c74ba04263e450ac821b443e4bdc053c`
 - 작업 브랜치: `codex/audit-report-30-remediation`
 - 작업 일자: 2026-08-24
-- 현재 판정: **ADR-0040 구현·표적 GREEN 완료 / 전체 local gate·새 CI pending / PROGRAM·PUBLICATION HOLD**
+- 현재 판정: **implementation `59c8872` 전체 local·clean Windows actual Verified / 새 양 OS CI pending / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. report 29 기술 successor `a91a9c7/32706869079`의 evidence는 보존하되, report 30의 active authority와 public Rust visibility를 별도 RED/GREEN 및 새 same-SHA 양 OS bundle로 검증한다.
 
@@ -96,11 +96,19 @@ clean-worktree actual bundle을 제외한 전체 gate를 실행했다.
 
 Report 29 기술 회귀는 content 13, allocator/transaction 6, document 10, archive 2, Windows bundle 7, NH367 10, runtime all-target와 TUI lib/main/ConPTY/contract 27을 별도 표적 실행해 모두 PASS했다. test 수 감소는 external direct low-level contract 4개를 production `GameSession`/unit/feature-gated compatibility 경계로 교체한 의도된 결과이며 coverage 삭제가 아니다.
 
-`build.bat --release`는 dirty worktree를 의도적으로 거부하므로 자체 review와 implementation commit 뒤 clean 동일 SHA에서 실행한다.
+자체 5축 review와 staged secret/path scan 뒤 implementation commit `59c88720924d28b892e66f732eb4007825eb76d5`를 만들고 clean worktree에서 `cmd /d /c build.bat --release`를 실행했다.
+
+```text
+PASS source archive: format=zip entries=377
+PASS Windows release bundle: version=0.3.0 commit=59c88720924d28b892e66f732eb4007825eb76d5
+빌드 완료: output\aihack.exe, output\aihack-headless.exe
+```
+
+output은 binary 2, license/notice/modification/approval/metadata 문서 5, source ZIP, `SHA256SUMS`의 9개 exact entry다. 이 시점 local lifecycle은 `Verified`, 새 양 OS CI는 pending이다.
 
 ## 6. clean same-SHA Ubuntu/Windows actual bundle
 
-아직 실행하지 않았다. implementation/local evidence를 clean commit으로 고정하고 같은 SHA의 Ubuntu/Windows actual platform bundle job이 모두 success해야 한다.
+implementation/local evidence를 기록한 docs successor commit의 push와 CI가 pending이다. 해당 clean SHA의 Ubuntu/Windows actual platform bundle job이 모두 success한 뒤 run/job ID와 step 수를 기록한다.
 
 ## 7. 잔여 경계
 

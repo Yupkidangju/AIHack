@@ -6,7 +6,7 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implementation contract; current authority `docs/audit/audit_report_30.md`; ADR-0040 implementation/표적 GREEN 완료, 전체 local gate·새 CI pending; PROGRAM/PUBLICATION HOLD
+문서 상태: active implementation contract; current authority `docs/audit/audit_report_30.md`; implementation `59c8872` 전체 local/clean Windows actual bundle Verified, 새 양 OS CI pending; PROGRAM/PUBLICATION HOLD
 작성일: 2026-07-15
 최근 동기화: 2026-08-24
 기준: `spec.md`

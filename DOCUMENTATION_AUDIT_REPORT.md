@@ -267,4 +267,4 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 
 - report 30이 designs/compatibility/remediation/roadmap lifecycle과 broader public World/system mutation의 단일 현재 권위다.
 - ADR-0040과 `docs/audit/audit_report_30_remediation.md`가 문서 우선 계약, external compile RED/GREEN과 새 gate를 추적한다.
-- ADR-0040 implementation과 표적 adversarial GREEN은 완료됐고 전체 local gate, 새 clean same-SHA 양 OS actual bundle과 후속 독립 감사는 pending이다. 별도 게시 승인 전까지 program/publication HOLD다.
+- ADR-0040 implementation `59c8872`의 전체 local gate와 clean Windows actual bundle은 Verified됐고 새 clean same-SHA 양 OS CI와 후속 독립 감사는 pending이다. 별도 게시 승인 전까지 program/publication HOLD다.

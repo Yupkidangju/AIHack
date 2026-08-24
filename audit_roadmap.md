@@ -385,7 +385,7 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 `docs/audit/audit_report_24.md`의 DBG-F011, SEC-F003, IMP-F019 시정은 cargo-deny 0.19.4, platform permission regression, SC-CAUSE 개별 mapping regression과 전체 로컬 quality gate를 PASS했다. implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 [Actions run `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171)은 Ubuntu/Windows test, canonical R7/R8, release build/bundle, cargo-audit, cargo-deny와 lockfile 불변을 모두 PASS했다.
 
-final multi-audit report 1과 report 25~29는 historical/technical evidence로 보존한다. report 29 technical successor `a91a9c7/32706869079`는 당시 전체 gate와 양 OS actual bundle이 Verified됐지만, 현재 최상위 권위 `docs/audit/audit_report_30.md`가 designs/compatibility/remediation/roadmap lifecycle과 broader public World/system mutation을 재개방했다. ADR-0040 구현·표적 GREEN은 `docs/audit/audit_report_30_remediation.md`에 기록했으며 전체 local gate, 새 clean same-SHA CI와 독립 감사 전에는 전체 program PASS로 전환하지 않는다.
+final multi-audit report 1과 report 25~29는 historical/technical evidence로 보존한다. 현재 최상위 권위 `docs/audit/audit_report_30.md`의 ADR-0040 implementation `59c8872`는 전체 local gate와 clean Windows actual bundle까지 Verified됐으며, 새 clean same-SHA 양 OS CI와 독립 감사 전에는 전체 program PASS로 전환하지 않는다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -462,5 +462,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: report 30 ADR-0040 authority/public visibility 구현과 external compile·Report 29 표적 GREEN은 완료했고 전체 local gate·새 CI는 pending이다. 후속 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 구현 판정: report 30 implementation SHA `59c88720924d28b892e66f732eb4007825eb76d5`의 전체 local gate와 clean Windows actual bundle은 Verified이며 새 same-SHA 양 OS CI가 pending이다. 후속 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
 현재 문서 감사 판정: 단일 current authority는 `docs/audit/audit_report_30.md`이며 current remediation은 `docs/audit/audit_report_30_remediation.md`다. designs/compatibility/report29-remediation/roadmap을 포함한 document-wide negative gate와 public compile contract가 완료된 뒤에만 Verified로 갱신하며 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.

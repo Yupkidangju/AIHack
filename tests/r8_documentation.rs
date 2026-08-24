@@ -65,7 +65,7 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
     assert!(compatibility.contains("current authority `docs/audit/audit_report_30.md`"));
-    assert!(compatibility.contains("ADR-0040 feature-gated C010 helper/public visibility"));
+    assert!(compatibility.contains("feature-gated C010/public visibility"));
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn active_document_sections_have_one_report_30_authority_and_reject_predecessors
         roadmap_current_start + roadmap[roadmap_current_start..].find("```bash").unwrap();
     let roadmap_current = &roadmap[roadmap_current_start..roadmap_current_end];
     validate_current_authority(roadmap_current, CURRENT, STALE).unwrap();
-    assert!(roadmap_current.contains("ADR-0040 구현·표적 GREEN"));
+    assert!(roadmap_current.contains("ADR-0040 implementation `59c8872`"));
     let roadmap_final = &roadmap[roadmap.find("현재 구현 판정:").unwrap()..];
     validate_current_authority(roadmap_final, CURRENT, STALE).unwrap();
 
@@ -215,27 +215,32 @@ fn active_document_sections_have_one_report_30_authority_and_reject_predecessors
     let designs = project_file("designs.md");
     let designs_header = &designs[..designs.find("## 1. 경험 목표").unwrap()];
     validate_current_authority(designs_header, CURRENT, STALE).unwrap();
-    assert!(designs_header.contains("ADR-0040 implementation/표적 GREEN 완료"));
+    assert!(designs_header
+        .contains("implementation `59c8872` 전체 local/clean Windows actual bundle Verified"));
 
     let compatibility = project_file("docs/compatibility/README.md");
     let compatibility_header = &compatibility[..compatibility.find("## 1. 목적").unwrap()];
     validate_current_authority(compatibility_header, CURRENT, STALE).unwrap();
-    assert!(compatibility_header
-        .contains("ADR-0040 feature-gated C010 helper/public visibility 표적 GREEN"));
+    assert!(compatibility_header.contains(
+        "implementation `59c8872` feature-gated C010/public visibility와 전체 local gate Verified"
+    ));
 
     let report_29_remediation = project_file("docs/audit/audit_report_29_remediation.md");
     let report_29_header = &report_29_remediation[..report_29_remediation
         .find("## 1. Finding 대조와 결정")
         .unwrap()];
     validate_current_authority(report_29_header, CURRENT, STALE).unwrap();
-    assert!(report_29_header.contains("REPORT 30 AUTHORITY·PUBLIC SURFACE 구현·표적 GREEN 완료"));
+    assert!(
+        report_29_header.contains("REPORT 30 `59c8872` 전체 local·clean Windows actual Verified")
+    );
 
     let report_30_remediation = project_file("docs/audit/audit_report_30_remediation.md");
     let report_30_header = &report_30_remediation[..report_30_remediation
         .find("## 1. Finding 대조와 결정")
         .unwrap()];
     validate_current_authority(report_30_header, CURRENT, STALE).unwrap();
-    assert!(report_30_header.contains("ADR-0040 구현·표적 GREEN 완료"));
+    assert!(report_30_header
+        .contains("implementation `59c8872` 전체 local·clean Windows actual Verified"));
 
     let valid = format!("현재 권위는 `{CURRENT}`다.");
     assert!(validate_current_authority(&valid, CURRENT, STALE).is_ok());
