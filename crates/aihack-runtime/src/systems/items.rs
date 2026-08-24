@@ -1,7 +1,6 @@
 use aihack_core::{
     domain::{
         entity::EntityLocation,
-        inventory::InventoryLetter,
         item::{ConsumableEffect, EquipmentSlot, ItemClass},
         level::{
             PHASE5_LEVEL1_ID, PHASE5_LEVEL1_STAIRS_DOWN, PHASE5_LEVEL2_ID,
@@ -269,10 +268,6 @@ pub fn read(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
         ConsumableEffect::Heal { .. } => return Err("item is not a scroll".to_string()),
     }
     Ok(events)
-}
-
-pub fn inventory_letter(world: &GameWorld, item: EntityId) -> Option<InventoryLetter> {
-    world.inventory.letter_for(item)
 }
 
 pub(crate) fn remove_inventory_item(world: &mut GameWorld, item: EntityId) -> Result<(), String> {

@@ -12,9 +12,38 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-0040: report 30 active authority와 submit-only visibility 강제
+
+Status: Implemented with targeted regression; full local gate and same-SHA CI pending (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R30-01
+
+Context:
+
+`docs/audit/audit_report_30.md`는 report 29의 content, allocator, TUI gesture, archive identity와 projectile/monster 축소를 Verified했지만 designs/compatibility/remediation/roadmap active header가 과거 lifecycle을 유지하고, default public `GameWorld` mutator와 combat/death/doors/items/movement/stairs/traps가 master submit-only 계약을 우회함을 재현했다.
+
+Decision:
+
+- current authority는 report 30 하나다. designs, compatibility index, report 29 remediation top status와 roadmap current paragraph를 포함한 모든 active header/section을 common exact-one/negative mutation gate로 검사한다. predecessor는 명시적 historical section에서만 허용한다.
+- default `aihack-runtime` public mutation entry는 atomic `GameSession::submit` 하나다. `GameWorld` mutator·fixture constructor와 combat/death/doors/items/movement/monster/projectile/stairs/traps module은 crate-private로 축소한다.
+- read-only world/entity query, validated save/bootstrap와 순수 score/vision API는 public으로 유지한다.
+- C010 depleted-death처럼 session 이전 상태를 구성해야 하는 호환 fixture는 opt-in `testing` feature 아래의 명시적 비원자 test helper로만 제공한다. root compatibility test host만 이 feature를 사용하며 TUI/headless dependency와 production source에는 `testing` feature/import를 금지한다.
+- external temporary crate regression은 default public read query compile-pass와 World/system mutation compile-fail을 실제 `cargo check --offline`으로 검증한다. 문자열 visibility 검사는 보조 근거로만 사용한다.
+- report 29 기술 회귀와 새 clean same-SHA 양 OS actual bundle을 모두 재실행해도 report 30 후속 독립 감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- 모든 low-level mutator를 public compatibility로 문서화: shipped consumer가 turn/RNG/event/monster/invariant commit을 우회하므로 master 계약과 제품 안전성이 약해져 기각한다.
+- mutator 이름에 `unchecked`만 추가: compiler visibility가 그대로여서 잘못 쓰기 쉬우므로 기각한다.
+- test helper를 default public에 유지: Hyrum's Law상 production contract가 되므로 opt-in feature 격리를 선택한다.
+
+Consequences:
+
+일부 pre-release Rust public path는 제거된다. 외부 production consumer는 `GameSession`과 read-only query로 이동해야 하며, test-only direct world scenarios는 feature-gated helper 또는 persisted `SessionBuilder`로 이동한다. source/test/document 변경과 RED/GREEN, 전체 gate 및 CI는 `docs/audit/audit_report_30_remediation.md`에 기록한다.
+
 ## ADR-0039: report 29 transition·source identity·public boundary 폐쇄
 
-Status: Implemented and clean same-SHA Ubuntu/Windows actual bundles verified; independent re-audit pending (2026-08-24)
+Status: Superseded in active authority by ADR-0040; historical technical implementation verified (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R29-01
 

@@ -62,7 +62,8 @@ impl GameWorld {
     }
 
     /// 호환 시나리오의 `ResolveDeath` 직전 HP 0 world만 구성하는 제한 경계다.
-    pub fn from_depleted_saved_world(
+    #[cfg(feature = "testing")]
+    pub(crate) fn from_depleted_saved_world(
         saved: SavedWorldV1,
     ) -> Result<Self, aihack_core::error::GameError> {
         crate::save::validate_depleted_saved_world(&saved)?;
@@ -72,11 +73,12 @@ impl GameWorld {
         )?)
     }
 
+    #[cfg(any(test, feature = "testing"))]
     pub fn try_fixture_phase5() -> Result<Self, ContentError> {
         Self::try_fixture_phase5_with_registry(aihack_content::registry()?)
     }
 
-    pub fn try_fixture_phase5_with_registry(
+    pub(crate) fn try_fixture_phase5_with_registry(
         registry: &ContentRegistry,
     ) -> Result<Self, ContentError> {
         let state = crate::bootstrap::initial_world(registry)?;
@@ -89,23 +91,20 @@ impl GameWorld {
         })
     }
 
-    pub fn fixture_phase2() -> Self {
-        Self::fixture_phase5()
+    pub(crate) fn fixture_phase4() -> Self {
+        Self::try_fixture_phase5_with_registry(
+            aihack_content::registry().expect("embedded content registry must validate"),
+        )
+        .expect("embedded content registry must build the default world")
     }
 
-    pub fn fixture_phase3() -> Self {
-        Self::fixture_phase5()
-    }
-
-    pub fn fixture_phase4() -> Self {
-        Self::fixture_phase5()
-    }
-
+    #[cfg(any(test, feature = "testing"))]
     pub fn fixture_phase5() -> Self {
         Self::try_fixture_phase5()
             .expect("embedded content registry must validate for the default fixture")
     }
 
+    #[cfg(any(test, feature = "testing"))]
     pub fn fixture_without_monsters() -> Self {
         let mut world = Self::fixture_phase5();
         world.state.entities.clear_monsters();
@@ -148,7 +147,7 @@ impl GameWorld {
         self.map(self.current_level)
     }
 
-    pub fn current_map_mut(&mut self) -> &mut GameMap {
+    pub(crate) fn current_map_mut(&mut self) -> &mut GameMap {
         self.map_mut(self.state.current_level)
     }
 
@@ -158,7 +157,7 @@ impl GameWorld {
             .expect("검증된 world는 요청한 level map을 가진다")
     }
 
-    pub fn map_mut(&mut self, level: LevelId) -> &mut GameMap {
+    pub(crate) fn map_mut(&mut self, level: LevelId) -> &mut GameMap {
         self.state
             .levels
             .map_mut(level)
@@ -171,7 +170,7 @@ impl GameWorld {
             .expect("검증된 world는 player actor 위치를 가진다")
     }
 
-    pub fn set_player_location(&mut self, level: LevelId, pos: Pos) {
+    pub(crate) fn set_player_location(&mut self, level: LevelId, pos: Pos) {
         let player_id = self.player_id;
         assert!(
             self.state
@@ -188,10 +187,6 @@ impl GameWorld {
         pos
     }
 
-    pub fn set_player_pos(&mut self, pos: Pos) {
-        self.set_player_location(self.current_level, pos);
-    }
-
     pub fn player_alive(&self) -> bool {
         self.entities
             .get(self.player_id)
@@ -203,7 +198,7 @@ impl GameWorld {
         self.entities.hostile_monsters_on_level(self.current_level)
     }
 
-    pub fn identify_item_kind(&mut self, kind: ItemKind) {
+    pub(crate) fn identify_item_kind(&mut self, kind: ItemKind) {
         if !self.state.identified_items.contains(&kind) {
             self.state.identified_items.push(kind);
             self.state.identified_items.sort_by_key(|kind| *kind as u8);
@@ -217,14 +212,8 @@ impl GameWorld {
     pub fn gold(&self) -> u32 {
         self.gold
     }
-    pub fn set_gold(&mut self, gold: u32) {
-        self.state.gold = gold;
-    }
     pub fn kill_count(&self) -> u32 {
         self.kill_count
-    }
-    pub fn set_kill_count(&mut self, kill_count: u32) {
-        self.state.kill_count = kill_count;
     }
 
     pub fn carried_weight(&self) -> i16 {
@@ -243,14 +232,6 @@ impl GameWorld {
             paralysis_turns: self.paralysis_turns,
             hallucinating: self.hallucinating,
         }
-    }
-
-    pub fn set_status(&mut self, status: Status) {
-        self.state.nutrition = status.nutrition;
-        self.state.luck = status.luck;
-        self.state.prayer_cooldown = status.prayer_cooldown;
-        self.state.paralysis_turns = status.paralysis_turns;
-        self.state.hallucinating = status.hallucinating;
     }
 
     pub fn hunger_state(&self) -> HungerState {

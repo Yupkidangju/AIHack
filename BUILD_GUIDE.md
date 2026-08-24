@@ -19,7 +19,7 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | report 29 successor `a91a9c70523288bf2d5289bb35c9d1f1e5565a33`, [run `32706869079`](https://github.com/Yupkidangju/AIHack/actions/runs/32706869079), Ubuntu/Windows 각 19 success step과 actual platform bundle success | 독립 재감사 전 program HOLD |
+| CI | report 29 technical `a91a9c7/32706869079` historical success; report 30 ADR-0040 표적 GREEN 완료, 전체 local/새 clean same-SHA run pending | 독립 재감사 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 
@@ -60,6 +60,8 @@ cargo 1.94.1 (...)
 local LLM은 core build와 test의 필수 조건이 아니다. LLM integration test는 loopback mock server를 사용하고 외부 네트워크를 사용하지 않는다.
 
 R6 dependency는 `reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json"] }`로 고정한다. HTTP loopback만 허용하므로 TLS feature를 넣지 않는다. `ClientBuilder::no_proxy()`, connect timeout 500ms, narrative total timeout 2000ms, decision/soft-adjudication total timeout 1500ms를 config/helper의 단일 상수에서 사용한다. v0.3.0 built-in runtime locale은 English이며 provider Unicode output은 검증 후 그대로 표시한다.
+
+`aihack-runtime`의 default feature는 비어 있다. root `aihack` compatibility test host만 `testing` feature를 활성화해 C010 depleted-death helper를 사용하며, release binary를 만드는 `apps/aihack-tui`와 `apps/aihack-headless`는 이 feature 및 low-level mutating system을 활성화하거나 import하지 않는다.
 
 ## 3. 현재 빠른 실행
 
@@ -468,4 +470,4 @@ Linux/Windows release verifier는 fresh staging 또는 승격된 `output/` root�
 - [x] report 28 시정 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle — `9725c378`, Actions `32694375654`
 - [x] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171`
 
-기존 report 21~28 계보는 역사적 evidence로 보존한다. 현재 authority는 `docs/audit/audit_report_29.md`이며 ADR-0039 successor `a91a9c7/32706869079`의 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐다. 새 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
+기존 report 21~29 계보는 historical/technical evidence로 보존한다. 현재 authority는 `docs/audit/audit_report_30.md`이며 ADR-0040 implementation/표적 GREEN은 완료했고 전체 gate와 새 clean same-SHA 양 OS actual bundle은 pending이다. 새 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.

@@ -47,6 +47,7 @@
 | G-CORE-003 | P1 | invariant가 타입으로 검증되지 않음 | 6종 invariant/no-commit regression과 `audit_report_3.md` independent verification | R2-2 | SC-CORE-02 | Closed |
 | G-CORE-004 | P0 | allocator/custom registry/equipment removal consumer 불변식 | exact successor/fallible spawn, bootstrap saveability와 common removal; SHA `9725c378` Actions `32694375654` 양 OS success | report 28 시정 | FIN-F001, FIN-F007 | Verified |
 | G-CORE-005 | P1 | public projectile/monster primitive의 직접 `Err` partial mutation | 외부 mutation을 atomic `GameSession::submit`으로 한정하고 low-level system을 crate 내부로 축소, `1fa6d90` local gate GREEN | report 29 시정 | R29-DBG-F002 | Verified |
+| G-CORE-006 | P0 | submit-only master와 broader public World/system mutation 불일치 | default visibility 축소, testing feature 격리와 external compile pass/fail GREEN | report 30 시정 | R30-IMP-F001, FIN-F005 | Implemented |
 | G-DATA-001 | P1 | TOML loader가 runtime과 분리 | runtime ContentRegistry factory/level construction과 `audit_report_3.md` independent verification | R3-1..R3-3 | SC-DATA-01 | Closed |
 | G-DATA-002 | P1 | invalid embedded content가 session bootstrap에서 panic 가능 | fallible TUI/headless bootstrap, injected missing level/item regression, `audit_report_3.md` independent verification | R3-1, R3-4 | SC-DATA-01 | Closed |
 | G-DATA-003 | P0 | item ID-kind identity 분리와 multi-scalar glyph 축약 | canonical ID-kind table, shape-valid mismatch reject와 exact-one-scalar Unicode matrix, `1fa6d90` local gate GREEN | report 29 시정 | R29-IMP-F001, R29-IMP-F002 | Verified |
@@ -64,13 +65,14 @@
 | G-DOC-005 | P2 | SC-CAUSE-01..07 개별 ID mapping | report 24와 same-SHA Actions `32107862171`이 종결 | report 24 시정 | SC-CAUSE-01..07 | Closed |
 | G-DOC-006 | P2 | implementation summary 후반 stale next-step | report 28 current lifecycle과 section 1/10/11 negative regression, Actions `32694375654` | report 28 시정 | FIN-F012 | Verified |
 | G-DOC-007 | P0 | active 문서 current-authority false-green 재발 | report 29 단일 authority와 README/ADR/roadmap/summary/build/gap section-scoped predecessor mutation, `1fa6d90` local gate GREEN | report 29 시정 | R29-DOC-F001, R29-DOC-F002 | Verified |
+| G-DOC-008 | P0 | designs/compatibility/remediation/roadmap active lifecycle 누락 | report 30 단일 authority와 모든 active header 공통 exact-one/negative mutation GREEN | report 30 시정 | R29-DOC-F002 Re-audit #1, FIN-F012 | Implemented |
 | G-SEC-001 | P0 | artifact link/root/ambient/archive 경계 | Windows alias/staging/link와 archive canonical alias·strict calendar 및 actual 양 OS bundle `32683076204` | report 27 시정 | SEC-F001, FIN-F004, FIN-F014 | Verified |
 | G-SEC-003 | P0 | archive Windows component alias와 year 0000 parity | case/trailing/reserved/collision 및 year 0000/0001/9999와 actual 양 OS bundle `32694375654` | report 28 시정 | FIN-F014, FIN-F015 | Verified |
 | G-UI-002 | P0 | control-key Repeat state crossing과 F9 실제 경로 evidence | Esc/Enter/F9/Q Press-only sequence와 actual F9 handler regression, Actions `32694375654` | report 28 시정 | FIN-F008, FIN-F009, FIN-F016 | Verified |
 | G-SEC-004 | P0 | archive raw type/extraction 및 `ExpectedCommit` complete tree 미결합 | format-aware common validator, safe extraction, independent `git archive` identity와 `1fa6d90` clean Windows actual bundle GREEN | report 29 시정 | R29-SEC-F001, R29-SEC-F002 | Verified |
 | G-UI-003 | P0 | 동등 transition과 Release 없는 연속 Press state crossing | 합성 Release 비신뢰·500ms quiet+2 idle gate, constructed/actual ConPTY와 `1fa6d90` local gate GREEN | report 29 시정 | R29-DBG-F001 | Verified |
 | G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | report 24와 Actions `32107862171`이 Unix 0600/Windows parent DACL 계약을 종결 | report 24 시정 | SEC-F003 | Closed |
-| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 29 독립 재감사 HOLD | report 29 9개 finding, `a91a9c7` Actions `32706869079` clean same-SHA 양 OS actual bundle Verified; 독립 감사 pending | report 29 remediation | report 29 finding과 FIN-F001..F018 | Verified |
+| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 30 독립 재감사 HOLD | report 30 authority/public surface 구현과 표적 GREEN 완료; 전체 gate·새 CI pending | report 30 remediation | report 30 finding과 FIN-F001..F018 | Implemented |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -267,4 +269,4 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0~R8 기존 remediation과 report 23/24는 역사적으로 종결됐다. report 25 `b732c42d/32650404618`은 partial evidence이고 report 26~28 successor 계보는 보존한다. 현재 authority는 `docs/audit/audit_report_29.md`이며 G-CORE-005/G-DATA-003/G-DOC-007/G-SEC-004/G-UI-003와 G-FINAL-001은 `a91a9c7/32706869079` 전체 gate와 clean same-SHA 양 OS actual bundle로 Verified다. 독립 감사와 별도 게시 승인 전까지 Closed 및 program/publication PASS로 올리지 않는다.
+R0~R8 기존 remediation과 report 23/24는 역사적으로 종결됐다. report 25는 partial, report 26~29는 historical/technical evidence로 보존한다. 현재 authority는 `docs/audit/audit_report_30.md`이며 G-CORE-006/G-DOC-008/G-FINAL-001은 표적 GREEN으로 Implemented다. 전체 gate·새 CI·독립 감사와 별도 게시 승인 전까지 Verified/Closed 및 program/publication PASS로 올리지 않는다.

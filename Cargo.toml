@@ -26,7 +26,7 @@ aihack-core = { path = "crates/aihack-core", version = "0.3.0" }
 aihack-content = { path = "crates/aihack-content", version = "0.3.0" }
 aihack-ai-contract = { path = "crates/aihack-ai-contract", version = "0.3.0" }
 aihack-llm = { path = "crates/aihack-llm", version = "0.3.0" }
-aihack-runtime = { path = "crates/aihack-runtime", version = "0.3.0" }
+aihack-runtime = { path = "crates/aihack-runtime", version = "0.3.0", features = ["testing"] }
 aihack-tui = { path = "apps/aihack-tui", version = "0.3.0" }
 aihack-headless = { path = "apps/aihack-headless", version = "0.3.0" }
 

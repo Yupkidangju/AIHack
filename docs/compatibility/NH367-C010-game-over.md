@@ -32,7 +32,8 @@ expected:
   hash_fields: [run_state, player_alive, death_cause, score]
 implementation:
   task: R7-2E
-  module: crates/aihack-runtime/src/systems/death.rs; crates/aihack-core/src/death.rs
+  module: crates/aihack-runtime/src/testing.rs -> systems/death.rs; crates/aihack-core/src/death.rs
+  boundary: opt-in testing feature; non-production and non-atomic fixture
 test:
   file: tests/nethack_367_compat.rs
   function: nh367_c010_player_death_records_cause_and_game_over_state
@@ -42,4 +43,4 @@ review:
   reviewed_at: 2026-07-18
 ```
 
-사망 원인은 typed state와 event로 보존한다. NetHack의 종료 화면 문구나 scoring 전체를 복제하지 않는다.
+사망 원인은 typed state와 event로 보존한다. NetHack의 종료 화면 문구나 scoring 전체를 복제하지 않는다. HP 0 `ResolveDeath` precondition은 default public mutation API가 아니라 root compatibility test host가 활성화한 `aihack-runtime/testing` helper에서만 구성하며 TUI/headless production dependency에는 포함하지 않는다.

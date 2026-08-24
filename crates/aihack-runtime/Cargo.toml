@@ -6,6 +6,10 @@ rust-version = "1.94"
 license = "NGPL"
 publish = false
 
+[features]
+default = []
+testing = []
+
 [dependencies]
 aihack-core = { path = "../aihack-core", version = "0.3.0" }
 aihack-content = { path = "../aihack-content", version = "0.3.0" }

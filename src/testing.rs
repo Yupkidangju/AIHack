@@ -9,6 +9,8 @@ use crate::{
     domain::{item::ItemKind, map::GameMap, status::Status},
 };
 
+pub use aihack_runtime::testing::resolve_depleted_death;
+
 type SavedWorldConfigurator = Box<dyn FnOnce(&mut SavedWorldV1)>;
 
 pub struct SessionBuilder {

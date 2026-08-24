@@ -39,28 +39,6 @@ pub fn move_actor(
     Ok(())
 }
 
-pub fn validate_actor_destination(
-    world: &GameWorld,
-    actor: EntityId,
-    from: Pos,
-    to: Pos,
-    direction: Direction,
-) -> Result<(), GameError> {
-    let (level, _) = actor_origin(world, actor)?;
-    aihack_core::movement::validate_destination_on_level(world, actor, level, from, to, direction)
-}
-
-pub fn validate_actor_destination_on_level(
-    world: &GameWorld,
-    actor: EntityId,
-    level: LevelId,
-    from: Pos,
-    to: Pos,
-    direction: Direction,
-) -> Result<(), GameError> {
-    aihack_core::movement::validate_destination_on_level(world, actor, level, from, to, direction)
-}
-
 pub fn is_passable_for_actor(world: &GameWorld, actor: EntityId, direction: Direction) -> bool {
     aihack_core::movement::is_passable_for_actor(world, actor, direction)
 }

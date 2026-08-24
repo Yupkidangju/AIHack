@@ -9,6 +9,9 @@ pub mod save;
 pub mod session;
 pub mod snapshot;
 pub mod systems;
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub mod testing;
 mod transaction;
 pub mod world;
 

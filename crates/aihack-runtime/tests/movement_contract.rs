@@ -1,12 +1,16 @@
-use aihack_core::position::Direction;
-use aihack_runtime::{systems::movement, world::GameWorld};
+use aihack_core::{action::CommandIntent, position::Direction};
+use aihack_runtime::GameSession;
 
 #[test]
 fn runtime_movement_updates_the_player_location() {
-    let mut world = GameWorld::fixture_without_monsters();
-    let before = world.player_pos();
+    let mut session = GameSession::new_for_playing(42);
+    let before = session.world().player_pos();
 
-    movement::move_player(&mut world, Direction::East).unwrap();
+    let outcome = session.submit(CommandIntent::Move(Direction::West));
 
-    assert_eq!(world.player_pos(), before.offset(Direction::East.delta()));
+    assert!(outcome.accepted);
+    assert_eq!(
+        session.world().player_pos(),
+        before.offset(Direction::West.delta())
+    );
 }

@@ -257,8 +257,14 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - ADR-0038과 `docs/audit/audit_report_28_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
 - report 28 시정은 전체 local gate와 implementation SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`의 Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐지만 report 29가 인접 경계를 재개방했다.
 
-### 10.16 `docs/audit/audit_report_29.md` 현재 상태 (2026-08-24)
+### 10.16 `docs/audit/audit_report_29.md` 역사적 technical predecessor 상태 (2026-08-24)
 
-- 위 report 29가 TUI 동등 transition, archive raw type/extraction, `ExpectedCommit` complete tree, document-wide authority, item ID-kind/glyph, allocator fixture와 public atomicity의 단일 현재 권위다.
+- report 29는 TUI 동등 transition, archive raw type/extraction, `ExpectedCommit` complete tree, document-wide authority, item ID-kind/glyph, allocator fixture와 public atomicity를 재현한 technical predecessor다.
 - ADR-0039와 `docs/audit/audit_report_29_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
-- ADR-0039 successor `a91a9c7/32706869079`의 전체 gate와 clean same-SHA Ubuntu/Windows actual bundle은 Verified됐고 후속 독립 감사는 pending이다. 별도 게시 승인 전까지 program/publication HOLD다.
+- ADR-0039 successor `a91a9c7/32706869079`의 전체 gate와 clean same-SHA Ubuntu/Windows actual bundle은 Verified됐지만 report 30이 authority/public surface를 재개방했다.
+
+### 10.17 `docs/audit/audit_report_30.md` 현재 상태 (2026-08-24)
+
+- report 30이 designs/compatibility/remediation/roadmap lifecycle과 broader public World/system mutation의 단일 현재 권위다.
+- ADR-0040과 `docs/audit/audit_report_30_remediation.md`가 문서 우선 계약, external compile RED/GREEN과 새 gate를 추적한다.
+- ADR-0040 implementation과 표적 adversarial GREEN은 완료됐고 전체 local gate, 새 clean same-SHA 양 OS actual bundle과 후속 독립 감사는 pending이다. 별도 게시 승인 전까지 program/publication HOLD다.

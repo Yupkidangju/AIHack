@@ -49,6 +49,9 @@
 - ZIP/TAR 공통 raw name/type/prefix validator, safe temporary extraction과 `ExpectedCommit` 독립 `git archive` byte identity를 양 release verifier에 연결했다.
 - known item ID-kind mismatch와 empty/multi-scalar glyph를 registry에서 거부하고 projectile/monster mutating system을 crate 내부 transaction primitive로 축소했다.
 - report 29 successor SHA `a91a9c7`의 Actions `32706869079`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+- report 30 계약에 따라 designs/compatibility/remediation/roadmap을 포함한 active authority gate와 submit-only default Rust visibility 시정을 시작했다.
+- designs/compatibility/remediation/roadmap header를 report 30 lifecycle로 복구하고 모든 active section에 exact-one/predecessor mutation gate를 적용했다.
+- default runtime의 mutating World/system surface를 crate-private로 축소하고 C010 direct-death fixture를 opt-in `testing` feature로 격리했으며 external compile pass/fail 회귀를 추가했다.
 - inverse inventory owner/index, actor HP/alive와 armor overflow malformed save가 수용되거나 panic하던 경계를 typed `InvalidSave`로 닫고, writer가 self-unloadable 16 MiB 초과 save를 게시하지 않도록 수정했다.
 - replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
 - Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.

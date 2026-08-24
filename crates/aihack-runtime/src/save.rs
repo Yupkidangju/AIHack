@@ -468,6 +468,7 @@ pub(crate) fn validate_saved_world(world: &SavedWorldV1) -> Result<(), GameError
     validate_saved_world_inner(world, false, None, aihack_content::registry()?)
 }
 
+#[cfg(feature = "testing")]
 pub(crate) fn validate_depleted_saved_world(world: &SavedWorldV1) -> Result<(), GameError> {
     validate_saved_world_inner(world, true, None, aihack_content::registry()?)
 }

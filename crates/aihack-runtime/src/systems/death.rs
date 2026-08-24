@@ -67,6 +67,7 @@ pub fn collect_death_events_if_hp_depleted(
     Ok(vec![GameEvent::EntityDied { entity, cause }])
 }
 
+#[cfg(feature = "testing")]
 pub fn state_after_deaths(world: &GameWorld) -> RunState {
     aihack_core::death::state_after_death_check(world.player_alive(), world.last_death_cause)
 }

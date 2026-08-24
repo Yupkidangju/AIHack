@@ -1,12 +1,11 @@
 use aihack::{
     core::{CommandIntent, Direction, EntityId, GameEvent, GameRng, GameSession, Pos},
     domain::{
-        combat::DamageRoll,
+        combat::{attack_roll_value, roll_damage, DamageRoll},
         entity::{ActorStats, EntityKind, EntityStore, Faction},
         monster::{monster_template, MonsterKind},
         player::adventurer_template,
     },
-    systems::combat,
 };
 
 #[test]
@@ -151,19 +150,27 @@ fn hit_formula_uses_d20_bonuses_and_defense() {
     let a = store.get(attacker).unwrap();
     let d = store.get(defender).unwrap();
 
-    assert_eq!(combat::attack_roll_value(a, d, 1, 12), (15, 15, true));
-    assert_eq!(combat::attack_roll_value(a, d, 1, 11), (14, 15, false));
+    let attacker_stats = a.actor().unwrap().4;
+    let defender_stats = d.actor().unwrap().4;
+    assert_eq!(
+        attack_roll_value(attacker_stats.hit_bonus, defender_stats.ac, 1, 12),
+        (15, 15, true)
+    );
+    assert_eq!(
+        attack_roll_value(attacker_stats.hit_bonus, defender_stats.ac, 1, 11),
+        (14, 15, false)
+    );
 }
 
 #[test]
 fn damage_formula_rolls_dice_and_clamps_minimum_one() {
     let mut rng = GameRng::new(42);
-    let damage = combat::roll_damage(&mut rng, DamageRoll { dice: 1, sides: 4 }, 0, 0);
+    let damage = roll_damage(&mut rng, DamageRoll { dice: 1, sides: 4 }, 0, 0);
     assert!((1..=4).contains(&damage));
 
     let mut rng = GameRng::new(42);
     assert_eq!(
-        combat::roll_damage(&mut rng, DamageRoll { dice: 1, sides: 2 }, 0, 99),
+        roll_damage(&mut rng, DamageRoll { dice: 1, sides: 2 }, 0, 99),
         1
     );
 }

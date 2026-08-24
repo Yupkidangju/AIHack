@@ -430,12 +430,7 @@ fn nh367_c010_player_death_records_cause_and_game_over_state() {
     let attacker = EntityId(3);
     let mut saved = session.to_save_data().world;
     saved.entities.actor_stats_mut(player).unwrap().hp = 0;
-    let mut world = aihack::core::GameWorld::from_depleted_saved_world(saved).unwrap();
-
-    let events =
-        aihack::systems::death::collect_death_events_after_attack(&mut world, attacker, player)
-            .unwrap();
-    let state = aihack::systems::death::state_after_deaths(&world);
+    let (events, state) = aihack::testing::resolve_depleted_death(saved, attacker, player).unwrap();
 
     assert!(events.iter().any(|event| matches!(
         event,

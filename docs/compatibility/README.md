@@ -1,6 +1,6 @@
 # NetHack 3.6.7 Compatibility Records
 
-문서 상태: NH367-C001..C010 engineering/provenance closed; report 28 remediation `9725c378/32694375654` same-SHA verified; independent re-audit pending
+문서 상태: NH367-C001..C010 engineering/provenance closed; current authority `docs/audit/audit_report_30.md`; ADR-0040 feature-gated C010 helper/public visibility 표적 GREEN, 전체 gate·새 CI pending
 작성일: 2026-07-15 (2026-07-18 R7 구현 갱신)
 관련 Task: R7-2
 기준: `../../spec.md` 13절, `../../PROVENANCE.md`
