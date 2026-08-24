@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0038: report 28 allocator·registry·input·archive 동등 경계
 
-Status: Accepted; implementation and new same-SHA CI pending (2026-08-24)
+Status: Implemented and same-SHA verified; independent re-audit pending (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R28-01
 
@@ -43,6 +43,8 @@ Alternatives:
 Consequences:
 
 wire schema v1은 유지하지만 allocator gap, invalid live monster와 forbidden item shape save/custom registry는 더 일찍 typed reject된다. 공개 spawn API는 fallible해지고 caller가 오류를 처리해야 한다. TUI control-key Repeat와 F9 evidence, archive/calendar parity가 양 OS regression matrix에 추가된다. 수정 전 RED와 전체 검증은 `docs/audit/audit_report_28_remediation.md`에 기록한다.
+
+Verification update: implementation SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`의 Actions `32694375654`에서 Ubuntu/Windows 각 19개 step, 전체 tests, R7/R8, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success다. 이 evidence는 구현을 Verified로 올리지만 report 28 후속 독립 재감사나 외부 게시 승인을 대신하지 않는다.
 
 ## ADR-0037: report 27 field-only causal 및 consumer canonical 경계
 

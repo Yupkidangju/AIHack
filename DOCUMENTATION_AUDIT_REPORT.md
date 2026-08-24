@@ -255,4 +255,4 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 
 - 현재 권위는 allocator MAX-1, invalid custom monster/equipment removal, control-key Repeat/F9 실제 경로, Windows archive component alias, year 0000 parity와 stale summary를 재현한 `docs/audit/audit_report_28.md`다.
 - ADR-0038과 `docs/audit/audit_report_28_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
-- 전체 local gate와 새 clean same-SHA Ubuntu/Windows actual bundle은 pending이며 후속 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.
+- report 28 시정은 전체 local gate와 implementation SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`의 Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. 후속 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.

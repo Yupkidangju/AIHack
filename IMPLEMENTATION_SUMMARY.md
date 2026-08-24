@@ -15,9 +15,9 @@
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
-현재 권위는 report 27 구현 `ea7822a5/32683076204`와 docs successor `01b2bd3/32684490662`를 adversarial probe로 다시 HOLD한 `docs/audit/audit_report_28.md`다. report 25 SHA `b732c42d62f295f4d8be64480c1d0a5a440fe738`/Actions `32650404618`은 partial evidence로, report 26의 `fc01ec12/32658658526`은 partial, `a9a39d8/32660221745`는 Linux failure, `1e84a94/32660514315`는 final predecessor로 보존한다. report 28 시정은 allocator exact successor/fallible spawn, custom registry/equipment removal, TUI control-key/F9, Windows-compatible archive component와 year parity를 ADR-0038 계약에 따라 정렬 중이다.
+현재 권위는 report 27 구현 `ea7822a5/32683076204`와 docs successor `01b2bd3/32684490662`를 adversarial probe로 다시 HOLD한 `docs/audit/audit_report_28.md`다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26 successor 계보는 historical evidence로 보존한다. report 28 시정은 allocator exact successor/fallible spawn, custom registry/equipment removal, TUI control-key/F9, Windows-compatible archive component와 year parity를 ADR-0038 계약에 따라 정렬했고 구현 SHA는 `9725c37896a8d149be5c500cdd26da154ab0a3fa`다.
 
-report 27의 수정 전 RED, 전체 local gate와 clean same-SHA evidence는 `docs/audit/audit_report_27_remediation.md`에 보존한다. report 28의 adversarial RED와 표적 GREEN은 `docs/audit/audit_report_28_remediation.md`에 누적하며 전체 local gate와 새 clean same-SHA CI는 pending이다. 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+report 27 evidence는 `docs/audit/audit_report_27_remediation.md`에 보존한다. report 28의 adversarial RED, 두 번의 전체 local run과 SHA `9725c378`의 Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle은 `docs/audit/audit_report_28_remediation.md`에 기록했다. 구현은 Verified지만 독립 재감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -923,7 +923,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `docs/audit/audit_report_28.md`가 재개방한 allocator/custom registry/equipment removal, TUI control-key/F9 evidence와 archive/calendar parity의 시정이다. report 27 implementation `ea7822a5/32683076204`와 docs successor `01b2bd3/32684490662`의 양 OS evidence는 유효한 predecessor로 유지한다. 외부 게시는 report 28 시정의 새 independent PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+다음 단계는 `docs/audit/audit_report_28.md` 시정의 새 독립 재감사다. 전체 local gate와 clean same-SHA 양 OS actual bundle은 `9725c378/32694375654`에서 Verified됐다. report 27 predecessor와 project-owner NGPL approval은 유지되며 외부 게시는 새 independent PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
 
 2026-08-18 `audit_report_23.md` 시정은 문서 우선으로 시작한다. 첫 slice인 SEC-F001은 ADR-0032와 `spec.md` 14·16절을 구현 권한으로 삼아 `ArtifactStore` capability root, no-follow/single-link open, `create_new` save temp, 실행별 TUI quick-save 경계를 구현한다. 회귀 기준은 사전 배치 temp hard link와 replay symlink/hard link가 외부 victim을 바꾸지 않고, 기존 save 보존과 정상 save/load/replay가 함께 통과하는 것이다. 완료 표시는 표적 테스트와 workspace 검증 후에만 갱신한다.
 
@@ -931,7 +931,7 @@ DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.
 
 ## 11. R9 콘텐츠 인과 폐쇄 Task
 
-역사 기록 (2026-08-18~24): R9-1..R9-5의 표적 인과 루프 이후 report 23이 R9-6 witness를 HOLD했고 report 24가 당시 coder remediation을 검증했다. report 25의 production GoldScore pair는 Actions `32650404618`에서 양 OS Verified됐다. report 26의 command/observer omission matrix는 report 27에서 field-only A/B와 나머지 8개 record equality로 교체됐고 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했다. report 28 시정의 새 CI와 독립 재감사 전에는 전체 program PASS를 선언하지 않는다.
+역사 기록 (2026-08-18~24): R9 causal field-only A/B와 나머지 8개 record equality는 report 27 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했고 `9725c378/32694375654`에서 해당 시정도 양 OS Verified됐다. 후속 독립 재감사 전에는 전체 program PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 

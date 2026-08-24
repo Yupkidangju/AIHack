@@ -462,5 +462,5 @@ Evidence paths:
 Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 ```
 
-현재 구현 판정: report 27 predecessor `ea7822a5/32683076204`까지의 시정은 양 OS Verified됐다. report 28 시정은 표적 GREEN이며 전체 local gate와 새 same-SHA CI가 pending이므로 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
-현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 종결했다. current authority는 `docs/audit/audit_report_28.md`이며 시정 evidence는 `docs/audit/audit_report_28_remediation.md`에 누적한다. 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.
+현재 구현 판정: report 28 시정 SHA `9725c378/32694375654`까지 전체 local gate와 clean same-SHA 양 OS actual bundle이 Verified됐다. 후속 독립 재감사 전까지 program HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+현재 문서 감사 판정: `audit_report_9.md`가 R1~R5를, `audit_report_11.md`가 R6를, `docs/audit/audit_report_21.md`가 report 20을, `audit_report_24.md`와 후속 CI가 report 23/24를 종결했다. current authority는 `docs/audit/audit_report_28.md`이며 `docs/audit/audit_report_28_remediation.md`가 `9725c378/32694375654` evidence를 기록한다. 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.

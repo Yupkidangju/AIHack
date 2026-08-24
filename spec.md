@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 27 시정 SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`, Actions `32683076204` clean same-SHA Ubuntu/Windows actual bundle Verified. `docs/audit/audit_report_28.md`가 allocator headroom, custom registry/equipment removal, archive alias/calendar parity와 TUI evidence를 재개방하여 시정 중이며 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 코드 기준: Cargo package 0.3.0, report 28 시정 SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`, Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle Verified. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙

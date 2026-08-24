@@ -6,7 +6,7 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implementation contract, report 27 predecessor `ea7822a5/32683076204`, `audit_report_28.md` remediation in progress; PROGRAM/PUBLICATION HOLD
+문서 상태: active implementation contract, report 28 remediation `9725c378/32694375654` same-SHA 양 OS Verified; independent re-audit pending, PROGRAM/PUBLICATION HOLD
 작성일: 2026-07-15
 최근 동기화: 2026-08-24
 기준: `spec.md`

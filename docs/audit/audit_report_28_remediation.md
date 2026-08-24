@@ -1,6 +1,6 @@
 # audit report 28 시정 기록
 
-문서 상태: 시정 진행 중
+문서 상태: IMPLEMENTATION SAME-SHA VERIFIED / INDEPENDENT RE-AUDIT PENDING / PROGRAM HOLD
 작성일: 2026-08-24
 감사 기준: `docs/audit/audit_report_28.md`
 현재 권한: 독립 재감사 HOLD
@@ -59,9 +59,20 @@
 | Git Bash `scripts/r7_checkpoint.sh`, `scripts/r8_checkpoint.sh` | 각각 PASS |
 | `cargo audit` | PASS, 318 dependencies, vulnerabilities 0건 |
 | cargo-deny 0.19.4 `licenses bans sources` | PASS |
-| clean actual bundle과 새 same-SHA 양 OS CI | pending |
+| clean actual bundle과 새 same-SHA 양 OS CI | PASS, `9725c378/32694375654` |
 
 첫 전체 run은 allocator 오류만 no-commit하도록 의도했으나 모든 rejected outcome을 no-commit해 `AwaitingDirection`의 기존 Playing 복귀 계약을 깨뜨렸다. 이 실패를 보존하고 internal `transaction_aborted` 표식으로 allocation/projectile/monster-phase partial mutation 오류만 rollback하도록 범위를 좁힌 뒤 두 번째 전체 workspace run이 PASS했다.
+
+### 3.3 clean implementation SHA와 양 OS CI
+
+- 구현 SHA: `9725c37896a8d149be5c500cdd26da154ab0a3fa`
+- clean local Windows `cmd /c build.bat --release`: PASS, 9-entry exact set과 metadata commit 일치
+- Actions: [run `32694375654`](https://github.com/Yupkidangju/AIHack/actions/runs/32694375654)
+- Ubuntu job `97333654365`: 19개 step success, 9분 12초. Unix archive alias/year edge matrix, R7/R8, actual Linux bundle, cargo-audit/deny와 lockfile 불변 PASS
+- Windows job `97333654540`: 19개 step success, 21분 11초. 445 tests/ConPTY, Windows archive alias/year matrix, R7/R8, actual Windows bundle, cargo-audit/deny와 lockfile 불변 PASS
+- 두 job의 `headSha`와 local/remote implementation SHA는 `9725c37896a8d149be5c500cdd26da154ab0a3fa`로 같다.
+
+report 28 시정 구현은 same-SHA Verified지만 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD다.
 
 ## 4. 종료 경계
 

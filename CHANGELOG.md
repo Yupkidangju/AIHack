@@ -53,6 +53,7 @@
 - report 27 시정 SHA `ea7822a5`/Actions `32683076204`에서 437 tests, R7/R8, actual 양 OS bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
 - report 28의 allocator headroom, hp 0 custom monster, armor Wear→Throw derived AC와 F9 실제 경로를 fail-closed 회귀로 수정했다.
 - archive component의 Windows case/trailing/reserved/collision alias와 Linux year 0000 calendar parity를 양 verifier에서 거부하도록 수정했다.
+- report 28 시정 SHA `9725c378`/Actions `32694375654`에서 전체 tests, R7/R8, actual 양 OS bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
 
 ### 2026-07-20 기준 누적 내역
 

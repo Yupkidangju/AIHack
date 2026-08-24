@@ -45,8 +45,9 @@ fn r8_design_and_decision_docs_describe_the_ngpl_release_boundary() {
 
     let compatibility = project_file("docs/compatibility/README.md");
     assert!(compatibility.contains("NH367-C001..C010 engineering/provenance closed"));
-    assert!(compatibility.contains("report 27 predecessor `ea7822a5/32683076204`"));
-    assert!(compatibility.contains("audit report 28 remediation in progress"));
+    assert!(
+        compatibility.contains("report 28 remediation `9725c378/32694375654` same-SHA verified")
+    );
 }
 
 #[test]
@@ -142,7 +143,7 @@ fn active_r8_status_docs_share_the_same_audited_ci_and_hold_boundary() {
         "DESIGN_DECISIONS.md",
     ] {
         let content = project_file(document);
-        for phrase in ["ea7822a5", "32683076204"] {
+        for phrase in ["9725c378", "32694375654"] {
             assert!(
                 content.contains(phrase),
                 "{document} report 27 evidence 누락: {phrase}"
@@ -234,13 +235,13 @@ fn active_release_sections_reject_known_stale_statuses() {
             "{verified} 현재 상태 불일치"
         );
     }
-    for in_progress in ["G-CORE-004", "G-DOC-006", "G-SEC-003", "G-UI-002"] {
+    for verified in ["G-CORE-004", "G-DOC-006", "G-SEC-003", "G-UI-002"] {
         assert!(
-            gap_row(&gaps, in_progress).ends_with("| In Progress |"),
-            "{in_progress} 현재 상태 불일치"
+            gap_row(&gaps, verified).ends_with("| Verified |"),
+            "{verified} 현재 상태 불일치"
         );
     }
-    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| In Progress |"));
+    assert!(gap_row(&gaps, "G-FINAL-001").ends_with("| Verified |"));
     for row in gaps.lines().filter(|line| line.starts_with("| G-")) {
         assert!(
             !row.contains("Closed /"),
@@ -293,7 +294,10 @@ fn implementation_summary_does_not_reopen_completed_report_27_ci() {
     assert!(implementation_order.contains("audit_report_28.md"));
     assert!(!implementation_order
         .contains("audit_report_27.md` 시정의 전체 local gate와 새 clean same-SHA 양 OS CI"));
+    assert!(!implementation_order
+        .contains("audit_report_28.md`가 재개방한 allocator/custom registry/equipment removal"));
     assert!(!r9.contains("새 CI와 독립 재감사 전에는 R9 최종 PASS"));
+    assert!(!r9.contains("report 28 시정의 새 CI와 독립 재감사 전"));
 }
 
 #[test]
