@@ -387,7 +387,7 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 final multi-audit report 1과 report 25~29는 historical/technical evidence로 보존한다. report 30 technical successor `ed02dbf/32733235414`는 전체 gate와 clean same-SHA 양 OS actual bundle 및 Report 31 public visibility 독립 검증까지 완료했다.
 
-현재 최상위 권위는 `docs/audit/audit_report_31.md`다. ADR-0041의 summary 1·10·11 exact-one과 predecessor current/completed-work generic negative gate 및 전체 local quality gate 453 tests는 PASS했다. 새 clean same-SHA 양 OS actual bundle과 후속 독립 PASS 전에는 전체 program PASS로 전환하지 않는다.
+현재 최상위 권위는 `docs/audit/audit_report_31.md`다. ADR-0041의 summary 1·10·11 exact-one과 predecessor current/completed-work generic negative gate, 전체 local quality gate 453 tests와 candidate `f3a7aa6` clean Windows actual bundle은 PASS했다. docs evidence successor의 same-SHA 양 OS actual bundle과 후속 독립 PASS 전에는 전체 program PASS로 전환하지 않는다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -466,4 +466,4 @@ Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 
 현재 구현 판정: report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐고 Report 31이 public visibility와 Report 29 기술 회귀를 독립 확인했다. 실제 model provider smoke는 비차단 고려 대상이다.
 
-현재 문서 감사 판정: 단일 current authority는 `docs/audit/audit_report_31.md`이며 current remediation은 `docs/audit/audit_report_31_remediation.md`다. summary 1·10·11과 기존 active 문서 범위의 generic lifecycle negative gate 및 전체 local quality gate는 PASS했다. 새 양 OS CI 뒤에만 Verified로 갱신하며 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.
+현재 문서 감사 판정: 단일 current authority는 `docs/audit/audit_report_31.md`이며 current remediation은 `docs/audit/audit_report_31_remediation.md`다. summary 1·10·11과 기존 active 문서 범위의 generic lifecycle negative gate, 전체 local quality gate와 candidate `f3a7aa6` Windows bundle은 PASS했다. docs evidence successor의 새 양 OS CI 뒤에만 Verified로 갱신하며 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.

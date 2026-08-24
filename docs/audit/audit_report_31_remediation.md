@@ -5,7 +5,7 @@
 - 작업 브랜치: `codex/audit-report-31-remediation`
 - 작업 일자: 2026-08-24
 - predecessor 기술 판정: **Report 30/29 표적 회귀 PASS**
-- 현재 판정: **regression RED/GREEN·full local quality gate PASS / clean bundle·CI pending / PROGRAM·PUBLICATION HOLD**
+- 현재 판정: **regression RED/GREEN·full local quality gate·candidate clean Windows actual bundle PASS / docs successor same-SHA CI pending / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. Report 30 public visibility와 technical successor `ed02dbf/32733235414`, Report 29의 content/allocator/TUI/archive 기술 증거는 역사적 Verified로 보존한다.
 
@@ -97,7 +97,15 @@ clean-worktree actual bundle을 제외한 전체 gate의 최종 실행 결과다
 | Git Bash `scripts/r7_checkpoint.sh` | PASS |
 | Git Bash `scripts/r8_checkpoint.sh` | PASS |
 
-clean commit의 `build.bat --release` actual bundle은 pending이다.
+candidate commit `f3a7aa662d8820b361c674b37264f3246cc2b7ac`의 clean worktree에서 `cmd /d /c build.bat --release`를 실행했다.
+
+```text
+PASS source archive: format=zip entries=379
+PASS Windows release bundle: version=0.3.0 commit=f3a7aa662d8820b361c674b37264f3246cc2b7ac
+output exact entries=9
+```
+
+output은 binary 2, license/notice/modification/approval/metadata 문서 5, source ZIP, `SHA256SUMS`의 정확히 9개 entry다. docs evidence successor의 clean Windows 재검증과 same-SHA 양 OS CI는 pending이다.
 
 ## 7. clean same-SHA Ubuntu/Windows actual bundle
 

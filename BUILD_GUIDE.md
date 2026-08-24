@@ -20,7 +20,7 @@
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
 | CI technical baseline | report 30 technical successor `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`, [run `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414), Ubuntu/Windows 각 19 success step과 actual platform bundle success 및 Report 31 독립 API 검증 | Verified |
-| CI current remediation | report 31 summary lifecycle generic gate | 새 양 OS evidence와 후속 독립 PASS 전 program HOLD |
+| CI current remediation | report 31 summary lifecycle generic gate; candidate `f3a7aa6` clean Windows actual bundle PASS | docs evidence successor의 same-SHA 양 OS evidence와 후속 독립 PASS 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 

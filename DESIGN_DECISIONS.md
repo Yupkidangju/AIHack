@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0041: report 31 summary lifecycle과 generic predecessor gate
 
-Status: Implemented and full local quality gate verified; clean same-SHA bundle/CI pending (2026-08-24)
+Status: Implemented with full local gate and clean Windows actual bundle verified; same-SHA Ubuntu/Windows CI pending (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R31-01
 
@@ -39,6 +39,8 @@ Alternatives:
 Consequences:
 
 문서 gate는 현재 report 번호와 predecessor lifecycle 상태를 구조적으로 해석한다. summary의 현재 기준, 다음 작업과 R9 이력은 서로 다른 문장이어도 하나의 lifecycle을 가리키며, 완료된 Report 30 기술 증거는 역사적 Verified로만 남는다. RED/GREEN, 전체 gate와 CI 증거는 `docs/audit/audit_report_31_remediation.md`에 기록한다.
+
+Local verification: candidate SHA `f3a7aa662d8820b361c674b37264f3246cc2b7ac`에서 453 named tests, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 379-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. docs evidence successor의 same-SHA Ubuntu/Windows CI는 pending이다.
 
 ## ADR-0040: report 30 active authority와 submit-only visibility 강제
 
