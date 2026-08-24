@@ -200,7 +200,7 @@ fn active_document_sections_have_one_report_30_authority_and_reject_predecessors
         roadmap_current_start + roadmap[roadmap_current_start..].find("```bash").unwrap();
     let roadmap_current = &roadmap[roadmap_current_start..roadmap_current_end];
     validate_current_authority(roadmap_current, CURRENT, STALE).unwrap();
-    assert!(roadmap_current.contains("ADR-0040 implementation `59c8872`"));
+    assert!(roadmap_current.contains("successor `ed02dbf/32733235414`"));
     let roadmap_final = &roadmap[roadmap.find("현재 구현 판정:").unwrap()..];
     validate_current_authority(roadmap_final, CURRENT, STALE).unwrap();
 
@@ -216,13 +216,13 @@ fn active_document_sections_have_one_report_30_authority_and_reject_predecessors
     let designs_header = &designs[..designs.find("## 1. 경험 목표").unwrap()];
     validate_current_authority(designs_header, CURRENT, STALE).unwrap();
     assert!(designs_header
-        .contains("implementation `59c8872` 전체 local/clean Windows actual bundle Verified"));
+        .contains("successor `ed02dbf/32733235414` clean same-SHA 양 OS actual bundle Verified"));
 
     let compatibility = project_file("docs/compatibility/README.md");
     let compatibility_header = &compatibility[..compatibility.find("## 1. 목적").unwrap()];
     validate_current_authority(compatibility_header, CURRENT, STALE).unwrap();
     assert!(compatibility_header.contains(
-        "implementation `59c8872` feature-gated C010/public visibility와 전체 local gate Verified"
+        "successor `ed02dbf/32733235414` feature-gated C010/public visibility와 양 OS actual bundle Verified"
     ));
 
     let report_29_remediation = project_file("docs/audit/audit_report_29_remediation.md");
@@ -230,9 +230,8 @@ fn active_document_sections_have_one_report_30_authority_and_reject_predecessors
         .find("## 1. Finding 대조와 결정")
         .unwrap()];
     validate_current_authority(report_29_header, CURRENT, STALE).unwrap();
-    assert!(
-        report_29_header.contains("REPORT 30 `59c8872` 전체 local·clean Windows actual Verified")
-    );
+    assert!(report_29_header
+        .contains("REPORT 30 `ed02dbf/32733235414` clean same-SHA 양 OS actual Verified"));
 
     let report_30_remediation = project_file("docs/audit/audit_report_30_remediation.md");
     let report_30_header = &report_30_remediation[..report_30_remediation
@@ -240,7 +239,7 @@ fn active_document_sections_have_one_report_30_authority_and_reject_predecessors
         .unwrap()];
     validate_current_authority(report_30_header, CURRENT, STALE).unwrap();
     assert!(report_30_header
-        .contains("implementation `59c8872` 전체 local·clean Windows actual Verified"));
+        .contains("successor `ed02dbf/32733235414` clean same-SHA 양 OS actual Verified"));
 
     let valid = format!("현재 권위는 `{CURRENT}`다.");
     assert!(validate_current_authority(&valid, CURRENT, STALE).is_ok());

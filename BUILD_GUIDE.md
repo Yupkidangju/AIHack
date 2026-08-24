@@ -19,7 +19,7 @@
 | edition/MSRV | edition 2021, rust-version 1.94 | edition 2021, rust-version 1.94 |
 | UI | ratatui 0.30.x + crossterm 0.29 단일 계열 | 같은 계열 유지 |
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
-| CI | report 30 implementation `59c88720924d28b892e66f732eb4007825eb76d5` 전체 local/clean Windows 9-entry actual bundle success; 새 clean same-SHA 양 OS run pending | 독립 재감사 전 program HOLD |
+| CI | report 30 successor `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`, [run `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414), Ubuntu/Windows 각 19 success step과 actual platform bundle success | 독립 재감사 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 
@@ -470,4 +470,4 @@ Linux/Windows release verifier는 fresh staging 또는 승격된 `output/` root�
 - [x] report 28 시정 전체 로컬 gate와 새 clean same-SHA Ubuntu/Windows actual bundle — `9725c378`, Actions `32694375654`
 - [x] `docs/audit/audit_report_24.md` 시정 clean same-SHA Ubuntu/Windows CI — `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171`
 
-기존 report 21~29 계보는 historical/technical evidence로 보존한다. 현재 authority는 `docs/audit/audit_report_30.md`이며 implementation `59c8872`의 전체 local gate와 clean Windows actual bundle은 완료했고 새 clean same-SHA 양 OS CI가 pending이다. 새 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
+기존 report 21~29 계보는 historical/technical evidence로 보존한다. 현재 authority는 `docs/audit/audit_report_30.md`이며 successor `ed02dbf/32733235414`의 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐다. 새 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.

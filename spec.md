@@ -9,7 +9,7 @@
 문서 상태: active implementation target
 작성일: 2026-07-15
 목표 버전: 0.3.0
-현재 코드 기준: Cargo package 0.3.0, report 30 implementation SHA `59c88720924d28b892e66f732eb4007825eb76d5`의 전체 local gate와 clean Windows actual bundle Verified, 새 clean same-SHA Ubuntu/Windows CI pending. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 코드 기준: Cargo package 0.3.0, report 30 successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 [Actions `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414) clean same-SHA Ubuntu/Windows actual bundle Verified. 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙

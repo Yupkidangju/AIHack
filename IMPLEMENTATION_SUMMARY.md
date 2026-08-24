@@ -17,7 +17,7 @@ R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 
 
 현재 권위는 report 29 technical successor/current docs를 adversarial probe로 다시 HOLD한 `docs/audit/audit_report_30.md`다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~29 successor 계보는 historical/technical evidence로 보존한다. report 29 시정은 content/allocator/TUI/archive와 projectile/monster 축소를 `a91a9c7/32706869079`에서 양 OS Verified했지만 report 30이 active document scope와 broader public mutation을 다시 열었다.
 
-report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence로 보존한다. report 30 시정 implementation SHA `59c88720924d28b892e66f732eb4007825eb76d5`의 document-wide authority, submit-only visibility, external compile, Report 29 regression, 전체 local gate와 clean Windows actual bundle은 Verified됐다. 새 same-SHA 양 OS CI가 pending이므로 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
+report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence로 보존한다. report 30 successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 document-wide authority, submit-only visibility, external compile, Report 29 regression, 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐다. 후속 독립 감사 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 

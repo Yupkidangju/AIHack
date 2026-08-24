@@ -1,6 +1,6 @@
 # NetHack 3.6.7 Compatibility Records
 
-문서 상태: NH367-C001..C010 engineering/provenance closed; current authority `docs/audit/audit_report_30.md`; implementation `59c8872` feature-gated C010/public visibility와 전체 local gate Verified, 새 양 OS CI pending
+문서 상태: NH367-C001..C010 engineering/provenance closed; current authority `docs/audit/audit_report_30.md`; successor `ed02dbf/32733235414` feature-gated C010/public visibility와 양 OS actual bundle Verified; independent re-audit pending
 작성일: 2026-07-15 (2026-07-18 R7 구현 갱신)
 관련 Task: R7-2
 기준: `../../spec.md` 13절, `../../PROVENANCE.md`

@@ -14,7 +14,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0040: report 30 active authority와 submit-only visibility 강제
 
-Status: Implemented and full local/Windows actual bundle verified; same-SHA CI pending (2026-08-24)
+Status: Implemented and clean same-SHA Ubuntu/Windows actual bundles verified; independent re-audit pending (2026-08-24)
 Date: 2026-08-24
 Decision ID: DEC-AUDIT-R30-01
 
@@ -42,6 +42,8 @@ Consequences:
 일부 pre-release Rust public path는 제거된다. 외부 production consumer는 `GameSession`과 read-only query로 이동해야 하며, test-only direct world scenarios는 feature-gated helper 또는 persisted `SessionBuilder`로 이동한다. source/test/document 변경과 RED/GREEN, 전체 gate 및 CI는 `docs/audit/audit_report_30_remediation.md`에 기록한다.
 
 Verification update: implementation SHA `59c88720924d28b892e66f732eb4007825eb76d5`에서 Windows named tests 452개, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 clean Windows 9-entry actual bundle이 PASS했다. 새 same-SHA Ubuntu/Windows CI와 후속 독립 감사는 pending이다.
+
+CI verification: docs/test successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 Ubuntu job `97450032431`과 Windows job `97450032767`이 각 19 success step과 actual platform bundle을 완료했다. cargo-audit, cargo-deny 0.19.4와 lockfile 불변도 모두 success이며 후속 독립 감사와 외부 게시 승인은 별도다.
 
 ## ADR-0039: report 29 transition·source identity·public boundary 폐쇄
 
