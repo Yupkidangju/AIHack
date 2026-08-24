@@ -5,7 +5,7 @@
 - 작업 브랜치: `codex/audit-report-32-remediation`
 - 작업 일자: 2026-08-25
 - Report 31 판정: **R29-DOC-F002 Re-audit #3 / FIN-F012 independently Closed**
-- 현재 판정: **R32-DBG-F001·FIN-F015 full local quality gate PASS / clean bundle·final-SHA CI pending / PROGRAM·PUBLICATION HOLD**
+- 현재 판정: **R32-DBG-F001·FIN-F015 full local·candidate clean Windows actual PASS / final-SHA 양 OS CI pending / PROGRAM·PUBLICATION HOLD**
 
 독립 감사 원문은 수정하지 않는다. Report 31 successor `8c042d48/32741917348`의 lifecycle/public visibility/Report 29 기술 증거는 historical Verified로 보존한다.
 
@@ -82,6 +82,16 @@ release_gate                                7 PASS
 | Git Bash `scripts/r8_checkpoint.sh` | PASS |
 
 Windows host에는 WSL distro와 Docker가 없어 local Linux binary를 권위 있게 생성할 수 없다. `build.sh`를 Windows Git Bash에서 실행한 결과는 Linux actual로 사용하지 않으며, final SHA의 `ubuntu-latest` `build.sh --release`를 clean Linux actual bundle evidence로 사용한다.
+
+candidate `57d8108a51db08f942aba3218eafd2a94cc011d3`의 commit date는 `2026-08-25`이며 clean worktree `cmd /d /c build.bat --release` 결과는 다음과 같다.
+
+```text
+PASS source archive: format=zip entries=381
+PASS Windows release bundle: version=0.3.0 commit=57d8108a51db08f942aba3218eafd2a94cc011d3
+output exact entries=9
+```
+
+final document-bearing commit에서도 clean Windows bundle을 다시 실행하고 동일 SHA의 Ubuntu/Windows CI를 사용한다.
 
 ## 6. clean Windows/Linux actual bundle과 final-SHA CI
 

@@ -14,7 +14,9 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
 
 ## ADR-0042: report 32 current-HEAD modification evidence와 final-SHA CI
 
-Status: Implemented with full local quality gate verified; clean Windows/Linux bundle and final-SHA CI pending (2026-08-25)
+Status: Implemented with full local gate and candidate clean Windows actual bundle verified; final-SHA Linux/Windows CI pending (2026-08-25)
+
+Local verification: candidate `57d8108a51db08f942aba3218eafd2a94cc011d3` date `2026-08-25`에서 453 named tests, fmt/clippy, release all-target build, RustSec/cargo-deny 0.19.4, R7/R8와 381-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. final document-bearing commit의 clean Windows 재검증과 Ubuntu actual Linux bundle/양 OS CI가 남아 있다.
 Date: 2026-08-25
 Decision ID: DEC-AUDIT-R32-01
 

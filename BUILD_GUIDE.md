@@ -21,7 +21,7 @@
 | binary 선택 | TUI default-run `aihack`, headless는 `-p aihack-headless --bin` | 같은 이름 + default-run aihack |
 | CI technical baseline | report 30 technical successor `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`, [run `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414), Ubuntu/Windows 각 19 success step과 actual platform bundle success 및 Report 31 독립 API 검증 | Verified |
 | CI historical closure | report 31 summary lifecycle/FIN-F012; successor `8c042d48/32741917348` clean same-SHA 양 OS actual success | Report 32 independent Closed |
-| CI current remediation | report 32 R32-DBG-F001/FIN-F015; 2026-08-25 Notice ID/period와 full local 453 tests PASS | clean actual bundle, final same-SHA 양 OS evidence와 후속 독립 PASS 전 program HOLD |
+| CI current remediation | report 32 R32-DBG-F001/FIN-F015; 2026-08-25 Notice ID/period, full local 453 tests와 candidate `57d8108a` clean Windows actual bundle PASS | final same-SHA Ubuntu/Linux·Windows evidence와 후속 독립 PASS 전 program HOLD |
 | script | locked, artifact fail-fast | locked, artifact fail-fast |
 | long run | default `survival-v1`, absolute target `1..=1,000,000`, 조기 GameOver nonzero | 같은 계약 유지 |
 

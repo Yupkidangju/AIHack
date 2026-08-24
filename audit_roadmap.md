@@ -387,7 +387,7 @@ R8 최종 PASS 전에 SC-LICENSE-01을 재실행해 PROV-0004와 NH367-C001..C01
 
 final multi-audit report 1과 report 25~30은 historical/technical evidence로 보존한다. report 31 successor `8c042d48/32741917348`의 summary lifecycle/FIN-F012는 Report 32에서 independent Closed로 종결됐다.
 
-현재 최상위 권위는 `docs/audit/audit_report_32.md`다. R32-DBG-F001/FIN-F015의 current HEAD `%cs`, modification Notice ID/period, release metadata와 양 verifier를 2026-08-25 revision으로 정렬했고 actual HEAD-date early gate와 전체 local quality gate 453 tests는 PASS했다. clean actual bundle과 final same-SHA 양 OS CI 및 후속 독립 PASS 전에는 전체 program PASS로 전환하지 않는다.
+현재 최상위 권위는 `docs/audit/audit_report_32.md`다. R32-DBG-F001/FIN-F015의 current HEAD `%cs`, modification Notice ID/period, release metadata와 양 verifier를 2026-08-25 revision으로 정렬했고 actual HEAD-date early gate, 전체 local quality gate 453 tests와 candidate `57d8108a` clean Windows actual bundle은 PASS했다. final same-SHA Ubuntu/Linux·Windows CI 및 후속 독립 PASS 전에는 전체 program PASS로 전환하지 않는다.
 
 ```bash
 scripts/r8_checkpoint.sh
@@ -468,4 +468,4 @@ Verdict: PASS|FAIL|PASS WITH KNOWN RISKS
 
 현재 문서 감사 판정: 단일 current authority는 `docs/audit/audit_report_32.md`이며 current remediation은 `docs/audit/audit_report_32_remediation.md`다.
 
-Report 31 lifecycle finding은 Closed로 보존한다. R32-DBG-F001/FIN-F015의 local quality gate는 PASS했으며 clean release bundle과 final same-SHA 양 OS CI가 완료된 뒤에만 Verified로 갱신한다. 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.
+Report 31 lifecycle finding은 Closed로 보존한다. R32-DBG-F001/FIN-F015의 local quality gate와 candidate Windows bundle은 PASS했으며 final same-SHA 양 OS CI가 완료된 뒤에만 Verified로 갱신한다. 새 independent PASS 뒤에만 `Closed`와 전체 program 판정을 갱신한다.

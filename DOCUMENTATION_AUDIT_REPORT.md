@@ -280,4 +280,4 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 
 - report 32가 current HEAD release candidate date와 modification evidence lifecycle의 단일 현재 권위다.
 - ADR-0042와 `docs/audit/audit_report_32_remediation.md`가 R32-DBG-F001/FIN-F015의 Notice ID/period, actual HEAD-date 조기 gate와 final-SHA bundle을 추적한다.
-- current HEAD `8045249` date `2026-08-25`가 bundled period end `2026-08-24` 밖이어서 actual Windows bundle은 fail-closed했다. ADR-0042의 2026-08-25 Notice ID/period, actual HEAD-date 조기 regression과 전체 local quality gate 453 tests는 PASS했다. clean actual bundle, final same-SHA 양 OS evidence와 후속 독립 PASS 및 별도 게시 승인 전까지 program/publication HOLD다.
+- current HEAD `8045249` date `2026-08-25`가 bundled period end `2026-08-24` 밖이어서 actual Windows bundle은 fail-closed했다. ADR-0042의 2026-08-25 Notice ID/period, actual HEAD-date 조기 regression, 전체 local quality gate 453 tests와 candidate `57d8108a` clean Windows actual bundle은 PASS했다. final same-SHA 양 OS evidence와 후속 독립 PASS 및 별도 게시 승인 전까지 program/publication HOLD다.
