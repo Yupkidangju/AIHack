@@ -33,6 +33,7 @@ fn current_level_hostile_monsters_are_filtered_and_sorted() {
             .saved()
             .entities
             .spawn_monster(MonsterKind::FloatingEye, Pos { x: 7, y: 7 })
+            .unwrap()
     });
     assert!(aihack::testing::SessionBuilder::mutate(
         &mut session,
@@ -250,6 +251,7 @@ fn floating_eye_remains_stationary() {
             .saved()
             .entities
             .spawn_monster(MonsterKind::FloatingEye, Pos { x: 8, y: 8 })
+            .unwrap()
     });
     let before = session.world().entities().actor_location(eye);
 
@@ -274,6 +276,7 @@ fn floating_eye_does_not_attack_when_adjacent() {
             .saved()
             .entities
             .spawn_monster(MonsterKind::FloatingEye, Pos { x: 9, y: 8 })
+            .unwrap()
     });
 
     let outcome = session.submit(CommandIntent::Wait);
@@ -335,7 +338,12 @@ fn player_death_stops_remaining_monster_actions() {
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         let stats = world.saved().entities.actor_stats_mut(player).unwrap();
         stats.hp = 1;
-        stats.ac = -20;
+        world
+            .saved()
+            .entities
+            .actor_stats_mut(EntityId(2))
+            .unwrap()
+            .hit_bonus = 100;
     });
     assert!(aihack::testing::SessionBuilder::mutate(
         &mut session,

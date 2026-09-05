@@ -35,6 +35,7 @@ pub fn item_kind_from_id(id: &str) -> Result<ItemKind, ContentError> {
         "item.weapon.rock" => Ok(ItemKind::Rock),
         "item.armor.leather" => Ok(ItemKind::ArmorLeather),
         "item.corpse.jackal" => Ok(ItemKind::CorpseJackal),
+        "item.quest.ascension" => Ok(ItemKind::AmuletAscension),
         _ => Err(ContentError::UnknownReference {
             owner: "item kind".to_owned(),
             target: id.to_owned(),

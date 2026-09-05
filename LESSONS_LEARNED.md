@@ -1,5 +1,23 @@
 # AIHack Lessons Learned
 
+## 2026-08-24: 동일 SHA Linux 검증과 directory fsync
+
+- Windows no-op branch와 로컬 Windows 전체 green은 Unix durability branch의 실행 증거가 아니다. clean same-SHA Ubuntu가 첫 atomic save에서 EBADF를 재현하면서 platform branch를 실제 OS에서 실행해야 하는 이유를 다시 확인했다.
+- Linux의 capability directory handle은 O_PATH일 수 있다. handle clone을 일반 `File`로 변환했다고 sync 가능한 descriptor가 되는 것은 아니며, 같은 capability 아래 directory를 read-only file로 다시 열고 type을 확인한 뒤 fsync해야 한다.
+- exact-set 검사는 필수 파일 존재 검사보다 뒤에 두어야 fail-closed 강도와 구체적 진단을 함께 유지한다. 먼저 count만 비교하면 기존 negative fixture가 기대한 누락 파일 원인을 잃는다.
+
+## 2026-08-18: 감사 false-green과 파일 handle 경계
+
+- 경로를 canonicalize한 뒤 bare path를 다시 여는 방식은 보안 경계가 아니다. root directory capability와 실제 open/rename을 결합하고, 열린 handle의 file type과 hard-link count를 확인해야 한다.
+- 임시 파일 이름을 예측하기 어렵게 만드는 것만으로는 충분하지 않다. 원자적 신규 생성, 같은 directory의 sync·replace, 실패 시 기존 파일 보존을 하나의 API가 책임져야 한다.
+- 장기 테스트의 “상태가 달라졌다” assertion은 여러 인과 계약을 한꺼번에 증명하지 못한다. 필수 witness를 닫힌 enum과 count map으로 정의하고 누락·event-only·turn-only negative를 acceptance validator에 넣어야 한다.
+- 감사 보고서는 Initial Finding, coder remediation, 독립 재감사 판정을 같은 현재형으로 섞지 않는다. 후속 보고서의 종결 권한과 새 HOLD를 시간 순서대로 분리해야 자동 문서 회귀가 과거 pending을 현재 상태로 되살리지 않는다.
+- line-ending fixture를 무조건 정규화하면 실제 Windows checkout 실패를 숨길 수 있다. canonical checkout 속성과 CRLF 입력 회귀를 모두 검사하고 실제 platform 명령을 CI에서 실행해야 한다.
+- SPDX exception은 기본 license와 별개이며 일반 allowlist보다 crate/version 한정 exception이 권한 확대를 줄인다. owner, 만료일과 dependency 변경 trigger를 함께 기록하고 고정 cargo-deny binary로 실제 실행해야 한다.
+- Unix mode 0600을 Windows owner-only ACL과 동일하게 표현하면 안 된다. Windows가 parent DACL을 상속한다면 문서·함수 이름·테스트가 그 실제 경계를 그대로 말해야 한다.
+- Linux `O_TMPFILE`은 이름이 붙기 전 link count가 0이다. 기존 destination의 single-link 불변조건을 신규 anonymous temp에 그대로 재사용하면 보안 강화가 정상 저장을 차단하므로 lifecycle별 validator를 분리해야 한다.
+- negative fixture는 실패 payload가 실제 산출물에 들어갔는지 먼저 증명해야 한다. Git ignore나 export attribute에 따라 주입이 사라지면 verifier가 아니라 fixture가 false-green/false-red를 만든다.
+
 ## 2026-08-17: 콘텐츠 인과 폐쇄
 
 - 1000턴 도달과 반복 hash만으로는 콘텐츠가 simulation에 참여한다는 사실을 증명할 수 없다. turn/event metadata를 제외한 semantic snapshot delta와 콘텐츠별 producer-consumer witness가 함께 필요하다.
@@ -9,7 +27,7 @@
 
 문서 상태: active
 작성일: 2026-05-20
-최근 갱신: 2026-07-20
+최근 갱신: 2026-08-18
 버전: v0.3.0
 
 ---

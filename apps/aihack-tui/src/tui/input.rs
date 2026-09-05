@@ -17,6 +17,26 @@ pub enum UiPanel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InspectPresentation {
+    Inventory,
+    Hover,
+    Decision,
+}
+
+pub fn inspect_presentation(
+    hovered: Option<Pos>,
+    decision_lines: &[String],
+) -> InspectPresentation {
+    if hovered.is_some() {
+        InspectPresentation::Hover
+    } else if decision_lines.is_empty() {
+        InspectPresentation::Inventory
+    } else {
+        InspectPresentation::Decision
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiInputEvent {
     Key(CommandIntent),
     MouseHover { column: u16, row: u16 },
@@ -27,17 +47,32 @@ pub enum UiInputEvent {
     Quit,
 }
 
-/// [v0.2.0] Phase 17: TUI 화면 전환과 명령 후보다.
+/// TUI 화면 전환과 명령 후보다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiCommandCandidate {
+    BeginAction(char),
+    ChooseItem {
+        action: char,
+        item: aihack_ai_contract::EntityId,
+    },
+    MenuPage(bool),
+    ConfirmQuit,
+    OpenCommands,
+    ShowMessages,
     Command(CommandIntent),
     Inspect(Pos),
     Focus(UiPanel),
     Save,
     Load,
     Quit,
-    /// [v0.2.0] Phase 17: Game Over에서 새 게임 시작
+    /// Game Over에서 새 게임을 시작한다.
     NewRun,
+    CloseOverlay,
+    BackToTitle,
+    InventoryLetter(char),
+    FocusNext,
+    FocusPrevious,
+    ToggleDebug,
     /// 표시 전용 LLM 결과를 제거하며 core command는 생성하지 않는다.
     DismissLlmResult,
     LlmNarrative,
@@ -49,6 +84,76 @@ pub enum UiCommandCandidate {
     LlmBackspace,
     LlmSubmitInput,
     LlmCancelInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanelCta {
+    pub label: String,
+    pub candidate: Option<UiCommandCandidate>,
+}
+
+pub fn command_panel_ctas(observation: &Observation) -> Vec<PanelCta> {
+    let open_candidate = key_to_candidate('o', observation);
+    vec![
+        PanelCta {
+            label: "[i] Inventory".to_string(),
+            candidate: key_to_candidate('i', observation),
+        },
+        PanelCta {
+            label: "[. ] Wait".to_string(),
+            candidate: observation
+                .action_space
+                .commands
+                .contains(&ActionIntent::Command(CommandIntent::Wait))
+                .then_some(UiCommandCandidate::Command(CommandIntent::Wait)),
+        },
+        PanelCta {
+            label: if open_candidate.is_some() {
+                "[o] Open".to_string()
+            } else {
+                "[o] Open*".to_string()
+            },
+            candidate: open_candidate,
+        },
+        PanelCta {
+            label: "[?] All".to_string(),
+            candidate: Some(UiCommandCandidate::OpenCommands),
+        },
+        PanelCta {
+            label: "[hover] Inspect".to_string(),
+            candidate: Some(UiCommandCandidate::Focus(UiPanel::Inspect)),
+        },
+    ]
+}
+
+pub fn inventory_panel_ctas(observation: &Observation) -> Vec<PanelCta> {
+    observation
+        .inventory
+        .iter()
+        .map(|item| {
+            let slot = item
+                .equipped_slot
+                .map(|slot| format!(" {:?}", slot))
+                .unwrap_or_default();
+            let identified = if item.identified { "" } else { " ?" };
+            let label = format!(
+                "{} {}{}{}",
+                item.letter.0,
+                item_label(item.kind),
+                slot,
+                identified
+            );
+            let candidate = primary_inventory_command(item)
+                .filter(|intent| {
+                    observation
+                        .action_space
+                        .commands
+                        .contains(&ActionIntent::Command(*intent))
+                })
+                .map(UiCommandCandidate::Command);
+            PanelCta { label, candidate }
+        })
+        .collect()
 }
 
 pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
@@ -81,12 +186,6 @@ pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
         ),
         ('.', UiInputEvent::Key(CommandIntent::Wait)),
         ('s', UiInputEvent::Key(CommandIntent::Search)),
-        ('o', UiInputEvent::Key(CommandIntent::Open(Direction::East))),
-        (
-            'c',
-            UiInputEvent::Key(CommandIntent::Close(Direction::East)),
-        ),
-        ('K', UiInputEvent::Key(CommandIntent::Kick(Direction::East))),
         (',', UiInputEvent::Key(CommandIntent::Pickup)),
         ('i', UiInputEvent::Key(CommandIntent::ShowInventory)),
         ('>', UiInputEvent::Key(CommandIntent::Descend)),
@@ -94,11 +193,32 @@ pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
         ('p', UiInputEvent::Key(CommandIntent::Pray)),
         ('S', UiInputEvent::SaveRequest),
         ('L', UiInputEvent::LoadRequest),
-        ('q', UiInputEvent::Quit),
+        ('Q', UiInputEvent::Quit),
     ]
 }
 
 pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiCommandCandidate> {
+    if key == 'B' {
+        return observation
+            .legal_actions
+            .contains(&CommandIntent::EnterBranch)
+            .then_some(UiCommandCandidate::Command(CommandIntent::EnterBranch));
+    }
+    if matches!(
+        key,
+        'o' | 'c' | 'K' | 'w' | 'e' | 'q' | 'f' | 'd' | 't' | 'z' | 'r'
+    ) {
+        return Some(UiCommandCandidate::BeginAction(key));
+    }
+    if key == 'Q' {
+        return Some(UiCommandCandidate::Quit);
+    }
+    if key == '?' {
+        return Some(UiCommandCandidate::OpenCommands);
+    }
+    if key == 'M' {
+        return Some(UiCommandCandidate::ShowMessages);
+    }
     let llm_candidate = match key {
         'G' => Some(UiCommandCandidate::LlmNarrative),
         'A' => Some(UiCommandCandidate::LlmSuggest),
@@ -134,63 +254,7 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
         return base;
     }
 
-    let first_by = |pred: fn(&ItemObservation) -> bool| {
-        observation
-            .inventory
-            .iter()
-            .find(|item| pred(item))
-            .map(|item| item.item)
-    };
-
-    match key {
-        'w' => first_by(|item| item.kind == crate::domain::item::ItemKind::Dagger)
-            .and_then(|item| command_candidate(CommandIntent::Wield { item })),
-        'e' => first_by(|item| item.kind == crate::domain::item::ItemKind::ArmorLeather)
-            .and_then(|item| command_candidate(CommandIntent::Wear { item })),
-        'q' => first_by(|item| matches!(item.kind, crate::domain::item::ItemKind::PotionHealing))
-            .and_then(|item| command_candidate(CommandIntent::Quaff { item })),
-        'f' => first_by(|item| {
-            matches!(
-                item.kind,
-                crate::domain::item::ItemKind::FoodRation
-                    | crate::domain::item::ItemKind::CorpseJackal
-            )
-        })
-        .and_then(|item| command_candidate(CommandIntent::Eat { item })),
-        'd' => observation
-            .inventory
-            .first()
-            .and_then(|item| command_candidate(CommandIntent::Drop { item: item.item })),
-        't' => first_by(|item| {
-            matches!(
-                item.kind,
-                crate::domain::item::ItemKind::Dagger | crate::domain::item::ItemKind::Rock
-            )
-        })
-        .and_then(|item| {
-            command_candidate(CommandIntent::Throw {
-                item,
-                direction: Direction::East,
-            })
-        }),
-        'z' => first_by(|item| item.kind == crate::domain::item::ItemKind::WandMagicMissile)
-            .and_then(|item| {
-                command_candidate(CommandIntent::Zap {
-                    item,
-                    direction: Direction::East,
-                })
-            }),
-        'r' => first_by(|item| {
-            matches!(
-                item.kind,
-                crate::domain::item::ItemKind::ScrollReveal
-                    | crate::domain::item::ItemKind::ScrollIdentify
-                    | crate::domain::item::ItemKind::ScrollLevelTeleport
-            )
-        })
-        .and_then(|item| command_candidate(CommandIntent::Read { item })),
-        _ => None,
-    }
+    None
 }
 
 pub fn map_mouse_event(
@@ -198,6 +262,7 @@ pub fn map_mouse_event(
     layout: TuiLayout,
     viewport: Viewport,
     observation: &Observation,
+    inspect_presentation: InspectPresentation,
 ) -> Option<UiCommandCandidate> {
     match event {
         UiInputEvent::MouseHover { column, row } => viewport
@@ -212,12 +277,18 @@ pub fn map_mouse_event(
                     .map(|direction| UiCommandCandidate::Command(CommandIntent::Move(direction)))
                     .or(Some(UiCommandCandidate::Inspect(pos)))
             } else if contains(layout.inspect, column, row) {
-                inspect_panel_click_candidate(layout.inspect, row, observation)
-                    .or(Some(UiCommandCandidate::Focus(UiPanel::Inspect)))
+                inspect_panel_click_candidate(
+                    layout.inspect,
+                    column,
+                    row,
+                    observation,
+                    inspect_presentation,
+                )
+                .or(Some(UiCommandCandidate::Focus(UiPanel::Inspect)))
             } else if contains(layout.status, column, row) {
                 Some(UiCommandCandidate::Focus(UiPanel::Status))
             } else if contains(layout.command, column, row) {
-                command_panel_click_candidate(layout.command, column, observation)
+                command_panel_click_candidate(layout.command, column, row, observation)
                     .or(Some(UiCommandCandidate::Focus(UiPanel::Command)))
             } else {
                 None
@@ -263,47 +334,41 @@ fn contains(rect: Rect, column: u16, row: u16) -> bool {
 
 fn inspect_panel_click_candidate(
     inspect: Rect,
+    column: u16,
     row: u16,
     observation: &Observation,
+    presentation: InspectPresentation,
 ) -> Option<UiCommandCandidate> {
+    if presentation != InspectPresentation::Inventory {
+        return None;
+    }
     let row_index = row.checked_sub(inspect.y + 1)? as usize;
-    inventory_primary_candidates(observation)
-        .get(row_index)
-        .copied()
-        .map(UiCommandCandidate::Command)
+    let offset = column.checked_sub(inspect.x)? as usize;
+    let cta = inventory_panel_ctas(observation).get(row_index)?.clone();
+    (offset < cta.label.chars().count())
+        .then_some(cta.candidate)
+        .flatten()
 }
 
 fn command_panel_click_candidate(
     command: Rect,
     column: u16,
+    row: u16,
     observation: &Observation,
 ) -> Option<UiCommandCandidate> {
-    let left = column.checked_sub(command.x)?;
-    if left < 16 {
-        key_to_candidate('i', observation)
-    } else if left < 32 {
-        Some(UiCommandCandidate::Command(CommandIntent::Wait))
-    } else if left < 48 {
-        key_to_candidate('o', observation)
-    } else if left < 64 {
-        Some(UiCommandCandidate::Focus(UiPanel::Inspect))
-    } else {
-        None
+    if row != command.y.saturating_add(1) {
+        return None;
     }
-}
-
-fn inventory_primary_candidates(observation: &Observation) -> Vec<CommandIntent> {
-    observation
-        .inventory
-        .iter()
-        .filter_map(primary_inventory_command)
-        .filter(|intent| {
-            observation
-                .action_space
-                .commands
-                .contains(&ActionIntent::Command(*intent))
-        })
-        .collect()
+    let offset = column.checked_sub(command.x)? as usize;
+    let mut start = 0usize;
+    for cta in command_panel_ctas(observation) {
+        let end = start + cta.label.chars().count();
+        if (start..end).contains(&offset) {
+            return cta.candidate;
+        }
+        start = end + 1;
+    }
+    None
 }
 
 fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
@@ -321,6 +386,22 @@ fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
             Some(CommandIntent::Read { item: item.item })
         }
         _ => None,
+    }
+}
+
+pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> &'static str {
+    match kind {
+        crate::domain::item::ItemKind::Dagger => "dagger",
+        crate::domain::item::ItemKind::FoodRation => "food ration",
+        crate::domain::item::ItemKind::PotionHealing => "healing potion",
+        crate::domain::item::ItemKind::WandMagicMissile => "wand",
+        crate::domain::item::ItemKind::ScrollReveal => "reveal scroll",
+        crate::domain::item::ItemKind::ScrollIdentify => "identify scroll",
+        crate::domain::item::ItemKind::ScrollLevelTeleport => "teleport scroll",
+        crate::domain::item::ItemKind::Rock => "rock",
+        crate::domain::item::ItemKind::ArmorLeather => "leather armor",
+        crate::domain::item::ItemKind::CorpseJackal => "jackal corpse",
+        crate::domain::item::ItemKind::AmuletAscension => "Amulet of Ascension",
     }
 }
 

@@ -1,9 +1,10 @@
 use ratatui::style::Color;
 
-/// [v0.1.0] Phase 10 최소 테마 토큰이다.
+/// 실제 renderer가 소비하는 semantic theme token이다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiTheme {
     pub fg: Color,
+    pub bg: Color,
     pub accent: Color,
     pub danger: Color,
     pub muted: Color,
@@ -13,6 +14,7 @@ impl UiTheme {
     pub fn standard() -> Self {
         Self {
             fg: Color::White,
+            bg: Color::Black,
             accent: Color::Cyan,
             danger: Color::Red,
             muted: Color::DarkGray,
@@ -22,6 +24,7 @@ impl UiTheme {
     pub fn high_contrast() -> Self {
         Self {
             fg: Color::White,
+            bg: Color::Black,
             accent: Color::Yellow,
             danger: Color::LightRed,
             muted: Color::Gray,

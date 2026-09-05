@@ -1,6 +1,6 @@
 use clap::Parser;
 
-/// [v0.1.0] Phase 10 TUI adapter 진입 인자다.
+/// NetHack 3.6.7 호환 Rust 로그라이크의 TUI 실행 인자다.
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(long, default_value_t = 42)]
@@ -9,6 +9,8 @@ struct Args {
     high_contrast: bool,
     #[arg(long)]
     reduced_motion: bool,
+    #[arg(long, default_value = "runtime/tui")]
+    save_dir: std::path::PathBuf,
 }
 
 fn main() {
@@ -18,7 +20,9 @@ fn main() {
         reduced_motion: args.reduced_motion,
         ..Default::default()
     };
-    if let Err(error) = aihack_tui::tui::run_tui_with_config(args.seed, ui_config) {
+    if let Err(error) =
+        aihack_tui::tui::run_tui_with_config_and_save_dir(args.seed, ui_config, &args.save_dir)
+    {
         eprintln!("{error}");
         std::process::exit(1);
     }

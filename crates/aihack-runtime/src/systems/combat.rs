@@ -1,8 +1,5 @@
 use aihack_core::{
-    domain::{
-        combat::{AttackProfile, DamageRoll},
-        entity::Entity,
-    },
+    domain::{combat::AttackProfile, entity::Entity},
     event::GameEvent,
     ids::EntityId,
     rng::GameRng,
@@ -34,7 +31,7 @@ pub fn resolve_attack_with_profile(
     profile: AttackProfile,
 ) -> Option<AttackResolution> {
     aihack_core::domain::combat::resolve_attack_with_profile(
-        &mut world.entities,
+        world.state_mut().entities.inner_mut(),
         rng,
         attacker_id,
         defender_id,
@@ -67,31 +64,6 @@ pub fn attack_profile_for(
             .unwrap_or(UNARMED_ATTACK);
     }
     attacker.natural_attack_profile().unwrap_or(UNARMED_ATTACK)
-}
-
-pub fn attack_roll_value(
-    attacker: &Entity,
-    defender: &Entity,
-    weapon_hit_bonus: i16,
-    d20: i16,
-) -> (i16, i16, bool) {
-    let (_, _, _, _, attacker_stats, _) = attacker.actor().expect("attacker must be actor");
-    let (_, _, _, _, defender_stats, _) = defender.actor().expect("defender must be actor");
-    aihack_core::domain::combat::attack_roll_value(
-        attacker_stats.hit_bonus,
-        defender_stats.ac,
-        weapon_hit_bonus,
-        d20,
-    )
-}
-
-pub fn roll_damage(
-    rng: &mut GameRng,
-    damage: DamageRoll,
-    damage_bonus: i16,
-    damage_reduction: i16,
-) -> i16 {
-    aihack_core::domain::combat::roll_damage(rng, damage, damage_bonus, damage_reduction)
 }
 
 pub fn roll_die(rng: &mut GameRng, sides: i16) -> i16 {

@@ -1,12 +1,20 @@
 use crate::{
     core::{EntityObservation, GameEvent, Observation, Pos},
-    domain::{entity::EntityKind, item::ItemKind, tile::TileKind},
+    domain::{entity::EntityKind, tile::TileKind},
     ui::tui::UiPanel,
 };
 use aihack_llm::config::LlmRequestKind;
-use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{Modifier, Style},
+    widgets::Widget,
+};
 
-use super::LlmUiStatus;
+use super::{
+    input::{command_panel_ctas, inventory_panel_ctas, item_label},
+    LlmUiStatus, UiTheme,
+};
 
 pub struct TextPanel<'a> {
     pub title: &'a str,
@@ -15,30 +23,59 @@ pub struct TextPanel<'a> {
 
 impl Widget for TextPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-        for y in area.y..area.y + area.height {
-            for x in area.x..area.x + area.width {
-                buf[(x, y)].reset();
-            }
-        }
+        render_text_panel(area, buf, self.title, &self.lines, UiTheme::standard());
+    }
+}
+
+pub struct ThemedTextPanel<'a> {
+    pub title: &'a str,
+    pub lines: Vec<String>,
+    pub theme: UiTheme,
+}
+
+impl Widget for ThemedTextPanel<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        render_text_panel(area, buf, self.title, &self.lines, self.theme);
+    }
+}
+
+fn render_text_panel(area: Rect, buf: &mut Buffer, title: &str, lines: &[String], theme: UiTheme) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+    let body_style = Style::default().fg(theme.fg).bg(theme.bg);
+    let title_style = Style::default()
+        .fg(theme.accent)
+        .bg(theme.bg)
+        .add_modifier(Modifier::BOLD);
+    for y in area.y..area.y + area.height {
         for x in area.x..area.x + area.width {
-            buf[(x, area.y)].set_char('-');
+            buf[(x, y)].reset();
+            buf[(x, y)].set_style(body_style);
         }
-        let mut write_line = |row: u16, text: &str| {
-            for (i, ch) in text.chars().take(area.width as usize).enumerate() {
-                buf[(area.x + i as u16, row)].set_char(ch);
-            }
-        };
-        write_line(area.y, self.title);
-        for (idx, line) in self.lines.iter().enumerate() {
-            let row = area.y + 1 + idx as u16;
-            if row >= area.y + area.height {
-                break;
-            }
-            write_line(row, line);
+    }
+    for x in area.x..area.x + area.width {
+        buf[(x, area.y)].set_char('-').set_style(title_style);
+    }
+    let mut write_line = |row: u16, text: &str| {
+        for (i, ch) in text.chars().take(area.width as usize).enumerate() {
+            buf[(area.x + i as u16, row)].set_char(ch);
         }
+    };
+    if area.height == 1 && title == "LOG" {
+        write_line(
+            area.y,
+            lines.first().map(String::as_str).unwrap_or("No events."),
+        );
+        return;
+    }
+    write_line(area.y, title);
+    for (idx, line) in lines.iter().enumerate() {
+        let row = area.y + 1 + idx as u16;
+        if row >= area.y + area.height {
+            break;
+        }
+        write_line(row, line);
     }
 }
 
@@ -53,7 +90,7 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
     } else {
         "stable"
     };
-    vec![
+    let mut lines = vec![
         format!("turn {}", observation.turn),
         format!(
             "hp {}/{} {}",
@@ -63,31 +100,43 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
             "level {}:{}",
             match observation.current_level.branch {
                 crate::core::BranchId::Main => "Main",
+                crate::core::BranchId::Mines => "Mines",
             },
             observation.current_level.depth
         ),
         format!(
-            "pos {},{}",
-            observation.player_pos.x, observation.player_pos.y
+            "food {}{}",
+            observation.player.hunger,
+            if observation.campaign.as_ref().is_some_and(|c| c.has_amulet) {
+                " Amulet!"
+            } else {
+                ""
+            }
         ),
-    ]
+    ];
+    if let Some(campaign) = &observation.campaign {
+        lines[3] = format!(
+            "food{} w{}/{}{}",
+            observation.player.hunger,
+            campaign.carried_weight,
+            campaign.carrying_capacity,
+            if campaign.has_amulet { " A" } else { "" }
+        );
+        lines.push(format!(
+            "{:?} L{} X{}",
+            campaign.role, campaign.level, campaign.xp
+        ));
+    }
+    lines
 }
 
 pub fn command_lines(observation: &Observation, focused_panel: UiPanel) -> Vec<String> {
-    let open_hint = if observation
-        .legal_actions
-        .iter()
-        .any(|intent| matches!(intent, crate::core::CommandIntent::Open(_)))
-    {
-        "[o] Open"
-    } else {
-        "[o] Open*"
-    };
     vec![
-        format!(
-            "[i] Inventory [. ] Wait {} [hover] Inspect [click] Focus",
-            open_hint
-        ),
+        command_panel_ctas(observation)
+            .into_iter()
+            .map(|cta| cta.label)
+            .collect::<Vec<_>>()
+            .join(" "),
         format!("focus {:?}", focused_panel),
     ]
 }
@@ -181,17 +230,16 @@ pub fn inspect_lines(
     focused_panel: UiPanel,
     decision_lines: &[String],
 ) -> Vec<String> {
-    if let Some(pos) = hovered {
-        return hovered_inspect_lines(observation, pos);
-    }
-
-    if !decision_lines.is_empty() {
-        let mut lines = decision_lines.iter().take(4).cloned().collect::<Vec<_>>();
-        lines.push(format!("focus {:?}", focused_panel));
-        return lines;
-    }
-
-    let mut lines = inventory_lines(observation);
+    let mut lines = match super::input::inspect_presentation(hovered, decision_lines) {
+        super::input::InspectPresentation::Hover => hovered_inspect_lines(
+            observation,
+            hovered.expect("hover presentation has a position"),
+        ),
+        super::input::InspectPresentation::Decision => {
+            decision_lines.iter().take(4).cloned().collect::<Vec<_>>()
+        }
+        super::input::InspectPresentation::Inventory => inventory_lines(observation),
+    };
     lines.push(format!("focus {:?}", focused_panel));
     lines
 }
@@ -218,25 +266,32 @@ fn hovered_inspect_lines(observation: &Observation, pos: Pos) -> Vec<String> {
 }
 
 fn inventory_lines(observation: &Observation) -> Vec<String> {
-    observation
-        .inventory
-        .iter()
-        .take(4)
-        .map(|item| {
-            let slot = item
-                .equipped_slot
-                .map(|slot| format!(" {:?}", slot))
-                .unwrap_or_default();
-            let identified = if item.identified { "" } else { " ?" };
-            format!(
-                "{} {}{}{}",
-                item.letter.0,
-                item_label(item.kind),
-                slot,
-                identified
-            )
-        })
+    inventory_panel_ctas(observation)
+        .into_iter()
+        .map(|cta| cta.label)
         .collect()
+}
+
+pub fn inventory_overlay_lines(observation: &Observation) -> Vec<String> {
+    let mut lines = inventory_lines(observation);
+    if lines.is_empty() {
+        lines.push("Inventory is empty.".to_string());
+    }
+    lines.push("Select an item letter; Esc closes inventory.".to_string());
+    lines
+}
+
+pub fn storage_error_lines(operation: super::StorageOperation) -> Vec<String> {
+    let operation = match operation {
+        super::StorageOperation::Save => "save",
+        super::StorageOperation::Load => "load",
+        super::StorageOperation::NewRun => "new run",
+    };
+    vec![
+        format!("Unable to complete {operation}."),
+        "The quick-save store rejected the operation; no path detail is shown.".to_string(),
+        "Press Esc or any key to continue.".to_string(),
+    ]
 }
 
 fn recent_priority_messages(observation: &Observation) -> Vec<String> {
@@ -296,22 +351,7 @@ fn tile_label(tile: TileKind) -> &'static str {
     }
 }
 
-fn item_label(kind: ItemKind) -> &'static str {
-    match kind {
-        ItemKind::Dagger => "dagger",
-        ItemKind::FoodRation => "food ration",
-        ItemKind::PotionHealing => "healing potion",
-        ItemKind::WandMagicMissile => "wand",
-        ItemKind::ScrollReveal => "reveal scroll",
-        ItemKind::ScrollIdentify => "identify scroll",
-        ItemKind::ScrollLevelTeleport => "teleport scroll",
-        ItemKind::Rock => "rock",
-        ItemKind::ArmorLeather => "leather armor",
-        ItemKind::CorpseJackal => "jackal corpse",
-    }
-}
-
-// [v0.2.0] Phase 17: 화면별 렌더링 함수들
+// 화면별 presentation line 생성 함수다.
 
 /// Title 화면 텍스트 라인 생성
 pub fn title_lines() -> Vec<String> {
@@ -336,6 +376,12 @@ pub fn character_creation_lines() -> Vec<String> {
         "         Character Creation".to_string(),
         "".to_string(),
         "         Class: Adventurer".to_string(),
+        "         [1] Knight - HP28, melee".to_string(),
+        "         [2] Scout - HP22, accuracy".to_string(),
+        "         [3] Mage - HP18, wands".to_string(),
+        "         Campaign: Main 6 + Mines 2; return the Amulet".to_string(),
+        "         Main 3 up stairs: B enters the Mines".to_string(),
+        "         Enter: legacy two-floor Adventurer".to_string(),
         "         HP: 16/16".to_string(),
         "         Strength: 10".to_string(),
         "         Dexterity: 10".to_string(),
@@ -369,6 +415,16 @@ pub fn game_over_lines(
     ]
 }
 
+pub fn victory_lines(score: i32) -> Vec<String> {
+    vec![
+        "".into(),
+        "              ASCENDED".into(),
+        "The Amulet has reached the surface.".into(),
+        format!("Score: {score}"),
+        "[N] New Run    [Q] Quit".into(),
+    ]
+}
+
 /// AwaitingDirection 상태 라인 생성
 pub fn awaiting_direction_lines(action_name: &str) -> Vec<String> {
     vec![
@@ -396,13 +452,10 @@ pub fn more_prompt_lines() -> Vec<String> {
     ]
 }
 
-// [v0.2.0] Phase 18: Debug Observation 패널
+// Debug Observation 패널
 
-/// [v0.2.0] Phase 18: debug observation 패널 텍스트 라인 생성.
-/// designs.md 10 기준: schema_version, seed, turn, snapshot_hash, legal_actions,
-/// visible tile/entity 수, last_events 등을 표시한다.
-/// [v0.2.0] Phase 18: debug observation 패널 텍스트 라인 생성.
-/// designs.md 10 기준: schema_version, seed, turn, run_state, player 상태,
+/// debug observation 패널 텍스트 라인을 생성한다.
+/// designs.md 기준으로 schema_version, seed, turn, run_state, player 상태,
 /// visible tile/entity 수, inventory 수, action_space 수, last_events, legal_actions를 표시한다.
 pub fn debug_observation_lines(observation: &Observation) -> Vec<String> {
     let mut lines = vec![

@@ -6,10 +6,11 @@ use aihack::{
 #[test]
 fn layout_80x28_has_no_overlap() {
     let layout = compute_layout(80, 28);
-    assert_eq!(layout.tier, LayoutTier::Degraded);
+    assert_eq!(layout.tier, LayoutTier::Standard);
     layout.validate().unwrap();
-    assert_eq!(layout.map.width, 40);
-    assert_eq!(layout.map.height, 20);
+    assert_eq!(layout.map.width, 52);
+    assert_eq!(layout.status.width, 28);
+    assert!(layout.map.height >= 20);
 }
 
 #[test]
@@ -32,7 +33,20 @@ fn larger_layout_tiers_preserve_panel_contract() {
     roomy.validate().unwrap();
     assert_eq!(standard.tier, LayoutTier::Standard);
     assert_eq!(roomy.tier, LayoutTier::Roomy);
+    assert_eq!(standard.map.width, 65);
+    assert_eq!(roomy.map.width, 84);
     assert!(roomy.debug.is_some());
+}
+
+#[test]
+fn compact_60x24_keeps_every_panel_in_bounds_without_overlap() {
+    let compact = compute_layout(60, 24);
+    assert_eq!(compact.tier, LayoutTier::Degraded);
+    compact.validate().unwrap();
+    assert_eq!((compact.map.x, compact.map.y), (0, 0));
+    assert_eq!((compact.map.width, compact.map.height), (40, 20));
+    assert_eq!(compact.command.height, 3);
+    assert_eq!(compact.log.height, 1);
 }
 
 #[test]

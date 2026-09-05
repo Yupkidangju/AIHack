@@ -50,6 +50,16 @@ pub fn from_world(
 
     let legal_actions = legal_actions(world, run_state);
     Observation {
+        campaign: world
+            .campaign
+            .map(|campaign| aihack_ai_contract::CampaignObservation {
+                carried_weight: world.carried_weight(),
+                carrying_capacity: world.carrying_capacity(),
+                role: campaign.role,
+                xp: campaign.xp,
+                level: campaign.level(),
+                has_amulet: crate::campaign::has_amulet(world),
+            }),
         schema_version: OBSERVATION_SCHEMA_VERSION,
         seed,
         turn,
@@ -89,6 +99,7 @@ fn run_state_summary(run_state: RunState) -> RunStateSummary {
         RunState::AwaitingInventorySelection { .. } => RunStateSummary::AwaitingInventorySelection,
         RunState::MorePrompt => RunStateSummary::MorePrompt,
         RunState::GameOver { .. } => RunStateSummary::GameOver,
+        RunState::Victory { .. } => RunStateSummary::Victory,
     }
 }
 
@@ -122,13 +133,24 @@ fn visible_entities(world: &GameWorld) -> Vec<EntityObservation> {
                 return None;
             }
             if let Some((_, _, level, pos, stats, alive)) = entity.actor() {
-                if level == world.current_level() && visible.contains(&pos) {
+                if alive && level == world.current_level() && visible.contains(&pos) {
                     return Some(EntityObservation {
                         entity: entity.id,
                         kind: entity.kind(),
                         pos,
                         hp: Some(stats.hp),
                         alive,
+                    });
+                }
+            }
+            if let Some((_, _, EntityLocation::OnMap { level, pos }, _, _)) = entity.item() {
+                if level == world.current_level() && visible.contains(&pos) {
+                    return Some(EntityObservation {
+                        entity: entity.id,
+                        kind: entity.kind(),
+                        pos,
+                        hp: None,
+                        alive: true,
                     });
                 }
             }
@@ -172,11 +194,23 @@ fn inventory_observations(world: &GameWorld) -> Vec<ItemObservation> {
 
 fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
     match run_state {
-        RunState::Title | RunState::CharacterCreation => {
+        RunState::CharacterCreation => {
+            let mut actions = vec![CommandIntent::Wait, CommandIntent::Quit];
+            actions.extend(
+                [
+                    aihack_core::campaign::Role::Knight,
+                    aihack_core::campaign::Role::Scout,
+                    aihack_core::campaign::Role::Mage,
+                ]
+                .map(|role| CommandIntent::StartCampaign { role }),
+            );
+            actions
+        }
+        RunState::Title => {
             vec![CommandIntent::Wait, CommandIntent::Quit]
         }
         RunState::MorePrompt => vec![CommandIntent::AcknowledgeMore],
-        RunState::GameOver { .. } => vec![CommandIntent::Quit],
+        RunState::GameOver { .. } | RunState::Victory { .. } => vec![CommandIntent::Quit],
         RunState::AwaitingDirection { .. } => {
             let mut actions = Direction::ALL
                 .iter()
@@ -227,12 +261,17 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
 }
 
 fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
+    if world.paralysis_turns > 0 {
+        return vec![CommandIntent::Wait, CommandIntent::Quit];
+    }
     let mut actions = vec![
         CommandIntent::Wait,
         CommandIntent::Search,
-        CommandIntent::Pray,
         CommandIntent::ShowInventory,
     ];
+    if world.prayer_cooldown == 0 {
+        actions.push(CommandIntent::Pray);
+    }
     if world
         .entities
         .item_at(world.current_level(), world.player_pos())
@@ -242,7 +281,19 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
     }
     match world.current_map().tile(world.player_pos()) {
         Ok(TileKind::StairsDown) => actions.push(CommandIntent::Descend),
-        Ok(TileKind::StairsUp) => actions.push(CommandIntent::Ascend),
+        Ok(TileKind::StairsUp) => {
+            if world.campaign.is_none()
+                || world.current_level() != aihack_core::ids::LevelId::main(1)
+                || crate::campaign::has_amulet(world)
+            {
+                actions.push(CommandIntent::Ascend);
+            }
+            if world.campaign.is_some()
+                && world.current_level() == aihack_core::ids::LevelId::main(3)
+            {
+                actions.push(CommandIntent::EnterBranch);
+            }
+        }
         _ => {}
     }
     for entry in &world.inventory.entries {
@@ -295,7 +346,14 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             Some(DoorState::Open) => actions.push(CommandIntent::Close(direction)),
             None => {}
         }
-        actions.push(CommandIntent::Kick(direction));
+        if matches!(
+            world
+                .current_map()
+                .tile(world.player_pos().offset(direction.delta())),
+            Ok(TileKind::Door(DoorState::Closed) | TileKind::HiddenDoor)
+        ) {
+            actions.push(CommandIntent::Kick(direction));
+        }
     }
     for entry in &world.inventory.entries {
         actions.push(CommandIntent::Drop { item: entry.item });

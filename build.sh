@@ -1,12 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 cd "$ROOT"
 
 BUILD_TYPE="debug"
 RUN_TESTS="false"
 OUTPUT_DIR="output"
+PACKAGE_DIR="$OUTPUT_DIR"
+STAGING_DIR=""
+BACKUP_DIR=""
+
+cleanup_release_directories() {
+    for path in "$STAGING_DIR"; do
+        case "$path" in
+            "$ROOT"/.release-stage.* | "$ROOT"/.release-old.*)
+                if [[ -d "$path" && ! -L "$path" ]]; then
+                    rm -rf -- "$path"
+                fi
+                ;;
+        esac
+    done
+}
+
+trap cleanup_release_directories EXIT
 
 if [ "$#" -eq 0 ]; then
     echo "=== AIHack 빌드 스크립트 (인터랙티브 모드) ==="
@@ -55,11 +72,25 @@ case "$(uname -s)" in
     MINGW* | MSYS* | CYGWIN*) suffix=".exe" ;;
 esac
 
-mkdir -p "$OUTPUT_DIR"
-cp LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md "$OUTPUT_DIR/"
+if [ "$BUILD_TYPE" = "release" ]; then
+    if [[ -e "$ROOT/$OUTPUT_DIR" || -L "$ROOT/$OUTPUT_DIR" ]]; then
+        [[ -d "$ROOT/$OUTPUT_DIR" && ! -L "$ROOT/$OUTPUT_DIR" ]] \
+            || { echo "release output root must be a real directory" >&2; exit 1; }
+        lexical_output=$(realpath -sm -- "$ROOT/$OUTPUT_DIR")
+        physical_output=$(realpath -e -- "$ROOT/$OUTPUT_DIR")
+        [[ "$lexical_output" == "$physical_output" ]] \
+            || { echo "release output root must not traverse a symbolic link" >&2; exit 1; }
+    fi
+    STAGING_DIR=$(mktemp -d "$ROOT/.release-stage.XXXXXXXX")
+    PACKAGE_DIR="$STAGING_DIR"
+else
+    mkdir -p "$OUTPUT_DIR"
+fi
+
+cp LICENSE NOTICE MODIFICATIONS.md PROJECT_OWNER_LICENSE_APPROVAL.md "$PACKAGE_DIR/"
 for binary in "aihack${suffix}" "aihack-headless${suffix}"; do
     source_path="$SOURCE_DIR/$binary"
-    destination_path="$OUTPUT_DIR/$binary"
+    destination_path="$PACKAGE_DIR/$binary"
 
     if [ ! -f "$source_path" ]; then
         echo "필수 artifact가 없습니다: $source_path" >&2
@@ -75,16 +106,17 @@ done
 
 if [ "$BUILD_TYPE" = "release" ]; then
     release_commit=$(git rev-parse HEAD)
-    printf 'product=AIHack\nversion=0.3.0\ncommit=%s\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-07-20-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n' \
-        "$release_commit" >"$OUTPUT_DIR/RELEASE-METADATA"
-    source_archive="$OUTPUT_DIR/aihack-0.3.0-source.tar.gz"
+    candidate_date=$(git show -s --format=%cs HEAD)
+    printf 'product=AIHack\nversion=0.3.0\ncommit=%s\ncandidate_date=%s\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-08-25-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n' \
+        "$release_commit" "$candidate_date" >"$PACKAGE_DIR/RELEASE-METADATA"
+    source_archive="$PACKAGE_DIR/aihack-0.3.0-source.tar.gz"
     git archive --format=tar.gz --output="$source_archive" HEAD
     if [ ! -s "$source_archive" ]; then
         echo "대응 소스 archive 검증에 실패했습니다: $source_archive" >&2
         exit 1
     fi
     (
-        cd "$OUTPUT_DIR"
+        cd "$PACKAGE_DIR"
         sha256sum \
             "aihack${suffix}" \
             "aihack-headless${suffix}" \
@@ -95,7 +127,27 @@ if [ "$BUILD_TYPE" = "release" ]; then
             RELEASE-METADATA \
             "${source_archive##*/}" >SHA256SUMS
     )
-    "$ROOT/scripts/verify_release_bundle.sh" "$ROOT/$OUTPUT_DIR" "$release_commit"
+    "$ROOT/scripts/verify_release_bundle.sh" "$PACKAGE_DIR" "$release_commit" "$candidate_date" "$ROOT"
+
+    if [[ -d "$ROOT/$OUTPUT_DIR" ]]; then
+        BACKUP_DIR="$ROOT/.release-old.$RANDOM.$RANDOM"
+        mv -- "$ROOT/$OUTPUT_DIR" "$BACKUP_DIR"
+    fi
+    if ! mv -- "$STAGING_DIR" "$ROOT/$OUTPUT_DIR"; then
+        if [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" && ! -e "$ROOT/$OUTPUT_DIR" ]]; then
+            if mv -- "$BACKUP_DIR" "$ROOT/$OUTPUT_DIR"; then
+                BACKUP_DIR=""
+            else
+                echo "기존 release output 복원에 실패했습니다: $BACKUP_DIR" >&2
+            fi
+        fi
+        exit 1
+    fi
+    STAGING_DIR=""
+    if [[ -n "$BACKUP_DIR" ]]; then
+        rm -rf -- "$BACKUP_DIR"
+        BACKUP_DIR=""
+    fi
 fi
 
 printf '빌드 완료: %s/%s, %s/%s\n' \

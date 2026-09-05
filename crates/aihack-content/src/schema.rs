@@ -1,10 +1,15 @@
 use std::collections::BTreeMap;
 
+use aihack_core::domain::entity::MAX_ABSOLUTE_ACTOR_STAT;
 use serde::{Deserialize, Serialize};
 
 use crate::core::error::ContentError;
 
 pub const CONTENT_SCHEMA_VERSION: u16 = 1;
+pub const MAX_CONTENT_ARMOR_AC_BONUS: i16 = 10_000;
+pub const MAX_CONTENT_NUTRITION: i16 = 10_000;
+pub const MAX_CONTENT_BASE_PRICE: i32 = 1_000_000;
+pub const MAX_CONTENT_MONSTER_HP: i16 = MAX_ABSOLUTE_ACTOR_STAT as i16;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ItemData {
@@ -212,17 +217,54 @@ fn validate(
     levels: &BTreeMap<String, LevelData>,
 ) -> Result<(), ContentError> {
     for item in items.values() {
-        if item.base_price.is_some_and(|price| price < 0) {
+        let mut glyphs = item.glyph.chars();
+        if glyphs.next().is_none() || glyphs.next().is_some() {
+            return item_contract_error(item, "glyph must contain exactly one Unicode scalar");
+        }
+        if let Some(expected_kind) = canonical_item_kind(&item.id) {
+            if item.kind != expected_kind {
+                return item_contract_error(
+                    item,
+                    &format!("declared kind must be canonical {expected_kind}"),
+                );
+            }
+        }
+        if item.weight < 0 {
             return Err(ContentError::Parse {
                 file: "items.toml".to_owned(),
-                message: format!("{} base_price must be non-negative", item.id),
+                message: format!("{} weight must be non-negative", item.id),
             });
         }
+        if item
+            .base_price
+            .is_some_and(|price| !(0..=MAX_CONTENT_BASE_PRICE).contains(&price))
+        {
+            return item_contract_error(item, "base_price exceeds the consumer-safe range");
+        }
+        if item
+            .nutrition
+            .is_some_and(|value| !(1..=MAX_CONTENT_NUTRITION).contains(&value))
+        {
+            return item_contract_error(item, "nutrition exceeds the consumer-safe range");
+        }
+        if item
+            .ac_bonus
+            .is_some_and(|value| !(0..=MAX_CONTENT_ARMOR_AC_BONUS).contains(&value))
+        {
+            return item_contract_error(item, "ac_bonus exceeds the consumer-safe range");
+        }
+        validate_item_shape(item)?;
         if let Some(damage) = &item.damage {
             validate_dice(damage)?;
         }
     }
     for monster in monsters.values() {
+        if !(1..=MAX_CONTENT_MONSTER_HP).contains(&monster.hp) {
+            return Err(ContentError::Parse {
+                file: "monsters.toml".to_owned(),
+                message: format!("{} hp must be in 1..={MAX_CONTENT_MONSTER_HP}", monster.id),
+            });
+        }
         if !(0..=12).contains(&monster.speed) {
             return Err(ContentError::Parse {
                 file: "monsters.toml".to_owned(),
@@ -238,6 +280,18 @@ fn validate(
         validate_dice(&monster.damage)?;
     }
     for level in levels.values() {
+        if !(1..i16::MAX).contains(&level.depth)
+            || level.branch != "Main"
+            || level.level_id != format!("main:{}", level.depth)
+        {
+            return Err(ContentError::Parse {
+                file: "levels".to_owned(),
+                message: format!(
+                    "{} level identity/depth is outside the consumer-safe main branch",
+                    level.level_id
+                ),
+            });
+        }
         validate_level_coordinates(level)?;
         for entry in level.monster.as_deref().unwrap_or_default() {
             if !monsters.contains_key(&entry.id) {
@@ -267,6 +321,104 @@ fn validate(
         }
     }
     Ok(())
+}
+
+fn canonical_item_kind(id: &str) -> Option<&'static str> {
+    match id {
+        "item.weapon.dagger" | "item.weapon.rock" => Some("weapon"),
+        "item.food.ration" => Some("food"),
+        "item.potion.healing" => Some("potion"),
+        "item.wand.magic_missile" => Some("wand"),
+        "item.scroll.reveal" | "item.scroll.identify" | "item.scroll.teleport" => Some("scroll"),
+        "item.armor.leather" => Some("armor"),
+        "item.corpse.jackal" => Some("corpse"),
+        "item.quest.ascension" => Some("quest"),
+        _ => None,
+    }
+}
+
+fn item_contract_error(item: &ItemData, message: &str) -> Result<(), ContentError> {
+    Err(ContentError::Parse {
+        file: "items.toml".to_owned(),
+        message: format!("{} {message}", item.id),
+    })
+}
+
+fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
+    let dedicated_fields_valid = match item.kind.as_str() {
+        "quest" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.effect.is_none()
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
+        }
+        "weapon" => {
+            item.slot.as_deref() == Some("melee")
+                && item.hit_bonus.is_some()
+                && item.damage.is_some()
+                && item.effect.is_none()
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
+        }
+        "food" | "corpse" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.nutrition.is_some()
+                && item.effect.is_none()
+                && item.charges.is_none()
+                && item.ac_bonus.is_none()
+        }
+        "potion" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.effect.as_deref() == Some("heal_1d8_plus_4")
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
+        }
+        "wand" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.effect.as_deref() == Some("magic_missile")
+                && item.charges.is_some_and(|charges| charges > 0)
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
+        }
+        "scroll" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && matches!(
+                    item.effect.as_deref(),
+                    Some("reveal" | "identify" | "teleport")
+                )
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
+        }
+        "armor" => {
+            item.slot.as_deref() == Some("body")
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.ac_bonus.is_some()
+                && item.effect.is_none()
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+        }
+        _ => false,
+    };
+    if dedicated_fields_valid {
+        Ok(())
+    } else {
+        item_contract_error(item, "has an invalid kind-specific field shape")
+    }
 }
 
 fn validate_dice(value: &str) -> Result<(), ContentError> {
@@ -378,15 +530,19 @@ fn coordinate(level: &LevelData, value: &[i16]) -> Result<(), ContentError> {
 }
 
 fn has_paired_up(level: &LevelData, levels: &BTreeMap<String, LevelData>) -> bool {
+    let Some(next_depth) = level.depth.checked_add(1) else {
+        return false;
+    };
     levels.values().any(|other| {
-        other.branch == level.branch && other.depth == level.depth + 1 && other.stairs_up.is_some()
+        other.branch == level.branch && other.depth == next_depth && other.stairs_up.is_some()
     })
 }
 fn has_paired_down(level: &LevelData, levels: &BTreeMap<String, LevelData>) -> bool {
+    let Some(previous_depth) = level.depth.checked_sub(1) else {
+        return false;
+    };
     levels.values().any(|other| {
-        other.branch == level.branch
-            && other.depth == level.depth - 1
-            && other.stairs_down.is_some()
+        other.branch == level.branch && other.depth == previous_depth && other.stairs_down.is_some()
     })
 }
 

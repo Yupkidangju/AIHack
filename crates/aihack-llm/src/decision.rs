@@ -14,7 +14,7 @@ use crate::{
     worker::RequestId,
 };
 
-pub const DECISION_TIMEOUT_MS: u64 = 2_000;
+pub use crate::config::DEFAULT_DECISION_TIMEOUT_MS as DECISION_TIMEOUT_MS;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecisionRequest {
@@ -147,6 +147,11 @@ pub fn validate_decision_payload(
         return Err(invalid(LlmValidationCode::InvalidConfidence));
     }
     let rationale = payload.rationale.trim();
+    if rationale.is_empty() {
+        return Err(LlmResponseError::InvalidSchema {
+            code: LlmValidationCode::EmptyText,
+        });
+    }
     if rationale.chars().count() > 160 {
         return Err(invalid(LlmValidationCode::TextTooLong));
     }
@@ -219,6 +224,8 @@ fn wire_action_value(action: ActionIntent) -> Value {
 
 fn wire_command_value(command: CommandIntent) -> Value {
     match command {
+        CommandIntent::StartCampaign { role } => json!({ "type": "START_CAMPAIGN", "role": role }),
+        CommandIntent::EnterBranch => json!({ "type": "ENTER_BRANCH" }),
         CommandIntent::Wait => json!({ "type": "WAIT" }),
         CommandIntent::Quit => json!({ "type": "QUIT" }),
         CommandIntent::Move(direction) => direction_action("MOVE", direction),

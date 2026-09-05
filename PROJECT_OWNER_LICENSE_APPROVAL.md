@@ -41,7 +41,7 @@ Evidence channel: direct user instruction in the AIHack implementation session. 
 - 해당 binary를 만든 clean commit의 complete corresponding source archive
 - binary와 문서, source archive를 묶는 `SHA256SUMS`
 
-archive와 output의 `RELEASE-METADATA`는 `owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01`과 `modification_notice=AIHACK-MODIFICATIONS-2026-07-20-01`을 각각 정확히 한 번 포함하며, 두 값 전체는 함께 배포되는 각 record의 ID와 일치해야 한다.
+archive와 output의 `RELEASE-METADATA`는 `owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01`과 `modification_notice=AIHACK-MODIFICATIONS-2026-08-24-01`을 각각 정확히 한 번 포함하며, 두 값 전체는 함께 배포되는 각 record의 ID와 일치해야 한다. 후자는 exact `candidate_date`인 2026-08-24까지 포함하는 v0.3.0 candidate의 갱신된 modification record다.
 
 이 방식은 저장소가 채택한 보수적 engineering distribution contract다. 본 승인 기록은 변호사 또는 별도 qualified license reviewer의 법률 의견이라고 주장하지 않는다.
 

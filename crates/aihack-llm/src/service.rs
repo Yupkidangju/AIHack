@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     sync::{
         mpsc::{self, Receiver, SyncSender, TrySendError},
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
     },
     thread::{self, JoinHandle},
     time::Duration,
@@ -92,6 +92,12 @@ pub trait LocalLlmPort {
     fn try_recv(&self) -> Option<LlmResponseEnvelope>;
 }
 
+#[derive(Default)]
+struct ResponseQueue {
+    entries: Mutex<VecDeque<LlmResponseEnvelope>>,
+    ready: Condvar,
+}
+
 struct WorkerRequest {
     request_id: RequestId,
     input: LlmRequestInput,
@@ -99,7 +105,7 @@ struct WorkerRequest {
 
 pub struct LocalLlmService {
     request_tx: Option<SyncSender<WorkerRequest>>,
-    response_queue: Arc<Mutex<VecDeque<LlmResponseEnvelope>>>,
+    response_queue: Arc<ResponseQueue>,
     handle: Option<JoinHandle<()>>,
     done_rx: Option<Receiver<()>>,
     outstanding: Arc<Mutex<[bool; 3]>>,
@@ -109,7 +115,7 @@ impl LocalLlmService {
     pub fn disabled() -> Self {
         Self {
             request_tx: None,
-            response_queue: Arc::new(Mutex::new(VecDeque::new())),
+            response_queue: Arc::new(ResponseQueue::default()),
             handle: None,
             done_rx: None,
             outstanding: Arc::new(Mutex::new([false; 3])),
@@ -123,7 +129,7 @@ impl LocalLlmService {
         let transport = OpenAiNarrativeTransport::new(config)?;
         let (request_tx, request_rx) = mpsc::sync_channel(WORKER_CAPACITY);
         let (done_tx, done_rx) = mpsc::sync_channel(1);
-        let response_queue = Arc::new(Mutex::new(VecDeque::new()));
+        let response_queue = Arc::new(ResponseQueue::default());
         let worker_response_queue = Arc::clone(&response_queue);
         let outstanding = Arc::new(Mutex::new([false; 3]));
         let worker_outstanding = Arc::clone(&outstanding);
@@ -163,6 +169,30 @@ impl LocalLlmService {
         }
         finished
     }
+
+    pub fn recv_timeout(&self, timeout: Duration) -> Option<LlmResponseEnvelope> {
+        let queue = self.response_queue.entries.lock().ok()?;
+        let (mut queue, _) = self
+            .response_queue
+            .ready
+            .wait_timeout_while(queue, timeout, |entries| entries.is_empty())
+            .ok()?;
+        queue.pop_front()
+    }
+
+    pub fn wait_for_response(&self, timeout: Duration) -> bool {
+        let Ok(queue) = self.response_queue.entries.lock() else {
+            return false;
+        };
+        let Ok((queue, _)) =
+            self.response_queue
+                .ready
+                .wait_timeout_while(queue, timeout, |entries| entries.is_empty())
+        else {
+            return false;
+        };
+        !queue.is_empty()
+    }
 }
 
 impl LocalLlmPort for LocalLlmService {
@@ -201,7 +231,7 @@ impl LocalLlmPort for LocalLlmService {
     }
 
     fn try_recv(&self) -> Option<LlmResponseEnvelope> {
-        self.response_queue.lock().ok()?.pop_front()
+        self.response_queue.entries.lock().ok()?.pop_front()
     }
 }
 
@@ -214,7 +244,7 @@ impl Drop for LocalLlmService {
 fn run_worker(
     transport: OpenAiNarrativeTransport,
     request_rx: Receiver<WorkerRequest>,
-    response_queue: Arc<Mutex<VecDeque<LlmResponseEnvelope>>>,
+    response_queue: Arc<ResponseQueue>,
     outstanding: Arc<Mutex<[bool; 3]>>,
 ) {
     while let Ok(request) = request_rx.recv() {
@@ -319,15 +349,13 @@ enum WireRequestKind {
     SoftAdjudication,
 }
 
-fn push_response(
-    response_queue: &Mutex<VecDeque<LlmResponseEnvelope>>,
-    response: LlmResponseEnvelope,
-) {
-    if let Ok(mut queue) = response_queue.lock() {
+fn push_response(response_queue: &ResponseQueue, response: LlmResponseEnvelope) {
+    if let Ok(mut queue) = response_queue.entries.lock() {
         if queue.len() == WORKER_CAPACITY {
             queue.pop_front();
         }
         queue.push_back(response);
+        response_queue.ready.notify_one();
     }
 }
 
@@ -347,7 +375,7 @@ mod tests {
 
     #[test]
     fn response_queue_drops_the_oldest_presentation_when_full() {
-        let queue = Mutex::new(VecDeque::new());
+        let queue = ResponseQueue::default();
         for turn in 0..=WORKER_CAPACITY as u64 {
             push_response(
                 &queue,
@@ -365,7 +393,7 @@ mod tests {
             );
         }
 
-        let queue = queue.lock().unwrap();
+        let queue = queue.entries.lock().unwrap();
         assert_eq!(queue.len(), WORKER_CAPACITY);
         assert_eq!(queue.front().unwrap().revision.turn, 1);
         assert_eq!(queue.back().unwrap().revision.turn, WORKER_CAPACITY as u64);

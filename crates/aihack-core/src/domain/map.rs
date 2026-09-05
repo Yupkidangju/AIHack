@@ -25,7 +25,7 @@ pub const PHASE7_HIDDEN_TRAP: Pos = Pos { x: 16, y: 5 };
 pub const PHASE5_LEVEL2_STAIRS_UP: Pos = Pos { x: 5, y: 5 };
 pub const PHASE5_LEVEL2_CLOSED_DOOR: Pos = Pos { x: 8, y: 5 };
 
-/// [v0.1.0] Phase 2는 row-major 40x20 fixture map만 제공한다.
+/// row-major tile map이다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameMap {
     pub width: i16,

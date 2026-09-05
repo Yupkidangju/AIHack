@@ -1,5 +1,9 @@
 # AIHack Provenance and License Gate
 
+## P1–P3 콘텐츠 변경 기록 (2026-09-05)
+
+`item.quest.ascension`은 사용자 요청에 따른 AIHack 캠페인용 신규 설계 데이터다. glyph/weight/price/effect shape는 `docs/campaign_spec.md`에 정의했으며 NetHack 원본 텍스트나 새 외부 asset을 복사하지 않았다. 기존 10개 item 정의는 변경하지 않았다. LF `items.toml` SHA256은 `77e3915de6b90667b030c341456eeeea558c61e1eed2650cb9495133fd1af1d9`에서 `12f4a178a457ff64fa739dea8e683e77ccf7c828b4653fca33c0791633ea6018`로 변경된다. 아래 소유자 승인 기록의 일자·주체를 새 승인으로 바꾸지 않으며 release/게시 승인은 별개다.
+
 문서 상태: active inventory, project-owner derivative classification approved
 작성일: 2026-07-15
 관련 결정: DEC-LICENSE-01, ADR-0027
@@ -47,7 +51,7 @@ project-owner approval reference: `AIHACK-OWNER-2026-07-20-NGPL-01` (`PROJECT_OW
 | PROV-0002 | `crates/**` | AI-assisted semantic rewrite and AIHack workspace extraction history | Git object history | Approved | yes | Project owner | 2026-07-20 | `NGPL` | whole AIHack derivative distribution; PROV-0004 is the specific content record | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; workspace boundary tests |
 | PROV-0003 | `apps/**` | AIHack-authored TUI/headless adapters for the derivative work | Git object history | Approved | yes | Project owner | 2026-07-20 | `NGPL` | whole AIHack derivative distribution | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; headless/TUI tests |
 | PROV-0004 | `crates/aihack-content/src/data/**` | AI-assisted semantic rewrite from NetHack 3.6.7 source into reduced deterministic fixtures | `docs/provenance/r7-content.sha256` | Approved | yes | Project owner | 2026-07-20 | `NGPL` | whole AIHack derivative distribution | true | true | Project owner derivative classification; `AIHACK-OWNER-2026-07-20-NGPL-01`; AI-assisted semantic rewrite from NetHack 3.6.7 source |
-| PROV-0005 | `Cargo.lock` | crates.io packages locked by checksum | Cargo.lock registry checksums | Approved | yes | Codex engineering review | 2026-07-18 | SPDX allowlist | private workspace dependency graph | false | false | `cargo deny check licenses bans sources`; no exception |
+| PROV-0005 | `Cargo.lock` | crates.io packages locked by checksum과 별도 time-bounded exception ledger | Cargo.lock registry checksums, `dependency-exceptions.json`의 `DEP-EXC-0001` | Approved | yes | Dependency owner / Release manager | 2026-08-23 | SPDX allowlist + `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception` | private workspace dependency graph | false | false | cargo-deny 0.19.4; `DEP-EXC-0001` owner/2026-10-31 expiry/trigger graph machine gate |
 | PROV-0006 | `legacy_nethack_port_reference/src/**` | previous Rust port | not trusted for inclusion | Blocked | no | Codex engineering review | 2026-07-18 | pending | mixed or unclear legacy scope | pending | pending | direct import and copy prohibited |
 | PROV-0007 | `legacy_nethack_port_reference/assets/**` | previous port and possible NetHack-derived data/text | not trusted for inclusion | Blocked | no | Codex engineering review | 2026-07-18 | pending | mixed or unclear legacy scope | pending | pending | strings tables and data copy prohibited |
 | PROV-0008 | `legacy_nethack_port_reference/LICENSE.NGPL` | damaged local NGPL-looking text | `5e3e7c0cd3be7f65f4d9b59b49820c303abfa92c95497c5eb8cff2b64e456bdf` | Blocked | no | Codex engineering review | 2026-07-18 | pending | not valid notice evidence | pending | pending | lines 33..35 corruption preserved; do not ship |

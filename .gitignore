@@ -3,6 +3,10 @@
 # 1. Rust 관련 제외 설정
 /target
 /output/
+/.release-stage-*
+/.release-stage.*
+/.release-old-*
+/.release-old.*
 /runtime
 **/*.rs.bk
 

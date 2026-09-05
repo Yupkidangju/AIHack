@@ -1,5 +1,8 @@
 use aihack::{
-    core::{CommandIntent, Direction, EntityId, GameEvent, GameSession, RunState},
+    core::{
+        causal::{CausalField, CausalProjection, CausalScenario, CausalSummary, CausalWitness},
+        CommandIntent, Direction, EntityId, GameEvent, GameSession, RunState,
+    },
     domain::{
         entity::{EntityKind, EntityLocation},
         item::{item_data, ItemKind},
@@ -31,6 +34,17 @@ fn inventory_item(session: &GameSession, kind: ItemKind) -> aihack::core::Entity
         .expect("fixture inventory must contain the requested item")
 }
 
+fn world_item(session: &GameSession, kind: ItemKind) -> aihack::core::EntityId {
+    session
+        .world()
+        .entities()
+        .entities()
+        .iter()
+        .find(|entity| entity.kind() == EntityKind::Item(kind))
+        .map(|entity| entity.id)
+        .expect("fixture world must contain the requested item")
+}
+
 #[test]
 fn monster_speed_content_changes_actual_turn_movement() {
     let normal_registry = aihack::data::ContentRegistry::from_toml_sources(
@@ -58,6 +72,8 @@ fn monster_speed_content_changes_actual_turn_movement() {
             world.saved().entities.set_alive(EntityId(3), false);
         });
     }
+    let normal_projection_before = CausalProjection::from_session(&normal);
+    let stopped_projection_before = CausalProjection::from_session(&stopped);
     let normal_before = normal
         .world()
         .entities()
@@ -71,6 +87,8 @@ fn monster_speed_content_changes_actual_turn_movement() {
 
     assert!(normal.submit(CommandIntent::Wait).accepted);
     assert!(stopped.submit(CommandIntent::Wait).accepted);
+    let normal_projection_after = CausalProjection::from_session(&normal);
+    let stopped_projection_after = CausalProjection::from_session(&stopped);
 
     let normal_after = normal
         .world()
@@ -84,6 +102,21 @@ fn monster_speed_content_changes_actual_turn_movement() {
         .unwrap();
     assert_ne!(normal_after, normal_before);
     assert_eq!(stopped_after, stopped_before);
+
+    let mut summary = CausalSummary::default();
+    summary.observe_monster_speed_pair(
+        &normal_projection_before,
+        &normal_projection_after,
+        &stopped_projection_before,
+        &stopped_projection_after,
+        EntityId(2),
+    );
+    assert_eq!(summary.count(CausalWitness::MonsterSpeed), 1);
+    assert_eq!(summary.count(CausalWitness::MonsterAi), 0);
+    let record = summary.records().last().unwrap();
+    assert_eq!(record.scenario, CausalScenario::MonsterSpeedPair);
+    assert_eq!(record.field, CausalField::MonsterSpeed);
+    assert_eq!(record.producer, Some(EntityId(2)));
 }
 
 #[test]
@@ -112,6 +145,8 @@ fn monster_ai_content_changes_actual_turn_intent() {
             world.saved().entities.set_alive(EntityId(3), false);
         });
     }
+    let moving_projection_before = CausalProjection::from_session(&moving);
+    let stationary_projection_before = CausalProjection::from_session(&stationary);
     let moving_before = moving
         .world()
         .entities()
@@ -125,6 +160,8 @@ fn monster_ai_content_changes_actual_turn_intent() {
 
     assert!(moving.submit(CommandIntent::Wait).accepted);
     assert!(stationary.submit(CommandIntent::Wait).accepted);
+    let moving_projection_after = CausalProjection::from_session(&moving);
+    let stationary_projection_after = CausalProjection::from_session(&stationary);
 
     assert_ne!(
         moving
@@ -142,6 +179,21 @@ fn monster_ai_content_changes_actual_turn_intent() {
             .unwrap(),
         stationary_before
     );
+
+    let mut summary = CausalSummary::default();
+    summary.observe_monster_ai_pair(
+        &moving_projection_before,
+        &moving_projection_after,
+        &stationary_projection_before,
+        &stationary_projection_after,
+        EntityId(2),
+    );
+    assert_eq!(summary.count(CausalWitness::MonsterAi), 1);
+    assert_eq!(summary.count(CausalWitness::MonsterSpeed), 0);
+    let record = summary.records().last().unwrap();
+    assert_eq!(record.scenario, CausalScenario::MonsterAiPair);
+    assert_eq!(record.field, CausalField::MonsterAi);
+    assert_eq!(record.producer, Some(EntityId(2)));
 }
 
 #[test]
@@ -170,12 +222,13 @@ fn monster_passive_content_changes_player_status() {
     for session in [&mut plain, &mut passive] {
         aihack::testing::SessionBuilder::mutate(session, |world| {
             world.saved().entities.set_alive(EntityId(3), false);
-            world
+            let jackal = world
                 .saved()
                 .entities
                 .actor_stats_mut(EntityId(2))
-                .expect("jackal stats must exist")
-                .hp = 100;
+                .expect("jackal stats must exist");
+            jackal.hp = 100;
+            jackal.max_hp = 100;
         });
     }
 
@@ -234,6 +287,7 @@ fn prayer_created_luck_changes_the_next_attack_roll() {
                 .actor_stats_mut(EntityId(2))
                 .expect("jackal stats must exist");
             jackal.hp = 100;
+            jackal.max_hp = 100;
             jackal.ai_kind = Some(MonsterAiKind::Stationary);
         });
     }
@@ -322,6 +376,206 @@ fn armor_content_bonus_changes_player_defense_state() {
     assert!(content_bonus > 0);
     assert_eq!(after_ac, before_ac - content_bonus);
     assert_eq!(session.world().inventory().equipped_body, Some(armor));
+}
+
+#[test]
+fn armor_drop_restores_ac_and_rewear_does_not_stack_across_save_load() {
+    let mut session = GameSession::new_for_playing(7);
+    aihack::testing::SessionBuilder::mutate(&mut session, |world| {
+        world.saved().entities.clear_monsters();
+    });
+    assert!(
+        session
+            .submit(CommandIntent::Move(Direction::East))
+            .accepted
+    );
+    assert!(
+        session
+            .submit(CommandIntent::Move(Direction::East))
+            .accepted
+    );
+    assert!(session.submit(CommandIntent::Pickup).accepted);
+    let armor = inventory_item(&session, ItemKind::ArmorLeather);
+    let base_ac = session
+        .world()
+        .entities()
+        .actor_stats(session.world().player_id())
+        .unwrap()
+        .ac;
+    let bonus = session
+        .world()
+        .entities()
+        .item_data(armor)
+        .unwrap()
+        .ac_bonus;
+
+    assert!(session.submit(CommandIntent::Wear { item: armor }).accepted);
+    assert_eq!(
+        session
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac - bonus
+    );
+    assert!(session.submit(CommandIntent::Drop { item: armor }).accepted);
+    assert_eq!(session.world().inventory().equipped_body, None);
+    assert_eq!(
+        session
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac
+    );
+
+    assert!(session.submit(CommandIntent::Pickup).accepted);
+    assert!(session.submit(CommandIntent::Wear { item: armor }).accepted);
+    assert_eq!(
+        session
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac - bonus
+    );
+
+    let loaded = GameSession::from_save_data(session.to_save_data()).unwrap();
+    assert_eq!(loaded.world().inventory().equipped_body, Some(armor));
+    assert_eq!(
+        loaded
+            .world()
+            .entities()
+            .actor_stats(loaded.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac - bonus
+    );
+}
+
+#[test]
+fn accepted_custom_armor_registry_keeps_wear_drop_and_save_round_trip_reversible() {
+    let custom_items = ITEMS_TOML.replacen("ac_bonus=1", "ac_bonus=7", 1);
+    let registry = aihack::data::ContentRegistry::from_toml_sources(
+        1,
+        &custom_items,
+        MONSTERS_TOML,
+        &[("main_1.toml", LEVEL_1_TOML), ("main_2.toml", LEVEL_2_TOML)],
+    )
+    .unwrap();
+    let session = GameSession::try_new_for_playing_with_registry(7, &registry).unwrap();
+    let mut save = session.to_save_data();
+    save.world.entities.clear_monsters();
+    let mut session = GameSession::from_save_data_with_registry(save, &registry).unwrap();
+
+    assert!(
+        session
+            .submit(CommandIntent::Move(Direction::East))
+            .accepted
+    );
+    assert!(
+        session
+            .submit(CommandIntent::Move(Direction::East))
+            .accepted
+    );
+    assert!(session.submit(CommandIntent::Pickup).accepted);
+    let armor = inventory_item(&session, ItemKind::ArmorLeather);
+    let base_ac = session
+        .world()
+        .entities()
+        .actor_stats(session.world().player_id())
+        .unwrap()
+        .ac;
+    assert!(session.submit(CommandIntent::Wear { item: armor }).accepted);
+    assert_eq!(
+        session
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac - 7
+    );
+    assert!(session.submit(CommandIntent::Drop { item: armor }).accepted);
+    assert_eq!(
+        session
+            .world()
+            .entities()
+            .actor_stats(session.world().player_id())
+            .unwrap()
+            .ac,
+        base_ac
+    );
+    assert!(GameSession::from_save_data_with_registry(session.to_save_data(), &registry).is_ok());
+}
+
+#[test]
+fn injected_registry_survives_save_restore_and_drives_runtime_created_corpse() {
+    let custom_items = ITEMS_TOML.replacen("nutrition=50", "nutrition=500", 1);
+    let registry = aihack::data::ContentRegistry::from_toml_sources(
+        1,
+        &custom_items,
+        MONSTERS_TOML,
+        &[("main_1.toml", LEVEL_1_TOML), ("main_2.toml", LEVEL_2_TOML)],
+    )
+    .unwrap();
+    let session = GameSession::try_new_for_playing_with_registry(42, &registry).unwrap();
+    let mut save = session.to_save_data();
+    save.world.nutrition = 100;
+    save.world.entities.set_alive(EntityId(3), false);
+    let jackal = save
+        .world
+        .entities
+        .actor_stats_mut(EntityId(2))
+        .expect("jackal stats must exist");
+    jackal.hp = 1;
+    jackal.ai_kind = Some(MonsterAiKind::Stationary);
+    save.world.inventory.equipped_melee = Some(EntityId(5));
+    let mut restored = GameSession::from_save_data_with_registry(save, &registry).unwrap();
+
+    for _ in 0..20 {
+        if !restored
+            .world()
+            .entities()
+            .get(EntityId(2))
+            .unwrap()
+            .is_alive_actor()
+        {
+            break;
+        }
+        assert!(
+            restored
+                .submit(CommandIntent::Move(Direction::East))
+                .accepted
+        );
+    }
+    let corpse = world_item(&restored, ItemKind::CorpseJackal);
+    assert_eq!(
+        restored
+            .world()
+            .entities()
+            .item_data(corpse)
+            .unwrap()
+            .nutrition,
+        Some(500)
+    );
+
+    assert!(
+        restored
+            .submit(CommandIntent::Move(Direction::East))
+            .accepted
+    );
+    assert!(restored.submit(CommandIntent::Pickup).accepted);
+    let before = restored.snapshot().nutrition;
+    assert!(
+        restored
+            .submit(CommandIntent::Eat { item: corpse })
+            .accepted
+    );
+    assert_eq!(restored.snapshot().nutrition, before + 499);
 }
 
 #[test]

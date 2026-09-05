@@ -3,6 +3,7 @@
 //! R5는 순환 의존성을 만들지 않는 타입부터 이 crate로 이동한다.
 
 pub mod action;
+pub mod campaign;
 pub mod death;
 pub mod doors;
 pub mod error;

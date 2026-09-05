@@ -1,4 +1,5 @@
 pub mod action;
+pub mod causal;
 pub mod error;
 pub mod event;
 pub mod ids;

@@ -13,9 +13,23 @@
 
 ## 1. 현재 기준과 목표
 
-현재 코드는 R1~R7 engineering gate와 SC-BUILD-02를 완료했다. R6 독립 감사와 NetHack 3.6.7 출처·호환성 trace도 종결됐고, `audit_report_19.md`는 clean `b9bd680200d82b20d7c9ba961a2758caa3d49e16` bundle 및 Actions run `29886410221`의 same-SHA Linux/Windows CI를 Verified했다.
+### 멀티 감사 2 플레이 작업 (2026-09-05)
 
-v0.3.0의 현재 남은 release gate는 `audit_report_20.md`가 지적한 active-state 정합성과 false-green 회귀 계약을 시정한 뒤 받는 report 20 문서 HOLD 시정의 독립 재감사다. 외부 게시는 최종 독립 PASS와 별도 사용자 승인 전까지 수행하지 않는다.
+P1–P3 최종 로컬 검증: 전체 491 tests, fmt/clippy/release PASS. 현재 content registry hash는 `f106d044fee3e340`이며 아래 R5 완료 이력의 `c491b83c6f499a62`는 캠페인 item 추가 전의 역사적 값이다.
+
+플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P3 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. 새 캠페인은 3역할·XP 성장·생성 Main 6/Mines 2·고유 아뮬렛 귀환·Victory를 연결한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
+
+R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
+
+현재 권위는 `docs/audit/audit_report_32.md`다.
+
+Report 32는 Report 31의 implementation summary 후반 false-green 시정과 FIN-F012를 독립 종결했다. report 25 `b732c42d62f295f4d8be64480c1d0a5a440fe738/32650404618`은 partial evidence이고 report 26~30 successor 계보는 historical/technical evidence로 보존한다.
+
+report 27~29 evidence는 각 remediation 문서에 역사적/technical evidence로 보존한다. report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 submit-only visibility, external compile, Report 29 regression, 전체 gate와 clean same-SHA 양 OS actual bundle이 Verified됐고 Report 31이 이 기술/API 경계를 독립 확인했다.
+
+Report 31 시정은 summary 1·10·11절 current exact-one과 predecessor lifecycle generic negative gate를 구현했고 successor `8c042d48/32741917348`에서 clean same-SHA 양 OS actual bundle까지 Verified된 historical closure다.
+
+Report 32가 current HEAD `8045249`의 commit date `2026-08-25`와 modification period end `2026-08-24` 불일치로 R32-DBG-F001/FIN-F015를 열었다. Notice ID/period, metadata/build/verifier/checkpoint/tests의 2026-08-25 원자 동기화와 actual HEAD-date 조기 gate는 전체 local quality gate 453 tests까지 PASS했다. candidate `57d8108a`의 381-entry source ZIP·9-entry clean Windows actual bundle도 PASS했다. 최종 verification authority는 이 문서를 포함한 current final `headSha`의 clean Windows 결과와 동일 SHA GitHub Actions Ubuntu/Linux·Windows completed-success record다. 후속 독립 PASS와 별도 게시 승인 전에는 전체 program 또는 외부 게시 가능 상태로 올리지 않는다.
 
 실제 model provider smoke는 필수 release gate가 아니다. 최종 통합에서 추가 호환성 증거가 반드시 필요할 때만 localhost OpenAI-compatible 임시 adapter를 통해 원격 provider를 선택 검증한다.
 
@@ -53,20 +67,20 @@ LLM은 마지막 presentation branch에서만 호출한다. core turn은 LLM 응
 | 경로 | 현재 책임 |
 | --- | --- |
 | `crates/aihack-core/src/*` | 순수 domain, 결정론 규칙, generic state/save/transaction primitive |
-| `crates/aihack-content/src/*` | embedded schema, TOML asset, registry 검증 |
+| `crates/aihack-content/src/*` | embedded schema, canonical item ID-kind/glyph, TOML asset, registry 검증 |
 | `crates/aihack-ai-contract/src/*` | read-only Observation/ActionSpace/ClientRevision 계약 |
 | `crates/aihack-llm/src/*` | loopback transport, strict response validation, bounded worker, provider fallback와 R6 decision scaffold |
-| `crates/aihack-runtime/src/*` | content-aware world/session/system, projection, save/replay I/O |
-| `apps/aihack-tui/src/*` | Observation render, CommandIntent 생성, `aihack` binary |
-| `apps/aihack-headless/src/*` | policy 실행, report/replay CLI, `aihack-headless` binary |
-| `src/*` | 기존 public module path를 유지하는 root compatibility facade |
+| `crates/aihack-runtime/src/*` | content-aware read-only world/session, crate-internal mutating system primitive, public atomic submit, feature-gated test helper, production score pair, projection, bounded save/replay `ArtifactStore` I/O |
+| `apps/aihack-tui/src/*` | Observation render, 합성 Release 비신뢰·500ms quiet+2회 연속 queue-idle transition gesture dispatcher, render-derived CTA geometry, terminal lifecycle, `aihack` binary |
+| `apps/aihack-headless/src/*` | policy 실행, normalized/file-identity replay guard, report/replay CLI, `aihack-headless` binary |
+| `src/*` | 승인된 read-only/query·submit과 score/vision path, opt-in compatibility test helper만 유지하는 root facade |
 | `tests/support/*` | 공개 필드 대입을 대체하는 fixture builder |
 
 ### 3.2 R5 구현 workspace
 
 | crate/app | 허용 의존 |
 | --- | --- |
-| root `aihack` facade | core, content, AI contract, LLM/TUI는 test compatibility에만 re-export |
+| root `aihack` facade | core/content/AI/LLM/TUI read API와 runtime `testing` feature를 compatibility test host에서만 re-export; mutating systems re-export 금지 |
 | `aihack-core` | serde, thiserror, rand |
 | `aihack-content` | aihack-core ID/domain contract, serde, toml |
 | `aihack-ai-contract` | aihack-core read-only DTO |
@@ -858,7 +872,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 **설명:** 모든 성공 기준과 문서 동기화를 검증한다.
 
-**진행 상태 (2026-07-22):** R8-0 fail-closed preflight와 R8-1A/B/C를 구현했다. `scripts/r8_checkpoint.sh`는 script-relative canonical root에서 R7 승인 상태, workspace 0.3.0/NGPL, 공식 LICENSE checksum, NOTICE 필수 문구, binary와 complete corresponding source packaging 계약, README/CHANGELOG, provenance 외부 배포 판정과 7개 active document archive target을 검사한다. HOLD/FAIL fixture와 canonical-root 격리를 유지하며 licensing·documentation 회귀 테스트를 추가했다. commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 Actions run `29886410221`에서 Linux/Windows test·release bundle·audit·deny가 모두 PASS했다. `audit_report_19.md`는 기술 evidence를 Verified했고, 현재 상태는 `audit_report_20.md` active-state/false-green HOLD 시정 후 독립 재감사 대기다.
+**진행 상태 (2026-08-18):** R8-0 fail-closed preflight와 R8-1A/B/C를 구현했고 `audit_report_21.md`가 report 20의 active-state/false-green 시정을 PASS로 종결했다. `scripts/r8_checkpoint.sh`는 script-relative canonical root에서 R7 승인 상태, workspace 0.3.0/NGPL, 공식 LICENSE checksum, NOTICE, source packaging, 문서 archive target을 검사한다. R9 기준 commit `41a1b63f11a57a671b0f705883431dab24298b5a`의 Actions run `32034295607`은 Linux/Windows success다. report 23의 후속 HOLD는 R8 과거 시정 재발이 아니라 R9 witness·filesystem·Windows checkpoint·권한 문서의 새 finding이다.
 
 **수용 기준:**
 
@@ -866,7 +880,7 @@ cargo test -p aihack --locked --test golden_phase8_rules
 - [x] 승인된 whole-work NGPL과 notice를 workspace manifest 및 release 문서에 반영
 - [x] Cargo/README/CHANGELOG 버전 0.3.0
 - [x] archive chain 무결성 PASS
-- [x] AI 구현 문서 표준 12개 self-check PASS; report 20 active-state/false-green HOLD 시정 후 독립 재감사 대기
+- [x] AI 구현 문서 표준 12개 self-check와 report 20 시정 독립 재감사 PASS (`audit_report_21.md`)
 
 **검증:**
 
@@ -885,6 +899,8 @@ cargo test -p aihack --locked --test golden_phase8_rules
 **보고서 19 HOLD 시정 (2026-07-22):** `audit_report_19.md`는 보고서 18의 기술 시정, clean bundle과 same-SHA CI를 모두 Verified하고 활성 문서 상태만 `IMP-F016`/`XPF-F011`로 HOLD했다. 2026-07-22 기준 evidence는 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)이며 `ubuntu-latest quality gate`와 `windows-latest quality gate`가 success다. 활성 문서는 SC-BUILD-02 PASS와 report 19의 documentation-sync HOLD를 구분해 기록하며, 최종 R8 PASS는 이 문서 diff의 독립 재감사 전까지 선언하지 않는다.
 
 **보고서 20 HOLD 시정 (2026-07-22):** 최상단 current baseline, `G-LICENSE-001`, BUILD_GUIDE 전체 테스트 표현을 현재 evidence와 정렬했다. 문서 회귀는 implementation summary 절, gap별 행과 checklist 행을 직접 식별하고 알려진 stale 상태의 부재까지 검사한다. `IMP-F016`/`DBG-F008` 시정의 독립 재감사 전까지 R8 전체와 외부 게시는 HOLD다.
+
+**보고서 21 종결 (2026-07-22):** report 20의 `IMP-F016`, `DBG-F008`, `XPF-F011`을 Verified/Resolved하고 R8 문서 remediation을 PASS로 종결했다. 이후 문서에서 report 20 재감사 대기를 현재 상태로 사용하지 않는다.
 
 **선행:** R6 checkpoint, R7 checkpoint
 
@@ -919,11 +935,21 @@ cargo test -p aihack --locked --test golden_phase8_rules
 
 ## 10. 구현 시작 순서
 
-다음 단계는 `audit_report_20.md` active-state/false-green 문서 시정의 독립 재감사다. project-owner NGPL approval, SC-LICENSE-01, root distribution license, source packaging과 SC-BUILD-02 evidence는 검증됐지만 외부 게시는 최종 R8 독립 PASS와 별도 사용자 승인까지 HOLD다. 실제 model provider smoke는 비차단 고려 대상이다.
+`docs/audit/audit_report_32.md` 시정의 release evidence gate는 final document-bearing `headSha`의 clean Windows actual bundle과 동일 SHA Ubuntu/Linux·Windows Actions completed-success다. 이 외부 gate가 충족된 뒤 다음 단계는 R32-DBG-F001/FIN-F015 후속 독립 재감사와 별도 사용자 게시 승인이다. ADR-0042, actual HEAD `%cs` containment regression, 전체 local quality gate 453 tests와 candidate `57d8108a` Windows bundle은 PASS했으며 Report 31 lifecycle finding은 independent closure로 다시 열지 않는다. 실제 model provider smoke는 비차단 고려 대상이다.
+
+Report 30 technical successor `ed02dbf/32733235414`의 ADR-0040 public visibility, Report 29 기술 회귀와 양 OS actual bundle은 완료된 Verified evidence이며 lifecycle을 재개방하지 않는다.
+
+2026-08-18 `audit_report_23.md` 시정은 문서 우선으로 시작한다. 첫 slice인 SEC-F001은 ADR-0032와 `spec.md` 14·16절을 구현 권한으로 삼아 `ArtifactStore` capability root, no-follow/single-link open, `create_new` save temp, 실행별 TUI quick-save 경계를 구현한다. 회귀 기준은 사전 배치 temp hard link와 replay symlink/hard link가 외부 victim을 바꾸지 않고, 기존 save 보존과 정상 save/load/replay가 함께 통과하는 것이다. 완료 표시는 표적 테스트와 workspace 검증 후에만 갱신한다.
+
+DBG-F009의 platform authority는 두 OS 모두 Git Bash `scripts/r7_checkpoint.sh`와 `scripts/r8_checkpoint.sh`로 확정한다. `.sha256` checkout은 LF로 고정하되 스크립트는 CRLF fixture도 정규화하며, Windows CI가 실제 checkout checkpoint를 bundle gate와 별도로 실행한다. `tests/provenance_manifest.rs`의 CRLF positive와 checksum drift negative가 두 조건을 분리한다.
 
 ## 11. R9 콘텐츠 인과 폐쇄 Task
 
-진행 상태 (2026-08-17): R9-1..R9-6 구현과 local 전체 gate 완료. 상세 인과 매트릭스와 accepted compatibility risk는 `docs/audit/audit_report_22.md`를 따른다.
+역사 기록 (2026-08-18~24): R9 causal field-only A/B와 나머지 8개 record equality는 report 27 `ea7822a5/32683076204`에서 양 OS Verified됐다. report 28은 이 causal 범위를 Verified로 유지하며 allocator/registry/equipment 등 인접 경계를 재개방했고 `9725c378/32694375654`에서 해당 시정도 양 OS Verified됐다. report 29 technical successor `a91a9c7/32706869079`는 content/allocator/TUI/archive 회귀를, report 30 technical successor `ed02dbf/32733235414`는 submit-only public visibility와 전체 gate를 양 OS Verified했다.
+
+현재 authority는 `docs/audit/audit_report_32.md`다.
+
+Report 31은 R9/Report 29 기술 회귀, Report 30 public visibility와 summary lifecycle generic gate를 독립 종결했다. Report 32의 current release-date HOLD는 R9 closure를 재개방하지 않는다. ADR-0042, 전체 local quality gate와 candidate `57d8108a` clean Windows actual bundle은 PASS했지만 R32-DBG-F001/FIN-F015의 final same-SHA 양 OS CI와 후속 독립 PASS 전에는 전체 program PASS를 선언하지 않는다.
 
 ### Task R9-1: semantic delta와 causal witness 기반
 
@@ -947,4 +973,16 @@ Food/Corpse item의 content nutrition을 Eat 명령으로 소비해 world nutrit
 
 ### Task R9-6: seed 기반 장기 인과 회귀
 
-seed 42, 7, 1234 각각 1000 accepted turn 이상 실행하며 필수 witness와 final hash를 3회 반복 비교한다. SC-CAUSE-01..07과 전체 workspace quality gate 통과가 완료 조건이다.
+seed 42, 7, 1234 각각 absolute turn 1000 이상 실행하며 9종 `CausalWitnessRecord`와 final hash를 3회 반복 비교한다. record는 scenario, producer, content field/source value와 consumer before/after를 보유한다. MonsterSpeed/MonsterAi는 독립 A/B pair에서만, GoldScore는 동일 world/turn의 gold/no-gold clone이 모두 production `death_score`를 통과한 exact pair에서만 기록한다. 일반 `survival-v1`과 분리된 테스트 전용 fixture가 production `GameSession::submit`을 사용하며 event-only·turn-only·witness별 누락 negative validator가 false-green을 차단한다. SC-CAUSE-01..07과 전체 workspace quality gate 통과가 완료 조건이다.
+
+### R9 SC-CAUSE 개별 책임 매핑
+
+| ID | 구현 책임 | 테스트 책임 |
+| --- | --- | --- |
+| SC-CAUSE-01 | `CausalProjection`, `CausalSummary`, `CausalWitnessRecord` attribution | `sc_cause_contract_ids_map_to_code_and_tests` |
+| SC-CAUSE-02 | content-backed armor·monster typed behavior, `observe_monster_speed_pair`, `observe_monster_ai_pair`, `observe_monster_difficulty_pair` | `monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent`, `monster_passive_content_changes_player_status`, `armor_content_bonus_changes_player_defense_state` |
+| SC-CAUSE-03 | Food/Corpse Eat와 death corpse producer | `eating_food_changes_nutrition_hunger_and_item_lifecycle`, `jackal_death_creates_an_edible_corpse_that_changes_hunger` |
+| SC-CAUSE-04 | production gold/no-gold exact score pair, Pray/luck와 hallucinating 비목표 risk | `item_base_price_changes_actual_game_over_score`, `gold_score_witness_uses_a_paired_production_score`, `prayer_created_luck_changes_the_next_attack_roll`, `sc_cause_contract_ids_map_to_code_and_tests` |
+| SC-CAUSE-05 | `REQUIRED_CAUSAL_WITNESSES`, attributed record required-set validator | `causal_fixture_covers_every_required_witness_for_each_seed` |
+| SC-CAUSE-06 | attributed witness record multiset와 final hash 결정론 | `causal_witness_multiset_and_final_hash_are_stable_across_three_runs` |
+| SC-CAUSE-07 | event/turn-only, shared command/observer omission과 원인 field drift false-green 거부 | `causal_validator_rejects_event_only_and_turn_only_changes`, `causal_field_only_ab_loses_exactly_one_witness_and_preserves_other_records`, `monster_speed_content_changes_actual_turn_movement`, `monster_ai_content_changes_actual_turn_intent` |

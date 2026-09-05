@@ -14,7 +14,8 @@ use std::sync::OnceLock;
 
 pub use schema::{
     ContentRegistry, DoorData, HiddenDoorData, HiddenTrapData, ItemData, LevelData, LevelItemData,
-    LevelMonsterData, MonsterData, WallData, CONTENT_SCHEMA_VERSION,
+    LevelMonsterData, MonsterData, WallData, CONTENT_SCHEMA_VERSION, MAX_CONTENT_ARMOR_AC_BONUS,
+    MAX_CONTENT_BASE_PRICE, MAX_CONTENT_MONSTER_HP, MAX_CONTENT_NUTRITION,
 };
 
 use aihack_core::domain::map::MapLayout;
@@ -161,6 +162,7 @@ pub fn item_data_from_registry(
         ItemKind::Rock => "item.weapon.rock",
         ItemKind::ArmorLeather => "item.armor.leather",
         ItemKind::CorpseJackal => "item.corpse.jackal",
+        ItemKind::AmuletAscension => "item.quest.ascension",
     };
     let definition = registry
         .item(id)
@@ -176,6 +178,7 @@ pub fn item_data_from_registry(
         "scroll" => ItemClass::Scroll,
         "armor" => ItemClass::Armor,
         "corpse" => ItemClass::Corpse,
+        "quest" => ItemClass::Quest,
         other => {
             return Err(ContentError::UnknownReference {
                 owner: id.to_owned(),
@@ -183,14 +186,17 @@ pub fn item_data_from_registry(
             })
         }
     };
-    let glyph = definition
-        .glyph
-        .chars()
-        .next()
-        .ok_or_else(|| ContentError::Parse {
+    let mut glyphs = definition.glyph.chars();
+    let glyph = glyphs.next().ok_or_else(|| ContentError::Parse {
+        file: id.to_owned(),
+        message: "glyph must contain exactly one Unicode scalar".to_owned(),
+    })?;
+    if glyphs.next().is_some() {
+        return Err(ContentError::Parse {
             file: id.to_owned(),
-            message: "glyph must contain one character".to_owned(),
-        })?;
+            message: "glyph must contain exactly one Unicode scalar".to_owned(),
+        });
+    }
     let attack_profile = definition
         .damage
         .as_deref()
@@ -377,6 +383,7 @@ pub fn level_spawns(level: &LevelData) -> Result<Vec<LevelSpawn>, ContentError> 
             "item.weapon.rock" => ItemKind::Rock,
             "item.armor.leather" => ItemKind::ArmorLeather,
             "item.corpse.jackal" => ItemKind::CorpseJackal,
+            "item.quest.ascension" => ItemKind::AmuletAscension,
             _ => {
                 return Err(ContentError::UnknownReference {
                     owner: level.level_id.clone(),

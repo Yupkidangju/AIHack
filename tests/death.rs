@@ -1,7 +1,6 @@
 use aihack::{
     core::{CommandIntent, Direction, EntityId, GameEvent, GameSession, Pos, RunState},
     domain::combat::DeathCause,
-    systems::death,
 };
 
 #[test]
@@ -52,17 +51,24 @@ fn dead_monster_no_longer_blocks_movement() {
 fn player_death_enters_game_over() {
     let mut session = GameSession::new_for_playing(42);
     let player = session.world().player_id();
-    let attacker = EntityId(3);
+    let attacker = EntityId(2);
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
-        world.saved().entities.actor_stats_mut(player).unwrap().hp = 0;
+        let stats = world.saved().entities.actor_stats_mut(player).unwrap();
+        stats.hp = 1;
+        world.saved().entities.set_alive(EntityId(3), false);
     });
 
-    let mut world = aihack::core::GameWorld::from_saved_world(session.to_save_data().world);
-    let events = death::collect_death_events_after_attack(&mut world, attacker, player);
-    let run_state = death::state_after_deaths(&world);
+    let mut death_events = Vec::new();
+    for _ in 0..50 {
+        let outcome = session.submit(CommandIntent::Wait);
+        death_events.extend(outcome.events);
+        if matches!(session.run_state(), RunState::GameOver { .. }) {
+            break;
+        }
+    }
 
-    assert!(matches!(run_state, RunState::GameOver { .. }));
-    assert!(events.iter().any(|event| matches!(
+    assert!(matches!(session.run_state(), RunState::GameOver { .. }));
+    assert!(death_events.iter().any(|event| matches!(
         event,
         GameEvent::EntityDied {
             entity,

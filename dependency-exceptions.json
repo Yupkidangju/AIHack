@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "exceptions": [
+    {
+      "id": "DEP-EXC-0001",
+      "crate": "winx",
+      "version": "0.36.4",
+      "deny_version_requirement": "=0.36.4",
+      "license": "Apache-2.0 WITH LLVM-exception",
+      "owner": "Dependency owner / Release manager",
+      "approved_on": "2026-08-18",
+      "expires_on": "2026-10-31",
+      "reason": "cap-primitives Windows backend의 shipped transitive dependency",
+      "dependency_path": [
+        "aihack-runtime",
+        "cap-fs-ext",
+        "cap-primitives",
+        "winx"
+      ],
+      "trigger_versions": {
+        "winx": "0.36.4",
+        "cap-primitives": "4.0.2",
+        "cap-std": "4.0.2",
+        "cap-fs-ext": "4.0.2",
+        "cap-tempfile": "4.0.2"
+      }
+    }
+  ]
+}

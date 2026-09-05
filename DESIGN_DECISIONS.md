@@ -12,6 +12,383 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-MA2-02: P1–P3 캠페인과 명시적 save 버전
+
+Status: Implemented with local verification; independent re-audit required (2026-09-05). 증거: `docs/campaign_implementation.md`.
+
+`docs/campaign_spec.md`의 세 단계를 실제 완주 경로로 연결한다. 기존 save/replay를 보존하기 위해 Creation Wait는 유지하고 StartCampaign(role)을 추가한다. CampaignState는 optional typed state, campaign save만 wire schema 2를 사용한다. world를 재진입마다 재생성하거나 구형 게임에 승리 플래그만 붙이는 대안은 기각한다. 목표는 실제 고유 item이며 성공은 별도 Victory다. atomic submit/save validator 경계를 공유한다.
+
+## ADR-MA2-01: 플레이 선택과 저장 수명
+
+Status: Accepted, 구현·검증 결과는 `docs/multi_audit/2/remediation.md` 참조 (2026-09-05)
+
+선택은 core persisted state를 새로 생산하지 않고 TUI 임시 메뉴로 관리한다. 방향·물건이 확정되면 기존 concrete intent를 submit한다. 선택·취소는 core turn/RNG를 보존하며 페이지/마우스 hit test는 표시된 CTA를 기준으로 한다. q는 Quaff, Q는 명시적 종료 확인이다.
+
+production 저장은 `--save-dir` 또는 현재 디렉터리 기준 `runtime/tui`의 capability ArtifactStore를 사용한다. 임시 저장은 테스트 기본값으로만 남긴다. 저장 schema나 public core mutation visibility를 변경하지 않는다. 공개 TUI builder와 CLI 저장 경로 옵션은 추가적 인터페이스다. 더 넓은 게임 목표는 별도 P1~P3 계약으로 단계별 구현한다.
+
+## ADR-0042: report 32 current-HEAD modification evidence와 final-SHA CI
+
+Status: Implemented with full local gate and candidate clean Windows actual bundle verified; exact-headSha CI is external verification authority; independent re-audit required (2026-08-25)
+
+Local verification: candidate `57d8108a51db08f942aba3218eafd2a94cc011d3` date `2026-08-25`에서 453 named tests, fmt/clippy, release all-target build, RustSec/cargo-deny 0.19.4, R7/R8와 381-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. final acceptance는 이 문서를 포함한 current final `headSha`의 clean Windows 재검증과 GitHub Actions Ubuntu/Linux·Windows completed-success record로 판정하며 별도 evidence commit을 만들지 않는다.
+Date: 2026-08-25
+Decision ID: DEC-AUDIT-R32-01
+
+Context:
+
+Report 32는 Report 31 lifecycle finding과 FIN-F012를 독립 종결했다. 그러나 final evidence commit `8045249`의 commit date는 `2026-08-25`이고 bundled modification period와 Notice ID는 `2026-08-24`에 머물러 clean Windows bundle이 source identity 검증 뒤 candidate-date 범위 오류로 실패했다. 기존 `license_compliance`는 실제 HEAD 날짜 대신 literal 2026-08-24만 확인해 이 불일치를 actual bundle 전에는 검출하지 못했다.
+
+Decision:
+
+- 단일 current authority는 `docs/audit/audit_report_32.md`다.
+- Report 31 lifecycle remediation은 historical independent closure로 보존하고 R32-DBG-F001/FIN-F015 및 PROGRAM/PUBLICATION HOLD를 current 상태로 둔다.
+- 배포 modification evidence를 Notice ID `AIHACK-MODIFICATIONS-2026-08-25-01`, covered period `2025-05-20..2026-08-25`로 갱신하고 metadata, build scripts, 양 verifier, R8 checkpoint와 tests에 exact value로 원자 전파한다.
+- candidate date의 source of truth는 wall-clock이 아니라 exact final commit의 `git show -s --format=%cs`다. `license_compliance`는 current HEAD 날짜와 `MODIFICATIONS.md`의 단일 period를 직접 파싱해 `start <= candidate <= end`를 조기 강제한다.
+- Linux/Windows verifier의 strict calendar와 out-of-period fail-closed 경계는 완화하지 않는다. fixture는 period 이전·종료일·다음 날에서 종료일까지 두 값만 허용한다.
+- CI 결과를 기록하려고 final SHA 뒤에 evidence-only commit을 만들지 않는다. remediation과 검증 절차를 포함한 final commit을 먼저 만들고, 그 exact `headSha`의 GitHub Actions completed-success run을 외부 불변 evidence로 사용한다.
+- 전체 local gate, clean Windows bundle과 Ubuntu runner의 clean Linux bundle, 동일 final SHA Ubuntu/Windows CI를 통과해도 후속 독립 감사와 별도 게시 승인 전까지 HOLD를 유지한다.
+
+Alternatives:
+
+- verifier가 manifest 종료일을 자동으로 현재 시각까지 늘림: 배포 증거를 build가 사후 조작하고 stale manifest를 은폐하므로 기각한다.
+- out-of-period를 warning으로 낮춤: complete corresponding source의 modification evidence를 fail-open하므로 기각한다.
+- 기존 2026-08-24 Notice ID만 유지하고 기간만 변경: ID가 가리키는 evidence revision을 숨기므로 새 날짜 ID로 함께 갱신한다.
+- CI 성공 후 결과 문서 commit을 추가하고 predecessor CI를 인용: final HEAD와 검증 SHA가 다시 갈라지는 Report 32 재현을 반복하므로 기각한다.
+
+Consequences:
+
+2026-08-25에 만들어지는 final commit은 bundled manifest 범위에 포함된다. 이후 날짜의 commit은 새 modification evidence revision 없이는 조기 test와 actual verifier에서 실패한다. source/test/document 변경과 RED/GREEN, 전체 gate 및 final-SHA CI 절차는 `docs/audit/audit_report_32_remediation.md`에 기록한다.
+
+## ADR-0041: report 31 summary lifecycle과 generic predecessor gate
+
+Status: Superseded in active authority by ADR-0042; independently closed by Report 32 (2026-08-25)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R31-01
+
+Context:
+
+Report 31은 ADR-0040 public Rust visibility와 report 29 기술 회귀, `ed02dbf/32733235414` 양 OS actual bundle을 Verified했다. 그러나 `IMPLEMENTATION_SUMMARY.md` 1절은 완료 증거를 기록하면서 10절은 완료 이전 실행 계획을 유지했고, 11절은 report 29를 현재 문서로 잘못 가리켰다. 기존 `r8_documentation`은 특정 report 27/28 문구와 선택된 header만 검사해 이 active 후반 회귀를 놓쳤다.
+
+Decision:
+
+- 단일 current authority는 `docs/audit/audit_report_31.md`다. implementation summary 1·10·11절을 각각 독립 active section으로 검사하며 모두 현재 report marker를 정확히 한 번 포함해야 한다.
+- current-authority 검사는 report 29/30 같은 개별 stale 문자열을 계속 나열하지 않는다. active line에서 current/현재 권위를 선언한 모든 `audit_report_N.md` 또는 `report N`을 추출하고, N이 현재 report 번호와 다르면 공통 규칙으로 거부한다.
+- 완료된 predecessor의 lifecycle 재개방도 공통 규칙으로 거부한다. predecessor report를 `다음 단계`, `시정 중`, `구현·검증 진행 중`, 구현/local gate/same-SHA/CI `pending`과 결합한 active line은 실패한다. successor가 Verified라는 역사 사실은 허용한다.
+- 기존 README 5개 locale, spec, ADR, summary, documentation audit, roadmap, build/gap, designs, compatibility 및 remediation header 검사는 유지하고 report 31 remediation header와 summary 10·11절을 coverage에 추가한다.
+- report 30 public visibility와 report 29 기술 회귀, 전체 local gate 및 새 clean same-SHA Ubuntu/Windows actual bundle을 다시 통과해도 report 31 후속 독립 PASS와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- report 29 current와 report 30 pending 문구만 exact string으로 추가: 표현이 조금만 달라져도 같은 false-green이 반복되므로 기각한다.
+- implementation summary 전체 파일에서 predecessor 문자열을 전면 금지: 11절의 검증된 기술 이력까지 지워 감사 계보를 잃으므로 active section별 의미 검사로 한정한다.
+- 상단 1절만 current marker로 검사: 10·11절의 실행 지시가 다시 부패한 이번 재현을 막지 못하므로 기각한다.
+
+Consequences:
+
+문서 gate는 현재 report 번호와 predecessor lifecycle 상태를 구조적으로 해석한다. summary의 현재 기준, 다음 작업과 R9 이력은 서로 다른 문장이어도 하나의 lifecycle을 가리키며, 완료된 Report 30 기술 증거는 역사적 Verified로만 남는다. RED/GREEN, 전체 gate와 CI 증거는 `docs/audit/audit_report_31_remediation.md`에 기록한다.
+
+Local verification: candidate SHA `f3a7aa662d8820b361c674b37264f3246cc2b7ac`에서 453 named tests, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 379-entry source ZIP·9-entry clean Windows actual bundle이 PASS했다. docs evidence successor의 same-SHA 양 OS 결과는 다음 CI verification으로 확정했다.
+
+CI verification: docs evidence successor SHA `8c042d48df57621e23a9c2a3406cc6fa68bea0af`의 Actions `32741917348`에서 Ubuntu job `97478142640`과 Windows job `97478143152`이 각 19 success step과 actual platform bundle을 완료했다. cargo-audit, cargo-deny 0.19.4와 lockfile 불변도 모두 success이며 후속 독립 감사와 외부 게시 승인은 별도다.
+
+## ADR-0040: report 30 active authority와 submit-only visibility 강제
+
+Status: Superseded in active authority by ADR-0041; historical technical implementation and independent verification complete (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R30-01
+
+Context:
+
+`docs/audit/audit_report_30.md`는 report 29의 content, allocator, TUI gesture, archive identity와 projectile/monster 축소를 Verified했지만 designs/compatibility/remediation/roadmap active header가 과거 lifecycle을 유지하고, default public `GameWorld` mutator와 combat/death/doors/items/movement/stairs/traps가 master submit-only 계약을 우회함을 재현했다.
+
+Decision:
+
+- current authority는 report 30 하나다. designs, compatibility index, report 29 remediation top status와 roadmap current paragraph를 포함한 모든 active header/section을 common exact-one/negative mutation gate로 검사한다. predecessor는 명시적 historical section에서만 허용한다.
+- default `aihack-runtime` public mutation entry는 atomic `GameSession::submit` 하나다. `GameWorld` mutator·fixture constructor와 combat/death/doors/items/movement/monster/projectile/stairs/traps module은 crate-private로 축소한다.
+- read-only world/entity query, validated save/bootstrap와 순수 score/vision API는 public으로 유지한다.
+- C010 depleted-death처럼 session 이전 상태를 구성해야 하는 호환 fixture는 opt-in `testing` feature 아래의 명시적 비원자 test helper로만 제공한다. root compatibility test host만 이 feature를 사용하며 TUI/headless dependency와 production source에는 `testing` feature/import를 금지한다.
+- external temporary crate regression은 default public read query compile-pass와 World/system mutation compile-fail을 실제 `cargo check --offline`으로 검증한다. 문자열 visibility 검사는 보조 근거로만 사용한다.
+- report 29 기술 회귀와 새 clean same-SHA 양 OS actual bundle을 모두 재실행해도 report 30 후속 독립 감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- 모든 low-level mutator를 public compatibility로 문서화: shipped consumer가 turn/RNG/event/monster/invariant commit을 우회하므로 master 계약과 제품 안전성이 약해져 기각한다.
+- mutator 이름에 `unchecked`만 추가: compiler visibility가 그대로여서 잘못 쓰기 쉬우므로 기각한다.
+- test helper를 default public에 유지: Hyrum's Law상 production contract가 되므로 opt-in feature 격리를 선택한다.
+
+Consequences:
+
+일부 pre-release Rust public path는 제거된다. 외부 production consumer는 `GameSession`과 read-only query로 이동해야 하며, test-only direct world scenarios는 feature-gated helper 또는 persisted `SessionBuilder`로 이동한다. source/test/document 변경과 RED/GREEN, 전체 gate 및 CI는 `docs/audit/audit_report_30_remediation.md`에 기록한다.
+
+Verification update: implementation SHA `59c88720924d28b892e66f732eb4007825eb76d5`에서 Windows named tests 452개, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 clean Windows 9-entry actual bundle이 PASS했다. 새 same-SHA Ubuntu/Windows CI와 후속 독립 감사는 pending이다.
+
+CI verification: docs/test successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 Actions `32733235414`에서 Ubuntu job `97450032431`과 Windows job `97450032767`이 각 19 success step과 actual platform bundle을 완료했다. cargo-audit, cargo-deny 0.19.4와 lockfile 불변도 모두 success이며 후속 독립 감사와 외부 게시 승인은 별도다.
+
+## ADR-0039: report 29 transition·source identity·public boundary 폐쇄
+
+Status: Superseded in active authority by ADR-0040; historical technical implementation verified (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R29-01
+
+Context:
+
+`docs/audit/audit_report_29.md`는 report 28 시정의 exact allocator, custom HP/bootstrap, equipment removal, F9 실제 경로와 calendar 구현을 유지했지만 key-code 중심 Repeat 방어, archive 표시 이름 중심 검사, metadata 문자열 중심 `ExpectedCommit`, active 문서의 current-authority false-green을 재현했다. item ID가 정하는 `ItemKind`와 declared class, public low-level system 오류 원자성도 서로 다른 consumer 기대를 만들었다.
+
+Decision:
+
+- transition/control candidate는 raw key code가 아니라 gesture lifecycle로 보호한다. modifier를 제외하고 Enter/CR/LF, Esc/ESC, Backspace/DEL을 정규화한 논리 key identity를 사용한다. ConPTY의 byte별 합성 Release를 독립 gesture authority로 신뢰하지 않고, transition candidate 뒤 같은 논리 key 또는 새 state의 다른 transition/control candidate를 최소 500ms quiet window와 production 50ms poll 2회 연속 idle이 모두 충족될 때까지 억제한다. 억제 대상이 다시 관찰되면 window/count를 초기화하고, 다른 논리 key의 repeat-safe movement/text candidate는 즉시 새 gesture로 허용한다.
+- source archive는 양 OS가 공유하는 format-aware validator로 raw name/type/link/prefix/Unicode·Windows extraction 의미를 검사하고, 검증 후 임시 추출 path/content manifest를 대조한다. 최종 archive는 `ExpectedCommit`에서 같은 format으로 독립 재생성한 `git archive`와 byte-identical해야 한다.
+- active documentation의 current authority는 report 29 하나이며 predecessor report와 SHA/run은 명시된 historical section에서만 허용한다. README, ADR, roadmap, summary와 build/gap 문서의 active section을 section-scoped positive/negative regression으로 검사한다.
+- 알려진 item ID는 canonical `ItemKind`와 declared kind/class의 고정 pair를 강제한다. v0.3.0 custom registry는 기존 ID의 class-changing override를 지원하지 않으며 모든 adapter가 canonical pair를 소비한다. item glyph는 정확히 한 Unicode scalar만 수용한다.
+- 외부 production mutation API는 atomic `GameSession::submit` 하나다. mutation 뒤 allocation 오류가 날 수 있는 projectile/monster low-level system은 crate 내부 transaction primitive로 축소한다. ordinary rejection의 invariant-valid state transition은 보존하고 `transaction_aborted` 또는 invariant failure에만 working world/RNG/turn/log/state 전체 rollback을 적용한다.
+- exact-successor valid save의 마지막 ID commit과 다음 exhaustion, Throw/Zap의 item·charge·RNG·full-save/hash rollback을 영구 integration fixture로 보존한다.
+- implementation/local gate/clean same-SHA CI가 완료돼도 report 29 후속 독립 재감사와 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- 모든 key Repeat 금지: text editing과 정상 movement hold를 손상하므로 repeat-safe allowlist와 gesture barrier를 선택한다.
+- timestamp debounce만 사용: runner 부하와 사용자 입력 속도에 따라 달라지므로 matching Release 또는 bounded 500ms quiet window와 production poll 2회 연속 empty를 함께 요구하는 drain boundary를 선택한다.
+- metadata commit 문자열과 checksum만 비교: complete corresponding source를 증명하지 못하므로 independently regenerated archive identity를 선택한다.
+- class-changing mod 허용 후 모든 consumer 재설계: v0.3.0 wire와 `ItemKind` 기반 UI/행동을 넓게 바꾸므로 canonical ID-kind reject를 선택한다.
+- public low-level API에 clone rollback을 각각 추가: mutation ownership이 중복되므로 existing session transaction에 캡슐화한다.
+
+Consequences:
+
+TUI production dispatcher는 mutable gesture state를 소유하고 event-loop idle 신호를 받는다. release 검증에는 Python 3 표준 라이브러리 기반 공통 archive validator가 추가되며 양 script가 같은 정책을 호출한다. custom registry의 이전 ID/class mismatch와 multi-scalar glyph는 시작 단계에서 typed reject된다. `systems::projectiles`와 `systems::monster_ai`의 외부 직접 호출은 더 이상 public contract가 아니다. 수정 전 RED, 구현, 전체 local gate와 양 OS clean same-SHA evidence는 `docs/audit/audit_report_29_remediation.md`에 순차 기록한다.
+
+Verification update: implementation SHA `1fa6d903ea09170014154c0c64e0fdaf673fcb6c`에서 Windows named tests 455개, fmt/clippy, release all-target build, cargo-audit/deny 0.19.4, R7/R8와 clean Windows 9-entry actual bundle이 PASS했다. 새 same-SHA Ubuntu/Windows CI와 후속 독립 감사는 pending이다.
+
+CI verification: Unix fixture identity 수정 successor SHA `a91a9c70523288bf2d5289bb35c9d1f1e5565a33`의 Actions `32706869079`에서 Ubuntu job `97369721441`과 Windows job `97369721295`가 각 19 success step, platform 반대편 1 skip으로 완료됐다. actual Linux/Windows bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success다. 이 evidence는 후속 독립 감사나 외부 게시 승인을 대신하지 않는다.
+
+## ADR-0038: report 28 allocator·registry·input·archive 동등 경계
+
+Status: Superseded in active authority by ADR-0039; historical implementation verified (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R28-01
+
+Context:
+
+`docs/audit/audit_report_28.md`는 report 27 구현/문서 SHA의 양 OS success를 인정했지만 `next_id=u32::MAX-1`, hp 0 custom monster, damage armor의 Wear→Throw, Windows archive component alias를 production/adversarial 경계에서 재현했다. Esc/Enter control-key Repeat 정책, Linux year 0000, F9 실제 toggle 증거와 implementation summary 후반 상태도 열려 있다.
+
+Decision:
+
+- persisted allocator는 `next_id == max_entity_id.checked_add(1)`을 요구하고 core/runtime spawn은 fallible allocation을 사용한다. allocation failure처럼 `transaction_aborted`로 표시한 partial-mutation 오류는 working transaction을 commit하지 않고 원본 RNG/hash/world를 보존하며, ordinary invariant-valid rejection의 state transition은 유지한다.
+- content registry는 live monster hp와 item kind별 complete required/forbidden field table을 검증한다. custom registry session은 반환 전 save/persisted invariant를 통과해야 한다.
+- armor는 damage/hit bonus를 가질 수 없다. Drop, Throw, consume/read를 포함한 inventory removal은 공통 fallible unequip helper를 거쳐 equipment pointer와 derived AC를 원자적으로 복원한다.
+- TUI soft-input의 문자/Backspace Repeat는 허용하지만 Esc, Enter, F9와 Quit `q/Q`는 Press-only로 시작했다. report 29가 동등 transition과 Release 없는 연속 Press를 재개방했으므로 활성 gesture 계약은 ADR-0039가 대체한다.
+- source archive의 모든 component는 Windows-compatible fail-closed rule을 따른다. ASCII case-insensitive 이름, trailing dot/space, reserved device basename과 extraction collision을 거부하고 excluded root도 같은 canonical first component로 비교한다.
+- candidate/period 날짜는 양 OS 공통 year `0001..9999`와 Gregorian round-trip을 요구한다.
+- F9 regression은 실제 Press candidate와 handler return/flag/revision/hash를 검사하고 active implementation summary의 다음 단계는 report 28 시정과 독립 재감사로 갱신한다.
+- report 28은 이 ADR 구현 당시 authority였으며 report 29가 활성 authority를 대체한다. 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- save에서 `MAX-1`만 추가 차단: live allocator의 unchecked panic 경계를 남겨 기각한다.
+- schema reject만 하고 Throw removal을 유지: future equipment-capable item이 같은 우회를 재발시켜 공통 lifecycle을 선택한다.
+- 모든 key Repeat 전역 차단: movement와 text editing의 정상 hold 입력까지 잃으므로 destructive transition/control key만 Press-only로 분리한다.
+- Windows verifier만 alias 강화: cross-platform source archive의 추출 의미가 달라지므로 양 verifier 공통 rule을 선택한다.
+
+Consequences:
+
+wire schema v1은 유지하지만 allocator gap, invalid live monster와 forbidden item shape save/custom registry는 더 일찍 typed reject된다. 공개 spawn API는 fallible해지고 caller가 오류를 처리해야 한다. TUI control-key Repeat와 F9 evidence, archive/calendar parity가 양 OS regression matrix에 추가된다. 수정 전 RED와 전체 검증은 `docs/audit/audit_report_28_remediation.md`에 기록한다.
+
+Historical verification: implementation SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`의 Actions `32694375654`에서 Ubuntu/Windows 각 19개 step, 전체 tests, R7/R8, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success였다. report 29가 이 ADR의 인접 경계를 재개방했고 ADR-0039가 활성 계약을 대체한다.
+
+## ADR-0037: report 27 field-only causal 및 consumer canonical 경계
+
+Status: Superseded in active authority by ADR-0038/ADR-0039; historical implementation verified (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R27-01
+
+Context:
+
+`docs/audit/audit_report_27.md`는 report 26 최종 verifier 시정 SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`와 Actions `32660514315`의 양 OS success를 확인했지만, save allocator/level/charge, unsafe injected armor, omission-by-skipping causal harness, archive path alias, Linux calendar, debug panel mouse, Judge text repeat와 repository-root local action recursion을 production entrypoint에서 재현했다. broad green은 열거하지 않은 consumer와 verifier alias를 증명하지 않는다.
+
+Decision:
+
+- SaveDataV1은 다음 spawn이 가능한 allocator headroom, active registry와 동일한 level ID 집합, checked stairs target과 dynamic/max charge optional shape를 load 전에 검증한다.
+- ContentRegistry는 item kind별 numeric/field shape를 consumer-safe 범위로 제한한다. armor AC는 adventurer base에서 직접 derive하고 unequip/drop도 base로 재계산하여 accepted registry의 장비 lifecycle을 가역적으로 만든다.
+- 9종 causal isolation은 active/control 양쪽에서 같은 producer·consumer command와 observer를 실행하고 대상 field/state 하나만 neutralize한다. difficulty 양쪽은 같은 kill을 수행하며 omission마다 나머지 8개 full attribution record가 complete run과 같아야 한다.
+- source archive entry는 raw prefix가 아니라 canonical component로 검사한다. absolute, dot/parent, 빈 component, backslash와 excluded first component를 Linux/Windows 모두 fail-closed로 거부한다. candidate/period 날짜는 strict Gregorian calendar와 ordered containment를 만족해야 한다.
+- F9 debug panel은 비모달이지만 visible rect의 mouse authority를 소유한다. Judge editor에서는 character Repeat를 허용하되 일반 Playing LLM request Repeat는 계속 차단한다.
+- action pin gate는 repository-root local action을 resolve해 `action.yml` 또는 `action.yaml`의 transitive `uses`를 cycle-safe 재귀 검사하며 missing, root escape, mutable remote와 invalid Docker ref를 거부한다.
+- report 27은 이 ADR 구현 당시 독립 authority였고 report 28/29가 차례로 활성 authority를 대체했다. 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+
+Alternatives:
+
+- allocator/stairs에서 panic만 catch: 성공 load의 consumer-safe 계약을 충족하지 않아 기각한다.
+- saturating Wear/Drop 유지: inverse가 아니며 정상 session을 unsaveable하게 만들 수 있어 base-derived 재계산을 선택한다.
+- omission branch에서 command/observer 생략: field 인과성을 증명하지 못하므로 동일 flow field-only A/B를 선택한다.
+- archive entry raw prefix만 확장: 새로운 lexical alias를 계속 놓치므로 component canonical validation을 선택한다.
+
+Consequences:
+
+wire schema v1은 유지하지만 이전에 수용되던 malformed allocator/level/charge save와 unsafe custom content는 typed error가 된다. debug panel 아래 map click은 더 이상 turn을 만들지 않고 Judge text repeat는 정상 입력된다. local composite action chain과 release archive/date fixture가 양 OS gate에 추가된다. 수정 전 실패 fixture, 전체 local gate와 새 clean same-SHA CI를 `docs/audit/audit_report_27_remediation.md`에 보존한다.
+
+Historical verification: implementation SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`의 Actions `32683076204`에서 Ubuntu/Windows 각 19개 step, 437 tests, R7/R8, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success였다. 후속 report 28/29가 활성 경계를 대체한다.
+
+## ADR-0036: report 26 consumer-safe artifact와 presentation/release authority 경계
+
+Status: Superseded in part by ADR-0037; final report 26 evidence retained (2026-08-24)
+Date: 2026-08-24
+Decision ID: DEC-AUDIT-R26-01
+
+Context:
+
+`docs/audit/audit_report_26.md`는 report 25 시정 SHA의 clean same-SHA 양 OS PASS를 인정하면서도, 열거되지 않은 malformed scalar, Win32 trailing-name alias, modal mouse, hidden Inspect CTA, summary-label deletion, preplaced release root/inode와 stale modification date를 production probe로 재현했다. helper와 self-consistent metadata만으로는 다음 consumer와 실제 filesystem/UI 의미가 안전하다고 증명되지 않았다.
+
+Decision:
+
+- SaveDataV1 복원은 unequipped player base AC, consumer-safe turn/score 조합과 전달된 registry에 대한 persisted `ItemData` equality를 검사한다. runtime 좁은 정수 consumer도 widening/saturating 정책으로 wraparound를 만들지 않는다.
+- Windows artifact component는 trailing dot/space, ADS·금지 문자와 reserved device name을 거부한다. lexical compare, handle identity와 atomic replace가 같은 Win32 이름 의미를 사용한다.
+- causal negative는 `CausalSummary::without` 같은 사후 evidence 삭제를 사용하지 않는다. 각 producer command/content/pair를 실행 전에 하나씩 제거한 full production run으로 exactly-one missing witness를 확인한다.
+- TUI는 modal/overlay guard를 event kind보다 먼저 적용한다. Inspect renderer와 mouse hit-test는 같은 `InspectPresentation`을 소비하며 LLM request key는 Press만 허용한다.
+- release build는 workspace 내부 random fresh directory에서 create-new staging하고 검증된 directory rename으로 승격한다. verifier는 root reparse/symlink와 expected file hard link를 거부한다. Windows link count는 열린 handle의 `GetFileInformationByHandle` 결과를 사용한다.
+- release metadata는 exact candidate commit에서 파생한 `candidate_date`를 포함하고 modification manifest 기간과 자동 교차 검증한다. dependency exception은 미래 approval을 거부하며 action pin gate는 `.github/**/*.yml|yaml`을 YAML node로 구조 순회한다.
+- 이 결정 당시 report 26을 authority로 두었다. 12건의 로컬 RED→GREEN, 전체 gate와 새 clean same-SHA 양 OS bundle 뒤에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD를 유지한다. 현재 authority는 ADR-0037과 report 27이 대체한다.
+
+Alternatives:
+
+- validator 뒤 consumer만 saturating 처리: forged state를 정상 save로 승인하므로 기각한다.
+- mouse click을 마지막에 취소: 이미 생성된 hidden candidate와 renderer 불일치를 유지하므로 기각한다.
+- 기존 `output/` 안에서 destination별 replace: root junction과 preplaced inode authority를 계속 신뢰하므로 fresh directory promotion을 선택한다.
+- modification ID 문자열만 날짜와 함께 변경: exact commit이 범위 안인지 자동 증명하지 못하므로 `candidate_date` 필드를 추가한다.
+
+Consequences:
+
+wire schema version은 1로 유지하지만 registry와 소비 산술에 맞지 않는 과거 malformed save 및 Windows 비정규 artifact name은 typed error가 된다. release metadata에 새 필수 key가 추가되고 build/verifier 호출은 candidate date를 함께 전달한다. 각 경계는 수정 전 실패 fixture를 보존하고 새 clean commit의 Ubuntu/Windows actual bundle까지 통과해야 Verified가 된다.
+
+Verification update: `fc01ec12bac522e601bc56bced06b0908f5873b0`/Actions `32658658526`은 후속 pipefail 재현 전의 부분 evidence이고, `a9a39d87235109c0fb1d1ea7a31ea3751fd37a30`/Actions `32660221745`는 Ubuntu failure evidence다. 최종 verifier fix SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`의 Actions `32660514315`에서 Ubuntu/Windows 각 19개 step, actual platform bundle, cargo-audit, cargo-deny 0.19.4와 lockfile 불변이 모두 success다. 이 evidence는 report 26 구현을 Verified로 올리지만 report 27 독립 finding이나 외부 게시 승인을 대신하지 않는다.
+
+## ADR-0035: report 25 production 경계와 exact-set 재시정
+
+Status: Superseded in part by ADR-0036; report 25 evidence retained (2026-08-24)
+Date: 2026-08-23
+Decision ID: DEC-AUDIT-R25-01
+
+Context:
+
+`docs/audit/audit_report_25.md`는 final multi-audit report 1의 첫 시정본을 실제 production entrypoint와 변조 fixture로 재검증했다. broad workspace green과 helper-level test는 inverse save relation, write-side budget, replay alias identity, production GoldScore pair, TUI event-loop 우선순위/geometry, terminal failure lifecycle, actual release output 집합을 닫지 못했다. 문서도 report 23/24, final report 1과 report 25의 authority를 동시에 current처럼 표현했다.
+
+Decision:
+
+- save read/write는 동일 semantic/byte 예산을 사용한다. actor `alive/hp/max_hp`, inventory 양방향 relation과 armor checked arithmetic을 복원 전에 검증하고, writer도 capped serialization 성공 전에 destination을 열거나 교체하지 않는다.
+- headless target 1,000,000은 실행 범위일 뿐 save 성공 보장이 아니다. budget 초과 save는 typed 실패와 no-clobber로 닫으며 v0.3.0에서 history를 자동 폐기하지 않는다.
+- artifact relative path는 `.`을 제거한 canonical lexical form을 사용한다. replay input/output은 lexical form, Windows case와 열린 file identity를 함께 비교하고 ambient path helper를 public API에서 제거한다.
+- GoldScore는 동일 world/turn의 active/control clone에서 gold만 0으로 바꾸고 양쪽 모두 production `death_score`를 호출한 결과로만 witness를 기록한다.
+- TUI는 raw event에서 candidate를 만드는 state-aware dispatcher 하나를 production loop와 tests가 공유한다. blocking state는 LLM dismiss/focus보다 우선하고, reset 이전 response ID는 새 outstanding 존재 여부와 무관하게 먼저 폐기한다.
+- blocking prompt는 최소 60x24/80x24에서 별도 modal 높이를 보장한다. command/inspect mouse hit box는 renderer와 같은 CTA label model에서 파생한다.
+- release `output/` 전체를 게시 bundle로 정의하고 platform별 actual top-level entry exact set을 검사한다. extra file/directory/link/reparse는 checksum 미포함 여부와 관계없이 실패다.
+- dependency exception은 parsed TOML AST, exact trigger set과 valid calendar date를 검사한다. 모든 CI `uses:`는 40-hex ref여야 하며 provenance comment는 실제 tag/SHA와 일치해야 한다.
+- 현재 authority는 report 25 HOLD다. report 23/24는 historical closed, final report 1과 첫 remediation은 partial historical evidence이며 gap child/aggregate는 동일 lifecycle을 따른다.
+
+Alternatives:
+
+- loader, checksum inventory, mapper helper만 보강: production writer/output/event loop가 계속 다른 계약을 실행하므로 기각한다.
+- 1,000,000턴 save를 항상 보장하도록 즉시 event compaction 도입: wire/evidence retention 정책을 새로 만들고 범위를 확대하므로 v0.3.0에서는 기각한다.
+- release publish 대상을 checksum에 적힌 파일만으로 간주: 현재 build와 문서가 `output/` directory를 bundle로 전달하므로 기각한다.
+
+Consequences:
+
+기존 malformed save와 stale release directory 일부는 새 gate에서 거부된다. public ambient path helper 제거는 pre-release internal API 정리이며 production caller는 이미 `ArtifactStore`를 사용한다. 각 수정은 report 25의 수정 전 fixture를 이름 붙인 RED 기록으로 보존하고, 로컬 전체 gate 뒤 clean 동일 SHA의 Ubuntu/Windows release verifier까지 통과해야 `Verified`로 승격한다.
+
+2026-08-24 same-SHA verification update: 첫 clean run `32648979651`의 Ubuntu가 O_PATH `Dir` clone에 대한 parent `sync_all`을 EBADF로 거부했다. capability root를 ambient path로 되돌리지 않고 parent 아래 `.`을 read-only directory `File`로 다시 열어 sync 가능한 descriptor를 얻는 방식으로 시정한다. 첫 run은 실패 증거로 보존하며 후속 same-SHA run만 closure evidence로 사용한다.
+
+Final implementation verification: SHA `b732c42d62f295f4d8be64480c1d0a5a440fe738`의 Actions `32650404618`에서 Ubuntu/Windows tests, R7/R8, actual platform bundle, cargo-audit/deny와 lockfile 불변이 모두 success다. 이 증거는 구현을 `Verified`로 올리지만 독립 재감사나 외부 게시 승인을 대신하지 않는다.
+
+## ADR-0034: SaveDataV1 fail-closed 복원과 self-verifying replay
+
+Status: Superseded in part by ADR-0035 and ADR-0036
+Date: 2026-08-23
+Decision ID: DEC-SAVE-03
+
+Context:
+
+최종 다중 감사 `FIN-F001..F007`은 v1 save가 schema 외 semantic 관계와 자원 상한을 검사하지 않고, replay metadata를 검증하지 않으며, public `DerefMut`와 registry/equipment lifecycle가 transaction truth를 우회한다고 확인했다. 기존 valid-fixture test와 deterministic hash는 손상 artifact와 외부 mutation을 증명하지 못한다.
+
+Decision:
+
+- SaveDataV1 wire shape와 schema version 1은 유지하되 16 MiB, event/entity 각 100,000개, RNG 1,000,000 draw, persisted text 512 UTF-8 byte의 fail-closed 경계를 둔다.
+- 복원 전에 entity, player, map, inventory, equipment, actor stat과 text 관계를 typed validator로 검사한다. invalid artifact는 `GameError::InvalidSave`이며 live session이나 RNG를 만들지 않는다.
+- ReplayLineV1은 self-verifying artifact다. 소비한 line의 turn, full outcome, outer hash를 working clone에서 비교하고 전체 성공 후 한 번만 commit한다.
+- GameSession/GameWorld/runtime EntityStore의 외부 `DerefMut`를 제거하고 crate-private typed mutation surface만 사용한다.
+- GameWorld는 immutable registry context를 runtime-only로 보존한다. injected save 복원은 동일 registry를 인자로 받으며, runtime-created corpse/equipment도 그 context와 공통 lifecycle helper를 사용한다.
+- replay append는 bounded read 후 atomic rewrite로 바꿔 외부 hard-link inode에 열린 append handle로 쓰지 않는다.
+- atomic replace 뒤 Unix parent directory를 fsync한다. Windows directory handle flush의 portable 보장은 현재 dependency에서 제공하지 않으므로 file sync + atomic replace 이후 전원 손실 metadata durability는 명시적 platform 잔여 위험이다.
+
+Alternatives:
+
+- SaveDataV2로 즉시 변경: v0.3.0 wire 호환을 불필요하게 깨므로 기각한다.
+- replay를 command-only로 축소: 기존 integrity 필드와 감사/재현 용도를 무의미하게 만들어 기각한다.
+- invalid state를 deserialize 뒤 runtime `expect`에 맡김: panic과 부분 상태를 허용하므로 기각한다.
+- 같은 계정의 악성 concurrent writer까지 애플리케이션 lock으로 격리: OS sandbox 없이 완전한 경계를 보장할 수 없고 현재 single-writer 제품 모델을 넘으므로 비목표로 둔다. 사전 배치 link와 외부 inode write는 계속 차단한다.
+
+Consequences:
+
+valid v1 save/replay wire는 유지되지만 과거에 우연히 수용된 malformed artifact는 typed error가 된다. 테스트는 boundary-1/boundary/boundary+1, malformed 관계 matrix, replay field별 tamper/no-partial-commit, 외부 compile-fail, custom registry continuation, armor wear/drop/rewear를 직접 검증한다.
+
+## ADR-0033: winx 0.36.4 LLVM exception 한정 허용
+
+Status: Implemented with machine expiry/graph gate (2026-08-23)
+Date: 2026-08-18
+Decision ID: DEC-DEP-02
+
+Context:
+
+ADR-0032의 capability filesystem은 Windows에서 `cap-primitives -> winx 0.36.4`를 shipped dependency로 추가한다. `winx`의 유일한 SPDX 식은 `Apache-2.0 WITH LLVM-exception`이며 기존 `deny.toml`의 일반 `Apache-2.0` 허용만으로는 cargo-deny license gate를 통과하지 못한다.
+
+Decision:
+
+- 일반 allowlist를 넓히지 않고 `winx 0.36.4`에만 `Apache-2.0 WITH LLVM-exception`을 허용한다.
+- exception owner는 Dependency owner / Release manager다.
+- exception은 2026-10-31에 만료하며, 그 전에 `winx`, `cap-primitives`, `cap-std`, `cap-fs-ext`, `cap-tempfile` 중 하나의 version이 바뀌면 즉시 재검토한다.
+- `dependency-exceptions.json`의 `DEP-EXC-0001`을 예외 owner, 사유, 승인일, 만료일과 trigger version의 단일 ledger로 사용한다. CI test는 오늘 날짜가 만료일을 지났거나 deny 설정·Cargo graph가 ledger와 다르면 실패한다.
+- cargo-deny 0.19.4의 `licenses`, `bans`, `sources` 실제 PASS를 R1/R8 필수 증거로 유지한다.
+
+Alternatives:
+
+- `Apache-2.0 WITH LLVM-exception`을 일반 allowlist에 추가: 향후 무관한 crate까지 자동 허용하므로 기각한다.
+- capability dependency 제거: SEC-F001의 portable path sandbox와 atomic replace 경계를 후퇴시키므로 기각한다.
+- cargo-deny gate 생략: shipped dependency policy를 검증하지 못하므로 기각한다.
+
+Consequences:
+
+`deny.toml` exception은 crate와 version을 함께 고정한다. `dependency-exceptions.json` checker가 만료, unrelated crate 확장, dependency version 변경을 fail-closed한다. 실패 시 exception 유지, dependency 교체, 일반 정책 변경 중 하나를 다시 결정하고 `BUILD_GUIDE.md`와 감사 기록을 갱신한다.
+
+전역 `multiple-versions = "allow"`는 무제한 허용이 아니다. `dependency-duplicate-budget.json`의 정확한 all-target family/version 집합과 최대 23개 family를 별도 machine gate로 고정하며 drift는 review 전까지 실패한다.
+
+Verification update: implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 Ubuntu/Windows cargo-deny 0.19.4와 전체 quality gate가 success다. report 23/24 시정은 후속 독립 재감사와 외부 게시 승인을 대체하지 않는다.
+
+## ADR-0032: capability 기반 save/replay 파일 경계
+
+Status: Superseded in part by ADR-0034 (2026-08-23)
+Date: 2026-08-18
+Decision ID: DEC-SAVE-02
+
+Context:
+
+기존 headless 경로는 문자열 경로를 canonicalize한 뒤 실제 파일을 다시 열었고, save는 예측 가능한 `.tmp`를 truncate mode로 생성했다. 이 구조는 경로 검사와 open 사이의 교체 경쟁을 남기며, 미리 배치한 symbolic link 또는 hard link가 root 밖 파일을 열거나 truncate하게 할 수 있다. TUI quick-save도 모든 프로세스가 같은 OS temp 경로를 공유했다.
+
+Decision:
+
+- headless의 save/load/replay/report I/O는 열린 runtime root directory capability와 검증된 상대 경로를 함께 보유하는 `ArtifactStore`를 통한다. absolute path와 root 탈출은 구조적으로 거부하고, 각 open/rename은 root handle 기준으로 수행한다.
+- 쓰기 대상의 마지막 경로 요소는 symbolic link를 따라가지 않는다. 열린 handle이 일반 파일이며 hard-link count가 1인지 쓰기 전에 검증한다.
+- save는 대상과 같은 directory에 충돌하지 않는 임시 파일을 `create_new`로 생성하고 payload와 file metadata를 동기화한 뒤 capability-relative rename으로 교체한다. Unix는 mode `0600`을 강제하고 Windows는 parent directory DACL을 상속하므로, Windows에서 기밀성이 필요한 runtime root는 사용자 전용 directory여야 한다. 실패 시 새 임시 파일만 정리하고 기존 save는 보존한다.
+- replay 기록은 기존 payload를 bounded read한 뒤 같은 directory의 temporary file로 atomic rewrite한다. 열린 외부 inode에 append하지 않는다.
+- TUI quick-save는 프로세스별 임시 directory를 사용해 다른 실행과 경로를 공유하지 않는다.
+- `ArtifactStore::open`은 root의 마지막 component를 no-follow로 열고 symbolic link와 Windows junction/reparse root를 거절한다. TUI는 store와 relative quick-save path를 소유한다.
+
+Alternatives:
+
+- canonicalize 후 일반 `File::open`/`File::create` 유지: 검사와 사용 사이 경쟁을 닫지 못해 기각한다.
+- 고정 `.tmp` 이름에 `create_new`만 추가: 사전 배치 공격의 truncate는 막지만 동시 실행 충돌과 parent 교체 경계를 해결하지 못해 기각한다.
+- 플랫폼별 raw descriptor API를 프로젝트에서 직접 구현: `unsafe`와 OS별 유지보수 표면을 늘리므로 기각하고, 검증된 capability filesystem dependency를 사용한다.
+- Windows DACL을 runtime에서 직접 재작성: `unsafe` Windows ACL API와 권한 상속 파괴 위험이 현재 save 데이터 민감도보다 크므로 기각한다. owner-only가 필수인 배포는 사용자 전용 application directory를 root로 제공한다.
+
+Consequences:
+
+`aihack-runtime`은 capability filesystem dependency를 추가한다. path 기반 compatibility helper는 신뢰된 테스트 경로에서만 유지하고 production CLI는 `ArtifactStore`를 사용한다. `tests/headless_paths.rs`는 Windows와 Unix에서 temp hard-link/symlink, replay link, parent escape, 기존 save 보존과 platform permission contract를 직접 회귀한다. Windows inherited DACL은 owner-only hard boundary로 표현하지 않는다.
+
 ## ADR-0031: 콘텐츠 인과 폐쇄와 상태-delta 검증
 
 Status: Accepted (2026-08-17)
@@ -41,6 +418,8 @@ Alternatives:
 Consequences:
 
 R9는 테스트 기반을 먼저 만들고 음식/영양, content behavior, 경제/점수, 상태 orphan 순서로 작은 수직 슬라이스를 적용한다. 의도된 snapshot hash 변화는 witness와 ADR 근거 없이 baseline만 갱신할 수 없다.
+
+2026-08-18 verification update: `CausalProjection`과 9종 필수 `CausalWitness`가 seed 42/7/1234의 1000턴 fixture에서 각 1회 이상 발생하고 witness multiset/final hash가 3회 반복 일치한다. `hallucinating` SaveDataV1 compatibility risk owner는 Project owner/runtime maintainer이며 SaveDataV2·v0.4.0 scope 승인 또는 2026-10-31 중 먼저 도래하는 시점에 제거 migration과 실제 producer feature 중 하나를 재결정한다.
 
 ## ADR-0021: NetHack 3.6.7 행동 호환 clean reimplementation
 
@@ -98,7 +477,7 @@ Consequences:
 
 ## ADR-0028: RustSec 경고 없는 ratatui 0.30/crossterm 0.29 계열
 
-Status: Accepted; R1 and SC-BUILD-02 verified by `audit_report_19.md`
+Status: Accepted; R1/report 21 verified, RUSTSEC-2026-0253 remediation updated 2026-08-18
 Date: 2026-07-15
 Decision ID: DEC-UI-DEP-01
 
@@ -108,7 +487,7 @@ ADR-0022의 ratatui 0.29 계열은 crossterm 중복을 피했지만, 현재 Rust
 
 Decision:
 
-UI dependency를 `ratatui = "0.30"`과 `crossterm = "0.29"`로 함께 올린다. lockfile은 ratatui 0.30.2, crossterm 0.29.0, lru 0.18.1을 고정하며 `cargo audit`, `cargo deny check licenses bans sources`, crossterm 단일 버전 검증을 R1 gate에 포함한다.
+UI dependency를 `ratatui = "0.30"`과 `crossterm = "0.29"`로 함께 유지한다. lockfile은 ratatui 0.30.2, crossterm 0.29.0을 고정하고 전이 의존성 `lru`는 `RUSTSEC-2026-0253`이 수정된 0.18.2 이상을 요구한다. `cargo audit`, `cargo deny check licenses bans sources`, crossterm 단일 버전 검증을 R1 gate에 포함한다.
 
 Alternatives Considered:
 
@@ -232,6 +611,8 @@ Consequences:
 - R6-3은 strict soft payload와 `Neutral / LLM_UNAVAILABLE` fallback을 UI-only state로 보관하고, terminal 복원 뒤 worker를 최대 250ms만 정리한다.
 - R6 통합은 G/A/J 요청과 Y/N/R 안전 경로, 상태·modal, 동일 종류 outstanding·250ms cooldown, capacity 16 oldest-drop 표시 큐를 실제 TUI loop에 연결한다. 자동 failure matrix와 live PTY/loopback fixture matrix를 통과했고 `audit_report_11.md`가 checkpoint를 PASS로 종결했다.
 - public request는 `schema_version = 1`, `SessionRevision`, `LlmObservationView`, 독립 `ActionSpace`, `LlmRequestKind`를 소유하고 enqueue 전에 version·bounds·canonical size를 검증한다. response envelope도 TUI payload 수용 전에 version을 거부한다.
+- timeout의 단일 기본값은 connect 500ms, narrative 2000ms, decision/soft-adjudication 1500ms이며 helper와 env config가 같은 상수를 사용한다. decision rationale은 trim 후 1..=160자다.
+- v0.3.0 built-in runtime locale은 English로 한정한다. 다국어 README와 provider Unicode pass-through는 runtime 5-locale catalog 완료 증거가 아니다.
 - deterministic loopback fixture와 PTY script는 success/timeout/stale/down 및 pending-exit 복원 순서를 저장소에서 재현한다. `audit_report_11.md` 독립 재감사에서도 같은 evidence가 통과했다.
 - 실제 모델 smoke는 R6 필수 gate가 아니다. 최종 통합에서 별도 호환성 증거가 필요할 때만 localhost OpenAI-compatible 임시 adapter가 Google AI Studio Gemini 같은 원격 API를 대리 호출한다. AIHack은 계속 loopback만 호출하며 API key는 adapter 환경변수에만 주입하고 model ID는 실행 시점에 확인한다.
 
@@ -265,6 +646,7 @@ Consequences:
 - `audit_report_12.md` 이후 approval gate는 상태 문자열을 신뢰하지 않는다. runtime coverage, reviewer/date/license/scope/notice/evidence, content checksum, scenario schema/function과 Blocked reference를 모두 machine validation한 경우에만 PASS한다.
 - `audit_report_13.md`의 phase-cycle 시정에 따라 R7은 asset/scenario provenance를, R8은 root distribution license/version/packaging을 소유한다. R7 PASS만으로 외부 배포를 허용하지 않는다.
 - release checkpoint는 caller environment가 지정한 root를 신뢰하지 않고 script-relative canonical repository만 검사한다.
+- release bundle 무결성은 Linux Bash와 Windows PowerShell verifier가 동일한 required file, excluded path, metadata/record equality, checksum exact-set와 tamper negative matrix를 갖는다. 한 OS의 positive build만으로 다른 OS의 fail-closed parity를 대신하지 않는다.
 
 ## ADR-0029: 미승인 provenance를 R8 실제 런칭 게이트로 이관
 
@@ -296,7 +678,7 @@ Consequences:
 
 ## ADR-0030: NetHack 3.6.7 파생물 분류와 whole-work NGPL 배포
 
-Status: Implemented; report 19 technical evidence verified, report 20 documentation remediation pending re-audit
+Status: Implemented; report 21/24/25/26 historical closure retained, report 27 current HOLD
 Date: 2026-07-20
 Decision ID: DEC-LICENSE-03
 
@@ -323,4 +705,4 @@ Consequences:
 - source archive는 `.git/` history에 의존하지 않고 `MODIFICATIONS.md`의 scope/date와 `RELEASE-METADATA`의 commit을 수신자에게 전달한다.
 - 라이선스 정비 완료는 독립 R8 기술 감사 `PASS`나 외부 게시 실행을 자동 승인하지 않는다.
 - 이 결정과 프로젝트 기록은 qualified legal opinion이나 법률 자문을 대체하지 않는다.
-- Release verification update (2026-07-22): commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 [Actions run `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221)에서 `ubuntu-latest quality gate`와 `windows-latest quality gate` 및 bundle이 PASS했고 `audit_report_19.md`가 기술 evidence를 Verified했다. `audit_report_20.md`가 남긴 active-state/false-green 문서 HOLD 시정의 독립 재감사 전까지 R8 전체는 HOLD다.
+- Release verification update (2026-08-23): `audit_report_21.md`가 report 20을, `audit_report_24.md`와 implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`이 report 23/24를 historical closed했다. final multi-audit report 1의 첫 시정은 `docs/audit/audit_report_25.md`가 production 결함을 재현해 partial evidence로 강등했으며, report 25 시정·same-SHA CI·독립 재감사 전까지 전체 PASS나 외부 게시를 승인하지 않는다.

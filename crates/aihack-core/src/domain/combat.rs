@@ -67,9 +67,10 @@ pub fn roll_damage(
         return 0;
     }
     let rolled = (0..damage.dice)
-        .map(|_| roll_die(rng, damage.sides))
-        .sum::<i16>();
-    (rolled + damage_bonus - damage_reduction).max(1)
+        .map(|_| i32::from(roll_die(rng, damage.sides)))
+        .sum::<i32>();
+    let adjusted = rolled + i32::from(damage_bonus) - i32::from(damage_reduction);
+    adjusted.clamp(1, i32::from(i16::MAX)) as i16
 }
 
 pub fn attack_roll_value(
@@ -78,8 +79,10 @@ pub fn attack_roll_value(
     weapon_hit_bonus: i16,
     d20: i16,
 ) -> (i16, i16, bool) {
-    let attack_roll = d20 + attacker_hit_bonus + weapon_hit_bonus;
-    let defense = 10 + defender_ac;
+    let attack_roll = (i32::from(d20) + i32::from(attacker_hit_bonus) + i32::from(weapon_hit_bonus))
+        .clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
+    let defense =
+        (10_i32 + i32::from(defender_ac)).clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
     (attack_roll, defense, attack_roll >= defense)
 }
 
@@ -125,7 +128,8 @@ pub fn resolve_attack_with_profile(
         0
     };
     if hit {
-        entities.actor_stats_mut(defender_id)?.hp -= damage;
+        let stats = entities.actor_stats_mut(defender_id)?;
+        stats.hp = stats.hp.saturating_sub(damage);
     }
     Some(AttackResolution {
         attacker: attacker_id,

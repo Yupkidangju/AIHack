@@ -8,6 +8,7 @@ use aihack_core::{
 #[test]
 fn saved_world_roundtrip_preserves_persisted_state_and_resets_runtime_death_cause() {
     let world = WorldState {
+        campaign: None,
         levels: LevelRegistry::fixture_phase5(),
         current_level: aihack_core::ids::LevelId::main(1),
         entities: EntityStore::new(),

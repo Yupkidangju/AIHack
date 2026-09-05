@@ -4,19 +4,90 @@
 
 ### Added
 
+- 기사·정찰자·마법사 선택과 처치 XP/최대 10레벨 성장, 캠페인 운반 한도 120 및 HUD를 추가했다.
+- seed 기반 Main 6층/Mines 2층 생성·분기 왕복, 고유 아뮬렛 획득 후 지상 귀환 Victory를 연결했다.
+- `--role` headless 시작, campaign wire save schema 2와 구형 V1 호환 읽기, 성장/목표/맵/승리 검증을 추가했다.
+
+### Fixed
+
+- 멀티 감사 2의 적/바닥 물건 표시, q/Q 충돌, 방향·물건 선택, 전체 인벤토리 페이지, 최소 화면 로그/food 표시를 수정했다.
+- 시작·생성·게임 종료 화면과 명령/선택 메뉴에 내부 마우스 조작을 연결하고 UI 선택 취소의 turn/RNG 보존을 검증했다.
+- production TUI 저장소를 `--save-dir`로 구성 가능한 지속 경로로 전환했다. 저장은 명시적 S이며 자동 저장하지 않는다.
+- 마비·기도 cooldown·문 조건에 legal action을 정렬하고 headless의 legal Wait fallback 및 loaded turn보다 낮은 target 거부를 추가했다.
+
+## [0.3.0] - 2026-08-25
+
+### Added
+
 - 콘텐츠 생성 원인·소비 주체·직접 상태 변화·후속 영향을 추적하는 R9 인과 폐쇄 계약과 `docs/audit/audit_report_22.md`를 추가했다.
 - 음식과 jackal 시체를 실제 nutrition/hunger/item lifecycle에 연결하는 `Eat` 행동과 상태-delta 회귀 테스트를 추가했다.
 - 동일 seed의 A/B registry로 armor `ac_bonus`, monster `speed`/`ai`/`passive`, item `base_price`가 실제 simulation 상태를 바꾸는지 검증하는 테스트를 추가했다.
+- `CausalProjection`, 9종 typed `CausalWitness`와 seed별 witness multiset/final hash 반복 및 negative acceptance gate를 추가했다.
+- capability 기반 save/load/replay/report `ArtifactStore`와 hard-link/symlink/temp-file 보안 회귀를 추가했다.
+- SaveDataV1 semantic validator, artifact/RNG/text 예산, replay field별 self-verification과 no-partial-commit 회귀를 추가했다.
+- state-aware Inventory/MorePrompt/cancel/storage-error TUI, 실제 high-contrast renderer, mouse capture와 terminal restore failure-injection test를 추가했다.
+- dependency exception JSON ledger와 expiry/graph negative gate, Windows release bundle PowerShell verifier와 tamper matrix를 추가했다.
 
 ### Changed
 
 - monster speed, AI, passive, difficulty를 typed actor state에 보존하고 실제 turn cadence, intent, passive status, kill gold에 사용하도록 변경했다.
 - 기도가 luck을 생성하고 player attack roll이 luck을 소비하도록 연결했다.
 - 종료 점수에 소지 item의 content base price를 반영하고, 3 seed 장기 테스트가 turn/event metadata를 제외한 semantic world-state delta까지 요구하도록 강화했다.
+- R7/R8 checkpoint를 Linux/Windows 공통 canonical 명령으로 고정하고 checksum manifest/content LF checkout과 CRLF 입력 정규화를 적용했다.
+- report 20/21/22/23의 역사적 finding, 종결 권한, 새 HOLD와 coder remediation 상태를 분리했다.
+- `SC-CAUSE-01`부터 `SC-CAUSE-07`까지 각 계약을 production 책임 심볼과 정확한 테스트 함수에 개별 매핑했다.
+- save 권한 계약을 Unix mode `0600`과 Windows parent DACL 상속으로 구분해 Windows owner-only 과대주장을 제거했다.
+- headless 기본 policy를 `survival-v1`, `--turns`를 `1..=1,000,000`으로 고정하고 public `DerefMut` mutation 우회를 제거했다.
+- v0.3.0 release modification 범위를 2026-08-25 candidate commit까지 확장하고 CI action을 immutable commit으로 고정했다.
+- report 25 재감사에 따라 save read/write 예산, replay path identity, GoldScore production pair, TUI dispatcher/CTA geometry, release output exact-set을 단일 production 계약으로 강화했다.
+- active audit authority를 `docs/audit/audit_report_25.md` HOLD로 전환하고 first final-audit remediation의 broad-green 주장을 partial historical evidence로 분류했다.
+- report 27 계약에 따라 9종 causal isolation을 command/observer 생략이 없는 field-only active/control pair와 나머지 8개 attribution record equality로 강화했다.
+- F9 debug panel이 visible rect의 mouse authority를 갖도록 정하고 Judge editor의 문자 Repeat와 일반 LLM request Repeat를 분리했다.
+- CI action pin gate가 repository-root local composite action의 metadata를 cycle-safe 재귀 검사하도록 확장했다.
+- entity spawn API를 checked/fallible allocation으로 전환하고 rejected transaction이 working state를 commit하지 않도록 강화했다.
+- TUI text-edit Repeat와 Esc/Enter/F9/Q transition control-key의 Press-only 정책을 분리했다.
+- report 29 계약에 따라 item ID가 canonical declared kind/class를 강제하도록 결정하고, public mutation API를 atomic `GameSession::submit`으로 한정했다.
+- transition 입력을 key blocklist가 아닌 Release/queue-idle gesture lifecycle로, corresponding source를 metadata 문자열이 아닌 `ExpectedCommit` complete archive identity로 검증하도록 계약을 강화했다.
 
-## [0.3.0] - 2026-07-20
+### Fixed
 
-### Added
+- 예측 가능한 save `.tmp`와 replay hard-link/symlink가 외부 파일을 truncate하거나 변경할 수 있던 경로를 fail-closed handle 검증과 원자 교체로 수정했다.
+- Windows 실제 checkout에서 CRLF checksum manifest 때문에 R7/R8 checkpoint가 FAIL 2로 끝나던 문제를 수정했다.
+- `RUSTSEC-2026-0253`을 제거하도록 전이 의존성 `lru`를 0.18.2로 갱신했다.
+- 두 binary의 `--help`에서 오래된 v0.1.0/Phase 설명을 제거하고 현재 제품 설명으로 교체했다.
+- `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception`을 version-scoped cargo-deny exception으로 기록해 cargo-deny 0.19.4 license gate를 복구했다.
+- malformed save panic/모호한 entity 수용, forged replay 성공, injected registry corpse drift와 armor drop AC 누적을 수정했다.
+- TUI quick-save ambient path, dead inventory affordance, 전역 Esc quit, theme/mouse 미연결과 terminal cleanup short-circuit를 수정했다.
+- Windows bundle의 legacy include, metadata/record 불일치, zero-size, duplicate/wrong checksum fail-open 경로를 수정했다.
+- report 29가 재현한 TUI 동등 transition, archive raw component/type/extraction, complete-source substitution과 document-wide current-authority false-green을 시정 대상으로 등록했다.
+- transition gesture를 합성 Release 비신뢰·500ms quiet+2 idle gate로 구현하고 Load/Inventory/MorePrompt/selection/LLM/GameOver/F9와 actual ConPTY repeated-byte 회귀를 추가했다.
+- ZIP/TAR 공통 raw name/type/prefix validator, safe temporary extraction과 `ExpectedCommit` 독립 `git archive` byte identity를 양 release verifier에 연결했다.
+- known item ID-kind mismatch와 empty/multi-scalar glyph를 registry에서 거부하고 projectile/monster mutating system을 crate 내부 transaction primitive로 축소했다.
+- report 29 successor SHA `a91a9c7`의 Actions `32706869079`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+- report 30 계약에 따라 designs/compatibility/remediation/roadmap을 포함한 active authority gate와 submit-only default Rust visibility 시정을 시작했다.
+- designs/compatibility/remediation/roadmap header를 report 30 lifecycle로 복구하고 모든 active section에 exact-one/predecessor mutation gate를 적용했다.
+- default runtime의 mutating World/system surface를 crate-private로 축소하고 C010 direct-death fixture를 opt-in `testing` feature로 격리했으며 external compile pass/fail 회귀를 추가했다.
+- report 30 successor SHA `ed02dbf`의 Actions `32733235414`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+- report 31이 재현한 implementation summary 1·10·11절 lifecycle 불일치를 시정 대상으로 등록하고, predecessor current 표현과 완료된 predecessor 구현·CI 재개방을 report 번호 기반 generic negative gate로 차단하도록 계약을 강화했다.
+- report 31 successor SHA `8c042d48`의 Actions `32741917348`에서 Ubuntu/Windows 각 19 success step, actual platform bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+- Report 32에서 Report 31 lifecycle finding과 FIN-F012를 독립 종결하고, current HEAD 날짜가 modification period를 넘긴 R32-DBG-F001/FIN-F015를 새 HOLD로 등록했다.
+- release modification evidence를 `2026-08-25`까지 확장하고 literal self-check를 actual HEAD candidate-date containment regression으로 교체하는 계약을 ADR-0042로 동결했다.
+- inverse inventory owner/index, actor HP/alive와 armor overflow malformed save가 수용되거나 panic하던 경계를 typed `InvalidSave`로 닫고, writer가 self-unloadable 16 MiB 초과 save를 게시하지 않도록 수정했다.
+- replay `path`/`./path`/Windows case/file-identity alias, TUI blocking-state 입력 우회와 late LLM response 오표시, 최소 화면 prompt clipping과 표시 밖 mouse command를 수정했다.
+- Linux/Windows release verifier가 checksum에 없는 extra file/directory/link/reparse output을 허용하던 문제를 actual top-level exact-set 검증으로 수정했다.
+- Linux에서 O_PATH 기반 `cap_std::Dir`를 직접 fsync해 atomic save가 EBADF로 실패하던 문제를 capability 아래 `.`의 syncable directory descriptor 재open으로 수정했다.
+- report 26의 malformed scalar/ItemData, Win32 trailing-name alias, modal mouse·hidden Inspect CTA, causal producer-removal, release root/hardlink와 candidate-date 경계를 fail-closed 회귀로 수정했다.
+- report 26 Linux verifier의 `tar | grep -q` SIGPIPE false-green을 전체 listing 선캡처로 수정하고 최종 SHA `1e84a94`/Actions `32660514315` 계보를 복구했다.
+- report 27의 allocator exhaustion, registry level/charge shape, 비가역 custom armor를 load/import 전에 typed reject하고 Wear/Drop AC를 base-derived 가역 계산으로 수정했다.
+- source archive의 dot/parent/absolute/backslash alias와 불가능한 Gregorian candidate/period 날짜가 양 OS verifier를 우회하던 경계를 canonical component/strict calendar 검사로 닫았다.
+- report 27 시정 SHA `ea7822a5`/Actions `32683076204`에서 437 tests, R7/R8, actual 양 OS bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+- report 28의 allocator headroom, hp 0 custom monster, armor Wear→Throw derived AC와 F9 실제 경로를 fail-closed 회귀로 수정했다.
+- archive component의 Windows case/trailing/reserved/collision alias와 Linux year 0000 calendar parity를 양 verifier에서 거부하도록 수정했다.
+- report 28 시정 SHA `9725c378`/Actions `32694375654`에서 전체 tests, R7/R8, actual 양 OS bundle, cargo-audit/deny와 lockfile 불변을 clean same-SHA로 검증했다.
+
+### 2026-07-20 기준 누적 내역
+
+#### Added
 
 - `AI_IMPLEMENTATION_DOC_STANDARD.md`에 맞춘 v0.3.0 리팩터링 구현 계획을 `spec.md`, `IMPLEMENTATION_SUMMARY.md`, `GAP_CLOSURE_ROADMAP.md`, `audit_roadmap.md`에 작성했다.
 - build reproducibility, private state transaction, runtime content registry, accepted-turn 1000 검증, workspace 경계, local LLM transport/revision gate, provenance/compatibility의 R0~R8 Task와 종료 게이트를 정의했다.
@@ -46,7 +117,7 @@
 - R6 재감사를 위해 versioned `LlmRequestInput`/`LlmObservationView`, request·response schema mismatch gate와 synchronous payload bound를 추가했다.
 - `scripts/r6_loopback_fixture.py`, `scripts/r6_pty_matrix.sh`, `scripts/r6_pending_exit_smoke.sh`를 추가해 success/timeout/stale/down과 pending-exit terminal 복원을 재현 가능하게 했다.
 
-### Changed
+#### Changed
 
 - `audit_report_20.md`의 `IMP-F016`/`DBG-F008` 후속 시정으로 구현 요약 최상단, `G-LICENSE-001`, R8 전체 테스트 표현을 실제 evidence와 정렬하고 section/row별 positive·negative 문서 회귀 gate를 추가했다.
 - `audit_report_19.md`의 `IMP-F016`/`XPF-F011` 시정으로 활성 README, 구현 요약, gap/audit roadmap, build guide, ADR와 문서 감사표를 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16` 및 Actions run `29886410221`의 same-SHA 양 OS success와 동기화했다. 기술 gate PASS와 문서 시정 재감사 HOLD를 분리해 기록한다.
@@ -79,13 +150,13 @@
 - Windows 병렬 테스트에서 해제된 ephemeral port가 재사용되던 경합을 transport/TUI 통합 테스트에서 제거하고, 연결 직후 종료하는 loopback fixture로 LLM `Unavailable` 분류를 결정론적으로 검증한다. 환경 잠금 poison은 후속 독립 테스트로 전파하지 않는다.
 - `audit_report_10.md`의 IMP-F009/010 시정으로 public LLM error/command enum을 non-exhaustive 계약에 맞추고 TUI consumer에 wildcard 처리를 추가했다.
 
-### Security
+#### Security
 
 - LLM은 loopback endpoint와 presentation-only 권한을 기본으로 하며, stale/invalid response와 자유 텍스트 state mutation을 차단하는 계획을 명시했다.
 - local LLM endpoint의 scheme/credential/query/fragment와 resolve 결과를 검증하고, client 연결 주소를 loopback으로 고정했으며 redirect와 system proxy를 비활성화했다.
 - 출처 상태가 `Approved`가 아닌 legacy 코드·데이터·문자열은 runtime 포함 및 배포를 금지하는 gate를 명시했다.
 
-### Verification
+#### Verification
 
 - R0 문서 gate는 PASS다.
 - R1의 로컬 fmt, clippy, test, release build, cargo audit, cargo deny gate는 통과했다. Linux/Windows 원격 CI는 workflow push 후에만 PASS로 기록한다.

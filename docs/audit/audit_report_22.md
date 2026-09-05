@@ -1,7 +1,7 @@
 # D3D 감사 리포트 22: 콘텐츠 인과 폐쇄
 
 작성일: 2026-08-17
-상태: PASS WITH ACCEPTED COMPATIBILITY RISK
+상태: 2026-08-17 post-fix 판정 기록; `audit_report_23.md`가 장기 witness 증거를 HOLD했고 2026-08-18 coder remediation 후 독립 재감사 대기
 근거: `spec.md`, `AI_AUDIT_DOC_STANDARD.md`, active workspace source, root integration tests
 
 ## 1. 감사 범위
@@ -21,6 +21,13 @@
 ## 3. 판정 규칙
 
 PASS는 함수 호출이나 이벤트 발생만으로 인정하지 않는다. 명령 전후의 semantic world projection에서 turn, event count, last event처럼 자동으로 변하는 메타 필드를 제외하고도 하나 이상의 관찰 가능한 상태 delta가 있어야 한다. 후속 소비 루프는 그 delta가 뒤의 규칙 판정 또는 추가 상태 전이에 입력되는 것으로 증명한다.
+
+### 3.1 상태 계보
+
+- 5절의 `CAUSE-F001..004`, `TEST-F001`은 2026-08-17 구현 전 상태를 기록한 **Initial Finding**이다.
+- 같은 날 구현 뒤 4절 인과 인벤토리와 7절은 개별 A/B 인과 테스트를 근거로 post-fix 상태를 기록했지만, `TEST-F001`의 3-seed 필수 witness 집계는 실제로 구현되지 않았다.
+- `docs/audit/audit_report_23.md`가 이 false-green을 `TEST-F001` Re-audit #1로 HOLD했다.
+- 2026-08-18 coder remediation은 `CausalProjection`, 9종 `CausalWitness`, seed별 witness multiset/final hash 3회 반복, event-only·turn-only·witness 누락 negative gate를 추가했다. 이는 독립 재감사 판정이 아니라 시정 기록이다.
 
 ## 4. 인과 인벤토리
 
@@ -52,10 +59,12 @@ PASS는 함수 호출이나 이벤트 발생만으로 인정하지 않는다. �
 | kill count | monster death | death score | +1 | final score | 연결됨 |
 | save/replay/hash | session state | load/replay/regression | 상태 보존 | 결정론 증거 | 연결됨 |
 
-## 5. 주요 finding
+## 5. Initial Finding과 현재 시정 상태
 
 ### [CAUSE-F001] 콘텐츠 schema 값이 runtime behavior에 도달하지 않는다
 
+- Initial Status: **Needs Fix**
+- Current Status: **Verified by targeted tests** — `tests/causal_content.rs`의 monster speed/AI/passive, difficulty/economy, armor A/B·상태 delta 검증
 - 심각도: 높음
 - 증거: `speed`, `difficulty`, `passive`, `ac_bonus`가 parse되지만 actor/item 행동 데이터에 보존되지 않거나 kind 기반 상수로 대체된다.
 - 영향: TOML을 바꿔도 simulation 결과가 달라지지 않아 ContentRegistry가 실질적 진실원이 아니다.
@@ -64,6 +73,8 @@ PASS는 함수 호출이나 이벤트 발생만으로 인정하지 않는다. �
 
 ### [CAUSE-F002] 음식·시체 생성이 영양 상태와 닫힌 루프를 만들지 않는다
 
+- Initial Status: **Needs Fix**
+- Current Status: **Verified by targeted tests** — `tests/causal_content.rs`의 food/corpse producer-consumer 및 hunger/lifecycle delta 검증
 - 심각도: 높음
 - 증거: `nutrition` item field와 `ItemClass::Food/Corpse`는 존재하지만 `CommandIntent`에 섭취 행동이 없다.
 - 영향: 시체 생성과 식량 콘텐츠가 무게·인벤토리 외 다른 시스템에 영향을 주지 않는다.
@@ -72,6 +83,8 @@ PASS는 함수 호출이나 이벤트 발생만으로 인정하지 않는다. �
 
 ### [CAUSE-F003] 경제 상태는 production producer가 없다
 
+- Initial Status: **Needs Fix**
+- Current Status: **Verified by targeted tests** — monster difficulty kill reward와 `base_price` 기반 final score 차이를 검증
 - 심각도: 중간
 - 증거: `gold`와 `base_price`는 저장/조회되지만 실제 플레이에서 gold를 생성하거나 가격을 소비하는 경로가 없다.
 - 영향: 가격 데이터와 score 일부가 사실상 fixture 전용이다.
@@ -80,14 +93,21 @@ PASS는 함수 호출이나 이벤트 발생만으로 인정하지 않는다. �
 
 ### [CAUSE-F004] luck·hallucination은 저장 가능한 orphan state다
 
+- Initial Status: **Needs Fix**
+- Current Status: **Partially Verified / Time-bounded Accepted Compatibility Risk** — luck은 Pray producer와 combat consumer로 닫혔고 `hallucinating`만 SaveDataV1 호환 필드로 남음
 - 심각도: 중간
 - 증거: production producer가 없고 standalone pure helper만 값을 소비한다.
 - 영향: save/hash surface는 커지지만 플레이 인과관계는 없다.
 - 수정 방향: 명확한 producer와 downstream rule을 추가하거나 다음 schema에서 제거 대상으로 분류한다.
 - 재감사: 명령/콘텐츠로 상태가 생성되고 이후 명중·표현 또는 해제 전이에 실제로 사용되어야 한다.
 
+`hallucinating` accepted risk owner는 **Project owner / runtime maintainer**다. 재검토 시점은 **SaveDataV2 또는 v0.4.0 기능 범위 승인 시점과 2026-10-31 중 먼저 도래하는 때**이며, 그때 필드 제거 migration 또는 production producer/downstream consumer feature spec 중 하나로 닫는다. 그 전까지 새 producer가 없는 `hallucinating`을 active causal coverage나 완료 기능으로 주장하지 않는다.
+
 ### [TEST-F001] 기존 장기 테스트는 인과 커버리지를 증명하지 않는다
 
+- Initial Status: **Needs Fix**
+- Post-report-22 Re-audit: `audit_report_23.md`에서 **Needs Fix / Hold**
+- Current Coder Status (2026-08-18): **Remediated, independent re-audit pending** — `crates/aihack-runtime/src/causal.rs`, `tests/long_run.rs`
 - 심각도: 높음
 - 증거: `tests/long_run.rs`는 accepted turn 수, Playing 상태, 제출 수 범위, 최종 hash 반복성만 검사한다.
 - 영향: 모든 orphan이 남아 있어도 현재 테스트는 PASS한다.
@@ -105,8 +125,8 @@ PASS는 함수 호출이나 이벤트 발생만으로 인정하지 않는다. �
 
 ## 7. 최종 판정
 
-최종 판정은 **PASS WITH ACCEPTED COMPATIBILITY RISK**다. 음식/시체, `ac_bonus`, monster `speed`/`ai`/`passive`/`difficulty`, gold/price/score, luck은 observable state 경로에 연결됐고 3 seed 장기 테스트는 semantic delta를 확인한다. hallucination은 save v1 호환 필드로만 유지하고 필수 causal coverage에서 제외했으며 SaveV2 제거 또는 별도 producer feature spec이 필요하다. fmt, clippy `-D warnings`, workspace 전체 test/all-target build가 2026-08-17 PASS했다.
+2026-08-17의 post-fix 판정은 **PASS WITH ACCEPTED COMPATIBILITY RISK**였으나, `audit_report_23.md`가 3-seed 필수 witness 집계 부재를 확인해 R9 전체를 HOLD로 대체했다. 2026-08-18 coder remediation은 각 seed에서 9종 witness를 모두 1회 집계하고 final hash `5cde4a5f145ff3af`(42), `942403c665e19ad9`(7), `01a8631d0ad95d96`(1234)를 3회 반복 검증하며 negative gate를 추가했다. 현재 권한 상태는 **코더 시정 완료 / 독립 재감사 대기**이고, `hallucinating`은 위 owner·재검토 조건을 가진 time-bounded compatibility risk다.
 
 ## 8. Coder Handoff
 
-이 리포트와 갱신된 `spec.md`의 R9 계약을 기준으로 각 finding을 작은 수직 슬라이스로 수정하고, 호출 여부가 아니라 semantic state delta를 검증하는 seed 기반 회귀테스트를 먼저 작성한다.
+2026-08-17의 최초 coder handoff는 위 Initial Finding 시정으로 종결됐다. 현재 잔여 handoff는 `audit_report_23.md` 시정의 독립 재감사와 `hallucinating` risk의 지정 trigger 재검토뿐이며, 이미 Verified된 CAUSE finding을 다시 미구현 상태로 취급하지 않는다.

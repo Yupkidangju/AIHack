@@ -3,9 +3,9 @@ use std::env;
 use crate::is_forbidden_control;
 
 const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:11434/v1";
-const DEFAULT_CONNECT_TIMEOUT_MS: u64 = 500;
-const DEFAULT_NARRATIVE_TIMEOUT_MS: u64 = 2_000;
-const DEFAULT_DECISION_TIMEOUT_MS: u64 = 1_500;
+pub const DEFAULT_CONNECT_TIMEOUT_MS: u64 = 500;
+pub const DEFAULT_NARRATIVE_TIMEOUT_MS: u64 = 2_000;
+pub const DEFAULT_DECISION_TIMEOUT_MS: u64 = 1_500;
 const DEFAULT_MAX_OUTPUT_CHARS: usize = 240;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

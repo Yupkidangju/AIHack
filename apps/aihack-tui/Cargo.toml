@@ -22,3 +22,7 @@ serde = { version = "1", features = ["derive"] }
 ratatui = "0.30"
 crossterm = "0.29"
 clap = { version = "4", features = ["derive"] }
+tempfile = "3.23"
+
+[target.'cfg(windows)'.dev-dependencies]
+portable-pty = "0.9.0"

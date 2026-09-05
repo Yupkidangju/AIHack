@@ -9,8 +9,14 @@ id = "item.weapon.dagger"
 kind = "weapon"
 glyph = ")"
 weight = 10
+slot = "melee"
+hit_bonus = 0
 damage = "1d4"
 "#;
+const EMBEDDED_ITEMS: &str = include_str!("../crates/aihack-content/src/data/items.toml");
+const EMBEDDED_MONSTERS: &str = include_str!("../crates/aihack-content/src/data/monsters.toml");
+const EMBEDDED_LEVEL_1: &str = include_str!("../crates/aihack-content/src/data/levels/main_1.toml");
+const EMBEDDED_LEVEL_2: &str = include_str!("../crates/aihack-content/src/data/levels/main_2.toml");
 const MONSTERS: &str = r#"
 [[monster]]
 id = "monster.jackal"
@@ -157,6 +163,136 @@ fn causal_numeric_content_rejects_invalid_ranges() {
         ),
         Err(ContentError::Parse { .. })
     ));
+
+    let irreversible_armor = format!(
+        "{ITEMS}\n[[item]]\nid = \"item.armor.leather\"\nkind = \"armor\"\nglyph = \"[\"\nweight = 15\nslot = \"body\"\nac_bonus = {}\nbase_price = 8\n",
+        i16::MIN
+    );
+    assert!(matches!(
+        registry(
+            &irreversible_armor,
+            MONSTERS,
+            &[("one", LEVEL_1), ("two", LEVEL_2)]
+        ),
+        Err(ContentError::Parse { .. })
+    ));
+}
+
+#[test]
+fn registry_rejects_non_live_monster_hp_and_forbidden_armor_projectile_fields() {
+    for hp in [0, -1] {
+        let monsters = MONSTERS.replace("hp = 4", &format!("hp = {hp}"));
+        assert!(matches!(
+            registry(ITEMS, &monsters, &[("one", LEVEL_1), ("two", LEVEL_2)]),
+            Err(ContentError::Parse { .. })
+        ));
+    }
+
+    for forbidden in ["damage=\"1d4\"", "hit_bonus=1"] {
+        let items = EMBEDDED_ITEMS.replacen("ac_bonus=1", &format!("ac_bonus=1\n{forbidden}"), 1);
+        assert!(matches!(
+            registry(
+                &items,
+                EMBEDDED_MONSTERS,
+                &[
+                    ("main_1.toml", EMBEDDED_LEVEL_1),
+                    ("main_2.toml", EMBEDDED_LEVEL_2)
+                ]
+            ),
+            Err(ContentError::Parse { .. })
+        ));
+    }
+}
+
+#[test]
+fn accepted_custom_registry_bootstrap_wait_and_save_round_trip_remain_valid() {
+    let monsters = EMBEDDED_MONSTERS.replacen("hp=4", "hp=5", 1);
+    let registry = ContentRegistry::from_toml_sources(
+        CONTENT_SCHEMA_VERSION,
+        EMBEDDED_ITEMS,
+        &monsters,
+        &[
+            ("main_1.toml", EMBEDDED_LEVEL_1),
+            ("main_2.toml", EMBEDDED_LEVEL_2),
+        ],
+    )
+    .unwrap();
+    let mut session = GameSession::try_new_for_playing_with_registry(42, &registry).unwrap();
+    assert!(GameSession::from_save_data_with_registry(session.to_save_data(), &registry).is_ok());
+    assert!(session.submit(aihack::core::CommandIntent::Wait).accepted);
+    assert!(GameSession::from_save_data_with_registry(session.to_save_data(), &registry).is_ok());
+}
+
+#[test]
+fn known_item_id_rejects_a_shape_valid_declared_class_override() {
+    let dagger_as_armor = EMBEDDED_ITEMS.replacen(
+        "kind=\"weapon\"\nglyph=\")\"\nweight=10\nslot=\"melee\"\nhit_bonus=1\ndamage=\"1d4\"",
+        "kind=\"armor\"\nglyph=\"[\"\nweight=10\nslot=\"body\"\nac_bonus=1",
+        1,
+    );
+
+    assert!(matches!(
+        registry(
+            &dagger_as_armor,
+            EMBEDDED_MONSTERS,
+            &[
+                ("main_1.toml", EMBEDDED_LEVEL_1),
+                ("main_2.toml", EMBEDDED_LEVEL_2)
+            ]
+        ),
+        Err(ContentError::Parse { .. })
+    ));
+}
+
+#[test]
+fn embedded_known_item_ids_keep_the_canonical_declared_kind_table() {
+    let registry = ContentRegistry::from_embedded().unwrap();
+    for (id, expected_kind) in [
+        ("item.weapon.dagger", "weapon"),
+        ("item.food.ration", "food"),
+        ("item.potion.healing", "potion"),
+        ("item.wand.magic_missile", "wand"),
+        ("item.scroll.identify", "scroll"),
+        ("item.scroll.reveal", "scroll"),
+        ("item.scroll.teleport", "scroll"),
+        ("item.armor.leather", "armor"),
+        ("item.weapon.rock", "weapon"),
+        ("item.corpse.jackal", "corpse"),
+    ] {
+        assert_eq!(registry.item(id).unwrap().kind, expected_kind, "id={id}");
+    }
+}
+
+#[test]
+fn item_glyph_requires_exactly_one_unicode_scalar() {
+    for invalid in ["", "AB", "e\u{301}"] {
+        let items = EMBEDDED_ITEMS.replacen("glyph=\")\"", &format!("glyph=\"{invalid}\""), 1);
+        assert!(
+            matches!(
+                registry(
+                    &items,
+                    EMBEDDED_MONSTERS,
+                    &[
+                        ("main_1.toml", EMBEDDED_LEVEL_1),
+                        ("main_2.toml", EMBEDDED_LEVEL_2)
+                    ]
+                ),
+                Err(ContentError::Parse { .. })
+            ),
+            "invalid glyph accepted: {invalid:?}"
+        );
+    }
+
+    let unicode = EMBEDDED_ITEMS.replacen("glyph=\")\"", "glyph=\"🗡\"", 1);
+    assert!(registry(
+        &unicode,
+        EMBEDDED_MONSTERS,
+        &[
+            ("main_1.toml", EMBEDDED_LEVEL_1),
+            ("main_2.toml", EMBEDDED_LEVEL_2)
+        ]
+    )
+    .is_ok());
 }
 
 #[test]

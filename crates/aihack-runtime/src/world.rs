@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use aihack_content::ContentRegistry;
 use aihack_core::{
@@ -27,10 +27,22 @@ pub const PHASE3_GOBLIN_START: Pos = Pos { x: 20, y: 12 };
 pub const PHASE4_POTION_START: Pos = Pos { x: 8, y: 5 };
 pub const PHASE7_WAND_START_CHARGES: u8 = 3;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct GameWorld {
     state: WorldState<EntityStore>,
+    registry: ContentRegistry,
+    corpse_jackal_data: aihack_core::domain::item::ItemData,
 }
+
+impl PartialEq for GameWorld {
+    fn eq(&self, other: &Self) -> bool {
+        self.state == other.state
+            && self.registry.content_hash() == other.registry.content_hash()
+            && self.corpse_jackal_data == other.corpse_jackal_data
+    }
+}
+
+impl Eq for GameWorld {}
 
 impl Deref for GameWorld {
     type Target = WorldState<EntityStore>;
@@ -40,45 +52,62 @@ impl Deref for GameWorld {
     }
 }
 
-impl DerefMut for GameWorld {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.state
-    }
-}
-
 impl GameWorld {
+    pub fn from_saved_world(saved: SavedWorldV1) -> Result<Self, aihack_core::error::GameError> {
+        crate::save::validate_saved_world(&saved)?;
+        Ok(Self::from_saved_world_with_registry(
+            saved,
+            aihack_content::registry()?,
+        )?)
+    }
+
+    /// 호환 시나리오의 `ResolveDeath` 직전 HP 0 world만 구성하는 제한 경계다.
+    #[cfg(feature = "testing")]
+    pub(crate) fn from_depleted_saved_world(
+        saved: SavedWorldV1,
+    ) -> Result<Self, aihack_core::error::GameError> {
+        crate::save::validate_depleted_saved_world(&saved)?;
+        Ok(Self::from_saved_world_with_registry(
+            saved,
+            aihack_content::registry()?,
+        )?)
+    }
+
+    #[cfg(any(test, feature = "testing"))]
     pub fn try_fixture_phase5() -> Result<Self, ContentError> {
         Self::try_fixture_phase5_with_registry(aihack_content::registry()?)
     }
 
-    pub fn try_fixture_phase5_with_registry(
+    pub(crate) fn try_fixture_phase5_with_registry(
         registry: &ContentRegistry,
     ) -> Result<Self, ContentError> {
+        let state = crate::bootstrap::initial_world(registry)?;
+        let corpse_jackal_data =
+            crate::domain::item::try_item_data_from_registry(ItemKind::CorpseJackal, registry)?;
         Ok(Self {
-            state: crate::bootstrap::initial_world(registry)?,
+            state,
+            registry: registry.clone(),
+            corpse_jackal_data,
         })
     }
 
-    pub fn fixture_phase2() -> Self {
-        Self::fixture_phase5()
+    pub(crate) fn fixture_phase4() -> Self {
+        Self::try_fixture_phase5_with_registry(
+            aihack_content::registry().expect("embedded content registry must validate"),
+        )
+        .expect("embedded content registry must build the default world")
     }
 
-    pub fn fixture_phase3() -> Self {
-        Self::fixture_phase5()
-    }
-
-    pub fn fixture_phase4() -> Self {
-        Self::fixture_phase5()
-    }
-
+    #[cfg(any(test, feature = "testing"))]
     pub fn fixture_phase5() -> Self {
         Self::try_fixture_phase5()
             .expect("embedded content registry must validate for the default fixture")
     }
 
+    #[cfg(any(test, feature = "testing"))]
     pub fn fixture_without_monsters() -> Self {
         let mut world = Self::fixture_phase5();
-        world.entities.clear_monsters();
+        world.state.entities.clear_monsters();
         world
     }
 
@@ -88,6 +117,10 @@ impl GameWorld {
 
     pub fn state(&self) -> &WorldState<EntityStore> {
         &self.state
+    }
+
+    pub(crate) fn state_mut(&mut self) -> &mut WorldState<EntityStore> {
+        &mut self.state
     }
 
     pub fn current_level(&self) -> LevelId {
@@ -114,45 +147,44 @@ impl GameWorld {
         self.map(self.current_level)
     }
 
-    pub fn current_map_mut(&mut self) -> &mut GameMap {
-        self.map_mut(self.current_level)
+    pub(crate) fn current_map_mut(&mut self) -> &mut GameMap {
+        self.map_mut(self.state.current_level)
     }
 
     pub fn map(&self, level: LevelId) -> &GameMap {
         self.levels
             .map(level)
-            .expect("Phase 5 world는 fixed level map만 조회한다")
+            .expect("검증된 world는 요청한 level map을 가진다")
     }
 
-    pub fn map_mut(&mut self, level: LevelId) -> &mut GameMap {
-        self.levels
+    pub(crate) fn map_mut(&mut self, level: LevelId) -> &mut GameMap {
+        self.state
+            .levels
             .map_mut(level)
-            .expect("Phase 5 world는 fixed level map만 갱신한다")
+            .expect("검증된 world는 갱신할 level map을 가진다")
     }
 
     pub fn player_location(&self) -> (LevelId, Pos) {
         self.entities
             .actor_location(self.player_id)
-            .expect("Phase 5 world는 항상 player actor 위치를 가진다")
+            .expect("검증된 world는 player actor 위치를 가진다")
     }
 
-    pub fn set_player_location(&mut self, level: LevelId, pos: Pos) {
+    pub(crate) fn set_player_location(&mut self, level: LevelId, pos: Pos) {
         let player_id = self.player_id;
         assert!(
-            self.entities.set_actor_location(player_id, level, pos),
-            "Phase 5 world는 항상 player actor를 가진다"
+            self.state
+                .entities
+                .set_actor_location(player_id, level, pos),
+            "검증된 world는 player actor를 가진다"
         );
-        self.current_level = level;
+        self.state.current_level = level;
     }
 
     pub fn player_pos(&self) -> Pos {
         let (level, pos) = self.player_location();
         debug_assert_eq!(level, self.current_level);
         pos
-    }
-
-    pub fn set_player_pos(&mut self, pos: Pos) {
-        self.set_player_location(self.current_level, pos);
     }
 
     pub fn player_alive(&self) -> bool {
@@ -166,10 +198,10 @@ impl GameWorld {
         self.entities.hostile_monsters_on_level(self.current_level)
     }
 
-    pub fn identify_item_kind(&mut self, kind: ItemKind) {
-        if !self.identified_items.contains(&kind) {
-            self.identified_items.push(kind);
-            self.identified_items.sort_by_key(|kind| *kind as u8);
+    pub(crate) fn identify_item_kind(&mut self, kind: ItemKind) {
+        if !self.state.identified_items.contains(&kind) {
+            self.state.identified_items.push(kind);
+            self.state.identified_items.sort_by_key(|kind| *kind as u8);
         }
     }
 
@@ -180,14 +212,8 @@ impl GameWorld {
     pub fn gold(&self) -> u32 {
         self.gold
     }
-    pub fn set_gold(&mut self, gold: u32) {
-        self.gold = gold;
-    }
     pub fn kill_count(&self) -> u32 {
         self.kill_count
-    }
-    pub fn set_kill_count(&mut self, kill_count: u32) {
-        self.kill_count = kill_count;
     }
 
     pub fn carried_weight(&self) -> i16 {
@@ -195,7 +221,15 @@ impl GameWorld {
             .entries
             .iter()
             .filter_map(|entry| self.entities.item_data(entry.item).map(|data| data.weight))
-            .sum()
+            .fold(0, i16::saturating_add)
+    }
+
+    pub fn carrying_capacity(&self) -> i16 {
+        if self.campaign.is_some() {
+            120
+        } else {
+            80
+        }
     }
 
     pub fn status(&self) -> Status {
@@ -208,22 +242,29 @@ impl GameWorld {
         }
     }
 
-    pub fn set_status(&mut self, status: Status) {
-        self.nutrition = status.nutrition;
-        self.luck = status.luck;
-        self.prayer_cooldown = status.prayer_cooldown;
-        self.paralysis_turns = status.paralysis_turns;
-        self.hallucinating = status.hallucinating;
-    }
-
     pub fn hunger_state(&self) -> HungerState {
         self.status().hunger_state()
     }
 
-    pub fn from_saved_world(saved: SavedWorldV1) -> Self {
-        Self {
+    pub(crate) fn from_saved_world_with_registry(
+        saved: SavedWorldV1,
+        registry: &ContentRegistry,
+    ) -> Result<Self, ContentError> {
+        let corpse_jackal_data =
+            crate::domain::item::try_item_data_from_registry(ItemKind::CorpseJackal, registry)?;
+        Ok(Self {
             state: saved.into(),
-        }
+            registry: registry.clone(),
+            corpse_jackal_data,
+        })
+    }
+
+    pub(crate) fn content_registry(&self) -> &ContentRegistry {
+        &self.registry
+    }
+
+    pub(crate) fn corpse_jackal_data(&self) -> aihack_core::domain::item::ItemData {
+        self.corpse_jackal_data
     }
 }
 
@@ -279,6 +320,6 @@ impl DeathScoreView for GameWorld {
             .iter()
             .filter_map(|entry| self.entities.item_data(entry.item))
             .map(|data| data.base_price)
-            .sum()
+            .fold(0, u32::saturating_add)
     }
 }

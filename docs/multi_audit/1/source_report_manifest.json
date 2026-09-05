@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "run_directory": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1",
+  "reports": [
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_01_contract_docs.md",
+      "sha256": "c2286046186c36c6dcd4e4e83760cb52cf5a5ebc9dc68de7c65d4ba8aaf48d37",
+      "size": 29669,
+      "sealed_at_utc": "2026-08-23T11:42:28.174504+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_02_core_runtime.md",
+      "sha256": "de465f962a2192dcb0e2ee8212859b944b411c0a9c78c35fc15e8baa9b6d344c",
+      "size": 39026,
+      "sealed_at_utc": "2026-08-23T11:51:56.274638+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_03_file_security.md",
+      "sha256": "6c06411ca130986aaa3915ca4e14ba81c0e5693905cfcd56cc1ddfbac2191584",
+      "size": 33684,
+      "sealed_at_utc": "2026-08-23T11:45:27.540912+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_04_tests_determinism.md",
+      "sha256": "fd4b1a376a05c5fbda62789a31db13108a18b9e1af9db1926cbcf652785ae75d",
+      "size": 28510,
+      "sealed_at_utc": "2026-08-23T11:47:06.270650+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_05_supply_chain_ci.md",
+      "sha256": "f27e2b36af8f76b382a91ada83945595422974118ddcfe45c3294de3373f76e9",
+      "size": 33473,
+      "sealed_at_utc": "2026-08-23T11:48:35.187083+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_06_ui_llm_platform.md",
+      "sha256": "8fb6b3bb6d5321ed776a6cabe041863c47e7b23ec2570f7677409e4f14af32cc",
+      "size": 41061,
+      "sealed_at_utc": "2026-08-23T11:46:14.623847+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\1\\sub_audit_06_ui_llm_platform_supplement_1.md",
+      "sha256": "ae55e62a46fa24ff849308c8006ef09fe1427796a0530ff33138613c3622a9dd",
+      "size": 19918,
+      "sealed_at_utc": "2026-08-23T12:03:09.083795+00:00"
+    }
+  ],
+  "missing_source_reports": [],
+  "finalized_at_utc": "2026-08-23T12:03:36.523410+00:00"
+}

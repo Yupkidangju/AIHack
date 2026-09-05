@@ -1,5 +1,5 @@
 use aihack::{
-    core::{invariant::WorldInvariantError, GameSession, GameWorld, LevelId},
+    core::{GameSession, GameWorld, LevelId},
     domain::{entity::EntityLocation, inventory::Inventory},
 };
 
@@ -16,36 +16,18 @@ fn fixture_checks_all_six_world_invariants() {
 }
 
 #[test]
-fn invariant_report_classifies_each_persisted_world_violation() {
+fn persisted_world_constructor_rejects_each_world_violation() {
     let mut missing_level = saved_world();
     missing_level.current_level = LevelId::main(99);
-    assert!(matches!(
-        GameWorld::from_saved_world(missing_level)
-            .validate_invariants()
-            .errors
-            .as_slice(),
-        [WorldInvariantError::CurrentLevelMissing { .. }]
-    ));
+    assert!(GameWorld::from_saved_world(missing_level).is_err());
 
     let mut missing_player = saved_world();
     missing_player.player_id = aihack::core::EntityId(999);
-    assert!(matches!(
-        GameWorld::from_saved_world(missing_player)
-            .validate_invariants()
-            .errors
-            .as_slice(),
-        [WorldInvariantError::PlayerMissing { .. }]
-    ));
+    assert!(GameWorld::from_saved_world(missing_player).is_err());
 
     let mut non_player = saved_world();
     non_player.player_id = aihack::core::EntityId(2);
-    assert!(matches!(
-        GameWorld::from_saved_world(non_player)
-            .validate_invariants()
-            .errors
-            .as_slice(),
-        [WorldInvariantError::PlayerIsNotPlayer { .. }]
-    ));
+    assert!(GameWorld::from_saved_world(non_player).is_err());
 
     let mut wrong_level = saved_world();
     assert!(wrong_level.entities.set_actor_location(
@@ -53,13 +35,7 @@ fn invariant_report_classifies_each_persisted_world_violation() {
         LevelId::main(2),
         aihack::core::Pos { x: 5, y: 5 },
     ));
-    assert!(matches!(
-        GameWorld::from_saved_world(wrong_level)
-            .validate_invariants()
-            .errors
-            .as_slice(),
-        [WorldInvariantError::PlayerLevelMismatch { .. }]
-    ));
+    assert!(GameWorld::from_saved_world(wrong_level).is_err());
 
     let mut out_of_bounds = saved_world();
     assert!(out_of_bounds.entities.set_actor_location(
@@ -67,13 +43,7 @@ fn invariant_report_classifies_each_persisted_world_violation() {
         out_of_bounds.current_level,
         aihack::core::Pos { x: -1, y: 5 },
     ));
-    assert!(matches!(
-        GameWorld::from_saved_world(out_of_bounds)
-            .validate_invariants()
-            .errors
-            .as_slice(),
-        [WorldInvariantError::PlayerOutOfBounds { .. }]
-    ));
+    assert!(GameWorld::from_saved_world(out_of_bounds).is_err());
 
     let mut owner_mismatch = saved_world();
     owner_mismatch.inventory = Inventory::new(aihack::core::EntityId(2));
@@ -83,11 +53,5 @@ fn invariant_report_classifies_each_persisted_world_violation() {
             owner: aihack::core::EntityId(2),
         },
     );
-    assert!(matches!(
-        GameWorld::from_saved_world(owner_mismatch)
-            .validate_invariants()
-            .errors
-            .as_slice(),
-        [WorldInvariantError::InventoryOwnerMismatch { .. }]
-    ));
+    assert!(GameWorld::from_saved_world(owner_mismatch).is_err());
 }

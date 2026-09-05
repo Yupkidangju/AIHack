@@ -6,13 +6,20 @@
 >
 > Phase 2~20의 화면·TUI 설계 이력은 아카이브에 있다. 이 문서는 v0.3.0 target만 정의한다.
 
-문서 상태: active implemented design, report 20 active-state/false-green HOLD remediation pending re-audit
+문서 상태: active implementation contract; current authority `docs/audit/audit_report_32.md`; PROGRAM/PUBLICATION HOLD
+기술 증거: report 30 technical successor `ed02dbf/32733235414` clean same-SHA 양 OS actual bundle과 public visibility independent Verified
+historical closure: report 31 lifecycle/FIN-F012 independently Closed with `8c042d48/32741917348`
+현재 시정: report 32 R32-DBG-F001/FIN-F015 current-HEAD modification evidence와 final same-SHA 양 OS bundle
 작성일: 2026-07-15
-최근 동기화: 2026-07-22
+최근 동기화: 2026-08-25
 기준: `spec.md`
 관련 Task: R2-1, R5-2, R6-1..R6-3
 
 ## 1. 경험 목표
+
+P1–P3: Creation에 1 Knight / 2 Scout / 3 Mage 클릭 버튼을 추가하며 Enter는 기존 Adventurer 호환 run이다. HUD는 role/level/XP/amulet, 명령 메뉴는 B branch를 제공한다. Victory는 ASCENDED/score/N New Run/Q Quit를 표시한다. 데이터·저장·성공 조건은 `docs/campaign_spec.md`를 따른다.
+
+멀티 감사 2 시정에서는 지도에 visible item/actor glyph를 그린 뒤 player를 최상위로 그린다. 자동 라벨은 의미 glyph를 덮지 않는다. Playing q는 Quaff 선택, Q는 확인 후 종료이며 Esc는 열린 선택을 취소한다. 방향/아이템 선택은 UI-only, 실제 명령 제출 시에만 turn을 소비한다. inventory 전체 목록은 페이지를 제공하고 내부 item/닫기 CTA만 mouse로 실행한다. 60×24와 80×24의 1행 LOG는 제목 대신 최신 본문을 보여주며 일반 STATUS에 nutrition/hunger를 포함한다. 구체 구현과 검증은 `docs/multi_audit/2/remediation.md`에 기록한다.
 
 사용자는 로컬 LLM이 없어도 완전한 deterministic 로그라이크를 플레이할 수 있어야 한다. LLM을 켜면 다음 세 가지 presentation 기능만 추가된다.
 
@@ -83,6 +90,26 @@ Title
 
 LLM 요청 중에도 core input은 block하지 않는다. 요청 뒤 turn이 진행되면 도착한 응답은 `Stale`이며 자동 표시나 실행을 하지 않는다.
 
+TUI adapter의 명시적 presentation state는 다음과 같다. 이 state는 save/replay/snapshot에 들어가지 않는다.
+
+```rust
+pub enum UiOverlay {
+    None,
+    Inventory,
+    StorageError { operation: StorageOperation },
+}
+```
+
+- `Playing`에서 `I`는 `Inventory` overlay를 열고 turn/hash를 바꾸지 않는다.
+- inventory letter는 현재 observation의 같은 letter item에 대한 typed command로만 변환한다. Esc는 overlay만 닫는다.
+- persisted `AwaitingDirection`에서는 방향키가 concrete command, Esc가 non-turn cancel이다.
+- persisted `AwaitingInventorySelection`에서는 item letter가 해당 action의 concrete command, Esc가 non-turn cancel이다.
+- `MorePrompt`에서는 Esc를 포함한 첫 key가 `AcknowledgeMore`가 되며 Quit로 해석하지 않는다.
+- blocking run state(`AwaitingDirection`, `AwaitingInventorySelection`, `MorePrompt`, `GameOver`)의 의미는 LLM result dismiss, F9, Tab/BackTab focus보다 먼저 결정한다. 따라서 `GameOver + N`은 항상 `NewRun`, `MorePrompt + Tab/BackTab/N`은 모두 `AcknowledgeMore`다.
+- `CharacterCreation`의 Esc는 같은 seed의 Title session으로 돌아가며 process를 종료하지 않는다.
+- Title의 `L`은 app이 소유한 quick-save store에서 load한다.
+- save/load 실패는 process exit가 아니라 redacted `StorageError` overlay가 되며, 다음 Esc/정상 입력으로 복구한다.
+
 ## 5. Play 화면
 
 ### 5.1 120x36 이상
@@ -115,7 +142,7 @@ LLM 요청 중에도 core input은 block하지 않는다. 요청 뒤 turn이 진
 
 - terminal width 120 이상: map 70%, side panel 30%
 - 80..119: map 65%, side panel 35%
-- 60..79: map 위, HUD 아래 수직 배치
+- 60..79: 40x20 map과 최소 HUD를 나란히 두고 하단 영역을 log/command에 배정한다. 60x24에서 모든 panel은 1행 이상이며 겹치지 않는다. blocking prompt는 log 높이에 자르지 않고 root 중앙 modal에 최소 `title + 3 content rows`를 확보해 실제 action/item/`--More--` 안내를 모두 표시한다.
 - 60 미만 또는 높이 24 미만: core status와 “terminal requires 60x24”만 표시하고 clean input loop 유지
 
 ### 5.2 정보 우선순위
@@ -133,6 +160,8 @@ LLM 패널이 core prompt나 HP를 가리지 않는다.
 ### 5.3 New run reset
 
 `GameOver`에서 N을 누르면 `new_seed = previous_seed.wrapping_add(1)`로 `GameSession::new(new_seed)`를 만들고 Title로 이동한다. 다음 N 또는 Enter에서 CharacterCreation으로 이동한다. world, turn, RNG, event log, outstanding LLM request, LLM result, hover, focus, modal, debug overlay를 초기화한다. theme, reduced-motion, high-contrast 설정은 유지한다. 기존 save/replay 파일은 삭제하거나 덮어쓰지 않는다.
+
+load 성공도 presentation transient 전체(outstanding/queued/validated LLM, result, soft input, hover, focus, inventory/error overlay, debug, labels/effect sequence)를 같은 reset 함수로 초기화한다. 늦게 도착한 이전 request ID는 새 outstanding request 존재 여부와 관계없이 응답 schema/현재 request 검증보다 먼저 `ignored` 집합에서 제거하고 표시·submit 없이 폐기한다.
 
 ## 6. CTA와 입력 계약
 
@@ -152,6 +181,7 @@ LLM 패널이 core prompt나 HP를 가리지 않는다.
 - `N`과 Esc는 core turn을 소비하지 않는다.
 - narrative와 soft verdict는 apply CTA를 갖지 않는다.
 - mouse click은 같은 CTA ID를 생성하며 별도 command path를 만들지 않는다.
+- command/inspect panel의 clickable rectangle은 렌더에 사용한 동일 CTA label model에서 파생한다. content row와 label의 실제 열 범위만 활성화하며 title, panel border, blank, label 사이 공백, label 밖 열은 focus 또는 no-op이다.
 - Pending에서 Dismiss는 request ID를 `ignored`로 표시하고 panel만 닫는다. blocking worker를 강제 종료하지 않으며 해당 kind는 응답 또는 deadline까지 재요청할 수 없다. ignored response는 표시·submit 없이 폐기한다.
 
 ## 7. LLM UI 상태
@@ -177,7 +207,7 @@ pub enum LlmUiStatus {
 | Ready | `LLM: READY` | 마지막 성공 시간 없음 | G, A, J |
 | Pending | `LLM: WAIT` | 종류와 request ID 앞 8자 | Dismiss |
 | Busy | `LLM: BUSY` | request queue 16개가 사용 중 | Retry, Dismiss |
-| Timeout | `LLM: TIMEOUT` | 제한 500/1500/2000ms 표시 | Retry, Dismiss |
+| Timeout | `LLM: TIMEOUT` | connect 500ms, narrative 2000ms, decision/soft 1500ms 표시 | Retry, Dismiss |
 | Unavailable | `LLM: DOWN` | 연결 거부/transport 분류만 표시 | Retry, Dismiss |
 | Invalid | `LLM: INVALID` | 응답 schema 또는 legal action 불일치 | Dismiss |
 | Stale | `LLM: STALE` | 요청 turn과 현재 turn 표시 | Dismiss |
@@ -234,7 +264,7 @@ The attempt is plausible, but no core rule effect is applied.
 | core message | `GameEvent::Message` projection |
 | narrative/suggestion/verdict | `LlmPresentationState` |
 | request status | `LlmUiStatus` |
-| hover/focus/overlay | `UiState` |
+| hover/focus/overlay와 Inspect CTA | `UiState`가 만든 단일 `InspectPresentation` |
 
 UI가 `GameWorld`의 field를 직접 읽으면 R2/R5 실패다.
 
@@ -269,6 +299,9 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - rejected suggestion: current action space 재검증 결과 표시, submit 미호출
 - invariant error: core error panel을 최상위로 표시하며 LLM 결과 숨김
 - save/load error: typed error 요약과 경로만 표시하며 secret/path traversal detail 숨김
+- TUI 저장: production `TuiApp`은 `--save-dir` (기본 `runtime/tui`)의 `ArtifactStore`와 relative `quick-save.json`을 소유한다. 테스트 기본 생성자만 임시 directory를 사용한다. renderer/input candidate에는 경로를 포함하지 않으며 no-follow·single-link·atomic replace를 유지한다.
+- Inventory, storage error, soft judgment input과 core blocking state가 활성화된 동안 mouse는 underlying map/status/inspect/command/footer candidate를 만들지 않는다. 별도 modal CTA geometry가 없는 layer의 mouse click/hover는 명시적으로 무시한다.
+- Inspect 영역은 `Inventory`, `Hover`, `Decision` presentation을 한 번 계산해 renderer와 hit-test가 공유한다. Inventory presentation에 표시된 CTA만 command candidate가 될 수 있고 hover/decision/soft-input presentation에서는 숨은 inventory candidate를 제공하지 않는다.
 
 ## 11. 접근성
 
@@ -279,7 +312,14 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - focus 순서: map → HUD → inventory/inspect → LLM result → footer
 - suggestion rationale와 verdict를 screen reader 친화적인 한 문장으로 유지한다.
 - status 갱신은 core message를 덮어쓰지 않는다.
-- key repeat는 LLM 요청 중복 생성에 사용하지 않는다.
+- LLM request CTA `G`/`A`/`J`와 retry `R`은 일반 Playing 화면의 독립 `Press` gesture에서만 enqueue 후보가 된다. Judge soft-input editor의 일반 문자와 Backspace, 안정된 Playing 이동/대기만 repeat-safe다. 나머지 state/overlay/selection/LLM/debug transition candidate는 dispatcher가 같은 논리 key 또는 새 state의 다른 transition/control candidate를 최소 500ms quiet window와 50ms event poll 2회 연속 idle이 모두 충족될 때까지 억제하고 억제 대상이 다시 오면 window/count를 초기화한다. Release는 후보를 만들지 않지만 ConPTY 합성 Release만으로 quarantine을 해제하지 않는다. 다른 논리 key의 repeat-safe candidate와 drain 확인 뒤 독립 입력은 허용한다. 이 계약은 Load, Inventory, MorePrompt, direction/inventory selection, GameOver, LLM, F9를 production dispatcher→handler의 state/revision과 실제 ConPTY repeated-byte 경계로 검증하며 physical key-hold 주장은 별도로 한정한다.
+- F9 debug observation panel은 map 위에 그려지는 비모달 진단 panel이다. panel 바깥의 map mouse는 정상 동작하지만, 보이는 debug panel rect 안의 hover/click/down은 panel이 소비하며 가려진 map에 Move/Inspect/focus candidate를 전달하지 않는다. 실제 F9 `Press`→`ToggleDebug` candidate→handler는 UI flag만 바꾸고 handler return false와 core revision/hash 불변을 보장하며, 두 번째 Press는 원래 flag로 복원한다. F9 `Repeat`/`Release`는 후보를 만들지 않는다.
+
+### 11.1 v0.3.0 locale 범위
+
+- runtime TUI의 built-in screen, status, error와 deterministic fallback은 English 하나를 canonical locale로 사용한다.
+- 한국어/영어/일본어/중국어 번체/중국어 간체 README는 문서 접근성을 위한 번역이며 runtime message catalog 완료를 주장하지 않는다.
+- provider의 유효 Unicode narrative/verdict는 번역하지 않고 그대로 표시한다. 5-locale runtime은 key 기반 catalog와 locale별 snapshot matrix를 함께 도입하는 후속 versioned 기능이다.
 
 ## 12. 구현 제약
 
@@ -287,12 +327,15 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - transport future/channel은 TUI app layer에 있고 core crate에 없다.
 - 동시에 같은 종류의 outstanding request는 1개다.
 - response queue 최대 16개; 초과 시 가장 오래된 presentation response를 버리고 core는 유지한다.
-- 같은 CTA의 enqueue cooldown은 250ms이며 key repeat는 새 request를 만들지 않는다.
+- 같은 CTA의 enqueue cooldown은 250ms이며 request key는 `Press` event만 소비한다.
 - endpoint host는 `127.0.0.1`, `localhost`, `[::1]`만 기본 허용한다.
 - user text 240자, narrative 240자, rationale 160자, reason code 32자 제한을 render 이전에 검사한다.
 - prompt injection text는 command로 parse하지 않는다.
 - LLM result에 ANSI escape/control character를 허용하지 않는다.
+- terminal session guard는 alternate screen, raw mode, cursor, mouse capture 활성 상태를 각각 추적한다. setup/draw/read/restore 중 어느 단계가 실패해도 Drop에서 `Show`, `DisableMouseCapture`, raw disable, `LeaveAlternateScreen`을 가능한 항목 모두 best-effort 수행한다.
 - app exit는 terminal을 먼저 복원하고 request sender를 닫은 뒤 worker 종료 확인을 최대 250ms 기다린다. 250ms 안에 확인이 없으면 JoinHandle을 drop하고 process exit를 계속한다.
+- Windows CI는 dev-only `portable-pty 0.9.0`의 native `ConPtySystem`으로 실제 `aihack.exe`를 80x24 pseudoconsole에 실행해 Enter 1회씩 Title→Creation→Playing, `i` Inventory, Esc 복귀, 실제 mouse input과 Q clean exit를 검증한다. alternate screen과 cursor enter/leave는 byte stream으로, Windows crossterm mouse/raw 전환은 Console API lifecycle call matrix로 검증한다.
+- in-process one-event/failure-injection unit harness는 ConPTY test와 별도로 setup/restore 각 단계 실패 후 후속 cleanup 시도를 검증한다. Windows Terminal application 자체의 GUI 동작은 ConPTY contract와 구분하며 자동 PASS 범위에 넣지 않는다.
 
 ## 13. 검증
 
@@ -334,6 +377,6 @@ cargo test --workspace --locked --test llm_soft_adjudication
 | `PROJECT_OWNER_LICENSE_APPROVAL.md` | project-owner 승인 ID, 범위와 배포 경계 | metadata owner ID와 archive/output record 대조 |
 | `MODIFICATIONS.md` | modification notice ID, 변경 기간과 path scope | metadata modification ID와 archive/output record 대조 |
 | binary | `aihack`, `aihack-headless` | clean worktree의 release build |
-| complete corresponding source | 해당 binary를 만든 동일 commit의 추적 source | `build.sh`/`build.bat`의 `git archive` |
+| complete corresponding source | 해당 binary를 만든 동일 commit의 path/type/exported-content complete tree | `build.sh`/`build.bat`의 `git archive`와 verifier의 `ExpectedCommit` 독립 재생성 byte equality |
 
-`legacy_nethack_port_reference/`, `target/`, `output/`은 source archive에서 제외한다. release script는 untracked file을 포함해 worktree가 dirty하면 중단하므로 binary와 source commit의 불일치를 허용하지 않는다. 이 packaging 계약의 로컬 PASS는 독립 R8 감사나 외부 게시 승인을 뜻하지 않는다.
+`legacy_nethack_port_reference/`, `target/`, `output/`은 source archive에서 제외한다. release script는 untracked file을 포함해 worktree가 dirty하면 중단하고, workspace 내부의 새 random staging root에서 single-link file만 만든 뒤 verifier PASS 후 directory rename으로 `output/`을 승격한다. 기존 output root의 symlink/junction/reparse와 expected-name hard link는 외부 inode에 쓰지 않으며 verifier가 거부한다. 양 OS verifier는 공통 format-aware parser로 ZIP/TAR raw name, regular/directory type, link target 부재, file/directory prefix와 extraction 결과를 검사한다. absolute path, `.`/`..`, 빈 component, Windows 금지문자·control, trailing dot/space, classic·superscript device와 `CONIN$`/`CONOUT$`, Unicode normalization/casefold collision을 거부하며 excluded first component도 같은 canonical 규칙으로 차단한다. symlink/hardlink/device/FIFO는 허용하지 않는다. 검증된 archive를 임시 root에 추출해 exact manifest를 대조하고, 같은 `ExpectedCommit`에서 같은 format으로 새로 만든 `git archive`와 byte-identical하지 않으면 omission/substitution/safe extra/mode·type mutation을 모두 거부한다. metadata의 `candidate_date`와 modification period 시작/종료는 strict Gregorian `YYYY-MM-DD`, year `0001..9999`, `start <= candidate <= end`를 양 OS에서 동일하게 만족해야 한다. 이 packaging 계약의 로컬 PASS는 독립 R8 감사나 외부 게시 승인을 뜻하지 않는다.

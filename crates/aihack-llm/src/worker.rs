@@ -118,6 +118,10 @@ impl NarrativeWorker {
         self.response_rx.as_ref()?.try_recv().ok()
     }
 
+    pub fn recv_timeout(&self, timeout: Duration) -> Option<NarrativeResponseEnvelope> {
+        self.response_rx.as_ref()?.recv_timeout(timeout).ok()
+    }
+
     /// 요청 송신을 닫고 지정된 grace 동안만 worker 종료를 기다린다.
     /// 기한을 넘긴 worker는 join handle을 분리해 앱 종료를 막지 않는다.
     pub fn shutdown_with_grace(&mut self, grace: Duration) -> bool {

@@ -17,6 +17,11 @@ fn project_file(path: &str) -> String {
         .unwrap_or_else(|error| panic!("{path} 읽기 실패: {error}"))
 }
 
+fn project_bytes(path: &str) -> Vec<u8> {
+    fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join(path))
+        .unwrap_or_else(|error| panic!("{path} 읽기 실패: {error}"))
+}
+
 fn bash_program() -> PathBuf {
     #[cfg(windows)]
     {
@@ -77,7 +82,7 @@ impl CheckpointFixture {
         .unwrap();
         fs::write(
             root.join("docs/provenance/r7-content.sha256"),
-            project_file("docs/provenance/r7-content.sha256"),
+            project_bytes("docs/provenance/r7-content.sha256"),
         )
         .unwrap();
         for path in [
@@ -260,6 +265,36 @@ fn release_checkpoints_use_ci_portable_text_search_tools() {
     assert!(
         project_file("scripts/r8_checkpoint.sh").contains("tr -d '\\r'"),
         "R8 LICENSE checksum은 Windows CRLF checkout을 정규화해야 한다"
+    );
+}
+
+#[test]
+fn checksum_manifests_are_lf_in_git_and_r7_accepts_crlf_input() {
+    assert!(
+        [
+            "docs/provenance/*.sha256 text eol=lf",
+            "crates/aihack-content/src/data/*.toml text eol=lf",
+            "crates/aihack-content/src/data/levels/*.toml text eol=lf",
+        ]
+        .into_iter()
+        .all(|line| project_file(".gitattributes").contains(line)),
+        "checksum manifest와 검증 대상 content checkout은 LF로 고정해야 한다"
+    );
+
+    let fixture = CheckpointFixture::approved_with_evidence();
+    let manifest_path = fixture.root.join("docs/provenance/r7-content.sha256");
+    let manifest = fs::read_to_string(&manifest_path)
+        .unwrap()
+        .replace("\r\n", "\n")
+        .replace('\n', "\r\n");
+    fs::write(manifest_path, manifest).unwrap();
+
+    let output = fixture.run();
+    assert!(
+        output.status.success(),
+        "CRLF checksum manifest 실패: {}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 

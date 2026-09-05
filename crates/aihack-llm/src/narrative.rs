@@ -4,7 +4,7 @@ use aihack_ai_contract::{ClientRevision, NarrativeTopic, Observation};
 
 use crate::is_forbidden_control;
 
-pub const NARRATIVE_TIMEOUT_MS: u64 = 2_000;
+pub use crate::config::DEFAULT_NARRATIVE_TIMEOUT_MS as NARRATIVE_TIMEOUT_MS;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NarrativeRequest {
@@ -92,7 +92,7 @@ pub fn fallback_response(request: &NarrativeRequest, timed_out: bool) -> Narrati
     let observation = &request.observation;
     let text = match request.topic {
         NarrativeTopic::SituationSummary => format!(
-            "턴 {}: {}층에서 HP {}/{} 상태이며 보이는 대상 {}개를 관찰 중이다.",
+            "Turn {}: depth {}, HP {}/{}, observing {} visible entities.",
             observation.turn,
             observation.current_level.depth,
             observation.player.hp,

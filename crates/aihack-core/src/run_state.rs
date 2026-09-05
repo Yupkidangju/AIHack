@@ -14,4 +14,5 @@ pub enum RunState {
     AwaitingInventorySelection { action: InventoryAction },
     MorePrompt,
     GameOver { cause: DeathCause, final_score: i32 },
+    Victory { final_score: i32 },
 }

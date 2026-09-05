@@ -168,8 +168,10 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 | R6 deterministic PTY degraded matrix | PASS; success/timeout/stale/down, pending-exit restore |
 | fmt / clippy / full workspace test / release build | PASS |
 | cargo-audit / cargo-deny | PASS; cargo-audit는 local advisory DB 사용 |
-| 독립 R8 감사 | HOLD — report 20: report 19 evidence verified, residual active-state/false-green documentation HOLD |
-| Linux/Windows remote CI evidence | PASS — `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, Actions `29886410221` |
+| 독립 R8 문서 시정 감사 | PASS — report 21이 report 20의 `IMP-F016`/`DBG-F008`/`XPF-F011` 종결 |
+| Linux/Windows remote CI evidence | PASS — R9 commit `41a1b63f11a57a671b0f705883431dab24298b5a`, Actions `32034295607` |
+| report 23/24 통합 시정 | report 24와 same-SHA Actions `32107862171`로 historical closed |
+| final multi-audit report 1 | HOLD / 2026-08-23 coder remediation과 전체 재검증 진행 |
 
 따라서 R8 문서 구현은 독립 감사에 전달 가능한 상태지만, 전체 프로그램 또는 외부 배포 `PASS`는 아직 선언하지 않는다.
 
@@ -210,3 +212,72 @@ license scope와 root 배포 license는 프로젝트 소유자 또는 적격 검
 - `IMP-F016`: 최상단 current baseline, `G-LICENSE-001`과 BUILD_GUIDE의 고정 테스트 수를 현재 evidence와 정렬
 - `DBG-F008`: document-wide token 검사에 section/row별 positive·negative assertion을 추가
 - 현재 권한 상태: report 20 시정 완료 후 독립 재감사 대기. 기술 evidence는 다시 pending으로 되돌리지 않으며 최종 R8 PASS나 외부 게시를 선언하지 않는다.
+
+### 10.9 `audit_report_21.md` 종결 상태 (2026-07-22)
+
+- `IMP-F016`, `DBG-F008`: Verified
+- `XPF-F011`: Resolved
+- report 20의 active-state/false-green 시정은 PASS로 종결됐으며 해당 재감사 대기는 더 이상 current state가 아님
+- 외부 게시 승인은 별도 운영 gate로 유지
+
+### 10.10 `docs/audit/audit_report_22.md` / `docs/audit/audit_report_23.md` 역사적 상태 (2026-08-18)
+
+- report 22의 5절은 Initial Finding, 4·7절은 2026-08-17 post-fix 판정으로 분리했으며 report 23이 장기 witness false-green을 후속 HOLD함
+- report 23의 SEC-F001, TEST-F001, DBG-F009, IMP-F016/017은 report 24 재감사와 후속 same-SHA CI로 종결됐으며 현재 pending gate로 사용하지 않음
+- `hallucinating` compatibility risk는 Project owner/runtime maintainer가 소유하고 SaveDataV2·v0.4.0 범위 승인 또는 2026-10-31 중 먼저 도래하는 시점에 재검토
+
+### 10.11 `docs/audit/audit_report_24.md` 시정 상태 (2026-08-18)
+
+- `DBG-F011`: winx 0.36.4 전용 SPDX exception과 cargo-deny 0.19.4 실제 PASS로 시정
+- `SEC-F003`: Unix mode 0600과 Windows parent DACL 상속을 분리해 문서·코드·platform test를 정렬
+- `IMP-F019`: SC-CAUSE-01..07을 audit roadmap/implementation summary의 production 심볼·테스트 함수에 개별 연결
+- 현재 권한 상태: implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, Actions `32107862171` 양 OS PASS. 후속 독립 재감사와 외부 게시 승인은 별도 gate
+
+### 10.12 `docs/audit/audit_report_25.md` 역사적 부분 상태 (2026-08-23~24)
+
+- final multi-audit report 1은 audited HEAD `80d959af94cb08c5d9b2f2601f5e63f3827a1210`의 역사적 FIN-F001..F018 입력이며 첫 coder remediation은 partial evidence로 보존
+- `docs/audit/audit_report_25.md`는 inverse save relation, writer budget, replay alias, paired score, production TUI/terminal, release actual-set과 active lifecycle을 HOLD했고 해당 시정의 RED/GREEN 및 SHA `b732c42d` Actions `32650404618` clean same-SHA Ubuntu/Windows CI는 유효한 부분 evidence다.
+- report 26 독립 재감사가 열거되지 않은 production gap을 재개방했으므로 report 25를 현재 최상위 권위나 전체 closure로 사용하지 않는다.
+
+### 10.13 `docs/audit/audit_report_26.md` 역사적 최종 상태 (2026-08-24)
+
+- report 26은 malformed scalar/ItemData, Win32 trailing-name alias, actual causal producer removal, modal/Inspect mouse, release staging root/hardlink/candidate date와 네 P1 범위를 재현한 역사적 predecessor다.
+- ADR-0036, active spec/design/gap과 `docs/audit/audit_report_26_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
+- `fc01ec12/32658658526`은 부분 evidence, `a9a39d8/32660221745`는 Linux pipefail failure이며 최종 verifier fix SHA `1e84a94aa0623b5cee5349b5832992a4682e93a8`의 Actions `32660514315`에서 clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다.
+
+### 10.14 `docs/audit/audit_report_27.md` 역사적 predecessor 상태 (2026-08-24)
+
+- report 27은 save allocator/level/charge, unsafe custom registry, field-only causal A/B, archive canonical path, strict calendar, debug mouse, Judge repeat와 local action recursion을 재현한 predecessor다.
+- ADR-0037, active spec/design/gap과 `docs/audit/audit_report_27_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
+- report 27 시정은 전체 local gate와 implementation SHA `ea7822a5b32b3bb9ee8224176381c44871037bc4`의 Actions `32683076204` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐다. 완료 후에도 새 독립 감사와 별도 게시 승인 전까지 program/publication HOLD다.
+
+### 10.15 `docs/audit/audit_report_28.md` 역사적 predecessor 상태 (2026-08-24)
+
+- report 28은 allocator MAX-1, invalid custom monster/equipment removal, control-key Repeat/F9 실제 경로, Windows archive component alias, year 0000 parity와 stale summary를 재현한 역사적 predecessor다.
+- ADR-0038과 `docs/audit/audit_report_28_remediation.md`가 문서 우선 계약, 수정 전 RED와 표적 GREEN을 추적한다.
+- report 28 시정은 전체 local gate와 implementation SHA `9725c37896a8d149be5c500cdd26da154ab0a3fa`의 Actions `32694375654` clean same-SHA Ubuntu/Windows actual bundle까지 Verified됐지만 report 29가 인접 경계를 재개방했다.
+
+### 10.16 `docs/audit/audit_report_29.md` 역사적 technical predecessor 상태 (2026-08-24)
+
+- report 29는 TUI 동등 transition, archive raw type/extraction, `ExpectedCommit` complete tree, document-wide authority, item ID-kind/glyph, allocator fixture와 public atomicity를 재현한 technical predecessor다.
+- ADR-0039와 `docs/audit/audit_report_29_remediation.md`가 문서 우선 계약과 RED/GREEN을 추적한다.
+- ADR-0039 successor `a91a9c7/32706869079`의 전체 gate와 clean same-SHA Ubuntu/Windows actual bundle은 Verified됐지만 report 30이 authority/public surface를 재개방했다.
+
+### 10.17 `docs/audit/audit_report_30.md` 역사적 technical predecessor 상태 (2026-08-24)
+
+- report 30은 designs/compatibility/remediation/roadmap lifecycle과 broader public World/system mutation을 재개방한 predecessor다.
+- ADR-0040과 `docs/audit/audit_report_30_remediation.md`가 문서 우선 계약, external compile RED/GREEN과 새 gate를 추적한다.
+- ADR-0040 successor `ed02dbf/32733235414`의 전체 gate와 clean same-SHA Ubuntu/Windows actual bundle 및 Report 31 독립 API 검증은 Verified됐다.
+
+### 10.18 `docs/audit/audit_report_31.md` 역사적 independent closure (2026-08-25)
+
+- report 31은 implementation summary 1·10·11절 lifecycle과 document regression source를 시정한 predecessor다.
+- ADR-0041과 `docs/audit/audit_report_31_remediation.md`가 report 번호 기반 predecessor current/completed-work generic negative gate의 RED/GREEN을 추적한다.
+- Report 30 public visibility와 Report 29 기술 회귀는 독립 Verified다.
+- Report 31 시정의 전체 local quality gate 453 tests와 successor `8c042d48/32741917348` clean same-SHA Ubuntu/Windows actual bundle은 Verified됐고 Report 32가 FIN-F012와 함께 independent Closed로 종결했다.
+
+### 10.19 `docs/audit/audit_report_32.md` 현재 상태 (2026-08-25)
+
+- report 32가 current HEAD release candidate date와 modification evidence lifecycle의 단일 현재 권위다.
+- ADR-0042와 `docs/audit/audit_report_32_remediation.md`가 R32-DBG-F001/FIN-F015의 Notice ID/period, actual HEAD-date 조기 gate와 final-SHA bundle을 추적한다.
+- current HEAD `8045249` date `2026-08-25`가 bundled period end `2026-08-24` 밖이어서 actual Windows bundle은 fail-closed했다. ADR-0042의 2026-08-25 Notice ID/period, actual HEAD-date 조기 regression, 전체 local quality gate 453 tests와 candidate `57d8108a` clean Windows actual bundle은 PASS했다. final same-SHA 양 OS evidence와 후속 독립 PASS 및 별도 게시 승인 전까지 program/publication HOLD다.

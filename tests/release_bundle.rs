@@ -9,7 +9,8 @@ use std::{
 
 static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 const OWNER_APPROVAL_ID: &str = "AIHACK-OWNER-2026-07-20-NGPL-01";
-const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-07-20-01";
+const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-08-25-01";
+const CANDIDATE_DATE: &str = "2026-08-25";
 
 fn project_path(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(path)
@@ -18,6 +19,7 @@ fn project_path(path: &str) -> PathBuf {
 struct BundleFixture {
     root: PathBuf,
     commit: String,
+    candidate_date: String,
 }
 
 #[derive(Clone, Copy)]
@@ -29,6 +31,11 @@ enum BundleCase {
     MissingModificationMetadata,
     MismatchedModificationRecord,
     IncludedLegacy,
+    SimilarLegacyName,
+    MinimumYearCalendar,
+    MaximumYearCalendar,
+    CandidateBeforePeriodEnd,
+    StaleModificationPeriod,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -91,6 +98,43 @@ impl BundleFixture {
                 "AIHACK-MODIFICATIONS-MISMATCH",
             );
         }
+        if matches!(case, BundleCase::StaleModificationPeriod) {
+            replace_in_file(
+                &root.join("MODIFICATIONS.md"),
+                "Covered change period: `2025-05-20..2026-08-25`",
+                "Covered change period: `2025-05-20..2026-08-24`",
+            );
+        }
+        let candidate_date = match case {
+            BundleCase::MinimumYearCalendar => "0001-06-15",
+            BundleCase::MaximumYearCalendar => "9999-06-15",
+            BundleCase::CandidateBeforePeriodEnd => "2026-08-24",
+            _ => CANDIDATE_DATE,
+        };
+        let edge_period = match case {
+            BundleCase::MinimumYearCalendar => Some("0001-01-01..0001-12-31"),
+            BundleCase::MaximumYearCalendar => Some("9999-01-01..9999-12-31"),
+            _ => None,
+        };
+        if let Some(period) = edge_period {
+            replace_in_file(
+                &root.join("MODIFICATIONS.md"),
+                "2025-05-20..2026-08-25",
+                period,
+            );
+            replace_in_file(
+                &root.join("RELEASE-METADATA"),
+                "candidate_date=$Format:%cs$",
+                &format!("candidate_date={candidate_date}"),
+            );
+        }
+        if matches!(case, BundleCase::CandidateBeforePeriodEnd) {
+            replace_in_file(
+                &root.join("RELEASE-METADATA"),
+                "candidate_date=$Format:%cs$",
+                &format!("candidate_date={candidate_date}"),
+            );
+        }
         if matches!(case, BundleCase::MissingOwnerMetadata) {
             remove_line_containing(&root.join("RELEASE-METADATA"), "owner_approval=");
         }
@@ -118,13 +162,20 @@ impl BundleFixture {
             "must not ship\n",
         )
         .unwrap();
+        if matches!(case, BundleCase::SimilarLegacyName) {
+            fs::create_dir_all(root.join("legacy_nethack_port_reference_backup")).unwrap();
+            fs::write(
+                root.join("legacy_nethack_port_reference_backup/probe.txt"),
+                "allowed similar name\n",
+            )
+            .unwrap();
+        }
 
         for args in [
             &["init", "-q"][..],
             &["config", "user.name", "AIHack release test"][..],
             &["config", "user.email", "release-test@invalid"][..],
             &["add", "."][..],
-            &["commit", "-qm", "release fixture"][..],
         ] {
             let status = Command::new("git")
                 .args(args)
@@ -133,6 +184,22 @@ impl BundleFixture {
                 .unwrap();
             assert!(status.success(), "git fixture command 실패: {args:?}");
         }
+        if matches!(case, BundleCase::IncludedLegacy) {
+            let status = Command::new("git")
+                .args(["add", "-f", "legacy_nethack_port_reference/probe.txt"])
+                .current_dir(&root)
+                .status()
+                .unwrap();
+            assert!(status.success(), "legacy negative fixture 강제 추적 실패");
+        }
+        let status = Command::new("git")
+            .args(["commit", "-qm", "release fixture"])
+            .env("GIT_AUTHOR_DATE", "2026-08-25T12:00:00+09:00")
+            .env("GIT_COMMITTER_DATE", "2026-08-25T12:00:00+09:00")
+            .current_dir(&root)
+            .status()
+            .unwrap();
+        assert!(status.success(), "release fixture commit 실패");
         let commit = String::from_utf8(
             Command::new("git")
                 .args(["rev-parse", "HEAD"])
@@ -166,7 +233,9 @@ impl BundleFixture {
         if let Some((MetadataTarget::Output, fault)) = metadata_fault {
             output_metadata = mutate_metadata(&output_metadata, fault);
         }
-        output_metadata = output_metadata.replace("$Format:%H$", &commit);
+        output_metadata = output_metadata
+            .replace("$Format:%H$", &commit)
+            .replace("$Format:%cs$", candidate_date);
         fs::write(output.join("RELEASE-METADATA"), output_metadata).unwrap();
         let archive = output.join("aihack-0.3.0-source.tar.gz");
         let status = Command::new("git")
@@ -180,6 +249,18 @@ impl BundleFixture {
             .status()
             .unwrap();
         assert!(status.success());
+        if matches!(case, BundleCase::IncludedLegacy) {
+            let listing = Command::new("tar")
+                .args(["-tzf", archive.to_str().unwrap()])
+                .output()
+                .unwrap();
+            assert!(listing.status.success());
+            assert!(
+                String::from_utf8_lossy(&listing.stdout)
+                    .contains("legacy_nethack_port_reference/probe.txt"),
+                "legacy negative fixture archive에 차단 경로가 실제 포함되어야 한다"
+            );
+        }
 
         let mut names = vec![
             "aihack",
@@ -201,16 +282,118 @@ impl BundleFixture {
         assert!(hashes.status.success());
         fs::write(output.join("SHA256SUMS"), hashes.stdout).unwrap();
 
-        Self { root, commit }
+        Self {
+            root,
+            commit,
+            candidate_date: candidate_date.to_owned(),
+        }
     }
 
     fn verify(&self) -> std::process::Output {
+        self.verify_with_candidate(&self.candidate_date)
+    }
+
+    fn verify_with_candidate(&self, candidate_date: &str) -> std::process::Output {
         Command::new("bash")
             .arg(project_path("scripts/verify_release_bundle.sh"))
             .arg(self.root.join("output"))
             .arg(&self.commit)
+            .arg(candidate_date)
+            .arg(&self.root)
             .output()
             .unwrap()
+    }
+
+    fn rewrite_archive_with_path_alias(&self, alias: &str) {
+        let unpacked = self.root.join("archive-rewrite");
+        fs::create_dir_all(&unpacked).unwrap();
+        let archive = self.root.join("output/aihack-0.3.0-source.tar.gz");
+        let extract = Command::new("tar")
+            .args([
+                "-xzf",
+                archive.to_str().unwrap(),
+                "-C",
+                unpacked.to_str().unwrap(),
+            ])
+            .status()
+            .unwrap();
+        assert!(extract.success());
+        fs::write(unpacked.join("blocked-probe"), "blocked\n").unwrap();
+        let transform = format!("s,^blocked-probe$,{},", alias.replace('\\', "\\\\"));
+        let create = Command::new("tar")
+            .args([
+                "-czf",
+                archive.to_str().unwrap(),
+                "--transform",
+                &transform,
+                "-C",
+                unpacked.to_str().unwrap(),
+                "LICENSE",
+                "NOTICE",
+                "MODIFICATIONS.md",
+                "PROJECT_OWNER_LICENSE_APPROVAL.md",
+                "RELEASE-METADATA",
+                "Cargo.toml",
+                "blocked-probe",
+            ])
+            .status()
+            .unwrap();
+        assert!(create.success());
+        rewrite_checksums(&self.root.join("output"));
+    }
+
+    fn rewrite_calendar(&self, candidate_date: &str, start: &str, end: &str) {
+        let output = self.root.join("output");
+        replace_in_file(
+            &output.join("MODIFICATIONS.md"),
+            "Covered change period: `2025-05-20..2026-08-25`",
+            &format!("Covered change period: `{start}..{end}`"),
+        );
+        replace_in_file(
+            &output.join("RELEASE-METADATA"),
+            &format!("candidate_date={CANDIDATE_DATE}"),
+            &format!("candidate_date={candidate_date}"),
+        );
+        let unpacked = self.root.join("calendar-rewrite");
+        fs::create_dir_all(&unpacked).unwrap();
+        let archive = output.join("aihack-0.3.0-source.tar.gz");
+        assert!(Command::new("tar")
+            .args([
+                "-xzf",
+                archive.to_str().unwrap(),
+                "-C",
+                unpacked.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success());
+        replace_in_file(
+            &unpacked.join("MODIFICATIONS.md"),
+            "Covered change period: `2025-05-20..2026-08-25`",
+            &format!("Covered change period: `{start}..{end}`"),
+        );
+        replace_in_file(
+            &unpacked.join("RELEASE-METADATA"),
+            &format!("candidate_date={CANDIDATE_DATE}"),
+            &format!("candidate_date={candidate_date}"),
+        );
+        assert!(Command::new("tar")
+            .args([
+                "-czf",
+                archive.to_str().unwrap(),
+                "-C",
+                unpacked.to_str().unwrap(),
+                "LICENSE",
+                "NOTICE",
+                "MODIFICATIONS.md",
+                "PROJECT_OWNER_LICENSE_APPROVAL.md",
+                "RELEASE-METADATA",
+                "Cargo.toml",
+            ])
+            .status()
+            .unwrap()
+            .success());
+        rewrite_checksums(&output);
     }
 }
 
@@ -278,6 +461,26 @@ impl Drop for BundleFixture {
     }
 }
 
+fn rewrite_checksums(output: &Path) {
+    let names = [
+        "aihack",
+        "aihack-headless",
+        "LICENSE",
+        "NOTICE",
+        "MODIFICATIONS.md",
+        "PROJECT_OWNER_LICENSE_APPROVAL.md",
+        "RELEASE-METADATA",
+        "aihack-0.3.0-source.tar.gz",
+    ];
+    let hashes = Command::new("sha256sum")
+        .args(names)
+        .current_dir(output)
+        .output()
+        .unwrap();
+    assert!(hashes.status.success());
+    fs::write(output.join("SHA256SUMS"), hashes.stdout).unwrap();
+}
+
 #[test]
 fn verifier_accepts_commit_bound_bundle_with_notices_and_checksums() {
     let fixture = BundleFixture::new(BundleCase::Complete);
@@ -325,7 +528,107 @@ fn verifier_rejects_a_source_archive_containing_the_blocked_legacy_tree() {
     let fixture = BundleFixture::new(BundleCase::IncludedLegacy);
     let output = fixture.verify();
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("excluded path"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("excluded"));
+}
+
+#[test]
+fn verifier_rejects_canonical_aliases_of_blocked_archive_paths() {
+    for alias in [
+        "./legacy_nethack_port_reference/probe.txt",
+        "././legacy_nethack_port_reference/probe.txt",
+        "a/../legacy_nethack_port_reference/probe.txt",
+        "/legacy_nethack_port_reference/probe.txt",
+        "legacy_nethack_port_reference\\probe.txt",
+        "LEGACY_NETHACK_PORT_REFERENCE/probe.txt",
+        "Legacy_NetHack_Port_Reference/probe.txt",
+        "legacy_nethack_port_reference./probe.txt",
+        "legacy_nethack_port_reference /probe.txt",
+        "CON/probe.txt",
+        "license",
+    ] {
+        let fixture = BundleFixture::new(BundleCase::Complete);
+        fixture.rewrite_archive_with_path_alias(alias);
+        let output = fixture.verify();
+        assert!(
+            !output.status.success(),
+            "blocked archive alias was accepted: alias={alias} stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn verifier_accepts_a_normal_similar_archive_name() {
+    let fixture = BundleFixture::new(BundleCase::SimilarLegacyName);
+    let output = fixture.verify();
+    assert!(
+        output.status.success(),
+        "normal similar archive name was rejected: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn verifier_rejects_non_calendar_candidate_and_period_matrix() {
+    for (candidate, start, end) in [
+        ("2026-13-01", "2025-05-20", "2026-12-31"),
+        ("2026-02-30", "2025-05-20", "2026-12-31"),
+        ("2025-02-29", "2025-01-01", "2025-12-31"),
+        ("2026-08-24", "2026-00-00", "2026-99-99"),
+        ("2026-08-24", "2026-08-25", "2026-08-24"),
+        ("0000-06-15", "0000-01-01", "0000-12-31"),
+    ] {
+        let fixture = BundleFixture::new(BundleCase::Complete);
+        fixture.rewrite_calendar(candidate, start, end);
+        let output = fixture.verify_with_candidate(candidate);
+        assert!(
+            !output.status.success(),
+            "invalid calendar tuple was accepted: {start} <= {candidate} <= {end}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn verifier_accepts_minimum_and_maximum_supported_calendar_years() {
+    for (case, candidate) in [
+        (BundleCase::MinimumYearCalendar, "0001-06-15"),
+        (BundleCase::MaximumYearCalendar, "9999-06-15"),
+    ] {
+        let fixture = BundleFixture::new(case);
+        let output = fixture.verify();
+        assert!(
+            output.status.success(),
+            "supported calendar edge rejected: {candidate}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn verifier_accepts_candidate_before_and_on_the_modification_period_end() {
+    for case in [BundleCase::CandidateBeforePeriodEnd, BundleCase::Complete] {
+        let fixture = BundleFixture::new(case);
+        let output = fixture.verify();
+        assert!(
+            output.status.success(),
+            "candidate before/on period end rejected: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn verifier_rejects_a_candidate_date_outside_the_bundled_modification_period() {
+    let fixture = BundleFixture::new(BundleCase::StaleModificationPeriod);
+    let output = fixture.verify();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("candidate date"));
 }
 
 #[test]
@@ -347,4 +650,70 @@ fn verifier_rejects_wrong_suffixed_or_duplicate_metadata_values_in_archive_and_o
             );
         }
     }
+}
+
+#[test]
+fn verifier_rejects_extra_file_directory_and_symbolic_link_entries() {
+    use std::os::unix::fs::symlink;
+
+    for name in [
+        "UNTRACKED-UNSIGNED-PAYLOAD",
+        "unexpected-directory",
+        "linked-payload",
+    ] {
+        let fixture = BundleFixture::new(BundleCase::Complete);
+        let output_dir = fixture.root.join("output");
+        match name {
+            "UNTRACKED-UNSIGNED-PAYLOAD" => {
+                fs::write(output_dir.join(name), "unsigned\n").unwrap();
+            }
+            "unexpected-directory" => fs::create_dir(output_dir.join(name)).unwrap(),
+            "linked-payload" => {
+                symlink(output_dir.join("aihack"), output_dir.join(name)).unwrap();
+            }
+            _ => unreachable!(),
+        }
+
+        let output = fixture.verify();
+        assert!(
+            !output.status.success(),
+            "release verifier accepted extra output entry: {name}"
+        );
+    }
+}
+
+#[test]
+fn verifier_rejects_a_symbolic_link_output_root() {
+    use std::os::unix::fs::symlink;
+
+    let fixture = BundleFixture::new(BundleCase::Complete);
+    let output = fixture.root.join("output");
+    let real_output = fixture.root.join("redirected-output");
+    fs::rename(&output, &real_output).unwrap();
+    symlink(&real_output, &output).unwrap();
+
+    let result = fixture.verify();
+    assert!(
+        !result.status.success(),
+        "release verifier must reject an output-root symbolic link"
+    );
+}
+
+#[test]
+fn verifier_rejects_an_expected_name_hard_link_without_mutating_its_other_name() {
+    let fixture = BundleFixture::new(BundleCase::Complete);
+    let output = fixture.root.join("output");
+    let victim = fixture.root.join("outside-victim");
+    let original = fs::read(output.join("aihack")).unwrap();
+    fs::write(&victim, &original).unwrap();
+    fs::remove_file(output.join("aihack")).unwrap();
+    fs::hard_link(&victim, output.join("aihack")).unwrap();
+    rewrite_checksums(&output);
+
+    let result = fixture.verify();
+    assert!(
+        !result.status.success(),
+        "release verifier must reject an expected-name hard link"
+    );
+    assert_eq!(fs::read(victim).unwrap(), original);
 }

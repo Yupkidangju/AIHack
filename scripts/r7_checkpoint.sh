@@ -127,11 +127,11 @@ if ((${#ERRORS[@]} == 0)); then
             && ! "$line" =~ ^[0-9a-f]{64}[[:space:]][[:space:]]crates/aihack-content/src/data/levels/[^/[:space:]]+\.toml$ ]]; then
             checksum_manifest_valid=false
         fi
-    done <"$CONTENT_CHECKSUMS"
+    done < <(tr -d '\r' <"$CONTENT_CHECKSUMS")
     if [[ "$checksum_manifest_valid" != true ]]; then
         error "runtime content checksum manifest format invalid"
     fi
-    manifest_paths=$(awk '{print $2}' "$CONTENT_CHECKSUMS" | sort -u)
+    manifest_paths=$(tr -d '\r' <"$CONTENT_CHECKSUMS" | awk '{print $2}' | sort -u)
     actual_content_paths=$(
         cd "$ROOT"
         find crates/aihack-content/src/data -type f -name '*.toml' -print | sort
@@ -139,7 +139,7 @@ if ((${#ERRORS[@]} == 0)); then
     if [[ "$manifest_paths" != "$actual_content_paths" ]]; then
         error "runtime content checksum coverage incomplete"
     fi
-    if ! (cd "$ROOT" && sha256sum --check --strict "${CONTENT_CHECKSUMS#"$ROOT/"}" >/dev/null); then
+    if ! (cd "$ROOT" && sha256sum --check --strict <(tr -d '\r' <"$CONTENT_CHECKSUMS") >/dev/null); then
         error "runtime content checksum mismatch"
     fi
 

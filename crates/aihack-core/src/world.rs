@@ -8,6 +8,8 @@ use crate::{
 /// UI, content bootstrap, 파일 I/O와 분리된 게임 world의 저장 가능 상태다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorldState<E> {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub campaign: Option<crate::campaign::CampaignState>,
     pub levels: LevelRegistry,
     pub current_level: LevelId,
     pub entities: E,

@@ -8,11 +8,14 @@ use crate::{
         monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
         player::adventurer_template,
     },
+    error::EntityAllocationError,
     ids::{EntityId, LevelId},
     position::Pos,
 };
 
-/// [v0.1.0] Actor payload 내부 종류다. Item은 별도 payload로 분리한다.
+pub const MAX_ABSOLUTE_ACTOR_STAT: i32 = 10_000;
+
+/// Actor payload 내부 종류다. Item은 별도 payload로 분리한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ActorKind {
     Player,
@@ -20,7 +23,7 @@ pub enum ActorKind {
 }
 
 impl ActorKind {
-    /// [v0.1.0] actor가 monster라면 monster kind를 돌려준다.
+    /// actor가 monster라면 monster kind를 돌려준다.
     pub fn monster_kind(self) -> Option<MonsterKind> {
         match self {
             Self::Monster(kind) => Some(kind),
@@ -29,7 +32,7 @@ impl ActorKind {
     }
 }
 
-/// [v0.1.0] 외부 관찰/snapshot에서 쓰는 통합 entity 종류다.
+/// 외부 관찰/snapshot에서 쓰는 통합 entity 종류다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntityKind {
     Player,
@@ -37,7 +40,7 @@ pub enum EntityKind {
     Item(ItemKind),
 }
 
-/// [v0.1.0] 전투 관계를 판정하기 위한 최소 faction이다.
+/// 전투 관계를 판정하기 위한 최소 faction이다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Faction {
     Player,
@@ -45,7 +48,7 @@ pub enum Faction {
     Neutral,
 }
 
-/// [v0.1.0] Phase 3/4 actor stat이다. item payload는 이 값을 갖지 않는다.
+/// actor stat이며 item payload는 이 값을 갖지 않는다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ActorStats {
     pub hp: i16,
@@ -70,7 +73,7 @@ fn default_actor_speed() -> i16 {
     12
 }
 
-/// [v0.1.0] Phase 5 actor/item 공용 위치다. Consumed tombstone은 assigned_letter를 유지한다.
+/// actor/item 공용 위치다. Consumed tombstone은 assigned_letter를 유지한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntityLocation {
     OnMap { level: LevelId, pos: Pos },
@@ -94,7 +97,7 @@ impl EntityLocation {
     }
 }
 
-/// [v0.1.0] actor와 item의 invalid state를 막는 payload 분리 구조다.
+/// actor와 item의 invalid state를 막는 payload 분리 구조다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntityPayload {
     Actor {
@@ -128,7 +131,7 @@ pub type ItemViewMut<'a> = (
     &'a mut Option<u8>,
 );
 
-/// [v0.1.0] Phase 4 entity store에 저장되는 통합 엔티티다.
+/// entity store에 저장되는 통합 엔티티다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entity {
     pub id: EntityId,
@@ -287,7 +290,7 @@ impl Entity {
     }
 }
 
-/// [v0.1.0] Vec index 안정성을 위해 consumed/dead 엔티티를 즉시 제거하지 않는 저장소다.
+/// Vec index 안정성을 위해 consumed/dead 엔티티를 즉시 제거하지 않는 저장소다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntityStore {
     entities: Vec<Entity>,
@@ -308,7 +311,7 @@ impl EntityStore {
         }
     }
 
-    pub fn spawn_player(&mut self, pos: Pos) -> EntityId {
+    pub fn spawn_player(&mut self, pos: Pos) -> Result<EntityId, EntityAllocationError> {
         let template = adventurer_template();
         self.spawn_actor(
             ActorKind::Player,
@@ -336,7 +339,7 @@ impl EntityStore {
         kind: MonsterKind,
         template: MonsterTemplate,
         pos: Pos,
-    ) -> EntityId {
+    ) -> Result<EntityId, EntityAllocationError> {
         self.spawn_actor(
             ActorKind::Monster(kind),
             Faction::Hostile,
@@ -364,8 +367,8 @@ impl EntityStore {
         faction: Faction,
         pos: Pos,
         stats: ActorStats,
-    ) -> EntityId {
-        let id = self.next_entity_id();
+    ) -> Result<EntityId, EntityAllocationError> {
+        let id = self.next_entity_id()?;
         self.entities.push(Entity {
             id,
             payload: EntityPayload::Actor {
@@ -376,7 +379,7 @@ impl EntityStore {
                 alive: true,
             },
         });
-        id
+        Ok(id)
     }
 
     pub fn spawn_item_with_data(
@@ -384,8 +387,8 @@ impl EntityStore {
         kind: ItemKind,
         data: ItemData,
         location: EntityLocation,
-    ) -> EntityId {
-        let id = self.next_entity_id();
+    ) -> Result<EntityId, EntityAllocationError> {
+        let id = self.next_entity_id()?;
         self.entities.push(Entity {
             id,
             payload: EntityPayload::Item {
@@ -396,7 +399,7 @@ impl EntityStore {
                 charges: data.max_charges,
             },
         });
-        id
+        Ok(id)
     }
 
     pub fn get(&self, id: EntityId) -> Option<&Entity> {
@@ -415,6 +418,11 @@ impl EntityStore {
 
     pub fn entities(&self) -> &[Entity] {
         &self.entities
+    }
+
+    /// 저장 복원 validator가 allocator 충돌을 검사하기 위한 읽기 전용 값이다.
+    pub fn next_id(&self) -> u32 {
+        self.next_id
     }
 
     pub fn alive_actor_at(&self, level: LevelId, pos: Pos) -> Option<EntityId> {
@@ -497,9 +505,15 @@ impl EntityStore {
         let Some(entity) = self.get_mut(id) else {
             return false;
         };
-        let Some((_, _, alive_ref)) = entity.actor_mut() else {
+        let Some((_, stats, alive_ref)) = entity.actor_mut() else {
             return false;
         };
+        // alive/HP는 저장·world invariant의 한 관계다. fixture와 runtime helper도 절반만 바꾸지 않는다.
+        if alive && stats.hp <= 0 {
+            stats.hp = 1;
+        } else if !alive && stats.hp > 0 {
+            stats.hp = 0;
+        }
         *alive_ref = alive;
         true
     }
@@ -593,16 +607,42 @@ impl EntityStore {
     pub fn clear_monsters(&mut self) {
         for entity in &mut self.entities {
             if matches!(entity.kind(), EntityKind::Monster(_)) {
-                if let Some((_, _, alive)) = entity.actor_mut() {
+                if let Some((_, stats, alive)) = entity.actor_mut() {
+                    stats.hp = stats.hp.min(0);
                     *alive = false;
                 }
             }
         }
     }
 
-    fn next_entity_id(&mut self) -> EntityId {
+    fn next_entity_id(&mut self) -> Result<EntityId, EntityAllocationError> {
         let id = EntityId(self.next_id);
-        self.next_id += 1;
-        id
+        let next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or(EntityAllocationError::Exhausted)?;
+        self.next_id = next_id;
+        Ok(id)
+    }
+}
+
+#[cfg(test)]
+mod allocation_tests {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    use super::EntityStore;
+    use crate::{error::EntityAllocationError, position::Pos};
+
+    #[test]
+    fn exhausted_allocator_returns_without_panicking_or_mutating_the_store() {
+        let mut store = EntityStore::new();
+        store.next_id = u32::MAX;
+        let before = store.clone();
+
+        let result = catch_unwind(AssertUnwindSafe(|| store.spawn_player(Pos { x: 1, y: 1 })));
+
+        assert!(result.is_ok(), "allocator exhaustion must be a typed error");
+        assert_eq!(result.unwrap(), Err(EntityAllocationError::Exhausted));
+        assert_eq!(store, before, "failed allocation must not mutate the store");
     }
 }

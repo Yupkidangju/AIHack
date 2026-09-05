@@ -80,6 +80,16 @@ impl ReleaseFixture {
             project_file("scripts/verify_release_bundle.sh"),
         )
         .unwrap();
+        fs::write(
+            root.join("scripts/verify_source_archive.py"),
+            project_file("scripts/verify_source_archive.py"),
+        )
+        .unwrap();
+        fs::write(
+            root.join("scripts/release_staging.ps1"),
+            project_file("scripts/release_staging.ps1"),
+        )
+        .unwrap();
 
         let manifests = [
             "Cargo.toml",
@@ -128,7 +138,7 @@ impl ReleaseFixture {
         fs::write(root.join("README.md"), "> Current code: Cargo 0.3.0\n").unwrap();
         fs::write(
             root.join("CHANGELOG.md"),
-            "# Changelog\n\n## [0.3.0] - 2026-07-20\n",
+            "# Changelog\n\n## [0.3.0] - 2026-08-24\n",
         )
         .unwrap();
         fs::write(

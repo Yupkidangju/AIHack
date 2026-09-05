@@ -8,7 +8,7 @@ use aihack_core::{
 use crate::world::GameWorld;
 
 pub fn move_player(world: &mut GameWorld, direction: Direction) -> Result<(), GameError> {
-    if world.carried_weight() > 80 {
+    if world.carried_weight() > world.carrying_capacity() {
         return Err(GameError::CommandRejected(
             "movement blocked by encumbrance".to_string(),
         ));
@@ -27,7 +27,11 @@ pub fn move_actor(
 
     if actor == world.player_id {
         world.set_player_location(level, to);
-    } else if !world.entities.set_actor_location(actor, level, to) {
+    } else if !world
+        .state_mut()
+        .entities
+        .set_actor_location(actor, level, to)
+    {
         return Err(GameError::CommandRejected(format!(
             "actor {actor:?} position update failed"
         )));
@@ -35,34 +39,13 @@ pub fn move_actor(
     Ok(())
 }
 
-pub fn validate_actor_destination(
-    world: &GameWorld,
-    actor: EntityId,
-    from: Pos,
-    to: Pos,
-    direction: Direction,
-) -> Result<(), GameError> {
-    let (level, _) = actor_origin(world, actor)?;
-    aihack_core::movement::validate_destination_on_level(world, actor, level, from, to, direction)
-}
-
-pub fn validate_actor_destination_on_level(
-    world: &GameWorld,
-    actor: EntityId,
-    level: LevelId,
-    from: Pos,
-    to: Pos,
-    direction: Direction,
-) -> Result<(), GameError> {
-    aihack_core::movement::validate_destination_on_level(world, actor, level, from, to, direction)
-}
-
 pub fn is_passable_for_actor(world: &GameWorld, actor: EntityId, direction: Direction) -> bool {
     aihack_core::movement::is_passable_for_actor(world, actor, direction)
 }
 
 pub fn is_passable_for_legal_action(world: &GameWorld, direction: Direction) -> bool {
-    is_passable_for_actor(world, world.player_id, direction)
+    world.carried_weight() <= world.carrying_capacity()
+        && is_passable_for_actor(world, world.player_id, direction)
 }
 
 pub fn is_bump_attack_for_legal_action(world: &GameWorld, direction: Direction) -> bool {

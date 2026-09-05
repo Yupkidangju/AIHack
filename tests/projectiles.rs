@@ -142,10 +142,14 @@ fn wand_zap_stops_at_wall() {
         world.saved().entities.clear_monsters()
     });
     let eye = aihack::testing::SessionBuilder::mutate(&mut session, |world| {
-        world.saved().entities.spawn_monster(
-            aihack::domain::monster::MonsterKind::FloatingEye,
-            Pos { x: 11, y: 5 },
-        )
+        world
+            .saved()
+            .entities
+            .spawn_monster(
+                aihack::domain::monster::MonsterKind::FloatingEye,
+                Pos { x: 11, y: 5 },
+            )
+            .unwrap()
     });
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.set_player_pos(Pos { x: 9, y: 5 })

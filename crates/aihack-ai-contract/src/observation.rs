@@ -23,6 +23,7 @@ pub enum RunStateSummary {
     AwaitingInventorySelection,
     MorePrompt,
     GameOver,
+    Victory,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,6 +56,8 @@ pub struct ActionSpace {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub campaign: Option<CampaignObservation>,
     pub schema_version: u16,
     pub seed: u64,
     pub turn: u64,
@@ -68,6 +71,16 @@ pub struct Observation {
     pub last_events: Vec<GameEvent>,
     pub action_space: ActionSpace,
     pub legal_actions: Vec<CommandIntent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CampaignObservation {
+    pub carried_weight: i16,
+    pub carrying_capacity: i16,
+    pub role: aihack_core::campaign::Role,
+    pub xp: u32,
+    pub level: u8,
+    pub has_amulet: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

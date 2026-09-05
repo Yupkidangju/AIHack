@@ -1,19 +1,20 @@
 use aihack::{
     core::{CommandIntent, Direction, EntityId, GameEvent, GameRng, GameSession, Pos},
     domain::{
-        combat::DamageRoll,
+        combat::{attack_roll_value, roll_damage, DamageRoll},
         entity::{ActorStats, EntityKind, EntityStore, Faction},
         monster::{monster_template, MonsterKind},
         player::adventurer_template,
     },
-    systems::combat,
 };
 
 #[test]
 fn entity_store_assigns_stable_nonzero_ids() {
     let mut store = EntityStore::new();
-    let player = store.spawn_player(Pos { x: 5, y: 5 });
-    let jackal = store.spawn_monster(MonsterKind::Jackal, Pos { x: 6, y: 5 });
+    let player = store.spawn_player(Pos { x: 5, y: 5 }).unwrap();
+    let jackal = store
+        .spawn_monster(MonsterKind::Jackal, Pos { x: 6, y: 5 })
+        .unwrap();
 
     assert_eq!(player, EntityId(1));
     assert_eq!(jackal, EntityId(2));
@@ -31,9 +32,13 @@ fn entity_store_assigns_stable_nonzero_ids() {
 #[test]
 fn tombstone_does_not_compact_entity_ids() {
     let mut store = EntityStore::new();
-    let player = store.spawn_player(Pos { x: 5, y: 5 });
-    let jackal = store.spawn_monster(MonsterKind::Jackal, Pos { x: 6, y: 5 });
-    let goblin = store.spawn_monster(MonsterKind::Goblin, Pos { x: 20, y: 12 });
+    let player = store.spawn_player(Pos { x: 5, y: 5 }).unwrap();
+    let jackal = store
+        .spawn_monster(MonsterKind::Jackal, Pos { x: 6, y: 5 })
+        .unwrap();
+    let goblin = store
+        .spawn_monster(MonsterKind::Goblin, Pos { x: 20, y: 12 })
+        .unwrap();
 
     assert_eq!(player, EntityId(1));
     assert_eq!(jackal, EntityId(2));
@@ -41,7 +46,9 @@ fn tombstone_does_not_compact_entity_ids() {
     assert!(store.set_alive(jackal, false));
     assert!(!store.get(jackal).unwrap().actor().unwrap().5);
     assert_eq!(store.get(goblin).unwrap().id, EntityId(3));
-    let next = store.spawn_monster(MonsterKind::FloatingEye, Pos { x: 8, y: 8 });
+    let next = store
+        .spawn_monster(MonsterKind::FloatingEye, Pos { x: 8, y: 8 })
+        .unwrap();
     assert_eq!(next, EntityId(4));
 }
 
@@ -98,60 +105,72 @@ fn monster_factories_match_phase3_spec() {
 #[test]
 fn hit_formula_uses_d20_bonuses_and_defense() {
     let mut store = EntityStore::new();
-    let attacker = store.spawn(
-        EntityKind::Player,
-        Faction::Player,
-        Pos { x: 1, y: 1 },
-        ActorStats {
-            hp: 10,
-            max_hp: 10,
-            ac: 0,
-            hit_bonus: 2,
-            damage_bonus: 0,
-            damage_reduction: 0,
-            damage: DamageRoll { dice: 1, sides: 4 },
-            weapon_hit_bonus: 1,
-            speed: 12,
-            ai_kind: None,
-            passive: None,
-            difficulty: 0,
-        },
-    );
-    let defender = store.spawn(
-        EntityKind::Monster(MonsterKind::Goblin),
-        Faction::Hostile,
-        Pos { x: 2, y: 1 },
-        ActorStats {
-            hp: 10,
-            max_hp: 10,
-            ac: 5,
-            hit_bonus: 0,
-            damage_bonus: 0,
-            damage_reduction: 0,
-            damage: DamageRoll { dice: 1, sides: 2 },
-            weapon_hit_bonus: 0,
-            speed: 12,
-            ai_kind: None,
-            passive: None,
-            difficulty: 0,
-        },
-    );
+    let attacker = store
+        .spawn(
+            EntityKind::Player,
+            Faction::Player,
+            Pos { x: 1, y: 1 },
+            ActorStats {
+                hp: 10,
+                max_hp: 10,
+                ac: 0,
+                hit_bonus: 2,
+                damage_bonus: 0,
+                damage_reduction: 0,
+                damage: DamageRoll { dice: 1, sides: 4 },
+                weapon_hit_bonus: 1,
+                speed: 12,
+                ai_kind: None,
+                passive: None,
+                difficulty: 0,
+            },
+        )
+        .unwrap();
+    let defender = store
+        .spawn(
+            EntityKind::Monster(MonsterKind::Goblin),
+            Faction::Hostile,
+            Pos { x: 2, y: 1 },
+            ActorStats {
+                hp: 10,
+                max_hp: 10,
+                ac: 5,
+                hit_bonus: 0,
+                damage_bonus: 0,
+                damage_reduction: 0,
+                damage: DamageRoll { dice: 1, sides: 2 },
+                weapon_hit_bonus: 0,
+                speed: 12,
+                ai_kind: None,
+                passive: None,
+                difficulty: 0,
+            },
+        )
+        .unwrap();
     let a = store.get(attacker).unwrap();
     let d = store.get(defender).unwrap();
 
-    assert_eq!(combat::attack_roll_value(a, d, 1, 12), (15, 15, true));
-    assert_eq!(combat::attack_roll_value(a, d, 1, 11), (14, 15, false));
+    let attacker_stats = a.actor().unwrap().4;
+    let defender_stats = d.actor().unwrap().4;
+    assert_eq!(
+        attack_roll_value(attacker_stats.hit_bonus, defender_stats.ac, 1, 12),
+        (15, 15, true)
+    );
+    assert_eq!(
+        attack_roll_value(attacker_stats.hit_bonus, defender_stats.ac, 1, 11),
+        (14, 15, false)
+    );
 }
 
 #[test]
 fn damage_formula_rolls_dice_and_clamps_minimum_one() {
     let mut rng = GameRng::new(42);
-    let damage = combat::roll_damage(&mut rng, DamageRoll { dice: 1, sides: 4 }, 0, 0);
+    let damage = roll_damage(&mut rng, DamageRoll { dice: 1, sides: 4 }, 0, 0);
     assert!((1..=4).contains(&damage));
 
     let mut rng = GameRng::new(42);
     assert_eq!(
-        combat::roll_damage(&mut rng, DamageRoll { dice: 1, sides: 2 }, 0, 99),
+        roll_damage(&mut rng, DamageRoll { dice: 1, sides: 2 }, 0, 99),
         1
     );
 }

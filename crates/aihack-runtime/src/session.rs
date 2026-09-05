@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use aihack_ai_contract::{ClientRevision, Observation};
 use aihack_content::ContentRegistry;
@@ -25,11 +25,11 @@ use crate::{
     world::GameWorld,
 };
 
-/// [v0.1.0] 새 런타임의 단일 상태 원천이다.
-/// Phase 4에서는 map + actor/item store + inventory 상태를 소유한다.
+/// 결정론적 runtime의 단일 session 상태 원천이다.
 #[derive(Debug, Clone)]
 pub struct GameSession {
     pub(crate) inner: SessionState<GameWorld>,
+    pub(crate) transaction_aborted: bool,
 }
 
 impl Deref for GameSession {
@@ -37,12 +37,6 @@ impl Deref for GameSession {
 
     fn deref(&self) -> &Self::Target {
         &self.inner
-    }
-}
-
-impl DerefMut for GameSession {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
     }
 }
 
@@ -56,7 +50,7 @@ impl GameSession {
         seed: u64,
         registry: &ContentRegistry,
     ) -> Result<Self, ContentError> {
-        Ok(Self {
+        let session = Self {
             inner: SessionState {
                 meta: GameMeta { seed },
                 rng: GameRng::new(seed),
@@ -65,7 +59,15 @@ impl GameSession {
                 world: GameWorld::try_fixture_phase5_with_registry(registry)?,
                 event_log: Vec::new(),
             },
-        })
+            transaction_aborted: false,
+        };
+        crate::save::validate_save_data_with_registry(&session.to_save_data(), registry).map_err(
+            |error| ContentError::Parse {
+                file: "world bootstrap".to_owned(),
+                message: error.to_string(),
+            },
+        )?;
+        Ok(session)
     }
 
     pub fn try_new_for_playing(seed: u64) -> Result<Self, ContentError> {
@@ -77,7 +79,7 @@ impl GameSession {
         registry: &ContentRegistry,
     ) -> Result<Self, ContentError> {
         let mut session = Self::try_new_with_registry(seed, registry)?;
-        session.state = RunState::Playing;
+        session.inner.state = RunState::Playing;
         Ok(session)
     }
 
@@ -91,14 +93,14 @@ impl GameSession {
                 world: GameWorld::fixture_phase4(),
                 event_log: Vec::new(),
             },
+            transaction_aborted: false,
         }
     }
 
-    /// [v0.2.0] Phase 16: Title -> CharacterCreation -> Playing로 즉시 전환하여
-    /// 기존 테스트와 headless runner의 호환성을 유지한다.
+    /// Title/CharacterCreation을 건너뛰고 Playing fixture를 만든다.
     pub fn new_for_playing(seed: u64) -> Self {
         let mut session = Self::new(seed);
-        session.state = RunState::Playing;
+        session.inner.state = RunState::Playing;
         session
     }
 
@@ -131,6 +133,17 @@ impl GameSession {
     pub fn submit(&mut self, intent: CommandIntent) -> TurnOutcome {
         let mut transaction = crate::transaction::TurnTransaction::prepare(self);
         let outcome = transaction.apply(intent);
+        if transaction.was_aborted() {
+            let reason = outcome
+                .events
+                .iter()
+                .find_map(|event| match event {
+                    GameEvent::CommandRejected { reason } => Some(reason.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| "command rejected".to_string());
+            return self.reject(reason);
+        }
         let report = transaction.validate();
         if !report.is_valid() {
             return self.reject(crate::transaction::TurnTransaction::invariant_reason(
@@ -155,14 +168,16 @@ impl GameSession {
                 self.submit_in_awaiting_inventory(action, intent)
             }
             RunState::MorePrompt => self.submit_in_more_prompt(intent),
-            RunState::GameOver { .. } => self.submit_in_game_over(intent),
+            RunState::GameOver { .. } | RunState::Victory { .. } => {
+                self.submit_in_game_over(intent)
+            }
         }
     }
 
     fn submit_in_title(&mut self, intent: CommandIntent) -> TurnOutcome {
         match intent {
             CommandIntent::Wait => {
-                self.state = RunState::CharacterCreation;
+                self.inner.state = RunState::CharacterCreation;
                 self.accept_without_turn(vec![GameEvent::Message {
                     priority: MessagePriority::Info,
                     text: "Welcome to AIHack".to_string(),
@@ -175,8 +190,30 @@ impl GameSession {
 
     fn submit_in_character_creation(&mut self, intent: CommandIntent) -> TurnOutcome {
         match intent {
+            CommandIntent::StartCampaign { role } => {
+                if self.turn != 0 || self.world.campaign.is_some() {
+                    return self.reject("campaign requires a fresh creation state".into());
+                }
+                let registry = self.world.content_registry().clone();
+                let state = match crate::bootstrap::campaign_world(&registry, self.seed(), role) {
+                    Ok(state) => state,
+                    Err(error) => return self.abort_transaction(error.to_string()),
+                };
+                self.inner.world =
+                    match GameWorld::from_saved_world_with_registry((&state).into(), &registry) {
+                        Ok(world) => world,
+                        Err(error) => return self.abort_transaction(error.to_string()),
+                    };
+                self.inner.state = RunState::Playing;
+                self.accept_without_turn(vec![GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: format!(
+                        "{role:?}: recover the Amulet on Main 6 and return to the surface."
+                    ),
+                }])
+            }
             CommandIntent::Wait => {
-                self.state = RunState::Playing;
+                self.inner.state = RunState::Playing;
                 self.accept_without_turn(vec![GameEvent::Message {
                     priority: MessagePriority::Info,
                     text: "Character created. Good luck!".to_string(),
@@ -194,6 +231,13 @@ impl GameSession {
             return self.reject("player is paralyzed".to_string());
         }
         match intent {
+            CommandIntent::StartCampaign { .. } => {
+                self.reject("role is chosen only during creation".into())
+            }
+            CommandIntent::EnterBranch => match stairs::enter_branch(&mut self.inner.world) {
+                Ok(event) => self.accept_turn(vec![event]),
+                Err(error) => self.reject(error),
+            },
             CommandIntent::Wait => self.submit_wait(),
             CommandIntent::Quit => self.submit_quit(),
             CommandIntent::Move(direction) => self.submit_move(direction),
@@ -225,16 +269,17 @@ impl GameSession {
         action: DirectionalAction,
         intent: CommandIntent,
     ) -> TurnOutcome {
-        self.state = RunState::Playing;
+        self.inner.state = RunState::Playing;
         match intent {
             CommandIntent::Move(direction) => match action {
                 DirectionalAction::Open => self.submit_open(direction),
                 DirectionalAction::Close => self.submit_close(direction),
                 DirectionalAction::Kick => self.submit_kick(direction),
             },
+            CommandIntent::AcknowledgeMore => self.accept_without_turn(Vec::new()),
             CommandIntent::Quit => self.submit_quit(),
             _ => {
-                self.state = RunState::AwaitingDirection { action };
+                self.inner.state = RunState::AwaitingDirection { action };
                 self.reject("choose a direction or Esc to cancel".to_string())
             }
         }
@@ -245,11 +290,28 @@ impl GameSession {
         action: InventoryAction,
         intent: CommandIntent,
     ) -> TurnOutcome {
-        self.state = RunState::Playing;
+        self.inner.state = RunState::Playing;
         match intent {
+            CommandIntent::Drop { item } if action == InventoryAction::Drop => {
+                self.submit_drop(item)
+            }
+            CommandIntent::Wield { item } if action == InventoryAction::Wield => {
+                self.submit_wield(item)
+            }
+            CommandIntent::Wear { item } if action == InventoryAction::Wear => {
+                self.submit_wear(item)
+            }
+            CommandIntent::Quaff { item } if action == InventoryAction::Quaff => {
+                self.submit_quaff(item)
+            }
+            CommandIntent::Eat { item } if action == InventoryAction::Eat => self.submit_eat(item),
+            CommandIntent::Read { item } if action == InventoryAction::Read => {
+                self.submit_read(item)
+            }
+            CommandIntent::AcknowledgeMore => self.accept_without_turn(Vec::new()),
             CommandIntent::Quit => self.submit_quit(),
             _ => {
-                self.state = RunState::AwaitingInventorySelection { action };
+                self.inner.state = RunState::AwaitingInventorySelection { action };
                 self.reject("choose an item or Esc to cancel".to_string())
             }
         }
@@ -258,7 +320,7 @@ impl GameSession {
     fn submit_in_more_prompt(&mut self, intent: CommandIntent) -> TurnOutcome {
         match intent {
             CommandIntent::AcknowledgeMore => {
-                self.state = RunState::Playing;
+                self.inner.state = RunState::Playing;
                 self.accept_without_turn(Vec::new())
             }
             _ => self.reject("press any key to continue".to_string()),
@@ -293,7 +355,7 @@ impl GameSession {
     }
 
     fn submit_wait(&mut self) -> TurnOutcome {
-        let next_turn = self.turn + 1;
+        let next_turn = self.turn.saturating_add(1);
         self.accept_turn(vec![GameEvent::Waited { turn: next_turn }])
     }
 
@@ -309,7 +371,7 @@ impl GameSession {
                 return self.submit_bump_attack(defender);
             }
         }
-        match movement::move_player(&mut self.world, direction) {
+        match movement::move_player(&mut self.inner.world, direction) {
             Ok(()) => {
                 let to = self.world.player_pos();
                 let mut events = vec![GameEvent::EntityMoved {
@@ -317,16 +379,21 @@ impl GameSession {
                     from,
                     to,
                 }];
-                events.extend(traps::trigger_player_trap(&mut self.world));
+                events.extend(traps::trigger_player_trap(&mut self.inner.world));
                 let player_id = self.world.player_id();
-                events.extend(death::collect_death_events_if_hp_depleted(
-                    &mut self.world,
+                let death_events = match death::collect_death_events_if_hp_depleted(
+                    &mut self.inner.world,
                     player_id,
                     DeathCause::Trap {
                         trap: TrapKind::Pit,
                     },
-                ));
-                self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+                ) {
+                    Ok(events) => events,
+                    Err(error) => return self.abort_transaction(error),
+                };
+                events.extend(death_events);
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
             Err(error) => self.reject(format!("{error}")),
@@ -349,30 +416,34 @@ impl GameSession {
                 .and_then(|entity| entity.monster_passive()),
             Some(MonsterPassive::ParalyzeOnMelee)
         ) {
-            self.world.paralysis_turns = self.world.paralysis_turns.max(2);
+            self.inner.world.state_mut().paralysis_turns = self.world.paralysis_turns.max(2);
             events.push(GameEvent::PassiveAttackTriggered {
                 source: defender,
                 target: attacker,
             });
         }
-        events.extend(death::collect_death_events_after_attack(
-            &mut self.world,
+        let death_events = match death::collect_death_events_after_attack(
+            &mut self.inner.world,
             attacker,
             defender,
-        ));
-        self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+        ) {
+            Ok(events) => events,
+            Err(error) => return self.abort_transaction(error),
+        };
+        events.extend(death_events);
+        self.inner.state = death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
         self.accept_turn(events)
     }
 
     fn submit_pickup(&mut self) -> TurnOutcome {
-        match items::pickup(&mut self.world) {
+        match items::pickup(&mut self.inner.world) {
             Ok(event) => self.accept_turn(vec![event]),
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_search(&mut self) -> TurnOutcome {
-        let events = traps::search(&mut self.world);
+        let events = traps::search(&mut self.inner.world);
         self.accept_turn(events)
     }
 
@@ -380,22 +451,23 @@ impl GameSession {
         let state = &mut self.inner;
         match projectiles::throw_item(&mut state.world, &mut state.rng, item, direction) {
             Ok(events) => {
-                self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
-            Err(error) => self.reject(error),
+            Err(error) => self.abort_transaction(error),
         }
     }
 
     fn submit_drop(&mut self, item: EntityId) -> TurnOutcome {
-        match items::drop(&mut self.world, item) {
+        match items::drop(&mut self.inner.world, item) {
             Ok(event) => self.accept_turn(vec![event]),
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_wield(&mut self, item: EntityId) -> TurnOutcome {
-        match items::wield(&mut self.world, item) {
+        match items::wield(&mut self.inner.world, item) {
             Ok(Some(event)) => self.accept_turn(vec![event]),
             Ok(None) => self.accept_without_turn(Vec::new()),
             Err(error) => self.reject(error),
@@ -411,14 +483,14 @@ impl GameSession {
     }
 
     fn submit_eat(&mut self, item: EntityId) -> TurnOutcome {
-        match items::eat(&mut self.world, item) {
+        match items::eat(&mut self.inner.world, item) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_wear(&mut self, item: EntityId) -> TurnOutcome {
-        match items::wear(&mut self.world, item) {
+        match items::wear(&mut self.inner.world, item) {
             Ok(Some(event)) => self.accept_turn(vec![event]),
             Ok(None) => self.accept_without_turn(Vec::new()),
             Err(error) => self.reject(error),
@@ -429,22 +501,23 @@ impl GameSession {
         let state = &mut self.inner;
         match projectiles::zap_wand(&mut state.world, &mut state.rng, item, direction) {
             Ok(events) => {
-                self.state = death::state_after_deaths_at(&self.world, self.turn + 1);
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
-            Err(error) => self.reject(error),
+            Err(error) => self.abort_transaction(error),
         }
     }
 
     fn submit_read(&mut self, item: EntityId) -> TurnOutcome {
-        match items::read(&mut self.world, item) {
+        match items::read(&mut self.inner.world, item) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_kick(&mut self, direction: Direction) -> TurnOutcome {
-        match doors::kick_door(&mut self.world, direction) {
+        match doors::kick_door(&mut self.inner.world, direction) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(format!("{error}")),
         }
@@ -454,8 +527,8 @@ impl GameSession {
         if self.world.prayer_cooldown > 0 {
             return self.reject("prayer is on cooldown".to_string());
         }
-        self.world.prayer_cooldown = 20;
-        self.world.luck = self.world.luck.saturating_add(1).min(3);
+        self.inner.world.state_mut().prayer_cooldown = 20;
+        self.inner.world.state_mut().luck = self.world.luck.saturating_add(1).min(3);
         self.accept_turn(vec![GameEvent::PrayerOffered {
             entity: self.world.player_id(),
             cooldown_after: self.world.prayer_cooldown,
@@ -464,7 +537,7 @@ impl GameSession {
 
     fn submit_open(&mut self, direction: Direction) -> TurnOutcome {
         let pos = self.world.player_pos().offset(direction.delta());
-        match doors::open_door(&mut self.world, direction) {
+        match doors::open_door(&mut self.inner.world, direction) {
             Ok((from, to)) => self.accept_turn(vec![GameEvent::DoorChanged { pos, from, to }]),
             Err(error) => self.reject(format!("{error}")),
         }
@@ -472,31 +545,52 @@ impl GameSession {
 
     fn submit_close(&mut self, direction: Direction) -> TurnOutcome {
         let pos = self.world.player_pos().offset(direction.delta());
-        match doors::close_door(&mut self.world, direction) {
+        match doors::close_door(&mut self.inner.world, direction) {
             Ok((from, to)) => self.accept_turn(vec![GameEvent::DoorChanged { pos, from, to }]),
             Err(error) => self.reject(format!("{error}")),
         }
     }
 
     fn submit_descend(&mut self) -> TurnOutcome {
-        match stairs::descend(&mut self.world) {
+        match stairs::descend(&mut self.inner.world) {
             Ok(event) => self.accept_turn(vec![event]),
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_ascend(&mut self) -> TurnOutcome {
-        match stairs::ascend(&mut self.world) {
+        if self.world.campaign.is_some()
+            && self.world.current_level() == aihack_core::ids::LevelId::main(1)
+            && self.world.current_map().tile(self.world.player_pos()).ok()
+                == Some(aihack_core::domain::tile::TileKind::StairsUp)
+        {
+            if !crate::campaign::has_amulet(&self.world) || !self.world.player_alive() {
+                return self.reject("return with the Amulet of Ascension".into());
+            }
+            let Some(final_score) =
+                score::death_score(&self.world, self.turn + 1).checked_add(10_000)
+            else {
+                return self.abort_transaction("victory score overflows".into());
+            };
+            self.inner.state = RunState::Victory { final_score };
+            return self.accept_turn(vec![GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "Ascended! The Amulet has reached the surface.".into(),
+            }]);
+        }
+        match stairs::ascend(&mut self.inner.world) {
             Ok(event) => self.accept_turn(vec![event]),
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_quit(&mut self) -> TurnOutcome {
-        // [v0.2.0] Phase 16: Quit는 모든 상태에서 종료 요청으로 처리한다.
-        // 이미 GameOver 상태가 아니면 GameOver로 전환한다.
-        if !matches!(self.state, RunState::GameOver { .. }) {
-            self.state = RunState::GameOver {
+        // Quit는 모든 상태에서 종료 요청이며, 기존 GameOver 원인은 보존한다.
+        if !matches!(
+            self.state,
+            RunState::GameOver { .. } | RunState::Victory { .. }
+        ) {
+            self.inner.state = RunState::GameOver {
                 cause: DeathCause::Combat {
                     attacker: EntityId(0),
                 },
@@ -509,24 +603,31 @@ impl GameSession {
     }
 
     fn accept_turn(&mut self, mut events: Vec<GameEvent>) -> TurnOutcome {
-        let next_turn = self.turn + 1;
+        let next_turn = self.turn.saturating_add(1);
         events.insert(0, GameEvent::TurnStarted { turn: next_turn });
-        self.turn = next_turn;
-        self.world.nutrition = self.world.nutrition.saturating_sub(1);
-        self.world.prayer_cooldown = self.world.prayer_cooldown.saturating_sub(1);
+        self.inner.turn = next_turn;
+        self.inner.world.state_mut().nutrition = self.world.nutrition.saturating_sub(1);
+        self.inner.world.state_mut().prayer_cooldown = self.world.prayer_cooldown.saturating_sub(1);
         if self.world.paralysis_turns > 0 {
-            self.world.paralysis_turns -= 1;
+            self.inner.world.state_mut().paralysis_turns -= 1;
         }
-        if !matches!(self.state, RunState::GameOver { .. }) {
+        if !matches!(
+            self.state,
+            RunState::GameOver { .. } | RunState::Victory { .. }
+        ) {
             let state = &mut self.inner;
-            events.extend(monster_ai::run_monster_turn(
+            let monster_events = match monster_ai::run_monster_turn(
                 &mut state.world,
                 &mut state.rng,
                 &mut state.state,
                 next_turn,
-            ));
+            ) {
+                Ok(events) => events,
+                Err(error) => return self.abort_transaction(error),
+            };
+            events.extend(monster_events);
         }
-        self.event_log.extend(events.clone());
+        self.inner.event_log.extend(events.clone());
 
         TurnOutcome {
             accepted: true,
@@ -538,7 +639,7 @@ impl GameSession {
     }
 
     fn accept_without_turn(&mut self, events: Vec<GameEvent>) -> TurnOutcome {
-        self.event_log.extend(events.clone());
+        self.inner.event_log.extend(events.clone());
         TurnOutcome {
             accepted: true,
             turn_advanced: false,
@@ -556,6 +657,11 @@ impl GameSession {
             snapshot_hash: self.snapshot().stable_hash(),
             next_state: self.state,
         }
+    }
+
+    fn abort_transaction(&mut self, reason: String) -> TurnOutcome {
+        self.transaction_aborted = true;
+        self.reject(reason)
     }
 }
 
@@ -577,5 +683,38 @@ impl crate::client::GameClient for GameSession {
 
     fn submit(&mut self, intent: CommandIntent) -> TurnOutcome {
         GameSession::submit(self, intent)
+    }
+}
+
+#[cfg(test)]
+mod allocation_transaction_tests {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    use aihack_core::{action::CommandIntent, ids::EntityId, position::Direction};
+
+    use super::GameSession;
+
+    #[test]
+    fn corpse_allocation_exhaustion_rejects_without_panicking_or_committing_partial_state() {
+        let mut session = GameSession::new_for_playing(42);
+        let state = session.inner.world.state_mut();
+        state.entities.set_alive(EntityId(3), false);
+        let jackal = state.entities.actor_stats_mut(EntityId(2)).unwrap();
+        jackal.hp = 1;
+        let player = state.entities.actor_stats_mut(state.player_id).unwrap();
+        player.hit_bonus = 100;
+        let mut entities = serde_json::to_value(&state.entities).unwrap();
+        entities["next_id"] = serde_json::json!(u32::MAX);
+        state.entities = serde_json::from_value(entities).unwrap();
+        let before = session.to_save_data();
+
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            session.submit(CommandIntent::Move(Direction::East))
+        }));
+
+        assert!(result.is_ok(), "allocation exhaustion must not panic");
+        let outcome = result.unwrap();
+        assert!(!outcome.accepted);
+        assert_eq!(session.to_save_data(), before);
     }
 }

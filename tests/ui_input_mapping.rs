@@ -1,8 +1,8 @@
 use aihack::{
     core::{CommandIntent, Direction, GameSession, Pos},
     ui::tui::{
-        compute_layout, key_to_candidate, keyboard_baseline, map_mouse_event, UiCommandCandidate,
-        UiInputEvent, UiPanel, Viewport,
+        compute_layout, key_to_candidate, keyboard_baseline, map_mouse_event, InspectPresentation,
+        UiCommandCandidate, UiInputEvent, UiPanel, Viewport,
     },
 };
 
@@ -28,7 +28,9 @@ fn keyboard_baseline_maps_commands() {
     )));
     assert!(baseline.contains(&('s', UiInputEvent::Key(CommandIntent::Search))));
     assert!(baseline.contains(&('.', UiInputEvent::Key(CommandIntent::Wait))));
-    assert!(baseline.contains(&('K', UiInputEvent::Key(CommandIntent::Kick(Direction::East)))));
+    assert!(!baseline
+        .iter()
+        .any(|(key, _)| matches!(key, 'o' | 'c' | 'K' | 'q')));
     assert!(baseline.contains(&('p', UiInputEvent::Key(CommandIntent::Pray))));
     assert!(baseline.contains(&('S', UiInputEvent::SaveRequest)));
     assert!(baseline.contains(&('L', UiInputEvent::LoadRequest)));
@@ -37,21 +39,24 @@ fn keyboard_baseline_maps_commands() {
     let observation = session.observation();
     assert!(matches!(
         key_to_candidate('w', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Wield { .. }))
+        Some(UiCommandCandidate::BeginAction('w'))
     ));
     assert!(matches!(
         key_to_candidate('t', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Throw { .. }))
+        Some(UiCommandCandidate::BeginAction('t'))
     ));
     assert!(matches!(
         key_to_candidate('z', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Zap { .. }))
+        Some(UiCommandCandidate::BeginAction('z'))
     ));
     assert!(matches!(
         key_to_candidate('r', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Read { .. }))
+        Some(UiCommandCandidate::BeginAction('r'))
     ));
-    assert_eq!(key_to_candidate('o', &observation), None);
+    assert_eq!(
+        key_to_candidate('o', &observation),
+        Some(UiCommandCandidate::BeginAction('o'))
+    );
 }
 
 #[test]
@@ -68,18 +73,23 @@ fn mouse_mapping_matches_layout_contract() {
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
     assert_eq!(candidate, UiCommandCandidate::Inspect(Pos { x: 5, y: 7 }));
 
+    let east = viewport
+        .world_to_terminal(Pos { x: 31, y: 12 }, layout.map)
+        .unwrap();
     let move_candidate = map_mouse_event(
         UiInputEvent::MouseClick {
-            column: layout.map.x + layout.map.width / 2 + 1,
-            row: layout.map.y + layout.map.height / 2,
+            column: east.0,
+            row: east.1,
         },
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
     assert_eq!(
@@ -95,6 +105,7 @@ fn mouse_mapping_matches_layout_contract() {
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
     assert_eq!(focus, UiCommandCandidate::Focus(UiPanel::Status));
@@ -107,11 +118,23 @@ fn save_load_request_bridges_core_api() {
     let layout = compute_layout(100, 32);
     let viewport = Viewport::from_rect(Pos { x: 0, y: 0 }, Pos { x: 0, y: 0 }, layout.map);
     assert_eq!(
-        map_mouse_event(UiInputEvent::SaveRequest, layout, viewport, &observation),
+        map_mouse_event(
+            UiInputEvent::SaveRequest,
+            layout,
+            viewport,
+            &observation,
+            InspectPresentation::Inventory,
+        ),
         Some(UiCommandCandidate::Save)
     );
     assert_eq!(
-        map_mouse_event(UiInputEvent::LoadRequest, layout, viewport, &observation),
+        map_mouse_event(
+            UiInputEvent::LoadRequest,
+            layout,
+            viewport,
+            &observation,
+            InspectPresentation::Inventory,
+        ),
         Some(UiCommandCandidate::Load)
     );
 }
@@ -124,12 +147,8 @@ fn hover_inspect_is_non_turn() {
     );
     let before_turn = app.observation().turn;
     let before_hash = app.revision().snapshot_hash;
-    app.handle_candidate(
-        UiCommandCandidate::Inspect(Pos { x: 6, y: 5 }),
-        std::path::Path::new("/tmp/unused-save.json"),
-        std::path::Path::new("/tmp/unused-load.json"),
-    )
-    .unwrap();
+    app.handle_candidate_owned(UiCommandCandidate::Inspect(Pos { x: 6, y: 5 }))
+        .unwrap();
     assert_eq!(app.observation().turn, before_turn);
     assert_eq!(app.revision().snapshot_hash, before_hash);
     assert_eq!(app.hovered_pos(), Some(Pos { x: 6, y: 5 }));
@@ -149,7 +168,68 @@ fn inventory_click_selection_matches_keyboard_flow() {
         layout,
         viewport,
         &observation,
+        InspectPresentation::Inventory,
     )
     .unwrap();
-    assert_eq!(clicked, key_to_candidate('w', &observation).unwrap());
+    assert!(matches!(
+        clicked,
+        UiCommandCandidate::Command(CommandIntent::Wield { .. })
+    ));
+    assert_eq!(
+        key_to_candidate('w', &observation),
+        Some(UiCommandCandidate::BeginAction('w'))
+    );
+}
+
+#[test]
+fn command_and_inspect_clicks_follow_the_rendered_label_boundaries() {
+    let session = GameSession::new_for_playing(42);
+    let observation = session.observation();
+    let layout = compute_layout(100, 32);
+    let viewport = Viewport::from_rect(Pos { x: 0, y: 0 }, observation.player_pos, layout.map);
+    let command_line =
+        aihack::ui::tui::render_panels::command_lines(&observation, UiPanel::Map).remove(0);
+    let wait_start = command_line
+        .find("[. ] Wait")
+        .expect("rendered wait CTA must exist") as u16;
+
+    assert_eq!(
+        map_mouse_event(
+            UiInputEvent::MouseClick {
+                column: layout.command.x + wait_start,
+                row: layout.command.y + 1,
+            },
+            layout,
+            viewport,
+            &observation,
+            InspectPresentation::Inventory,
+        ),
+        Some(UiCommandCandidate::Command(CommandIntent::Wait))
+    );
+    assert_eq!(
+        map_mouse_event(
+            UiInputEvent::MouseClick {
+                column: layout.command.x + wait_start,
+                row: layout.command.y,
+            },
+            layout,
+            viewport,
+            &observation,
+            InspectPresentation::Inventory,
+        ),
+        Some(UiCommandCandidate::Focus(UiPanel::Command))
+    );
+    assert_eq!(
+        map_mouse_event(
+            UiInputEvent::MouseClick {
+                column: layout.inspect.x + layout.inspect.width - 1,
+                row: layout.inspect.y + 1,
+            },
+            layout,
+            viewport,
+            &observation,
+            InspectPresentation::Inventory,
+        ),
+        Some(UiCommandCandidate::Focus(UiPanel::Inspect))
+    );
 }

@@ -1,13 +1,13 @@
 use aihack::core::session::GameSession;
 
-/// [v0.2.0] Phase 20: load_items가 비어있지 않은 아이템 목록을 반환한다.
+/// load_items가 비어있지 않은 아이템 목록을 반환하는 콘텐츠 회귀다.
 #[test]
 fn load_items_returns_non_empty_list() {
     let items = aihack::data::load_items().expect("embedded content must validate");
     assert!(!items.is_empty(), "items.toml에서 아이템을 읽어와야 한다.");
 }
 
-/// [v0.2.0] Phase 20: load_items에서 dagger 아이템을 찾을 수 있다.
+/// load_items에서 dagger 아이템을 찾을 수 있어야 한다.
 #[test]
 fn load_items_includes_dagger() {
     let items = aihack::data::load_items().expect("embedded content must validate");
@@ -21,7 +21,7 @@ fn load_items_includes_dagger() {
     assert_eq!(dagger.weight, 10);
 }
 
-/// [v0.2.0] Phase 20: load_items에서 healing potion을 찾을 수 있다.
+/// load_items에서 healing potion을 찾을 수 있어야 한다.
 #[test]
 fn load_items_includes_healing_potion() {
     let items = aihack::data::load_items().expect("embedded content must validate");
@@ -34,7 +34,7 @@ fn load_items_includes_healing_potion() {
     assert_eq!(potion.effect.as_deref(), Some("heal_1d8_plus_4"));
 }
 
-/// [v0.2.0] Phase 20: load_monsters가 비어있지 않은 몬스터 목록을 반환한다.
+/// load_monsters가 비어있지 않은 몬스터 목록을 반환해야 한다.
 #[test]
 fn load_monsters_returns_non_empty_list() {
     let monsters = aihack::data::load_monsters().expect("embedded content must validate");
@@ -44,7 +44,7 @@ fn load_monsters_returns_non_empty_list() {
     );
 }
 
-/// [v0.2.0] Phase 20: load_monsters에서 jackal을 찾을 수 있다.
+/// load_monsters에서 jackal을 찾을 수 있어야 한다.
 #[test]
 fn load_monsters_includes_jackal() {
     let monsters = aihack::data::load_monsters().expect("embedded content must validate");
@@ -55,7 +55,7 @@ fn load_monsters_includes_jackal() {
     assert_eq!(jackal.damage, "1d2");
 }
 
-/// [v0.2.0] Phase 20: load_level이 main:1 레벨 데이터를 반환한다.
+/// load_level이 main:1 레벨 데이터를 반환해야 한다.
 #[test]
 fn load_level_main_1_returns_data() {
     let level = aihack::data::load_level("main:1").expect("main:1 must exist");
@@ -66,7 +66,7 @@ fn load_level_main_1_returns_data() {
     assert_eq!(level.stairs_down, Some(vec![34, 15]));
 }
 
-/// [v0.2.0] Phase 20: GameWorld.status()가 Status struct를 반환한다.
+/// GameWorld.status()가 현재 Status projection을 반환해야 한다.
 #[test]
 fn game_world_status_returns_status() {
     let session = GameSession::new_for_playing(42);
@@ -78,7 +78,7 @@ fn game_world_status_returns_status() {
     assert!(!status.hallucinating);
 }
 
-/// [v0.2.0] Phase 20: Status::hunger_state가 올바르게 계산된다.
+/// Status::hunger_state가 동결된 영양 경계대로 계산되어야 한다.
 #[test]
 fn status_hunger_state_calculation() {
     use aihack::domain::status::{HungerState, Status};
@@ -102,7 +102,7 @@ fn status_hunger_state_calculation() {
     assert!(matches!(satiated.hunger_state(), HungerState::Satiated));
 }
 
-/// [v0.2.0] Phase 20: GameWorld.hunger_state()가 Status 기반으로 동작한다.
+/// GameWorld.hunger_state()가 Status 진실원을 사용해야 한다.
 #[test]
 fn game_world_hunger_state_delegates_to_status() {
     let session = GameSession::new_for_playing(42);

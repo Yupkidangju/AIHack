@@ -19,6 +19,7 @@
 - baseline hash는 의도와 ADR 없이 갱신하지 않는다.
 - 이 문서의 계획 작성은 코드 구현 완료를 의미하지 않는다.
 - `Closed`는 해당 gap의 독립 audit 또는 동등한 re-audit evidence가 source·test·문서 정합성을 확인했음을 뜻한다. `Verified`는 구현 검증이 끝났지만 독립 closure evidence가 아직 없는 중간 상태다.
+- aggregate gap은 연결된 active child 중 가장 낮은 lifecycle보다 앞설 수 없다. child가 `Implemented`이면 aggregate도 최대 `Implemented`이고, 모두 로컬 gate를 통과한 뒤에만 함께 `Verified`로 올린다.
 
 ## 2. 우선순위
 
@@ -33,26 +34,47 @@
 | Gap ID | 등급 | 문제 | 현재 증거 | Task | 성공 기준 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- |
 | G-PRODUCT-001 | P0 | inspired game와 3.6.7 변환 목표 충돌 | 과거 spec은 1:1 포트 비목표 | R0-1, R0-2 | SC-DOC-01 | Closed |
-| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | owner approval ID, whole-work NGPL, 공식 LICENSE/NOTICE와 modification manifest; clean `b9bd680200d82b20d7c9ba961a2758caa3d49e16` bundle 및 Actions `29886410221` same-SHA CI를 `audit_report_19.md`가 Verified | R8-1 | SC-LICENSE-01 | Closed |
+| G-LICENSE-001 | P0 | Apache/NGPL 범위와 손상된 NGPL 사본 | owner approval ID, whole-work NGPL, 공식 LICENSE/NOTICE와 modification manifest; `audit_report_21.md` 종결 및 `2519bc8e0ede81c39f46b5778e62a41d4ca66901` Actions `32107862171` 양 OS success | R8-1 | SC-LICENSE-01 | Closed |
 | G-BUILD-001 | P1 | toolchain/MSRV 미고정 | rust-toolchain과 locked local build/audit evidence; `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-002 | P1 | UI dependency의 RustSec advisory와 crossterm 중복 | locked dependency/security policy와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-BUILD-003 | P1 | build script가 copy 실패를 무시 | fail-fast script와 `audit_report_3.md` independent verification | R1-2 | SC-BUILD-01 | Closed |
-| G-BUILD-004 | P1 | CI 부재 | 2026-07-22: `b9bd680200d82b20d7c9ba961a2758caa3d49e16`, [Actions `29886410221`](https://github.com/Yupkidangju/AIHack/actions/runs/29886410221) `ubuntu-latest quality gate`/`windows-latest quality gate` success; `audit_report_19.md` Verified | R1-3 | SC-BUILD-02 | Closed |
+| G-BUILD-004 | P1 | CI 부재 | report 24 implementation `2519bc8e0ede81c39f46b5778e62a41d4ca66901`, [Actions `32107862171`](https://github.com/Yupkidangju/AIHack/actions/runs/32107862171) Ubuntu/Windows success | R1-3 | SC-BUILD-02 | Closed |
+| G-BUILD-005 | P0 | Windows Git Bash R7/R8 checkpoint가 CRLF manifest에서 실패 | report 24 재감사와 Actions `32107862171` 양 OS 검증 | R8/R9 시정 | SC-BUILD-01, SC-COMPAT-01 | Closed |
+| G-BUILD-006 | P0 | dependency exception lifecycle/graph drift | future approval, 전체 YAML pin과 repository-root local action recursion; SHA `ea7822a5` Actions `32683076204` cargo-deny 0.19.4 양 OS success | report 27 시정 | SC-BUILD-01, SC-LICENSE-01 | Verified |
 | G-RUN-001 | P1 | README 기본 실행 명령 실패 | default binary/run command와 `audit_report_3.md` independent verification | R1-1 | SC-BUILD-01 | Closed |
 | G-CORE-001 | P0 | session/world mutable field 공개 | private state, read accessor, fixture boundary와 `audit_report_3.md` independent verification | R2-1, R2-2 | SC-CORE-01 | Closed |
 | G-CORE-002 | P1 | submit/accept mutation과 commit 결합 | cloned working-copy transaction과 no-commit regression, `audit_report_3.md` independent verification | R2-3 | SC-CORE-02 | Closed |
 | G-CORE-003 | P1 | invariant가 타입으로 검증되지 않음 | 6종 invariant/no-commit regression과 `audit_report_3.md` independent verification | R2-2 | SC-CORE-02 | Closed |
+| G-CORE-004 | P0 | allocator/custom registry/equipment removal consumer 불변식 | exact successor/fallible spawn, bootstrap saveability와 common removal; SHA `9725c378` Actions `32694375654` 양 OS success | report 28 시정 | FIN-F001, FIN-F007 | Verified |
+| G-CORE-005 | P1 | public projectile/monster primitive의 직접 `Err` partial mutation | 외부 mutation을 atomic `GameSession::submit`으로 한정하고 low-level system을 crate 내부로 축소, `1fa6d90` local gate GREEN | report 29 시정 | R29-DBG-F002 | Verified |
+| G-CORE-006 | P0 | submit-only master와 broader public World/system mutation 불일치 | default visibility/testing 격리와 `ed02dbf/32733235414` external compile·양 OS GREEN | report 30 시정 | R30-IMP-F001, FIN-F005 | Verified |
 | G-DATA-001 | P1 | TOML loader가 runtime과 분리 | runtime ContentRegistry factory/level construction과 `audit_report_3.md` independent verification | R3-1..R3-3 | SC-DATA-01 | Closed |
 | G-DATA-002 | P1 | invalid embedded content가 session bootstrap에서 panic 가능 | fallible TUI/headless bootstrap, injected missing level/item regression, `audit_report_3.md` independent verification | R3-1, R3-4 | SC-DATA-01 | Closed |
+| G-DATA-003 | P0 | item ID-kind identity 분리와 multi-scalar glyph 축약 | canonical ID-kind table, shape-valid mismatch reject와 exact-one-scalar Unicode matrix, `1fa6d90` local gate GREEN | report 29 시정 | R29-IMP-F001, R29-IMP-F002 | Verified |
 | G-TEST-001 | P0 | 1000턴 명령이 18~28턴 사망을 성공 처리 | policy runner 조기 실패 처리와 3 seed accepted turn 1000, `audit_report_6.md` 재감사 | R4-1, R4-2 | SC-TEST-01 | Closed |
 | G-TEST-002 | P1 | long-run 반복 hash가 실제 1000 accepted turn을 증명하지 않음 | 3 seed x 1000 accepted turn x 3회 hash, `audit_report_6.md` 재감사 | R4-2 | SC-TEST-02 | Closed |
+| G-TEST-003 | P0 | R9 causal witness 원인별 독립성 | 동일 command/observer를 유지한 9종 field-only A/B, exactly-one loss와 나머지 8개 record equality; SHA `ea7822a5` Actions `32683076204` 양 OS success | report 27 시정 | SC-CAUSE-05, SC-CAUSE-06, SC-CAUSE-07 | Verified |
 | G-ARCH-001 | P2 | core/UI/LLM이 한 package dependency tree 공유 | 7개 crate/app workspace, app core 직접 의존 0건, R4 hash 유지, `audit_report_6.md` 재감사 | R5-1, R5-2 | SC-ARCH-01 | Closed |
 | G-LLM-001 | P0 | 실제 local LLM provider 없음 | loopback transport·strict response validation·bounded worker 구현, `audit_report_11.md` 독립 재감사 | R6-1, R6-6 | SC-LLM-01 | Closed |
 | G-LLM-002 | P0 | timeout이 provider 인자일 뿐 강제되지 않음 | transport deadline·deterministic fallback·재현 fixture 구현, `audit_report_11.md` 독립 재감사 | R6-1, R6-6 | SC-LLM-01 | Closed |
 | G-LLM-003 | P0 | stale request와 현재 session correlation 없음 | versioned request/response, opaque request ID, current revision/ActionSpace 이중 gate와 submit 직전 재검증; `audit_report_11.md` 독립 재감사 | R6-2, R6-6 | SC-LLM-02 | Closed |
 | G-LLM-004 | P1 | LLM 판정의 권한 범위 미정 | strict soft verdict와 Neutral fallback을 presentation-only TUI state로 구현, core/save/replay effect 0; `audit_report_11.md` 독립 재감사 | R6-3, R6-6 | SC-LLM-03 | Closed |
-| G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests | R7-2 | SC-COMPAT-01 | Closed / License risk tracked separately |
-| G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | 0.3.0 동기화 뒤 `audit_report_20.md`의 `IMP-F016`/`DBG-F008` 잔여 active-status drift와 false-green gate 시정 | R8-1 | SC-DOC-01 | Implemented / report 20 re-audit pending |
+| G-COMPAT-001 | P1 | NetHack 규칙 출처와 테스트 trace 없음 | NH367-C001..C010 record/test와 독립 재감사 42 tests; license risk는 별도 ledger | R7-2 | SC-COMPAT-01 | Closed |
+| G-DOC-001 | P2 | Cargo 0.1.0과 문서 v0.2.0 불일치 | 0.3.0 동기화와 report 20 active-status/false-green 시정을 `audit_report_21.md`가 Verified | R8-1 | SC-DOC-01 | Closed |
+| G-DOC-004 | P0 | 과거 finding과 당시 권한 상태 혼재 | report 26 최종 `1e84a94/32660514315` 계보 복구와 당시 report 27 `ea7822a5/32683076204` authority 동기화 | report 27 시정 | SC-DOC-01 | Verified |
+| G-DOC-005 | P2 | SC-CAUSE-01..07 개별 ID mapping | report 24와 same-SHA Actions `32107862171`이 종결 | report 24 시정 | SC-CAUSE-01..07 | Closed |
+| G-DOC-006 | P2 | implementation summary 후반 stale next-step | report 28 current lifecycle과 section 1/10/11 negative regression, Actions `32694375654` | report 28 시정 | FIN-F012 | Verified |
+| G-DOC-007 | P0 | active 문서 current-authority false-green 재발 | report 29 단일 authority와 README/ADR/roadmap/summary/build/gap section-scoped predecessor mutation, `1fa6d90` local gate GREEN | report 29 시정 | R29-DOC-F001, R29-DOC-F002 | Verified |
+| G-DOC-008 | P0 | designs/compatibility/remediation/roadmap active lifecycle 누락 | report 30 단일 authority/common negative gate와 `ed02dbf/32733235414` 양 OS GREEN | report 30 시정 | R29-DOC-F002 Re-audit #1, FIN-F012 | Verified |
+| G-DOC-009 | P0 | implementation summary 10·11절 predecessor current/completed-work false-green | Report 32 independent closure, ADR-0041과 `8c042d48/32741917348` 양 OS GREEN | report 31 시정 | R29-DOC-F002 Re-audit #3, FIN-F012 | Closed |
+| G-BUILD-007 | P0 | current HEAD candidate date가 bundled modification period 밖임 | 2026-08-25 Notice ID/period와 actual HEAD-date early regression 표적 GREEN | report 32 시정 | R32-DBG-F001, FIN-F015 | Implemented |
+| G-SEC-001 | P0 | artifact link/root/ambient/archive 경계 | Windows alias/staging/link와 archive canonical alias·strict calendar 및 actual 양 OS bundle `32683076204` | report 27 시정 | SEC-F001, FIN-F004, FIN-F014 | Verified |
+| G-SEC-003 | P0 | archive Windows component alias와 year 0000 parity | case/trailing/reserved/collision 및 year 0000/0001/9999와 actual 양 OS bundle `32694375654` | report 28 시정 | FIN-F014, FIN-F015 | Verified |
+| G-UI-002 | P0 | control-key Repeat state crossing과 F9 실제 경로 evidence | Esc/Enter/F9/Q Press-only sequence와 actual F9 handler regression, Actions `32694375654` | report 28 시정 | FIN-F008, FIN-F009, FIN-F016 | Verified |
+| G-SEC-004 | P0 | archive raw type/extraction 및 `ExpectedCommit` complete tree 미결합 | format-aware common validator, safe extraction, independent `git archive` identity와 `1fa6d90` clean Windows actual bundle GREEN | report 29 시정 | R29-SEC-F001, R29-SEC-F002 | Verified |
+| G-UI-003 | P0 | 동등 transition과 Release 없는 연속 Press state crossing | 합성 Release 비신뢰·500ms quiet+2 idle gate, constructed/actual ConPTY와 `1fa6d90` local gate GREEN | report 29 시정 | R29-DBG-F001 | Verified |
+| G-SEC-002 | P2 | Windows save owner-only 권한 과대주장 | report 24와 Actions `32107862171`이 Unix 0600/Windows parent DACL 계약을 종결 | report 24 시정 | SEC-F003 | Closed |
+| G-FINAL-001 | P0 | final multi-audit FIN-F001..F018 및 report 32 release-date HOLD | report 31 lifecycle/FIN-F012 Closed; R32 date contract Implemented, exact-final-headSha Actions가 external verification authority | report 32 remediation | R32-DBG-F001, FIN-F001..F018 | Implemented |
 | G-DOC-002 | P2 | 완료 이력과 active 계약 혼재 | spec/summary/audit 600~1250 lines | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 | G-DOC-003 | P2 | LLM interface scaffold가 live integration 완료로 표현 | 과거 Phase 12/13 문서 | R0-1, R0-2, R0-3 | SC-DOC-01 | Closed |
 
@@ -249,4 +271,8 @@ checkpoint에서 하나라도 실패하면 후속 Phase 구현을 중단하고 �
 
 ## 7. 현재 완료 범위
 
-R0 문서화와 R1~R6의 G-BUILD, G-CORE, G-DATA, G-TEST, G-ARCH, G-LLM은 해당 독립 감사 범위에서 PASS/Closed다. R6는 `audit_report_11.md`가 종결 권한이다. SC-BUILD-02는 commit `b9bd680200d82b20d7c9ba961a2758caa3d49e16`의 Actions run `29886410221`에서 양 OS PASS했고 `audit_report_19.md`가 Verified했다. R7은 engineering 범위에서 `PASS WITH KNOWN RISKS`이며 R8 기술·release evidence도 Verified됐지만, R8 전체는 `audit_report_20.md` active-state/false-green HOLD 시정의 독립 재감사 전까지 HOLD다.
+R0~R8 기존 remediation과 report 23/24는 역사적으로 종결됐다. report 25는 partial, report 26~29는 historical/technical evidence로 보존한다. report 30의 G-CORE-006/G-DOC-008은 `ed02dbf/32733235414` clean same-SHA 양 OS actual bundle과 Report 31 독립 검증으로 Verified다.
+
+Report 31 G-DOC-009/FIN-F012는 successor `8c042d48/32741917348`와 Report 32 independent closure로 Closed다.
+
+현재 authority는 `docs/audit/audit_report_32.md`다. G-BUILD-007/G-FINAL-001은 R32-DBG-F001/FIN-F015의 Notice ID/period, actual HEAD-date gate와 final same-SHA 양 OS evidence가 끝날 때까지 Open이며, 후속 독립 감사와 별도 게시 승인 전까지 Closed 및 program/publication PASS로 올리지 않는다.

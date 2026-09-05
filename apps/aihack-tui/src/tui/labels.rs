@@ -1,23 +1,23 @@
 use crate::core::{observation::Observation, position::Pos};
 
-/// [v0.2.0] Phase 19: 자동 라벨의 종류다.
+/// 자동 라벨의 종류다.
 /// 우선순위는 숫자가 낮을수록 높다 (1이 가장 높음).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelKind {
-    /// [v0.2.0] Phase 19: 인접한 적대 몬스터. 가장 높은 우선순위.
+    /// 인접한 적대 몬스터이며 가장 높은 우선순위다.
     HostileAdjacent,
-    /// [v0.2.0] Phase 19: 플레이어 HP 30% 이하.
+    /// 플레이어 HP 30% 이하다.
     LowHpWarning,
-    /// [v0.2.0] Phase 19: 계단.
+    /// 계단이다.
     Stairs,
-    /// [v0.2.0] Phase 19: 미식별 아이템.
+    /// 미식별 아이템이다.
     UnidentifiedItem,
-    /// [v0.2.0] Phase 19: 비적대 몬스터.
+    /// 비적대 몬스터다.
     PassiveMonster,
 }
 
 impl LabelKind {
-    /// [v0.2.0] Phase 19: 라벨 우선순위 값을 반환한다.
+    /// 라벨 우선순위 값을 반환한다.
     /// 숫자가 작을수록 높은 우선순위다.
     pub fn priority(self) -> u8 {
         match self {
@@ -30,7 +30,7 @@ impl LabelKind {
     }
 }
 
-/// [v0.2.0] Phase 19: 자동 라벨 데이터다.
+/// 자동 라벨 데이터다.
 /// 맵 위에 일정 시간 동안 표시되는 텍스트 라벨이다.
 #[derive(Debug, Clone)]
 pub struct AutoLabel {
@@ -41,7 +41,7 @@ pub struct AutoLabel {
     pub duration_ms: u16,
 }
 
-/// [v0.2.0] Phase 19: Observation 기준으로 자동 라벨을 수집한다.
+/// Observation 기준으로 자동 라벨을 수집한다.
 /// 우선순위: hostile adjacent > low HP > stairs > unidentified item > passive monster
 /// 최대 3개까지 반환하며, 각 라벨은 1200ms 동안 표시된다.
 pub fn collect_auto_labels(observation: &Observation, current_time_ms: u64) -> Vec<AutoLabel> {
@@ -138,7 +138,7 @@ pub fn collect_auto_labels(observation: &Observation, current_time_ms: u64) -> V
     candidates.into_iter().take(3).collect()
 }
 
-/// [v0.2.0] Phase 19: 만료된 라벨을 필터링한다.
+/// 만료된 라벨을 필터링한다.
 pub fn filter_expired_labels(labels: &mut Vec<AutoLabel>, current_time_ms: u64) {
     labels.retain(|label| {
         let elapsed = current_time_ms.saturating_sub(label.created_at_ms);
