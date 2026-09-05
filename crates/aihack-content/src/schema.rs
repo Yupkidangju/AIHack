@@ -332,6 +332,7 @@ fn canonical_item_kind(id: &str) -> Option<&'static str> {
         "item.scroll.reveal" | "item.scroll.identify" | "item.scroll.teleport" => Some("scroll"),
         "item.armor.leather" => Some("armor"),
         "item.corpse.jackal" => Some("corpse"),
+        "item.quest.ascension" => Some("quest"),
         _ => None,
     }
 }
@@ -345,6 +346,15 @@ fn item_contract_error(item: &ItemData, message: &str) -> Result<(), ContentErro
 
 fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
     let dedicated_fields_valid = match item.kind.as_str() {
+        "quest" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.effect.is_none()
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
+        }
         "weapon" => {
             item.slot.as_deref() == Some("melee")
                 && item.hit_bonus.is_some()

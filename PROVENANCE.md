@@ -1,5 +1,9 @@
 # AIHack Provenance and License Gate
 
+## P1–P3 콘텐츠 변경 기록 (2026-09-05)
+
+`item.quest.ascension`은 사용자 요청에 따른 AIHack 캠페인용 신규 설계 데이터다. glyph/weight/price/effect shape는 `docs/campaign_spec.md`에 정의했으며 NetHack 원본 텍스트나 새 외부 asset을 복사하지 않았다. 기존 10개 item 정의는 변경하지 않았다. LF `items.toml` SHA256은 `77e3915de6b90667b030c341456eeeea558c61e1eed2650cb9495133fd1af1d9`에서 `12f4a178a457ff64fa739dea8e683e77ccf7c828b4653fca33c0791633ea6018`로 변경된다. 아래 소유자 승인 기록의 일자·주체를 새 승인으로 바꾸지 않으며 release/게시 승인은 별개다.
+
 문서 상태: active inventory, project-owner derivative classification approved
 작성일: 2026-07-15
 관련 결정: DEC-LICENSE-01, ADR-0027

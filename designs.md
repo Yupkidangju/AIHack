@@ -17,6 +17,10 @@ historical closure: report 31 lifecycle/FIN-F012 independently Closed with `8c04
 
 ## 1. 경험 목표
 
+P1–P3: Creation에 1 Knight / 2 Scout / 3 Mage 클릭 버튼을 추가하며 Enter는 기존 Adventurer 호환 run이다. HUD는 role/level/XP/amulet, 명령 메뉴는 B branch를 제공한다. Victory는 ASCENDED/score/N New Run/Q Quit를 표시한다. 데이터·저장·성공 조건은 `docs/campaign_spec.md`를 따른다.
+
+멀티 감사 2 시정에서는 지도에 visible item/actor glyph를 그린 뒤 player를 최상위로 그린다. 자동 라벨은 의미 glyph를 덮지 않는다. Playing q는 Quaff 선택, Q는 확인 후 종료이며 Esc는 열린 선택을 취소한다. 방향/아이템 선택은 UI-only, 실제 명령 제출 시에만 turn을 소비한다. inventory 전체 목록은 페이지를 제공하고 내부 item/닫기 CTA만 mouse로 실행한다. 60×24와 80×24의 1행 LOG는 제목 대신 최신 본문을 보여주며 일반 STATUS에 nutrition/hunger를 포함한다. 구체 구현과 검증은 `docs/multi_audit/2/remediation.md`에 기록한다.
+
 사용자는 로컬 LLM이 없어도 완전한 deterministic 로그라이크를 플레이할 수 있어야 한다. LLM을 켜면 다음 세 가지 presentation 기능만 추가된다.
 
 1. 최근 사건을 1~240자로 요약한 narrative
@@ -295,7 +299,7 @@ spawn/drop/corpse <----combat/death---- downstream legality/status/score
 - rejected suggestion: current action space 재검증 결과 표시, submit 미호출
 - invariant error: core error panel을 최상위로 표시하며 LLM 결과 숨김
 - save/load error: typed error 요약과 경로만 표시하며 secret/path traversal detail 숨김
-- TUI quick-save: `TuiApp`이 실행별 임시 directory handle, `ArtifactStore`, relative `quick-save.json`을 함께 소유한다. renderer/input caller는 absolute path나 parent를 전달할 수 없으며 `ArtifactStore`의 no-follow·single-link·atomic replace 경계를 우회하지 않는다.
+- TUI 저장: production `TuiApp`은 `--save-dir` (기본 `runtime/tui`)의 `ArtifactStore`와 relative `quick-save.json`을 소유한다. 테스트 기본 생성자만 임시 directory를 사용한다. renderer/input candidate에는 경로를 포함하지 않으며 no-follow·single-link·atomic replace를 유지한다.
 - Inventory, storage error, soft judgment input과 core blocking state가 활성화된 동안 mouse는 underlying map/status/inspect/command/footer candidate를 만들지 않는다. 별도 modal CTA geometry가 없는 layer의 mouse click/hover는 명시적으로 무시한다.
 - Inspect 영역은 `Inventory`, `Hover`, `Decision` presentation을 한 번 계산해 renderer와 hit-test가 공유한다. Inventory presentation에 표시된 CTA만 command candidate가 될 수 있고 hover/decision/soft-input presentation에서는 숨은 inventory candidate를 제공하지 않는다.
 

@@ -168,7 +168,9 @@ impl GameSession {
                 self.submit_in_awaiting_inventory(action, intent)
             }
             RunState::MorePrompt => self.submit_in_more_prompt(intent),
-            RunState::GameOver { .. } => self.submit_in_game_over(intent),
+            RunState::GameOver { .. } | RunState::Victory { .. } => {
+                self.submit_in_game_over(intent)
+            }
         }
     }
 
@@ -188,6 +190,28 @@ impl GameSession {
 
     fn submit_in_character_creation(&mut self, intent: CommandIntent) -> TurnOutcome {
         match intent {
+            CommandIntent::StartCampaign { role } => {
+                if self.turn != 0 || self.world.campaign.is_some() {
+                    return self.reject("campaign requires a fresh creation state".into());
+                }
+                let registry = self.world.content_registry().clone();
+                let state = match crate::bootstrap::campaign_world(&registry, self.seed(), role) {
+                    Ok(state) => state,
+                    Err(error) => return self.abort_transaction(error.to_string()),
+                };
+                self.inner.world =
+                    match GameWorld::from_saved_world_with_registry((&state).into(), &registry) {
+                        Ok(world) => world,
+                        Err(error) => return self.abort_transaction(error.to_string()),
+                    };
+                self.inner.state = RunState::Playing;
+                self.accept_without_turn(vec![GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: format!(
+                        "{role:?}: recover the Amulet on Main 6 and return to the surface."
+                    ),
+                }])
+            }
             CommandIntent::Wait => {
                 self.inner.state = RunState::Playing;
                 self.accept_without_turn(vec![GameEvent::Message {
@@ -207,6 +231,13 @@ impl GameSession {
             return self.reject("player is paralyzed".to_string());
         }
         match intent {
+            CommandIntent::StartCampaign { .. } => {
+                self.reject("role is chosen only during creation".into())
+            }
+            CommandIntent::EnterBranch => match stairs::enter_branch(&mut self.inner.world) {
+                Ok(event) => self.accept_turn(vec![event]),
+                Err(error) => self.reject(error),
+            },
             CommandIntent::Wait => self.submit_wait(),
             CommandIntent::Quit => self.submit_quit(),
             CommandIntent::Move(direction) => self.submit_move(direction),
@@ -528,6 +559,25 @@ impl GameSession {
     }
 
     fn submit_ascend(&mut self) -> TurnOutcome {
+        if self.world.campaign.is_some()
+            && self.world.current_level() == aihack_core::ids::LevelId::main(1)
+            && self.world.current_map().tile(self.world.player_pos()).ok()
+                == Some(aihack_core::domain::tile::TileKind::StairsUp)
+        {
+            if !crate::campaign::has_amulet(&self.world) || !self.world.player_alive() {
+                return self.reject("return with the Amulet of Ascension".into());
+            }
+            let Some(final_score) =
+                score::death_score(&self.world, self.turn + 1).checked_add(10_000)
+            else {
+                return self.abort_transaction("victory score overflows".into());
+            };
+            self.inner.state = RunState::Victory { final_score };
+            return self.accept_turn(vec![GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "Ascended! The Amulet has reached the surface.".into(),
+            }]);
+        }
         match stairs::ascend(&mut self.inner.world) {
             Ok(event) => self.accept_turn(vec![event]),
             Err(error) => self.reject(error),
@@ -536,7 +586,10 @@ impl GameSession {
 
     fn submit_quit(&mut self) -> TurnOutcome {
         // Quit는 모든 상태에서 종료 요청이며, 기존 GameOver 원인은 보존한다.
-        if !matches!(self.state, RunState::GameOver { .. }) {
+        if !matches!(
+            self.state,
+            RunState::GameOver { .. } | RunState::Victory { .. }
+        ) {
             self.inner.state = RunState::GameOver {
                 cause: DeathCause::Combat {
                     attacker: EntityId(0),
@@ -558,7 +611,10 @@ impl GameSession {
         if self.world.paralysis_turns > 0 {
             self.inner.world.state_mut().paralysis_turns -= 1;
         }
-        if !matches!(self.state, RunState::GameOver { .. }) {
+        if !matches!(
+            self.state,
+            RunState::GameOver { .. } | RunState::Victory { .. }
+        ) {
             let state = &mut self.inner;
             let monster_events = match monster_ai::run_monster_turn(
                 &mut state.world,

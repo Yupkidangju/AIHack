@@ -50,6 +50,15 @@ pub enum UiInputEvent {
 /// TUI 화면 전환과 명령 후보다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiCommandCandidate {
+    BeginAction(char),
+    ChooseItem {
+        action: char,
+        item: aihack_ai_contract::EntityId,
+    },
+    MenuPage(bool),
+    ConfirmQuit,
+    OpenCommands,
+    ShowMessages,
     Command(CommandIntent),
     Inspect(Pos),
     Focus(UiPanel),
@@ -107,12 +116,12 @@ pub fn command_panel_ctas(observation: &Observation) -> Vec<PanelCta> {
             candidate: open_candidate,
         },
         PanelCta {
-            label: "[hover] Inspect".to_string(),
-            candidate: Some(UiCommandCandidate::Focus(UiPanel::Inspect)),
+            label: "[?] All".to_string(),
+            candidate: Some(UiCommandCandidate::OpenCommands),
         },
         PanelCta {
-            label: "[click] Focus".to_string(),
-            candidate: Some(UiCommandCandidate::Focus(UiPanel::Command)),
+            label: "[hover] Inspect".to_string(),
+            candidate: Some(UiCommandCandidate::Focus(UiPanel::Inspect)),
         },
     ]
 }
@@ -121,7 +130,6 @@ pub fn inventory_panel_ctas(observation: &Observation) -> Vec<PanelCta> {
     observation
         .inventory
         .iter()
-        .take(4)
         .map(|item| {
             let slot = item
                 .equipped_slot
@@ -178,12 +186,6 @@ pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
         ),
         ('.', UiInputEvent::Key(CommandIntent::Wait)),
         ('s', UiInputEvent::Key(CommandIntent::Search)),
-        ('o', UiInputEvent::Key(CommandIntent::Open(Direction::East))),
-        (
-            'c',
-            UiInputEvent::Key(CommandIntent::Close(Direction::East)),
-        ),
-        ('K', UiInputEvent::Key(CommandIntent::Kick(Direction::East))),
         (',', UiInputEvent::Key(CommandIntent::Pickup)),
         ('i', UiInputEvent::Key(CommandIntent::ShowInventory)),
         ('>', UiInputEvent::Key(CommandIntent::Descend)),
@@ -191,11 +193,32 @@ pub fn keyboard_baseline() -> Vec<(char, UiInputEvent)> {
         ('p', UiInputEvent::Key(CommandIntent::Pray)),
         ('S', UiInputEvent::SaveRequest),
         ('L', UiInputEvent::LoadRequest),
-        ('q', UiInputEvent::Quit),
+        ('Q', UiInputEvent::Quit),
     ]
 }
 
 pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiCommandCandidate> {
+    if key == 'B' {
+        return observation
+            .legal_actions
+            .contains(&CommandIntent::EnterBranch)
+            .then_some(UiCommandCandidate::Command(CommandIntent::EnterBranch));
+    }
+    if matches!(
+        key,
+        'o' | 'c' | 'K' | 'w' | 'e' | 'q' | 'f' | 'd' | 't' | 'z' | 'r'
+    ) {
+        return Some(UiCommandCandidate::BeginAction(key));
+    }
+    if key == 'Q' {
+        return Some(UiCommandCandidate::Quit);
+    }
+    if key == '?' {
+        return Some(UiCommandCandidate::OpenCommands);
+    }
+    if key == 'M' {
+        return Some(UiCommandCandidate::ShowMessages);
+    }
     let llm_candidate = match key {
         'G' => Some(UiCommandCandidate::LlmNarrative),
         'A' => Some(UiCommandCandidate::LlmSuggest),
@@ -231,63 +254,7 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
         return base;
     }
 
-    let first_by = |pred: fn(&ItemObservation) -> bool| {
-        observation
-            .inventory
-            .iter()
-            .find(|item| pred(item))
-            .map(|item| item.item)
-    };
-
-    match key {
-        'w' => first_by(|item| item.kind == crate::domain::item::ItemKind::Dagger)
-            .and_then(|item| command_candidate(CommandIntent::Wield { item })),
-        'e' => first_by(|item| item.kind == crate::domain::item::ItemKind::ArmorLeather)
-            .and_then(|item| command_candidate(CommandIntent::Wear { item })),
-        'q' => first_by(|item| matches!(item.kind, crate::domain::item::ItemKind::PotionHealing))
-            .and_then(|item| command_candidate(CommandIntent::Quaff { item })),
-        'f' => first_by(|item| {
-            matches!(
-                item.kind,
-                crate::domain::item::ItemKind::FoodRation
-                    | crate::domain::item::ItemKind::CorpseJackal
-            )
-        })
-        .and_then(|item| command_candidate(CommandIntent::Eat { item })),
-        'd' => observation
-            .inventory
-            .first()
-            .and_then(|item| command_candidate(CommandIntent::Drop { item: item.item })),
-        't' => first_by(|item| {
-            matches!(
-                item.kind,
-                crate::domain::item::ItemKind::Dagger | crate::domain::item::ItemKind::Rock
-            )
-        })
-        .and_then(|item| {
-            command_candidate(CommandIntent::Throw {
-                item,
-                direction: Direction::East,
-            })
-        }),
-        'z' => first_by(|item| item.kind == crate::domain::item::ItemKind::WandMagicMissile)
-            .and_then(|item| {
-                command_candidate(CommandIntent::Zap {
-                    item,
-                    direction: Direction::East,
-                })
-            }),
-        'r' => first_by(|item| {
-            matches!(
-                item.kind,
-                crate::domain::item::ItemKind::ScrollReveal
-                    | crate::domain::item::ItemKind::ScrollIdentify
-                    | crate::domain::item::ItemKind::ScrollLevelTeleport
-            )
-        })
-        .and_then(|item| command_candidate(CommandIntent::Read { item })),
-        _ => None,
-    }
+    None
 }
 
 pub fn map_mouse_event(
@@ -434,6 +401,7 @@ pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> &'static str {
         crate::domain::item::ItemKind::Rock => "rock",
         crate::domain::item::ItemKind::ArmorLeather => "leather armor",
         crate::domain::item::ItemKind::CorpseJackal => "jackal corpse",
+        crate::domain::item::ItemKind::AmuletAscension => "Amulet of Ascension",
     }
 }
 

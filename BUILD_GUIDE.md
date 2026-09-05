@@ -12,6 +12,10 @@
 
 ## 1. 현재 상태
 
+멀티 감사 2 실행법: `cargo run -p aihack-tui --locked -- --seed 42 --save-dir runtime/tui`.
+P1–P3는 생성 화면 1/2/3으로 시작한다(Enter는 legacy). Headless 예: `cargo run -p aihack-headless --locked -- --seed 42 --role knight --turns 10 --policy wait-v1`. `--role`과 `--load`는 함께 쓸 수 없다. campaign 저장은 wire schema 2이고 구형 V1 reader가 거부한다. 구형 run은 자동 변환하지 않는다.
+`--save-dir` 생략 시에도 `runtime/tui`이며 현재 작업 디렉터리 기준이다. 기존 capability `ArtifactStore`의 경로/권한 검증을 유지하고 저장 파일은 프로세스 종료로 삭제하지 않는다. 테스트 기본 `TuiApp::new`만 격리된 임시 저장소를 사용한다. root regression은 실제 renderer/dispatcher를 호출하기 위해 기존 workspace 버전과 같은 ratatui 0.30/crossterm 0.29 dev-dependency를 직접 명시한다.
+
 | 항목 | 현재 working tree | v0.3.0 target |
 | --- | --- | --- |
 | Rust | `rust-toolchain.toml` 1.94.1 고정 | `rust-toolchain.toml` 1.94.1 |
@@ -262,6 +266,10 @@ flag contract:
 
 `--turns`는 현재 CLI와 같이 final target turn이다. 새 session의 turn 0에서 `--turns 1000`이면 1000번의 `turn_advanced=true`가 필요하다. load turn이 400이면 target 1000까지 600번을 수행하며 report의 `accepted_turns`는 600이다. load turn이 target보다 크면 exit code 2다.
 
+R34-DBG-F001 시정 범위: `TargetBeforeCurrent`는 wait/survival/replay-file 모두 입력 오류(exit 2)로 매핑한다. 동일 target은 0턴 성공(exit 0), 더 높은 target은 실제 진행이 필요하며 다른 runner 실패는 exit 1을 유지한다. 낮은 target에서는 failure report의 accepted/submitted가 0이고 입력 save/replay 및 지정된 save/replay 출력은 변경하지 않는다. 검증은 `cargo test -p aihack-headless --test target_exit_contract --locked`의 실제 binary 회귀로 한정한다.
+
+2026-09-05 표적 검증: 수정 전 wait-v1/target1에서 기대 exit2 대비 실제 exit1을 재현했다. 수정 후 위 명령은 2 tests PASS: turn2 저장에 wait/survival/replay 각각 target1/2/3의 9개 조합, stderr/failure report·입출력 파일 보존, 별도 replay 부족 exit1을 검사했다. 감사 원문과 gameplay PASS 판정은 보존하며 전체 workspace 감사·CI·번들 검증은 재실행하지 않았다.
+
 path flag는 repository `runtime/`의 마지막 component를 no-follow로 연 directory capability root로 사용한다. `.` component는 제거하고 absolute path, `..` 탈출, root 자체 symlink/Windows junction과 root 밖 link를 거부하며 실제 read/write/rename도 이 root handle 기준으로 수행한다. save는 같은 directory에 신규 임시 파일을 만들고 regular-file·single-link handle 검증, write/sync, atomic replace 순서로 처리하며 실패 시 기존 save를 보존한다. Unix는 mode `0600`과 replace 후 parent directory fsync를 수행한다. Linux의 root `Dir`가 O_PATH일 수 있으므로 같은 capability 아래 `.`을 read-only directory file로 다시 열어 sync 가능한 descriptor를 사용한다. Windows는 parent directory DACL 상속과 file sync/atomic replace를 보장 범위로 두므로 owner-only 또는 전원 손실 metadata 보장이 필요한 실행은 별도 OS 정책이 필요하다. replay 기록도 bounded read 후 atomic rewrite하며 final symlink/multi-link 파일을 거부한다. `--replay-in`과 `--replay-out`은 normalized path, Windows case와 열린 file identity 중 하나라도 같으면 exit 2이며 input bytes를 바꾸지 않는다.
 
 `--turns 1,000,000` 허용은 save 가능성 보장이 아니다. event history 또는 pretty JSON이 save 예산을 넘은 상태에서 `--save`를 요청하면 headless는 typed resource error로 exit 2하고 기존 destination을 보존한다. v0.3.0은 증거 보존을 위해 event history를 자동 압축·삭제하지 않는다.
@@ -290,7 +298,7 @@ seed=42 policy=survival-v1 requested_turns=1000 accepted_turns=1000 submitted_co
 
 exit code:
 
-- 0: accepted_turns가 requested_turns와 같음
+- 0: 최종 turn이 requested target에 도달함(동일 target 재개는 accepted_turns=0)
 - 1: accepted action 탐색 실패, replay 부족 또는 조기 GameOver
 - 2: CLI/policy/path/save/replay/report 입출력 오류
 

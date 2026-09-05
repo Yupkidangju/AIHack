@@ -343,7 +343,11 @@ impl GameSession {
     pub fn to_save_data(&self) -> SaveDataV1 {
         let world = self.world();
         SaveDataV1 {
-            schema_version: SAVE_SCHEMA_VERSION_V1,
+            schema_version: if world.campaign.is_some() {
+                2
+            } else {
+                SAVE_SCHEMA_VERSION_V1
+            },
             seed: self.meta.seed,
             turn: self.turn,
             run_state: self.state,
@@ -361,9 +365,14 @@ impl GameSession {
         save: SaveDataV1,
         registry: &aihack_content::ContentRegistry,
     ) -> Result<Self, GameError> {
-        if save.schema_version != SAVE_SCHEMA_VERSION_V1 {
+        let expected = if save.world.campaign.is_some() {
+            2
+        } else {
+            SAVE_SCHEMA_VERSION_V1
+        };
+        if save.schema_version != expected {
             return Err(GameError::SaveSchemaVersionMismatch {
-                expected: SAVE_SCHEMA_VERSION_V1,
+                expected,
                 actual: save.schema_version,
             });
         }
@@ -413,7 +422,32 @@ pub(crate) fn validate_save_data_with_registry(
     }
     validate_events(&save.event_log)?;
     validate_saved_world_for_run_state(&save.world, save.run_state, registry)?;
-    validate_consumer_safe_arithmetic(save)
+    if save.world.campaign.is_some() {
+        for level in &save.world.levels.levels {
+            let (expected, _) = crate::campaign_map::generate(save.seed, level.id)?;
+            if level.map != expected.map {
+                return invalid_world("campaign generator/map mismatch".into());
+            }
+        }
+    }
+    validate_consumer_safe_arithmetic(save)?;
+    if let RunState::Victory { final_score } = save.run_state {
+        let world = GameWorld::from_saved_world_with_registry(save.world.clone(), registry)?;
+        if !world.player_alive()
+            || !crate::campaign::has_amulet(&world)
+            || world.current_level() != LevelId::main(1)
+            || world.current_map().tile(world.player_pos()).ok()
+                != Some(aihack_core::domain::tile::TileKind::StairsUp)
+            || crate::systems::score::death_score(&world, save.turn).checked_add(10_000)
+                != Some(final_score)
+        {
+            return invalid_world(
+                "victory requires live player, carried amulet, surface exit and matching score"
+                    .into(),
+            );
+        }
+    }
+    Ok(())
 }
 
 fn validate_consumer_safe_arithmetic(save: &SaveDataV1) -> Result<(), GameError> {
@@ -509,10 +543,16 @@ fn validate_saved_world_inner(
             .checked_add(expected)
             .ok_or_else(|| invalid_world_error("total map tile count overflow"))?;
     }
-    let expected_level_ids = registry
-        .levels()
-        .map(|level| LevelId::main(level.depth))
-        .collect::<HashSet<_>>();
+    let expected_level_ids = if world.campaign.is_some() {
+        crate::campaign_map::level_ids()
+            .into_iter()
+            .collect::<HashSet<_>>()
+    } else {
+        registry
+            .levels()
+            .map(|level| LevelId::main(level.depth))
+            .collect::<HashSet<_>>()
+    };
     if level_ids != expected_level_ids {
         return invalid_world("persisted level IDs do not match the active registry".to_string());
     }
@@ -619,7 +659,8 @@ fn validate_saved_world_inner(
     {
         return invalid_world("player location/current level mismatch".to_string());
     }
-    validate_inventory(world)
+    validate_inventory(world)?;
+    crate::campaign::validate(world).map_err(|reason| invalid_world_error(&reason))
 }
 
 fn item_data_matches_registry(

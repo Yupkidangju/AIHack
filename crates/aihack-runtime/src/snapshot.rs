@@ -50,6 +50,8 @@ pub struct InventorySnapshot {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub campaign: Option<aihack_core::campaign::CampaignState>,
     pub seed: u64,
     pub turn: u64,
     pub run_state: RunState,
@@ -128,6 +130,7 @@ impl GameSnapshot {
         levels.sort_by_key(|level| level.id);
 
         Self {
+            campaign: world.campaign,
             seed,
             turn,
             run_state,

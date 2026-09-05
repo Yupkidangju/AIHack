@@ -224,6 +224,8 @@ fn wire_action_value(action: ActionIntent) -> Value {
 
 fn wire_command_value(command: CommandIntent) -> Value {
     match command {
+        CommandIntent::StartCampaign { role } => json!({ "type": "START_CAMPAIGN", "role": role }),
+        CommandIntent::EnterBranch => json!({ "type": "ENTER_BRANCH" }),
         CommandIntent::Wait => json!({ "type": "WAIT" }),
         CommandIntent::Quit => json!({ "type": "QUIT" }),
         CommandIntent::Move(direction) => direction_action("MOVE", direction),

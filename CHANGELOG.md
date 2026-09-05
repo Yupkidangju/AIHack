@@ -1,5 +1,20 @@
 # AIHack Changelog
 
+## [Unreleased]
+
+### Added
+
+- 기사·정찰자·마법사 선택과 처치 XP/최대 10레벨 성장, 캠페인 운반 한도 120 및 HUD를 추가했다.
+- seed 기반 Main 6층/Mines 2층 생성·분기 왕복, 고유 아뮬렛 획득 후 지상 귀환 Victory를 연결했다.
+- `--role` headless 시작, campaign wire save schema 2와 구형 V1 호환 읽기, 성장/목표/맵/승리 검증을 추가했다.
+
+### Fixed
+
+- 멀티 감사 2의 적/바닥 물건 표시, q/Q 충돌, 방향·물건 선택, 전체 인벤토리 페이지, 최소 화면 로그/food 표시를 수정했다.
+- 시작·생성·게임 종료 화면과 명령/선택 메뉴에 내부 마우스 조작을 연결하고 UI 선택 취소의 turn/RNG 보존을 검증했다.
+- production TUI 저장소를 `--save-dir`로 구성 가능한 지속 경로로 전환했다. 저장은 명시적 S이며 자동 저장하지 않는다.
+- 마비·기도 cooldown·문 조건에 legal action을 정렬하고 headless의 legal Wait fallback 및 loaded turn보다 낮은 target 거부를 추가했다.
+
 ## [0.3.0] - 2026-08-25
 
 ### Added

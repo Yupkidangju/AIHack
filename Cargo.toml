@@ -31,6 +31,8 @@ aihack-tui = { path = "apps/aihack-tui", version = "0.3.0" }
 aihack-headless = { path = "apps/aihack-headless", version = "0.3.0" }
 
 [dev-dependencies]
+ratatui = "0.30"
+crossterm = "0.29"
 saphyr = { version = "0.0.12", default-features = false }
 serde_json = "1"
 toml = "0.8"

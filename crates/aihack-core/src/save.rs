@@ -17,6 +17,8 @@ pub const SAVE_SCHEMA_VERSION_V1: u16 = 1;
 /// v1 JSON save에 포함되는 world 상태다. runtime-only 사망 원인은 저장하지 않는다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SavedWorldV1<E> {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub campaign: Option<crate::campaign::CampaignState>,
     pub levels: LevelRegistry,
     pub current_level: LevelId,
     pub entities: E,
@@ -35,6 +37,7 @@ pub struct SavedWorldV1<E> {
 impl<E: Clone> From<&WorldState<E>> for SavedWorldV1<E> {
     fn from(world: &WorldState<E>) -> Self {
         Self {
+            campaign: world.campaign,
             levels: world.levels.clone(),
             current_level: world.current_level,
             entities: world.entities.clone(),
@@ -55,6 +58,7 @@ impl<E: Clone> From<&WorldState<E>> for SavedWorldV1<E> {
 impl<E> From<SavedWorldV1<E>> for WorldState<E> {
     fn from(saved: SavedWorldV1<E>) -> Self {
         Self {
+            campaign: saved.campaign,
             levels: saved.levels,
             current_level: saved.current_level,
             entities: saved.entities,

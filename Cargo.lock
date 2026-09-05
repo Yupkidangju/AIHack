@@ -22,6 +22,8 @@ dependencies = [
  "aihack-llm",
  "aihack-runtime",
  "aihack-tui",
+ "crossterm",
+ "ratatui",
  "saphyr",
  "serde_json",
  "toml",

@@ -62,6 +62,13 @@ fn render_text_panel(area: Rect, buf: &mut Buffer, title: &str, lines: &[String]
             buf[(area.x + i as u16, row)].set_char(ch);
         }
     };
+    if area.height == 1 && title == "LOG" {
+        write_line(
+            area.y,
+            lines.first().map(String::as_str).unwrap_or("No events."),
+        );
+        return;
+    }
     write_line(area.y, title);
     for (idx, line) in lines.iter().enumerate() {
         let row = area.y + 1 + idx as u16;
@@ -83,7 +90,7 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
     } else {
         "stable"
     };
-    vec![
+    let mut lines = vec![
         format!("turn {}", observation.turn),
         format!(
             "hp {}/{} {}",
@@ -93,14 +100,34 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
             "level {}:{}",
             match observation.current_level.branch {
                 crate::core::BranchId::Main => "Main",
+                crate::core::BranchId::Mines => "Mines",
             },
             observation.current_level.depth
         ),
         format!(
-            "pos {},{}",
-            observation.player_pos.x, observation.player_pos.y
+            "food {}{}",
+            observation.player.hunger,
+            if observation.campaign.as_ref().is_some_and(|c| c.has_amulet) {
+                " Amulet!"
+            } else {
+                ""
+            }
         ),
-    ]
+    ];
+    if let Some(campaign) = &observation.campaign {
+        lines[3] = format!(
+            "food{} w{}/{}{}",
+            observation.player.hunger,
+            campaign.carried_weight,
+            campaign.carrying_capacity,
+            if campaign.has_amulet { " A" } else { "" }
+        );
+        lines.push(format!(
+            "{:?} L{} X{}",
+            campaign.role, campaign.level, campaign.xp
+        ));
+    }
+    lines
 }
 
 pub fn command_lines(observation: &Observation, focused_panel: UiPanel) -> Vec<String> {
@@ -349,6 +376,12 @@ pub fn character_creation_lines() -> Vec<String> {
         "         Character Creation".to_string(),
         "".to_string(),
         "         Class: Adventurer".to_string(),
+        "         [1] Knight - HP28, melee".to_string(),
+        "         [2] Scout - HP22, accuracy".to_string(),
+        "         [3] Mage - HP18, wands".to_string(),
+        "         Campaign: Main 6 + Mines 2; return the Amulet".to_string(),
+        "         Main 3 up stairs: B enters the Mines".to_string(),
+        "         Enter: legacy two-floor Adventurer".to_string(),
         "         HP: 16/16".to_string(),
         "         Strength: 10".to_string(),
         "         Dexterity: 10".to_string(),
@@ -379,6 +412,16 @@ pub fn game_over_lines(
         format!("  Seed: {:>12}", seed),
         "".to_string(),
         "         [N] New Run    [Q] Quit".to_string(),
+    ]
+}
+
+pub fn victory_lines(score: i32) -> Vec<String> {
+    vec![
+        "".into(),
+        "              ASCENDED".into(),
+        "The Amulet has reached the surface.".into(),
+        format!("Score: {score}"),
+        "[N] New Run    [Q] Quit".into(),
     ]
 }
 

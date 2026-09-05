@@ -18,3 +18,5 @@ pub mod world;
 pub use aihack_core::error::{ContentError, GameError};
 pub use client::GameClient;
 pub use session::GameSession;
+mod campaign;
+mod campaign_map;

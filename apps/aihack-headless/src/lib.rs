@@ -39,6 +39,10 @@ pub enum ReplayMismatchField {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error, Serialize)]
 pub enum HeadlessRunError {
+    #[error("campaign ascended at turn {turn} before requested target")]
+    VictoryBeforeTarget { turn: u64, submitted_commands: u64 },
+    #[error("target turn {target} is before loaded turn {turn}")]
+    TargetBeforeCurrent { turn: u64, target: u64 },
     #[error("no accepted action at turn {turn} after {attempts} attempts")]
     NoAcceptedAction {
         turn: u64,
@@ -60,7 +64,11 @@ pub enum HeadlessRunError {
 impl HeadlessRunError {
     pub const fn submitted_commands(&self) -> u64 {
         match self {
+            Self::TargetBeforeCurrent { .. } => 0,
             Self::NoAcceptedAction {
+                submitted_commands, ..
+            }
+            | Self::VictoryBeforeTarget {
                 submitted_commands, ..
             }
             | Self::GameOver {
@@ -83,8 +91,20 @@ pub fn run_replay_to_turn<C: GameClient + Clone>(
     replay: &[ReplayLineV1],
 ) -> Result<HeadlessRunReport, HeadlessRunError> {
     let start_turn = session.revision().turn;
+    if target_turn < start_turn {
+        return Err(HeadlessRunError::TargetBeforeCurrent {
+            turn: start_turn,
+            target: target_turn,
+        });
+    }
     let mut working = session.clone();
     let mut submitted_commands = 0;
+    if start_turn < target_turn && matches!(working.run_state(), RunState::Victory { .. }) {
+        return Err(HeadlessRunError::VictoryBeforeTarget {
+            turn: start_turn,
+            submitted_commands,
+        });
+    }
     for (line_index, line) in replay.iter().enumerate() {
         if working.revision().turn >= target_turn {
             break;
@@ -128,6 +148,14 @@ pub fn run_replay_to_turn<C: GameClient + Clone>(
             if !matches {
                 return Err(replay_mismatch(line_number, field, submitted_commands));
             }
+        }
+        if working.revision().turn < target_turn
+            && matches!(working.run_state(), RunState::Victory { .. })
+        {
+            return Err(HeadlessRunError::VictoryBeforeTarget {
+                turn: working.revision().turn,
+                submitted_commands,
+            });
         }
         if matches!(working.run_state(), RunState::GameOver { .. }) {
             return Err(HeadlessRunError::GameOver {
@@ -185,15 +213,39 @@ pub fn run_to_turn_with_trace<C: GameClient + ?Sized>(
     policy: HeadlessPolicy,
 ) -> Result<(HeadlessRunReport, Vec<ReplayLineV1>), HeadlessRunError> {
     let start_turn = session.revision().turn;
+    if target_turn < start_turn {
+        return Err(HeadlessRunError::TargetBeforeCurrent {
+            turn: start_turn,
+            target: target_turn,
+        });
+    }
     let mut submitted_commands = 0;
     let mut trace = Vec::new();
 
     while session.revision().turn < target_turn {
+        if matches!(session.run_state(), RunState::Victory { .. }) {
+            return Err(HeadlessRunError::VictoryBeforeTarget {
+                turn: session.revision().turn,
+                submitted_commands,
+            });
+        }
         let turn_before = session.revision().turn;
-        let candidates = policy.candidates(session);
+        let mut candidates = policy.candidates(session);
+        if policy != HeadlessPolicy::ReplayFile
+            && !candidates.contains(&CommandIntent::Wait)
+            && session
+                .observation()
+                .legal_actions
+                .contains(&CommandIntent::Wait)
+        {
+            candidates.truncate(15);
+            candidates.push(CommandIntent::Wait);
+        }
         let mut advanced = false;
+        let mut attempts = 0;
 
         for command in candidates.into_iter().take(16) {
+            attempts += 1;
             submitted_commands += 1;
             let outcome = session.submit(command);
             let accepted = outcome.accepted;
@@ -218,7 +270,7 @@ pub fn run_to_turn_with_trace<C: GameClient + ?Sized>(
         if !advanced {
             return Err(HeadlessRunError::NoAcceptedAction {
                 turn: turn_before,
-                attempts: 16,
+                attempts,
                 submitted_commands,
             });
         }

@@ -12,6 +12,20 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-MA2-02: P1–P3 캠페인과 명시적 save 버전
+
+Status: Implemented with local verification; independent re-audit required (2026-09-05). 증거: `docs/campaign_implementation.md`.
+
+`docs/campaign_spec.md`의 세 단계를 실제 완주 경로로 연결한다. 기존 save/replay를 보존하기 위해 Creation Wait는 유지하고 StartCampaign(role)을 추가한다. CampaignState는 optional typed state, campaign save만 wire schema 2를 사용한다. world를 재진입마다 재생성하거나 구형 게임에 승리 플래그만 붙이는 대안은 기각한다. 목표는 실제 고유 item이며 성공은 별도 Victory다. atomic submit/save validator 경계를 공유한다.
+
+## ADR-MA2-01: 플레이 선택과 저장 수명
+
+Status: Accepted, 구현·검증 결과는 `docs/multi_audit/2/remediation.md` 참조 (2026-09-05)
+
+선택은 core persisted state를 새로 생산하지 않고 TUI 임시 메뉴로 관리한다. 방향·물건이 확정되면 기존 concrete intent를 submit한다. 선택·취소는 core turn/RNG를 보존하며 페이지/마우스 hit test는 표시된 CTA를 기준으로 한다. q는 Quaff, Q는 명시적 종료 확인이다.
+
+production 저장은 `--save-dir` 또는 현재 디렉터리 기준 `runtime/tui`의 capability ArtifactStore를 사용한다. 임시 저장은 테스트 기본값으로만 남긴다. 저장 schema나 public core mutation visibility를 변경하지 않는다. 공개 TUI builder와 CLI 저장 경로 옵션은 추가적 인터페이스다. 더 넓은 게임 목표는 별도 P1~P3 계약으로 단계별 구현한다.
+
 ## ADR-0042: report 32 current-HEAD modification evidence와 final-SHA CI
 
 Status: Implemented with full local gate and candidate clean Windows actual bundle verified; exact-headSha CI is external verification authority; independent re-audit required (2026-08-25)

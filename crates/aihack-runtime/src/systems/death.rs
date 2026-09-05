@@ -64,7 +64,13 @@ pub fn collect_death_events_if_hp_depleted(
         state.kill_count = state.kill_count.saturating_add(1);
         state.gold = state.gold.saturating_add(u32::from(difficulty));
     }
-    Ok(vec![GameEvent::EntityDied { entity, cause }])
+    let mut events = vec![GameEvent::EntityDied { entity, cause }];
+    if entity != world.player_id
+        && matches!(cause, DeathCause::Combat { attacker } if attacker == world.player_id)
+    {
+        events.extend(crate::campaign::award_xp(world, difficulty));
+    }
+    Ok(events)
 }
 
 #[cfg(feature = "testing")]

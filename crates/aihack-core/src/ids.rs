@@ -12,6 +12,7 @@ pub struct LevelId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum BranchId {
     Main,
+    Mines,
 }
 
 impl LevelId {

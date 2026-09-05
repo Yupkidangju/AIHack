@@ -224,6 +224,14 @@ impl GameWorld {
             .fold(0, i16::saturating_add)
     }
 
+    pub fn carrying_capacity(&self) -> i16 {
+        if self.campaign.is_some() {
+            120
+        } else {
+            80
+        }
+    }
+
     pub fn status(&self) -> Status {
         Status {
             nutrition: self.nutrition,

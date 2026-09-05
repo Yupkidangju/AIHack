@@ -26,6 +26,10 @@ pub enum InventoryAction {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CommandIntent {
+    StartCampaign {
+        role: crate::campaign::Role,
+    },
+    EnterBranch,
     Wait,
     Quit,
     Move(Direction),

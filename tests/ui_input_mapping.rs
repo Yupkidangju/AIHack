@@ -28,7 +28,9 @@ fn keyboard_baseline_maps_commands() {
     )));
     assert!(baseline.contains(&('s', UiInputEvent::Key(CommandIntent::Search))));
     assert!(baseline.contains(&('.', UiInputEvent::Key(CommandIntent::Wait))));
-    assert!(baseline.contains(&('K', UiInputEvent::Key(CommandIntent::Kick(Direction::East)))));
+    assert!(!baseline
+        .iter()
+        .any(|(key, _)| matches!(key, 'o' | 'c' | 'K' | 'q')));
     assert!(baseline.contains(&('p', UiInputEvent::Key(CommandIntent::Pray))));
     assert!(baseline.contains(&('S', UiInputEvent::SaveRequest)));
     assert!(baseline.contains(&('L', UiInputEvent::LoadRequest)));
@@ -37,21 +39,24 @@ fn keyboard_baseline_maps_commands() {
     let observation = session.observation();
     assert!(matches!(
         key_to_candidate('w', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Wield { .. }))
+        Some(UiCommandCandidate::BeginAction('w'))
     ));
     assert!(matches!(
         key_to_candidate('t', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Throw { .. }))
+        Some(UiCommandCandidate::BeginAction('t'))
     ));
     assert!(matches!(
         key_to_candidate('z', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Zap { .. }))
+        Some(UiCommandCandidate::BeginAction('z'))
     ));
     assert!(matches!(
         key_to_candidate('r', &observation),
-        Some(UiCommandCandidate::Command(CommandIntent::Read { .. }))
+        Some(UiCommandCandidate::BeginAction('r'))
     ));
-    assert_eq!(key_to_candidate('o', &observation), None);
+    assert_eq!(
+        key_to_candidate('o', &observation),
+        Some(UiCommandCandidate::BeginAction('o'))
+    );
 }
 
 #[test]
@@ -166,7 +171,14 @@ fn inventory_click_selection_matches_keyboard_flow() {
         InspectPresentation::Inventory,
     )
     .unwrap();
-    assert_eq!(clicked, key_to_candidate('w', &observation).unwrap());
+    assert!(matches!(
+        clicked,
+        UiCommandCandidate::Command(CommandIntent::Wield { .. })
+    ));
+    assert_eq!(
+        key_to_candidate('w', &observation),
+        Some(UiCommandCandidate::BeginAction('w'))
+    );
 }
 
 #[test]

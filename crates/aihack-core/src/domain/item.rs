@@ -14,6 +14,7 @@ pub enum ItemKind {
     Rock,
     ArmorLeather,
     CorpseJackal,
+    AmuletAscension,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -26,6 +27,7 @@ pub enum ItemClass {
     Rock,
     Armor,
     Corpse,
+    Quest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

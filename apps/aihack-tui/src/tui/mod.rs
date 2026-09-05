@@ -36,6 +36,7 @@ use crate::llm::{
     transport::LlmResponseError,
 };
 use aihack_llm::worker::{LlmEnqueueError, RequestId};
+mod play_menu;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LlmUiStatus {
@@ -203,7 +204,7 @@ impl TuiClient for GameSession {
 }
 
 struct TuiStorage {
-    _directory: tempfile::TempDir,
+    _directory: Option<tempfile::TempDir>,
     store: ArtifactStore,
     quick_save: PathBuf,
 }
@@ -213,7 +214,7 @@ impl TuiStorage {
         let directory = tempfile::tempdir().map_err(|error| GameError::Io(error.to_string()))?;
         let store = ArtifactStore::open(directory.path())?;
         Ok(Self {
-            _directory: directory,
+            _directory: Some(directory),
             store,
             quick_save: PathBuf::from("quick-save.json"),
         })
@@ -221,6 +222,7 @@ impl TuiStorage {
 }
 
 pub struct TuiApp {
+    menu: Option<play_menu::PlayMenu>,
     client: Box<dyn TuiClient>,
     storage: Option<TuiStorage>,
     overlay: UiOverlay,
@@ -254,6 +256,16 @@ pub struct TuiApp {
 }
 
 impl TuiApp {
+    /// production과 별도 프로세스 재개가 공유하는 지속 저장 경계다.
+    pub fn with_save_directory(mut self, directory: &Path) -> Result<Self, GameError> {
+        self.storage = Some(TuiStorage {
+            _directory: None,
+            store: ArtifactStore::open(directory)?,
+            quick_save: PathBuf::from("quick-save.json"),
+        });
+        self.overlay = UiOverlay::None;
+        Ok(self)
+    }
     pub fn new(client: impl TuiClient + 'static, config: UiRuntimeConfig) -> Self {
         Self::new_with_llm_enabled(client, config, false)
     }
@@ -288,6 +300,7 @@ impl TuiApp {
         };
         Self {
             client: Box::new(client),
+            menu: None,
             storage,
             overlay,
             clock,
@@ -647,6 +660,7 @@ impl TuiApp {
     }
 
     fn reset_transients(&mut self) {
+        self.menu = None;
         if let Some(outstanding) = self.outstanding_llm_request.take() {
             if self.ignored_request_ids.len() == 16 {
                 self.ignored_request_ids.remove(0);
@@ -736,7 +750,9 @@ impl TuiApp {
                 ItemKind::ScrollReveal
                 | ItemKind::ScrollIdentify
                 | ItemKind::ScrollLevelTeleport => CommandIntent::Read { item: item.item },
-                ItemKind::WandMagicMissile | ItemKind::Rock => return None,
+                ItemKind::WandMagicMissile | ItemKind::Rock | ItemKind::AmuletAscension => {
+                    return None
+                }
             },
         };
         observation
@@ -770,14 +786,72 @@ impl TuiApp {
         &mut self,
         candidate: UiCommandCandidate,
     ) -> Result<bool, GameError> {
+        if matches!(
+            candidate,
+            UiCommandCandidate::Save
+                | UiCommandCandidate::Load
+                | UiCommandCandidate::LlmJudge
+                | UiCommandCandidate::LlmNarrative
+                | UiCommandCandidate::LlmSuggest
+                | UiCommandCandidate::ToggleDebug
+        ) {
+            self.menu = None;
+            self.overlay = UiOverlay::None;
+        }
         match candidate {
+            UiCommandCandidate::BeginAction(key) => {
+                self.menu = Some(play_menu::action_menu(&self.observation(), key, None));
+                Ok(false)
+            }
+            UiCommandCandidate::ChooseItem { action, item } => {
+                self.menu = Some(if action == 'i' {
+                    play_menu::item_menu(&self.observation(), item)
+                } else {
+                    play_menu::action_menu(&self.observation(), action, Some(item))
+                });
+                Ok(false)
+            }
+            UiCommandCandidate::MenuPage(forward) => {
+                if let Some(menu) = &mut self.menu {
+                    let max = menu.entries.len().saturating_sub(1) / play_menu::PAGE_SIZE;
+                    menu.page = if forward {
+                        (menu.page + 1).min(max)
+                    } else {
+                        menu.page.saturating_sub(1)
+                    };
+                }
+                Ok(false)
+            }
+            UiCommandCandidate::OpenCommands => {
+                self.menu = Some(play_menu::commands_menu(&self.observation()));
+                Ok(false)
+            }
+            UiCommandCandidate::ShowMessages => {
+                let entries = self
+                    .observation()
+                    .last_events
+                    .iter()
+                    .rev()
+                    .enumerate()
+                    .map(|(i, event)| play_menu::Entry {
+                        key: char::from(b'0' + i as u8),
+                        label: format!("{event:?}"),
+                        candidate: UiCommandCandidate::CloseOverlay,
+                    })
+                    .collect();
+                self.menu = Some(play_menu::PlayMenu::new("Recent messages", entries));
+                Ok(false)
+            }
+            UiCommandCandidate::ConfirmQuit => Ok(true),
             UiCommandCandidate::Command(intent) => {
                 let outcome = self.client.submit(intent);
                 if intent == aihack_ai_contract::CommandIntent::ShowInventory && outcome.accepted {
                     self.overlay = UiOverlay::Inventory;
+                    self.menu = Some(play_menu::inventory_menu(&self.observation()));
                     self.focused_panel = UiPanel::Inventory;
                 } else if outcome.accepted {
                     self.overlay = UiOverlay::None;
+                    self.menu = None;
                 }
                 // 턴이 진행된 경우에만 새 자동 라벨을 수집한다.
                 if outcome.turn_advanced {
@@ -823,7 +897,30 @@ impl TuiApp {
                 }
                 Ok(false)
             }
-            UiCommandCandidate::Quit => Ok(true),
+            UiCommandCandidate::Quit => {
+                if matches!(
+                    self.run_state(),
+                    RunState::Title | RunState::GameOver { .. } | RunState::Victory { .. }
+                ) {
+                    return Ok(true);
+                }
+                self.menu = Some(play_menu::PlayMenu::new(
+                    "Quit this run?",
+                    vec![
+                        play_menu::Entry {
+                            key: 'y',
+                            label: "Quit without saving".into(),
+                            candidate: UiCommandCandidate::ConfirmQuit,
+                        },
+                        play_menu::Entry {
+                            key: 'n',
+                            label: "Keep playing".into(),
+                            candidate: UiCommandCandidate::CloseOverlay,
+                        },
+                    ],
+                ));
+                Ok(false)
+            }
             UiCommandCandidate::NewRun => {
                 if self.client.start_new_run().is_err() {
                     self.overlay = UiOverlay::StorageError {
@@ -835,6 +932,7 @@ impl TuiApp {
                 Ok(false)
             }
             UiCommandCandidate::CloseOverlay => {
+                self.menu = None;
                 self.overlay = UiOverlay::None;
                 self.focused_panel = UiPanel::Map;
                 Ok(false)
@@ -1032,6 +1130,7 @@ impl TuiApp {
                 | aihack_ai_contract::CommandIntent::Wait,
             ) => {
                 self.overlay == UiOverlay::None
+                    && self.menu.is_none()
                     && self.soft_input.is_none()
                     && self.run_state() == RunState::Playing
             }
@@ -1058,6 +1157,14 @@ pub fn run_tui_with_config(
     seed: u64,
     ui_config: UiRuntimeConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    run_tui_with_config_and_save_dir(seed, ui_config, Path::new("runtime/tui"))
+}
+
+pub fn run_tui_with_config_and_save_dir(
+    seed: u64,
+    ui_config: UiRuntimeConfig,
+    save_dir: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     let llm_config = LocalLlmConfig::from_env().map_err(|error| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -1067,7 +1174,7 @@ pub fn run_tui_with_config(
     let llm_enabled = llm_config.enabled();
     let service = LocalLlmService::from_config(llm_config)
         .map_err(|error| std::io::Error::other(format!("local LLM startup failed: {error:?}")))?;
-    run_tui_with_service(seed, service, llm_enabled, ui_config)
+    run_tui_with_service(seed, service, llm_enabled, ui_config, save_dir)
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1225,6 +1332,7 @@ fn run_tui_with_service(
     mut llm_service: LocalLlmService,
     llm_enabled: bool,
     ui_config: UiRuntimeConfig,
+    save_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut stdout = std::io::stdout();
     let mut terminal_guard = TerminalSessionGuard::default();
@@ -1246,7 +1354,8 @@ fn run_tui_with_service(
             let backend = CrosstermBackend::new(stdout);
             let mut terminal = Terminal::new(backend)?;
             let mut app =
-                TuiApp::new_with_llm_enabled(GameSession::try_new(seed)?, ui_config, llm_enabled);
+                TuiApp::new_with_llm_enabled(GameSession::try_new(seed)?, ui_config, llm_enabled)
+                    .with_save_directory(save_dir)?;
             loop {
                 app.poll_llm_response(&llm_service);
                 terminal.draw(|frame| {
@@ -1265,24 +1374,7 @@ fn run_tui_with_service(
                         );
                         return;
                     }
-                    match app.run_state() {
-                        crate::core::session::RunState::Title => {
-                            render_title_screen(frame, size, app.theme())
-                        }
-                        crate::core::session::RunState::CharacterCreation => {
-                            render_character_creation_screen(frame, size, app.theme())
-                        }
-                        crate::core::session::RunState::Playing
-                        | crate::core::session::RunState::AwaitingDirection { .. }
-                        | crate::core::session::RunState::AwaitingInventorySelection { .. }
-                        | crate::core::session::RunState::MorePrompt => {
-                            render_play_screen(frame, size, &mut app)
-                        }
-                        crate::core::session::RunState::GameOver { cause, final_score } => {
-                            render_game_over_screen(frame, size, &app, cause, final_score)
-                        }
-                    }
-                    render_global_overlay(frame, size, &app);
+                    render_frame(frame, &mut app);
                 })?;
                 let size = terminal.size()?;
                 if event::poll(Duration::from_millis(50))? {
@@ -1308,6 +1400,35 @@ fn run_tui_with_service(
 
     run_result?;
     Ok(())
+}
+
+/// 실행 루프와 버퍼 회귀가 동일한 화면 그리기를 사용한다.
+pub fn render_frame(frame: &mut ratatui::Frame, app: &mut TuiApp) {
+    let size = frame.area();
+    match app.run_state() {
+        crate::core::session::RunState::Title => render_title_screen(frame, size, app.theme()),
+        crate::core::session::RunState::CharacterCreation => {
+            render_character_creation_screen(frame, size, app.theme())
+        }
+        crate::core::session::RunState::Playing
+        | crate::core::session::RunState::AwaitingDirection { .. }
+        | crate::core::session::RunState::AwaitingInventorySelection { .. }
+        | crate::core::session::RunState::MorePrompt => render_play_screen(frame, size, app),
+        crate::core::session::RunState::GameOver { cause, final_score } => {
+            render_game_over_screen(frame, size, app, cause, final_score)
+        }
+        RunState::Victory { final_score } => {
+            frame.render_widget(
+                render_panels::ThemedTextPanel {
+                    title: "ASCENDED",
+                    lines: render_panels::victory_lines(final_score),
+                    theme: app.theme(),
+                },
+                size,
+            );
+        }
+    }
+    render_global_overlay(frame, size, app);
 }
 
 fn render_title_screen(frame: &mut ratatui::Frame, size: Rect, theme: UiTheme) {
@@ -1545,7 +1666,7 @@ fn key_to_candidate_for_state(
     use crate::core::session::RunState;
     match state {
         RunState::Title => match ch {
-            '\n' | '\r' => Some(UiCommandCandidate::Command(
+            '\n' | '\r' | 'n' | 'N' => Some(UiCommandCandidate::Command(
                 crate::core::action::CommandIntent::Wait,
             )),
             'q' | 'Q' => Some(UiCommandCandidate::Quit),
@@ -1553,13 +1674,22 @@ fn key_to_candidate_for_state(
             _ => None,
         },
         RunState::CharacterCreation => match ch {
+            '1' | '2' | '3' => Some(UiCommandCandidate::Command(
+                aihack_ai_contract::CommandIntent::StartCampaign {
+                    role: match ch {
+                        '1' => aihack_ai_contract::Role::Knight,
+                        '2' => aihack_ai_contract::Role::Scout,
+                        _ => aihack_ai_contract::Role::Mage,
+                    },
+                },
+            )),
             '\n' | '\r' => Some(UiCommandCandidate::Command(
                 crate::core::action::CommandIntent::Wait,
             )),
             'q' | 'Q' => Some(UiCommandCandidate::Quit),
             _ => None,
         },
-        RunState::GameOver { .. } => match ch {
+        RunState::GameOver { .. } | RunState::Victory { .. } => match ch {
             'n' | 'N' => Some(UiCommandCandidate::NewRun),
             'q' | 'Q' => Some(UiCommandCandidate::Quit),
             _ => None,
@@ -1613,7 +1743,7 @@ pub fn runtime_key_to_candidate(
                 _ => None,
             };
         }
-        RunState::GameOver { .. } => {
+        RunState::GameOver { .. } | RunState::Victory { .. } => {
             return match key_code {
                 KeyCode::Esc => Some(UiCommandCandidate::Quit),
                 KeyCode::Char(character) => {
@@ -1636,7 +1766,8 @@ pub fn runtime_key_to_candidate(
             )),
             crate::core::session::RunState::Title
             | crate::core::session::RunState::Playing
-            | crate::core::session::RunState::GameOver { .. } => Some(UiCommandCandidate::Quit),
+            | crate::core::session::RunState::GameOver { .. }
+            | RunState::Victory { .. } => Some(UiCommandCandidate::Quit),
         },
         KeyCode::Tab => Some(UiCommandCandidate::FocusNext),
         KeyCode::BackTab => Some(UiCommandCandidate::FocusPrevious),
@@ -1647,6 +1778,124 @@ pub fn runtime_key_to_candidate(
 }
 
 /// 실제 event loop와 회귀 테스트가 공유하는 단일 state-aware dispatcher다.
+fn modal_mouse_candidate(
+    input: Event,
+    width: u16,
+    height: u16,
+    app: &TuiApp,
+) -> Option<UiCommandCandidate> {
+    let Event::Mouse(mouse) = input else {
+        return None;
+    };
+    if mouse.kind != MouseEventKind::Down(event::MouseButton::Left) {
+        return None;
+    }
+    if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
+        return Some(UiCommandCandidate::CloseOverlay);
+    }
+    let (lines, candidates): (Vec<String>, Vec<(&str, UiCommandCandidate)>) = match app.run_state()
+    {
+        RunState::Title => (
+            render_panels::title_lines(),
+            vec![
+                (
+                    "Press Enter to Start",
+                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::Wait),
+                ),
+                ("L - Load Game", UiCommandCandidate::Load),
+                ("Q - Quit", UiCommandCandidate::Quit),
+            ],
+        ),
+        RunState::CharacterCreation => (
+            render_panels::character_creation_lines(),
+            vec![
+                (
+                    "[1] Knight",
+                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
+                        role: aihack_ai_contract::Role::Knight,
+                    }),
+                ),
+                (
+                    "[2] Scout",
+                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
+                        role: aihack_ai_contract::Role::Scout,
+                    }),
+                ),
+                (
+                    "[3] Mage",
+                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
+                        role: aihack_ai_contract::Role::Mage,
+                    }),
+                ),
+                (
+                    "Press Enter to confirm",
+                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::Wait),
+                ),
+                ("Esc - Back to Title", UiCommandCandidate::BackToTitle),
+            ],
+        ),
+        RunState::GameOver {
+            cause: _,
+            final_score: _,
+        } => (
+            render_panels::game_over_lines("", 0, 0, 0, 0, 0),
+            vec![
+                ("[N] New Run", UiCommandCandidate::NewRun),
+                ("[Q] Quit", UiCommandCandidate::Quit),
+            ],
+        ),
+        RunState::Victory { final_score } => (
+            render_panels::victory_lines(final_score),
+            vec![
+                ("[N] New Run", UiCommandCandidate::NewRun),
+                ("[Q] Quit", UiCommandCandidate::Quit),
+            ],
+        ),
+        _ => {
+            if let Some(input) = app.soft_input() {
+                let area = compute_layout(width, height).inspect;
+                let lines = render_panels::soft_input_lines(input);
+                return text_cta_at(
+                    &lines,
+                    area,
+                    mouse.column,
+                    mouse.row,
+                    &[
+                        ("[Enter] Submit", UiCommandCandidate::LlmSubmitInput),
+                        ("[Esc] Cancel", UiCommandCandidate::LlmCancelInput),
+                    ],
+                );
+            }
+            return None;
+        }
+    };
+    text_cta_at(
+        &lines,
+        Rect::new(0, 0, width, height),
+        mouse.column,
+        mouse.row,
+        &candidates,
+    )
+}
+
+fn text_cta_at(
+    lines: &[String],
+    area: Rect,
+    x: u16,
+    y: u16,
+    candidates: &[(&str, UiCommandCandidate)],
+) -> Option<UiCommandCandidate> {
+    if !rect_contains(area, x, y) {
+        return None;
+    }
+    let line = lines.get(y.checked_sub(area.y + 1)? as usize)?;
+    let offset = x.checked_sub(area.x)? as usize;
+    candidates.iter().find_map(|(label, candidate)| {
+        let start = line.find(label)?;
+        (offset >= start && offset < start + label.len()).then_some(*candidate)
+    })
+}
+
 pub fn runtime_event_to_candidate(
     input_event: Event,
     width: u16,
@@ -1658,13 +1907,14 @@ pub fn runtime_event_to_candidate(
             Event::Key(key) => {
                 let candidate = (key.kind == KeyEventKind::Press
                     && matches!(key.code, KeyCode::Char('q' | 'Q') | KeyCode::Esc))
-                .then_some(UiCommandCandidate::Quit);
+                .then_some(UiCommandCandidate::ConfirmQuit);
                 app.filter_keyboard_candidate(&key, candidate)
             }
             _ => None,
         };
     }
     if matches!(&input_event, Event::Mouse(_))
+        && app.menu.is_none()
         && (app.ui_overlay() != &UiOverlay::None
             || app.soft_input().is_some()
             || matches!(
@@ -1675,13 +1925,24 @@ pub fn runtime_event_to_candidate(
                     | RunState::AwaitingInventorySelection { .. }
                     | RunState::MorePrompt
                     | RunState::GameOver { .. }
+                    | RunState::Victory { .. }
             ))
     {
-        return None;
+        return modal_mouse_candidate(input_event, width, height, app);
     }
     let key = match input_event {
         Event::Key(key) => key,
         Event::Mouse(mouse) => {
+            if let Some(menu) = &app.menu {
+                return match mouse.kind {
+                    MouseEventKind::Down(event::MouseButton::Left) => {
+                        menu.click(width, height, mouse.column, mouse.row)
+                    }
+                    MouseEventKind::ScrollDown => Some(UiCommandCandidate::MenuPage(true)),
+                    MouseEventKind::ScrollUp => Some(UiCommandCandidate::MenuPage(false)),
+                    _ => None,
+                };
+            }
             let layout = compute_layout(width, height);
             if app.debug_observation_visible
                 && rect_contains(
@@ -1698,17 +1959,25 @@ pub fn runtime_event_to_candidate(
                     column: mouse.column,
                     row: mouse.row,
                 },
-                MouseEventKind::Down(_) => UiInputEvent::MouseClick {
+                MouseEventKind::Down(event::MouseButton::Left) => UiInputEvent::MouseClick {
                     column: mouse.column,
                     row: mouse.row,
                 },
-                _ => UiInputEvent::FocusPanel(UiPanel::Map),
+                _ => return None,
             };
             return map_mouse_event_for_state(input, layout, viewport, app);
         }
         _ => return None,
     };
-    let candidate = if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
+    let candidate = if let Some(menu) = &app.menu {
+        match key.code {
+            KeyCode::Esc => Some(UiCommandCandidate::CloseOverlay),
+            KeyCode::PageDown => Some(UiCommandCandidate::MenuPage(true)),
+            KeyCode::PageUp => Some(UiCommandCandidate::MenuPage(false)),
+            KeyCode::Char(ch) => menu.key(ch),
+            _ => None,
+        }
+    } else if matches!(app.ui_overlay(), UiOverlay::StorageError { .. }) {
         Some(UiCommandCandidate::CloseOverlay)
     } else if app.ui_overlay() == &UiOverlay::Inventory {
         match key.code {
@@ -1734,6 +2003,7 @@ pub fn runtime_event_to_candidate(
                 | RunState::AwaitingInventorySelection { .. }
                 | RunState::MorePrompt
                 | RunState::GameOver { .. }
+                | RunState::Victory { .. }
         ) {
             runtime_key_to_candidate(key.code, &state, &app.observation())
         } else {
@@ -1750,6 +2020,17 @@ pub fn runtime_event_to_candidate(
 }
 
 fn render_global_overlay(frame: &mut ratatui::Frame, size: Rect, app: &TuiApp) {
+    if let Some(menu) = &app.menu {
+        frame.render_widget(
+            render_panels::ThemedTextPanel {
+                title: &menu.title,
+                lines: menu.lines(),
+                theme: app.theme(),
+            },
+            menu.area(size.width, size.height),
+        );
+        return;
+    }
     let (title, lines) = match app.ui_overlay() {
         UiOverlay::None => return,
         UiOverlay::Inventory => (
@@ -1802,7 +2083,10 @@ fn map_mouse_event_for_state(
 ) -> Option<UiCommandCandidate> {
     use crate::core::session::RunState;
     match app.run_state() {
-        RunState::Title | RunState::CharacterCreation | RunState::GameOver { .. } => None,
+        RunState::Title
+        | RunState::CharacterCreation
+        | RunState::GameOver { .. }
+        | RunState::Victory { .. } => None,
         _ => {
             if let UiInputEvent::MouseClick { column, row } = event {
                 let footer = render_panels::llm_footer_line(

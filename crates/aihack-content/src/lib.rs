@@ -162,6 +162,7 @@ pub fn item_data_from_registry(
         ItemKind::Rock => "item.weapon.rock",
         ItemKind::ArmorLeather => "item.armor.leather",
         ItemKind::CorpseJackal => "item.corpse.jackal",
+        ItemKind::AmuletAscension => "item.quest.ascension",
     };
     let definition = registry
         .item(id)
@@ -177,6 +178,7 @@ pub fn item_data_from_registry(
         "scroll" => ItemClass::Scroll,
         "armor" => ItemClass::Armor,
         "corpse" => ItemClass::Corpse,
+        "quest" => ItemClass::Quest,
         other => {
             return Err(ContentError::UnknownReference {
                 owner: id.to_owned(),
@@ -381,6 +383,7 @@ pub fn level_spawns(level: &LevelData) -> Result<Vec<LevelSpawn>, ContentError> 
             "item.weapon.rock" => ItemKind::Rock,
             "item.armor.leather" => ItemKind::ArmorLeather,
             "item.corpse.jackal" => ItemKind::CorpseJackal,
+            "item.quest.ascension" => ItemKind::AmuletAscension,
             _ => {
                 return Err(ContentError::UnknownReference {
                     owner: level.level_id.clone(),

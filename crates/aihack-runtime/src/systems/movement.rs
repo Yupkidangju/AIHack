@@ -8,7 +8,7 @@ use aihack_core::{
 use crate::world::GameWorld;
 
 pub fn move_player(world: &mut GameWorld, direction: Direction) -> Result<(), GameError> {
-    if world.carried_weight() > 80 {
+    if world.carried_weight() > world.carrying_capacity() {
         return Err(GameError::CommandRejected(
             "movement blocked by encumbrance".to_string(),
         ));
@@ -44,7 +44,8 @@ pub fn is_passable_for_actor(world: &GameWorld, actor: EntityId, direction: Dire
 }
 
 pub fn is_passable_for_legal_action(world: &GameWorld, direction: Direction) -> bool {
-    is_passable_for_actor(world, world.player_id, direction)
+    world.carried_weight() <= world.carrying_capacity()
+        && is_passable_for_actor(world, world.player_id, direction)
 }
 
 pub fn is_bump_attack_for_legal_action(world: &GameWorld, direction: Direction) -> bool {

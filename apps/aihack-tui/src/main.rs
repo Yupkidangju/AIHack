@@ -9,6 +9,8 @@ struct Args {
     high_contrast: bool,
     #[arg(long)]
     reduced_motion: bool,
+    #[arg(long, default_value = "runtime/tui")]
+    save_dir: std::path::PathBuf,
 }
 
 fn main() {
@@ -18,7 +20,9 @@ fn main() {
         reduced_motion: args.reduced_motion,
         ..Default::default()
     };
-    if let Err(error) = aihack_tui::tui::run_tui_with_config(args.seed, ui_config) {
+    if let Err(error) =
+        aihack_tui::tui::run_tui_with_config_and_save_dir(args.seed, ui_config, &args.save_dir)
+    {
         eprintln!("{error}");
         std::process::exit(1);
     }

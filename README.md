@@ -4,6 +4,20 @@
 
 ## 한국어
 
+### 멀티 감사 2 플레이 수정 (2026-09-05)
+
+Playing에서 `q`는 물약 선택, `Q`는 종료 확인이다. `?` 또는 하단 All은 전체 명령 메뉴, `i`는 전체 인벤토리, `M`은 최근 메시지다. 선택 메뉴는 방향/물건을 고른 뒤 실행하며 Esc는 턴 소비 없이 취소한다. 페이지는 PgUp/PgDn, `<`/`>`, 휠 또는 표시된 버튼으로 이동한다. `S` 저장·`L` 로드는 기본 `runtime/tui/quick-save.json`을 사용하며 `--save-dir <directory>`로 바꿀 수 있다. 종료 시 자동 저장하지 않는다.
+
+적·바닥 물건 표시와 최소 화면 로그/food 수치를 복구했다. 생성 화면의 **1 기사 / 2 정찰자 / 3 마법사**는 역할·XP 성장, seed 기반 본던전 6층+광산 2층 캠페인을 시작한다. Main 3 위 계단에서 B로 광산에 들어간다. Main 6의 아뮬렛을 주워 Main 1 위 계단에서 `<`로 귀환하면 승천한다. HUD의 A는 목표 소지 표시다. Enter는 기존 두 층 Adventurer 호환 모드다. [캠페인 계약](docs/campaign_spec.md)과 [검증 기록](docs/campaign_implementation.md)을 참조한다. NetHack 전체 규칙 동등성은 주장하지 않는다.
+
+Control note (EN): `q` selects a potion; `Q` confirms exit. `?` commands, `i` inventory, `M` recent events, `S`/`L` persistent save/load (`--save-dir`). No autosave. At creation choose 1 Knight / 2 Scout / 3 Mage for a six-floor campaign plus two Mines floors, XP growth and ascension. Retrieve the Main 6 Amulet and ascend from Main 1. B enters Mines at Main 3 up stairs. Enter retains the legacy two-floor run.
+
+操作メモ (JA): 作成画面の 1 騎士 / 2 斥候 / 3 魔法使いで本坑6階＋鉱山2階、XP成長、昇天を遊べます。本坑6階のアミュレットを持って1階の上り階段から帰還します。3階の上り階段でBは鉱山へ。Enterは旧2階モード。qは薬、Qは終了確認、S/Lは永続保存・読込。自動保存はありません。
+
+操作備註 (繁體中文): 建立角色時選1騎士／2斥候／3法師，進入主地城6層＋礦坑2層，支援XP成長與升天。取得主地城6層護符後由1層向上返回；3層上樓梯按B進礦坑。Enter保留舊2層模式。q選藥水、Q確認退出、S/L持久存讀檔，沒有自動存檔。
+
+操作备注 (简体中文): 创建角色时选1骑士／2斥候／3法师，进入主地城6层＋矿坑2层，支持XP成长与升天。取得主地城6层护符后由1层向上返回；3层上楼梯按B进矿坑。Enter保留旧2层模式。q选药水、Q确认退出、S/L持久存读档，没有自动存档。
+
 AIHack은 NetHack 3.6.7의 관찰 가능한 규칙을 시나리오와 테스트로 재구현하는 Rust 로그라이크다. 줄 단위 C-to-Rust 번역이 아니라 결정론적 core, 출처가 추적되는 호환 규칙, 격리된 local LLM adapter를 목표로 한다.
 
 ### 현재 상태

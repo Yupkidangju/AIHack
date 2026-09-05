@@ -13,6 +13,12 @@
 
 ## 1. 현재 기준과 목표
 
+### 멀티 감사 2 플레이 작업 (2026-09-05)
+
+P1–P3 최종 로컬 검증: 전체 491 tests, fmt/clippy/release PASS. 현재 content registry hash는 `f106d044fee3e340`이며 아래 R5 완료 이력의 `c491b83c6f499a62`는 캠페인 item 추가 전의 역사적 값이다.
+
+플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P3 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. 새 캠페인은 3역할·XP 성장·생성 Main 6/Mines 2·고유 아뮬렛 귀환·Victory를 연결한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
+
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 
 현재 권위는 `docs/audit/audit_report_32.md`다.

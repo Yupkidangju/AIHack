@@ -258,6 +258,14 @@ pub fn read(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
             } else {
                 (PHASE5_LEVEL1_ID, PHASE5_LEVEL1_STAIRS_DOWN)
             };
+            let to_pos = if world.campaign.is_some() {
+                world
+                    .levels
+                    .stairs_up_pos(to_level)
+                    .ok_or("teleport landing is missing")?
+            } else {
+                to_pos
+            };
             world.set_player_location(to_level, to_pos);
             events.push(GameEvent::LevelChanged {
                 entity: world.player_id,

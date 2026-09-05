@@ -11,6 +11,8 @@ use serde::Serialize;
 /// AIHack 결정론적 headless runner의 실행 인자다.
 #[derive(Parser, Debug)]
 struct Args {
+    #[arg(long, value_parser = ["knight", "scout", "mage"], conflicts_with = "load")]
+    role: Option<String>,
     #[arg(long)]
     seed: Option<u64>,
     #[arg(
@@ -80,7 +82,11 @@ fn main() {
             }
         }
     } else {
-        match GameSession::try_new_for_playing(args.seed.unwrap_or(42)) {
+        match if args.role.is_some() {
+            GameSession::try_new(args.seed.unwrap_or(42))
+        } else {
+            GameSession::try_new_for_playing(args.seed.unwrap_or(42))
+        } {
             Ok(session) => session,
             Err(error) => {
                 eprintln!("{error}");
@@ -88,6 +94,22 @@ fn main() {
             }
         }
     };
+    if let Some(role) = args.role.as_deref() {
+        use aihack_ai_contract::{CommandIntent, Role};
+        let role = match role {
+            "knight" => Role::Knight,
+            "scout" => Role::Scout,
+            _ => Role::Mage,
+        };
+        if !session.submit(CommandIntent::Wait).accepted
+            || !session
+                .submit(CommandIntent::StartCampaign { role })
+                .accepted
+        {
+            eprintln!("campaign initialization was rejected");
+            std::process::exit(2);
+        }
+    }
     let initial_turn = session.revision().turn;
     let report_path = report_path.or_else(|| {
         resolve_runtime_arg(
@@ -132,7 +154,7 @@ fn main() {
                     &error,
                 );
                 eprintln!("{error}");
-                std::process::exit(1);
+                std::process::exit(runner_exit_code(&error));
             }
         }
     } else {
@@ -153,7 +175,7 @@ fn main() {
                     &error,
                 );
                 eprintln!("{error}");
-                std::process::exit(1);
+                std::process::exit(runner_exit_code(&error));
             }
         }
     };
@@ -193,6 +215,13 @@ fn runtime_root() -> Result<PathBuf, String> {
     Ok(std::env::current_dir()
         .map_err(|error| error.to_string())?
         .join("runtime"))
+}
+
+fn runner_exit_code(error: &HeadlessRunError) -> i32 {
+    match error {
+        HeadlessRunError::TargetBeforeCurrent { .. } => 2,
+        _ => 1,
+    }
 }
 
 fn resolve_runtime_arg(store: &ArtifactStore, input: Option<&Path>) -> Option<PathBuf> {

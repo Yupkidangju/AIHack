@@ -16,6 +16,16 @@ Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c0
 
 ## 1. 문서 운영 규칙
 
+### P1–P3 캠페인 확장 (2026-09-05)
+
+사용자가 P3까지 구현을 요청했다. 역할·성장→seed 생성 탐험→아뮬렛 귀환·승천의 현재 계약은 `docs/campaign_spec.md`, 실행 계획은 `tasks/plan.md`다. 기존 2층 run은 저장/시나리오 호환 경로다. 기존 release 감사 권위/게시 HOLD는 별개다.
+
+### 멀티 감사 2 플레이 시정 계약 (2026-09-05)
+
+사용자가 선택한 후속 제품 목표는 넓은 NetHack식 탐험·역할·경험 성장·승천의 단계별 구현이다. 이번 기존 플레이 복구 후 역할/성장→생성 던전/탐험→목표/승천 순으로 구현하며 상세 단계는 `docs/multi_audit/2/remediation.md`에서 관리한다. TUI production 저장소는 기본 `runtime/tui`이며 `--save-dir`로 지정할 수 있다. 명시적 S 저장/L 복원만 수행하고 Quit은 확인 후 종료한다. 테스트용 TuiApp 기본 생성자는 실행별 저장소를 유지하며 production은 명시적 지속 저장 constructor를 사용한다. 지속 저장에도 ArtifactStore의 atomic/capability/link 방어가 동일하게 적용된다.
+
+현재 플레이 시정은 `docs/multi_audit/2/final_audit_report_2.md`와 `docs/multi_audit/2/remediation.md`를 따른다. 기존 release authority와 분리한다. visible_entities는 시야 안의 살아 있는 actor와 바닥 item을 포함하며 inventory/tombstone/off-level은 제외한다. Playing q는 물약 선택, Q는 종료 확인을 요청한다. 방향/물건 선택과 취소는 TUI-only 상태이며 최종 concrete command만 submit한다. 전체 inventory 접근과 최소 화면의 메시지/hunger 표시를 보장한다. MorePrompt는 저장 호환 상태이며 현재 자동 overflow producer를 제공하지 않는다. 마비 중 legal action은 Wait/Quit로 제한하고 prayer cooldown과 문 존재를 legal action에 반영한다. headless의 absolute target이 loaded turn보다 작으면 mutation 없이 오류, 같으면 0 accepted turn 성공, 크면 실제 진행해야 한다.
+
 이 문서는 AIHack v0.3.0 리팩터링의 최상위 계약이다.
 
 - 구현 전 이 문서와 `IMPLEMENTATION_SUMMARY.md`의 해당 Task를 읽는다.
@@ -185,12 +195,14 @@ R5 이전에는 `--workspace`를 제거하고 같은 명령을 사용한다.
 
 ```text
 Title --Start--> CharacterCreation --Confirm--> Playing
-Playing --needs direction--> AwaitingDirection --direction/cancel--> Playing
-Playing --needs item--> AwaitingInventorySelection --item/cancel--> Playing
-Playing --message overflow--> MorePrompt --ack--> Playing
+Playing --TUI action key--> UI-only selection --concrete command/cancel--> Playing
+AwaitingDirection / AwaitingInventorySelection (저장 호환 상태) --selection/cancel--> Playing
+MorePrompt (저장 호환 상태) --ack--> Playing
 Playing --death/quit--> GameOver
 GameOver --new run--> Title
 ```
+
+위 quit는 core `CommandIntent::Quit`의 기존 sentinel 계약이다. production TUI의 Q는 UI 확인 후 프로세스를 종료하며 core GameOver로 변환하지 않는다. 저장은 S로 명시적으로 수행한다.
 
 new run은 이전 seed에 `wrapping_add(1)`을 적용한다. session/world/RNG/turn/event와 LLM/UI transient state는 초기화하고 접근성 theme 설정은 유지한다. 기존 save/replay artifact는 자동 삭제하지 않는다.
 
@@ -553,6 +565,8 @@ trap_pit_damage = 3
 
 ## 11. 실데이터 기준
 
+아래 Phase fixture 데이터와 Adventurer 기본값은 legacy 호환 경로의 기준이다. P1–P3 역할별 시작·생성 던전·승천은 `docs/campaign_spec.md`의 campaign 계약을 적용한다.
+
 ### 11.1 플레이어
 
 ```toml
@@ -742,7 +756,7 @@ NH367-C008 hunger projection은 3.6.7 `newuhs` 경계를 따른다: nutrition `<
 - Unix save/temp는 mode `0600`을 강제한다. Windows save/temp는 parent directory DACL을 상속하며 runtime이 owner-only DACL을 재작성하지 않으므로, Windows 기밀성 경계는 사용자가 선택한 runtime root의 ACL이다.
 - replay 기록은 기존 payload를 bounded read·검증한 뒤 새 임시 파일로 atomic rewrite한다. 따라서 외부 inode를 직접 append하지 않으며 destination link 검증과 file sync를 save와 공유한다.
 - `--replay-in`과 `--replay-out`은 정규화 상대 경로, Windows case-insensitive path, 열린 파일의 device/file identity 중 하나라도 같으면 동일 artifact로 판정해 실행 전에 거부한다. Windows 상대 경로 component는 trailing dot/space, ADS 구분자, 제어·금지 문자와 reserved device name을 받지 않아 compare/open/replace가 같은 이름 의미를 사용하게 한다.
-- TUI quick-save는 실행별 `ArtifactStore`와 relative `quick-save.json`을 소유하며 caller가 전달한 absolute/parent path를 production 저장 경계로 사용하지 않는다. ambient `resolve_path_in_root` compatibility helper는 제거하고 production과 test 모두 `ArtifactStore` 경계를 사용한다.
+- TUI production 저장은 `--save-dir` (기본 `runtime/tui`)의 `ArtifactStore`와 relative `quick-save.json`을 소유한다. 입력 candidate에는 저장 경로를 포함하지 않으며 재실행한 같은 저장소에서 L로 복원한다. 테스트 기본 생성자는 실행별 임시 저장소를 제공한다. 모든 저장/복원은 동일 capability·atomic 경계를 사용한다.
 - runtime root는 한 프로세스가 쓰는 사용자 전용 directory다. 같은 계정의 악성 프로세스가 root directory entry를 동시에 교체하거나 여러 writer가 같은 replay를 갱신하는 상황은 OS sandbox가 없는 v0.3.0의 비목표다. 다만 사전 배치 link/reparse와 외부 inode write는 fail-closed하며 atomic rewrite가 open-after-link hard-link write race를 제거한다.
 
 현재 replay wire는 `TurnOutcome`을 직접 직렬화한다. `ReplayLineV1`은 turn_before, command, outcome, snapshot_hash_after를 보유하며, `outcome.accepted=false`는 거절/no-commit 결과를 나타낸다. v1 소비자는 이 모든 필드를 검증하되 wire field를 추가하거나 제거하지 않는다. canonical JSON fixture의 추가와 `Result<TurnOutcome, SubmitError>` projection은 후속 versioned schema에서만 정의한다.
