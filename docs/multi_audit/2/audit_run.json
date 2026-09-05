@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "turn": 2,
+  "project_root": "C:\\LocalDev\\rust\\AIHack",
+  "directory": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2",
+  "source_reports": [
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_01_game_contract.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_02_runtime_loop.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_03_recovery.md",
+    "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_04_input_ui.md"
+  ],
+  "final_report": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\final_audit_report_2.md",
+  "created_at_utc": "2026-09-04T18:52:07.506996+00:00"
+}

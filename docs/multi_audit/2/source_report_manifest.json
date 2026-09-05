@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "run_directory": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2",
+  "reports": [
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_01_game_contract.md",
+      "sha256": "405cf5c1f46e159e1a587ce4504d1703924bd86a2f90dc1765a84274500fbad3",
+      "size": 37501,
+      "sealed_at_utc": "2026-09-04T19:10:17.723016+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_02_runtime_loop.md",
+      "sha256": "a562c8bbdfe4d0911db2d9bf81d69fcf490b548758e813da65df576d097dd6d9",
+      "size": 25565,
+      "sealed_at_utc": "2026-09-04T19:11:13.684152+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_03_recovery.md",
+      "sha256": "b729e18e0d95886d91de33a89f1f392f97e8d3438fed9cc34c9b8173d370daa3",
+      "size": 19900,
+      "sealed_at_utc": "2026-09-04T19:08:28.066516+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_04_input_ui.md",
+      "sha256": "be40bfa84c34a03683d085d37cbebb8c50b364be28cdcd16434bd8746168d7e5",
+      "size": 35364,
+      "sealed_at_utc": "2026-09-04T19:07:44.774333+00:00"
+    },
+    {
+      "path": "C:\\LocalDev\\rust\\AIHack\\docs\\multi_audit\\2\\sub_audit_04_input_ui_supplement_1.md",
+      "sha256": "2584fd31dfa02317c27d1a0797c56c12425c862cbb8e9b8b5b8a3b71be138a2d",
+      "size": 6740,
+      "sealed_at_utc": "2026-09-04T18:58:22.777638+00:00"
+    }
+  ],
+  "missing_source_reports": [],
+  "finalized_at_utc": "2026-09-04T19:11:42.369160+00:00"
+}
