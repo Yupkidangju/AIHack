@@ -47,16 +47,29 @@ require_metadata_value() {
 }
 
 require_calendar_date() {
-    local value=$1 label=$2 parsed year
-    [[ "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+    local value=$1 label=$2 year month day max_day
+    [[ "$value" =~ ^([0-9]{4})-([0-9]{2})-([0-9]{2})$ ]] \
         || fail "$label must use YYYY-MM-DD"
-    year=${value%%-*}
-    ((10#$year >= 1 && 10#$year <= 9999)) \
+    year=$((10#${BASH_REMATCH[1]}))
+    month=$((10#${BASH_REMATCH[2]}))
+    day=$((10#${BASH_REMATCH[3]}))
+    ((year >= 1 && year <= 9999)) \
         || fail "$label year must be in 0001..9999"
-    parsed=$(date -u -d "$value" '+%F' 2>/dev/null) \
+    ((month >= 1 && month <= 12)) \
         || fail "$label is not a Gregorian calendar date"
-    [[ "$parsed" == "$value" ]] \
-        || fail "$label is not a canonical Gregorian calendar date"
+    case "$month" in
+        1|3|5|7|8|10|12) max_day=31 ;;
+        4|6|9|11) max_day=30 ;;
+        2)
+            if (((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)); then
+                max_day=29
+            else
+                max_day=28
+            fi
+            ;;
+    esac
+    ((day >= 1 && day <= max_day)) \
+        || fail "$label is not a Gregorian calendar date"
 }
 
 validate_archive_entry() {
