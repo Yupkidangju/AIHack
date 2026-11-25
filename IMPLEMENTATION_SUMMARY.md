@@ -15,9 +15,13 @@
 
 ### 멀티 감사 2 플레이 작업 (2026-09-05)
 
-P1–P3 최종 로컬 검증: 전체 491 tests, fmt/clippy/release PASS. 현재 content registry hash는 `f106d044fee3e340`이며 아래 R5 완료 이력의 `c491b83c6f499a62`는 캠페인 item 추가 전의 역사적 값이다.
+P1–P3 당시 로컬 검증은 전체 491 tests, fmt/clippy/release PASS를 기록했고, 당시 content registry hash는 `f106d044fee3e340`(R5 완료 이력의 `c491b83c6f499a62`는 캠페인 item 추가 전 역사적 값)이었다.
 
-플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P3 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. 새 캠페인은 3역할·XP 성장·생성 Main 6/Mines 2·고유 아뮬렛 귀환·Victory를 연결한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
+플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P4 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
+
+### P4 게임플레이 확장 (2026-11-26)
+
+현재 content registry hash는 `f3767a7764223506`이다(`items.toml` 5종·`monsters.toml` 3종 추가 반영). 생성 캠페인 맵은 generator v2로 문(`Door`)·비밀문(`HiddenDoor`)·함정 3종(`Pit`/`Dart`/`Bear`, `Dart`/`Bear` 사인과 Bear 마비 반영)을 배치하며 `campaign_map::validate_persisted_map`으로 정당한 런타임 전이만 허용한다. 제4역할 `Role::Cleric`(`HP 24, hit +3, dmg +1`, `[4] Cleric`, `--role cleric`), 신규 5아이템(`ShortSword`, `Mace`, `ArmorChainMail`, `PotionExtraHealing`, `ScrollCharging`), 신규 3몬스터(`Kobold`, `Orc`, `Ogre`)를 추가하고 기존 11아이템·3몬스터·V1 저장/해시는 그대로 유지했다.
 
 R1~R8 기존 시정과 report 23/24 finding은 `docs/audit/audit_report_24.md`, 후속 remediation, implementation SHA `2519bc8e0ede81c39f46b5778e62a41d4ca66901`의 Actions run `32107862171`에서 역사적으로 종결됐다. report 23의 독립 재감사 대기는 현재 gate가 아니다.
 

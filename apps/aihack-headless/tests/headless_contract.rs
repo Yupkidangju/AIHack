@@ -268,3 +268,51 @@ fn replay_windows_name_aliases_are_rejected_without_mutating_input() {
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[test]
+fn headless_cli_cleric_role_creates_campaign_save_and_report() {
+    let root = fixture_root("cleric-role");
+    fs::create_dir_all(root.join("runtime/saves")).unwrap();
+    fs::create_dir_all(root.join("runtime/reports")).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_aihack-headless"))
+        .args([
+            "--seed",
+            "42",
+            "--role",
+            "cleric",
+            "--turns",
+            "5",
+            "--policy",
+            "wait-v1",
+            "--save",
+            "saves/cleric.json",
+            "--report",
+            "reports/cleric.json",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let save_bytes = fs::read(root.join("runtime/saves/cleric.json")).unwrap();
+    let save: aihack_runtime::save::SaveDataV1 = serde_json::from_slice(&save_bytes).unwrap();
+    assert_eq!(save.schema_version, 2);
+    assert_eq!(
+        save.world.campaign.unwrap().role,
+        aihack_ai_contract::Role::Cleric
+    );
+    let restored = GameSession::from_save_data(save).unwrap();
+    assert_eq!(restored.turn(), 5);
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("runtime/reports/cleric.json")).unwrap())
+            .unwrap();
+    assert_eq!(report["accepted_turns"], 5);
+    fs::remove_dir_all(root).unwrap();
+}

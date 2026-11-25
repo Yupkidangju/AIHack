@@ -424,10 +424,8 @@ pub(crate) fn validate_save_data_with_registry(
     validate_saved_world_for_run_state(&save.world, save.run_state, registry)?;
     if save.world.campaign.is_some() {
         for level in &save.world.levels.levels {
-            let (expected, _) = crate::campaign_map::generate(save.seed, level.id)?;
-            if level.map != expected.map {
-                return invalid_world("campaign generator/map mismatch".into());
-            }
+            crate::campaign_map::validate_persisted_map(save.seed, level.id, &level.map)
+                .map_err(|reason| invalid_world_error(&reason))?;
         }
     }
     validate_consumer_safe_arithmetic(save)?;

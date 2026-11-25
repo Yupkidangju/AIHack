@@ -9,3 +9,14 @@
 | ascension | 목표 물건·귀환·성공 결과 | exploration |
 
 타입→runtime→UI의 작은 단위마다 표적 테스트, 마지막에 전체 테스트/fmt/clippy/release를 실행한다. 구형 save/hash는 campaign=None 생략으로 보존하고 새로운 저장은 wire schema 2로 구분한다. 위조 성장/목표와 단절된 dungeon은 validator/BFS/실제 명령 완주 테스트로 방어한다. 커밋·푸시·배포는 이번 범위가 아니다. 체크리스트는 `tasks/todo.md`, 결과는 `docs/campaign_implementation.md`.
+
+# P4 구현 계획 (2026-11-26)
+
+기준: `spec.md`, `docs/campaign_spec.md` (P4), `DESIGN_DECISIONS.md` (`ADR-P4-01`). 커밋·푸시는 수행하지 않는다.
+
+| 단계 | 책임 | 핵심 대상 |
+| --- | --- | --- |
+| P4a | `TrapKind::Dart/Bear`, 캠페인 문/비밀문/함정 생성, 전이-인식 V2 맵 검증 | `core/tile.rs`, `runtime/campaign_map.rs`, `runtime/save.rs`, `runtime/systems/traps.rs`, `runtime/systems/movement.rs`, `runtime/session.rs` |
+| P4b | `Role::Cleric`, 신규 아이템 5종(`RechargeWand` 포함), 몬스터 3종, 캠페인 배치 | `core/campaign.rs`, `core/domain/*`, `aihack-content/*`, `runtime/bootstrap.rs`, `runtime/systems/items.rs`, `runtime/observation.rs`, `PROVENANCE.md`, `r7-content.sha256` |
+| P4c | TUI 문/함정/아이템/몬스터/Cleric 렌더·입력 및 Headless `--role cleric` | `apps/aihack-tui/*`, `apps/aihack-headless/*` |
+| P4d | 통합/부정 테스트, 전체 gate(`fmt`, `clippy`, `test -j 4`, `release`, `audit`, `deny`, `r7/r8`) 및 문서 동기화 | `tests/campaign.rs`, `docs/campaign_implementation.md`, `IMPLEMENTATION_SUMMARY.md`, `README.md`, `CHANGELOG.md`, `tasks/todo.md` |

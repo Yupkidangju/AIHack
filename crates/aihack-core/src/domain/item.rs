@@ -5,14 +5,19 @@ use crate::domain::combat::AttackProfile;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ItemKind {
     Dagger,
+    ShortSword,
+    Mace,
     FoodRation,
     PotionHealing,
+    PotionExtraHealing,
     WandMagicMissile,
     ScrollReveal,
     ScrollIdentify,
     ScrollLevelTeleport,
+    ScrollCharging,
     Rock,
     ArmorLeather,
+    ArmorChainMail,
     CorpseJackal,
     AmuletAscension,
 }
@@ -42,6 +47,7 @@ pub enum ConsumableEffect {
     RevealLevel,
     IdentifySingle,
     LevelTeleport,
+    RechargeWand,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

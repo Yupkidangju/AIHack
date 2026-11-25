@@ -11,7 +11,7 @@ use serde::Serialize;
 /// AIHack 결정론적 headless runner의 실행 인자다.
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(long, value_parser = ["knight", "scout", "mage"], conflicts_with = "load")]
+    #[arg(long, value_parser = ["knight", "scout", "mage", "cleric"], conflicts_with = "load")]
     role: Option<String>,
     #[arg(long)]
     seed: Option<u64>,
@@ -99,6 +99,7 @@ fn main() {
         let role = match role {
             "knight" => Role::Knight,
             "scout" => Role::Scout,
+            "cleric" => Role::Cleric,
             _ => Role::Mage,
         };
         if !session.submit(CommandIntent::Wait).accepted

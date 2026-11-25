@@ -201,6 +201,7 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
                     aihack_core::campaign::Role::Knight,
                     aihack_core::campaign::Role::Scout,
                     aihack_core::campaign::Role::Mage,
+                    aihack_core::campaign::Role::Cleric,
                 ]
                 .map(|role| CommandIntent::StartCampaign { role }),
             );

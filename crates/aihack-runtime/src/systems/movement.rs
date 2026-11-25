@@ -84,6 +84,8 @@ fn is_walkable_or_attackable_destination(
         world.map(level).tile(to),
         Ok(TileKind::Floor
             | TileKind::Door(DoorState::Open)
+            | TileKind::Trap(_)
+            | TileKind::HiddenTrap(_)
             | TileKind::StairsDown
             | TileKind::StairsUp)
     ) && aihack_core::movement::validate_path(world, actor, level, from, direction).is_ok()

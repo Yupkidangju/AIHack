@@ -20,7 +20,10 @@ impl Widget for MapWidget<'_> {
                 let glyph = match tile.tile {
                     crate::domain::tile::TileKind::Wall => '#',
                     crate::domain::tile::TileKind::Floor => '.',
-                    crate::domain::tile::TileKind::Door(_) => '+',
+                    crate::domain::tile::TileKind::Door(aihack_ai_contract::DoorState::Closed) => {
+                        '+'
+                    }
+                    crate::domain::tile::TileKind::Door(aihack_ai_contract::DoorState::Open) => '-',
                     crate::domain::tile::TileKind::StairsDown => '>',
                     crate::domain::tile::TileKind::StairsUp => '<',
                     crate::domain::tile::TileKind::Trap(_) => '^',
@@ -44,15 +47,21 @@ impl Widget for MapWidget<'_> {
                     EntityKind::Monster(MonsterKind::Jackal) => 'd',
                     EntityKind::Monster(MonsterKind::Goblin) => 'g',
                     EntityKind::Monster(MonsterKind::FloatingEye) => 'e',
+                    EntityKind::Monster(MonsterKind::Kobold) => 'k',
+                    EntityKind::Monster(MonsterKind::Orc) => 'o',
+                    EntityKind::Monster(MonsterKind::Ogre) => 'O',
                     EntityKind::Item(kind) => match kind {
-                        ItemKind::Dagger => ')',
-                        ItemKind::ArmorLeather => '[',
-                        ItemKind::PotionHealing => '!',
+                        ItemKind::Dagger | ItemKind::ShortSword | ItemKind::Mace => ')',
+                        ItemKind::ArmorLeather | ItemKind::ArmorChainMail => '[',
+                        ItemKind::PotionHealing | ItemKind::PotionExtraHealing => '!',
                         ItemKind::WandMagicMissile => '/',
                         ItemKind::Rock => '*',
                         ItemKind::FoodRation | ItemKind::CorpseJackal => '%',
                         ItemKind::AmuletAscension => '"',
-                        _ => '?',
+                        ItemKind::ScrollReveal
+                        | ItemKind::ScrollIdentify
+                        | ItemKind::ScrollLevelTeleport
+                        | ItemKind::ScrollCharging => '?',
                     },
                 };
                 if let Some((x, y)) = self.viewport.world_to_terminal(entity.pos, area) {

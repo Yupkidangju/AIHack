@@ -24,6 +24,9 @@ pub fn monster_kind_from_id(id: &str) -> Result<MonsterKind, ContentError> {
         "monster.jackal" => Ok(MonsterKind::Jackal),
         "monster.goblin" => Ok(MonsterKind::Goblin),
         "monster.floating_eye" => Ok(MonsterKind::FloatingEye),
+        "monster.kobold" => Ok(MonsterKind::Kobold),
+        "monster.orc" => Ok(MonsterKind::Orc),
+        "monster.ogre" => Ok(MonsterKind::Ogre),
         _ => Err(ContentError::UnknownReference {
             owner: "monster kind".to_owned(),
             target: id.to_owned(),

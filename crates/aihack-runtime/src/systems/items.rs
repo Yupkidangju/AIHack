@@ -8,7 +8,7 @@ use aihack_core::{
         },
         player::adventurer_template,
     },
-    event::GameEvent,
+    event::{GameEvent, MessagePriority},
     ids::EntityId,
     rng::GameRng,
 };
@@ -272,6 +272,39 @@ pub fn read(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
                 from,
                 to: to_level,
             });
+        }
+        ConsumableEffect::RechargeWand => {
+            let mut candidate: Option<(EntityId, u8)> = None;
+            let mut fallback: Option<(EntityId, u8)> = None;
+            for entry in &world.inventory.entries {
+                if let Some((_, data, _, _, charges)) = world
+                    .entities
+                    .get(entry.item)
+                    .and_then(|entity| entity.item())
+                {
+                    if data.wand_effect.is_some() {
+                        if let Some(max_charges) = data.max_charges {
+                            if fallback.is_none() {
+                                fallback = Some((entry.item, max_charges));
+                            }
+                            if charges.unwrap_or(0) < max_charges {
+                                candidate = Some((entry.item, max_charges));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some((wand_id, max_charges)) = candidate.or(fallback) {
+                world
+                    .state_mut()
+                    .entities
+                    .set_item_charges(wand_id, Some(max_charges));
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: format!("Recharged wand to {max_charges} charges"),
+                });
+            }
         }
         ConsumableEffect::Heal { .. } => return Err("item is not a scroll".to_string()),
     }

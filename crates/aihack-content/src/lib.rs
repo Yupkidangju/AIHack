@@ -81,6 +81,9 @@ pub fn monster_template_from_registry(
         MonsterKind::Jackal => "monster.jackal",
         MonsterKind::Goblin => "monster.goblin",
         MonsterKind::FloatingEye => "monster.floating_eye",
+        MonsterKind::Kobold => "monster.kobold",
+        MonsterKind::Orc => "monster.orc",
+        MonsterKind::Ogre => "monster.ogre",
     };
     let definition = registry
         .monster(id)
@@ -114,6 +117,9 @@ pub fn monster_template_from_registry(
         MonsterKind::Jackal => "bite",
         MonsterKind::Goblin => "short sword",
         MonsterKind::FloatingEye => "gaze",
+        MonsterKind::Kobold => "spear",
+        MonsterKind::Orc => "scimitar",
+        MonsterKind::Ogre => "club",
     };
     Ok(MonsterTemplate {
         kind,
@@ -153,14 +159,19 @@ pub fn item_data_from_registry(
 ) -> Result<CoreItemData, ContentError> {
     let id = match kind {
         ItemKind::Dagger => "item.weapon.dagger",
+        ItemKind::ShortSword => "item.weapon.short_sword",
+        ItemKind::Mace => "item.weapon.mace",
         ItemKind::FoodRation => "item.food.ration",
         ItemKind::PotionHealing => "item.potion.healing",
+        ItemKind::PotionExtraHealing => "item.potion.extra_healing",
         ItemKind::WandMagicMissile => "item.wand.magic_missile",
         ItemKind::ScrollReveal => "item.scroll.reveal",
         ItemKind::ScrollIdentify => "item.scroll.identify",
         ItemKind::ScrollLevelTeleport => "item.scroll.teleport",
+        ItemKind::ScrollCharging => "item.scroll.charging",
         ItemKind::Rock => "item.weapon.rock",
         ItemKind::ArmorLeather => "item.armor.leather",
+        ItemKind::ArmorChainMail => "item.armor.chain_mail",
         ItemKind::CorpseJackal => "item.corpse.jackal",
         ItemKind::AmuletAscension => "item.quest.ascension",
     };
@@ -203,6 +214,8 @@ pub fn item_data_from_registry(
         .map(|value| {
             let name = match kind {
                 ItemKind::Dagger => "dagger",
+                ItemKind::ShortSword => "short sword",
+                ItemKind::Mace => "mace",
                 ItemKind::Rock => "rock",
                 _ => "weapon",
             };
@@ -219,9 +232,15 @@ pub fn item_data_from_registry(
             sides: 8,
             bonus: 4,
         }),
+        Some("heal_2d8_plus_8") => Some(ConsumableEffect::Heal {
+            dice: 2,
+            sides: 8,
+            bonus: 8,
+        }),
         Some("reveal") => Some(ConsumableEffect::RevealLevel),
         Some("identify") => Some(ConsumableEffect::IdentifySingle),
         Some("teleport") => Some(ConsumableEffect::LevelTeleport),
+        Some("charging") => Some(ConsumableEffect::RechargeWand),
         Some("magic_missile") | None => None,
         Some(effect) => {
             return Err(ContentError::UnknownReference {
@@ -359,6 +378,9 @@ pub fn level_spawns(level: &LevelData) -> Result<Vec<LevelSpawn>, ContentError> 
             "monster.jackal" => MonsterKind::Jackal,
             "monster.goblin" => MonsterKind::Goblin,
             "monster.floating_eye" => MonsterKind::FloatingEye,
+            "monster.kobold" => MonsterKind::Kobold,
+            "monster.orc" => MonsterKind::Orc,
+            "monster.ogre" => MonsterKind::Ogre,
             _ => {
                 return Err(ContentError::UnknownReference {
                     owner: level.level_id.clone(),
@@ -374,14 +396,19 @@ pub fn level_spawns(level: &LevelData) -> Result<Vec<LevelSpawn>, ContentError> 
     for item in level.item.as_deref().unwrap_or_default() {
         let kind = match item.id.as_str() {
             "item.weapon.dagger" => ItemKind::Dagger,
+            "item.weapon.short_sword" => ItemKind::ShortSword,
+            "item.weapon.mace" => ItemKind::Mace,
             "item.food.ration" => ItemKind::FoodRation,
             "item.potion.healing" => ItemKind::PotionHealing,
+            "item.potion.extra_healing" => ItemKind::PotionExtraHealing,
             "item.wand.magic_missile" => ItemKind::WandMagicMissile,
             "item.scroll.reveal" => ItemKind::ScrollReveal,
             "item.scroll.identify" => ItemKind::ScrollIdentify,
             "item.scroll.teleport" => ItemKind::ScrollLevelTeleport,
+            "item.scroll.charging" => ItemKind::ScrollCharging,
             "item.weapon.rock" => ItemKind::Rock,
             "item.armor.leather" => ItemKind::ArmorLeather,
+            "item.armor.chain_mail" => ItemKind::ArmorChainMail,
             "item.corpse.jackal" => ItemKind::CorpseJackal,
             "item.quest.ascension" => ItemKind::AmuletAscension,
             _ => {

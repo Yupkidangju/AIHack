@@ -43,3 +43,33 @@ snapshot은 campaign=None을 생략해 기존 hash를 유지한다. observation�
 `cargo test -p aihack --test campaign --locked`, TUI dispatcher tests, `cargo test --workspace --all-targets --locked`, `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo build --workspace --all-targets --release --locked`.
 
 역할별 차이·성장 전후 전투·3 seed BFS와 완주·층 재진입·저장/RNG 연속성·위조 목표/성장/topology·기존 478 회귀를 검사한다. NetHack 전체 규칙 동등성/외부 독립 감사/CI/게시 승인은 별개다. 기존 Rust 구조와 한국어 경계 주석, native cargo integration test 관례를 유지한다.
+
+## P4 캠페인 확장 (2026-11-26)
+
+P1–P3 첫 캠페인 위에 생성 던전 문·비밀문·다종 함정 상호작용과 4번째 역할·신규 장비/소모품·신규 몬스터를 확장한다. 기존 2층 Adventurer run, V1 저장/해시, 기존 11개 아이템·3종 몬스터 정의와 `NH367-C001..C010`/`P8-G01..G20` 호환성은 그대로 보존한다.
+
+### P4a 문·비밀문·함정·저장 검증
+
+- `TrapKind`: 기존 `Pit`(3 피해) 외에 `Dart`(2 피해), `Bear`(2 피해 + `paralysis_turns >= 1`)를 추가한다. `submit_move`의 치사 함정 사망 원인 `DeathCause::Trap { trap }`은 실제 발동한 `TrapKind`를 기록한다. 함정 타일 위의 적대 몬스터도 인접 bump attack 대상이 된다.
+- 생성 던전(`campaign_map`) v2: 40×20 4방+L자 통로 결정론 구조를 유지하되 모든 층에 1칸 폭 출입구 문(`x=7, y=centers[0].y` 닫힌 문, `x=17, y=centers[1].y` 홀수 층 닫힌 문 / 짝수 층 `HiddenDoor`)과 방 내부 회피 가능 숨겨진 함정(`centers[1]-(1,0)` Pit/Dart, `Main 3/5/6, Mines 2`의 `centers[2]-(1,0)` Bear)을 배치한다.
+- V2 저장 지도 검증(`validate_persisted_map`): seed/LevelId로 생성한 기준 맵 대비 허용된 런타임 상태 전이(`Door(Closed)<->Door(Open)`, `HiddenDoor->Door(*)`, `HiddenTrap(k)->Trap(k)`)만 통과시키고 지형·계단 위조나 함정/문 임의 삭제·생성을 거부한다.
+
+### P4b 4번째 역할·신규 아이템 5종·신규 몬스터 3종
+
+- `Role::Cleric`: `HP 24`, `hit +3`, `damage +1`, 기본 5종 + `Mace`·`PotionExtraHealing`·`ScrollIdentify` (초기 무게 97/120). Creation `[4]` 키와 mouse CTA 및 headless `--role cleric`을 지원한다.
+- 신규 아이템 5종(`crates/aihack-content/src/data/items.toml`):
+  - `item.weapon.short_sword` (`ShortSword`, `)`, weight 15, hit +1, `1d6`, price 10)
+  - `item.weapon.mace` (`Mace`, `)`, weight 20, hit +1, `1d6`, price 8)
+  - `item.armor.chain_mail` (`ArmorChainMail`, `[`, weight 35, `ac_bonus=3`, price 75)
+  - `item.potion.extra_healing` (`PotionExtraHealing`, `!`, weight 20, `heal_2d8_plus_8`, price 100)
+  - `item.scroll.charging` (`ScrollCharging`, `?`, weight 5, `charging`, price 60) — 인벤토리 첫 미충전(또는 첫) 완드의 `charges`를 `max_charges`까지 회복(`ConsumableEffect::RechargeWand`)
+- 신규 몬스터 3종(`crates/aihack-content/src/data/monsters.toml`):
+  - `monster.kobold` (`Kobold`, `k`, HP 5, AC 1, hit +1, `1d4`, `chase_on_sight`, speed 12, difficulty 2)
+  - `monster.orc` (`Orc`, `o`, HP 10, AC 2, hit +2, `1d6`, `chase_on_sight`, speed 12, difficulty 3)
+  - `monster.ogre` (`Ogre`, `O`, HP 16, AC 3, hit +3, `1d8`, `chase_on_sight`, speed 10, difficulty 5)
+- 캠페인 배치(`bootstrap::campaign_world`): `Main 1..2` Jackal, `Main 3` Goblin, `Main 4` Orc + FloatingEye, `Main 5` Orc, `Main 6` Ogre(아뮬렛 수호), `Mines 1` Kobold + FloatingEye, `Mines 2` Orc + Kobold, 그리고 층별 보너스 장비·물약·충전 두루마리를 배치한다.
+
+### P4c TUI/검증 계약
+
+- TUI 맵은 닫힌 문 `+`·열린 문 `-`을 구분 렌더링하고, hover 패널은 `closed door`/`open door` 및 `pit trap`/`dart trap`/`bear trap`, 신규 아이템/몬스터 라벨을 표시한다.
+- 수정된 `items.toml`/`monsters.toml`의 LF SHA-256을 `docs/provenance/r7-content.sha256`과 `PROVENANCE.md`에 기록하고, `aihack-content` registry golden hash를 동기화한다.

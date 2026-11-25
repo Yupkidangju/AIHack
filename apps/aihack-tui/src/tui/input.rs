@@ -373,16 +373,21 @@ fn command_panel_click_candidate(
 
 fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
     match item.kind {
-        crate::domain::item::ItemKind::Dagger => Some(CommandIntent::Wield { item: item.item }),
-        crate::domain::item::ItemKind::ArmorLeather => {
+        crate::domain::item::ItemKind::Dagger
+        | crate::domain::item::ItemKind::ShortSword
+        | crate::domain::item::ItemKind::Mace => Some(CommandIntent::Wield { item: item.item }),
+        crate::domain::item::ItemKind::ArmorLeather
+        | crate::domain::item::ItemKind::ArmorChainMail => {
             Some(CommandIntent::Wear { item: item.item })
         }
-        crate::domain::item::ItemKind::PotionHealing => {
+        crate::domain::item::ItemKind::PotionHealing
+        | crate::domain::item::ItemKind::PotionExtraHealing => {
             Some(CommandIntent::Quaff { item: item.item })
         }
         crate::domain::item::ItemKind::ScrollReveal
         | crate::domain::item::ItemKind::ScrollIdentify
-        | crate::domain::item::ItemKind::ScrollLevelTeleport => {
+        | crate::domain::item::ItemKind::ScrollLevelTeleport
+        | crate::domain::item::ItemKind::ScrollCharging => {
             Some(CommandIntent::Read { item: item.item })
         }
         _ => None,
@@ -392,14 +397,19 @@ fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
 pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> &'static str {
     match kind {
         crate::domain::item::ItemKind::Dagger => "dagger",
+        crate::domain::item::ItemKind::ShortSword => "short sword",
+        crate::domain::item::ItemKind::Mace => "mace",
         crate::domain::item::ItemKind::FoodRation => "food ration",
         crate::domain::item::ItemKind::PotionHealing => "healing potion",
+        crate::domain::item::ItemKind::PotionExtraHealing => "extra healing potion",
         crate::domain::item::ItemKind::WandMagicMissile => "wand",
         crate::domain::item::ItemKind::ScrollReveal => "reveal scroll",
         crate::domain::item::ItemKind::ScrollIdentify => "identify scroll",
         crate::domain::item::ItemKind::ScrollLevelTeleport => "teleport scroll",
+        crate::domain::item::ItemKind::ScrollCharging => "charging scroll",
         crate::domain::item::ItemKind::Rock => "rock",
         crate::domain::item::ItemKind::ArmorLeather => "leather armor",
+        crate::domain::item::ItemKind::ArmorChainMail => "chain mail",
         crate::domain::item::ItemKind::CorpseJackal => "jackal corpse",
         crate::domain::item::ItemKind::AmuletAscension => "Amulet of Ascension",
     }

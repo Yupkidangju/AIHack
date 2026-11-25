@@ -16,6 +16,10 @@ Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c0
 
 ## 1. 문서 운영 규칙
 
+### P4 캠페인 확장 (2026-11-26)
+
+P1–P3 첫 캠페인 위에 생성 던전의 문/비밀문/다종 함정(`Pit`/`Dart`/`Bear`) 상호작용 및 전이-인식 V2 저장 검증, 4번째 역할 `Cleric`, 신규 아이템 5종(`ShortSword`, `Mace`, `ArmorChainMail`, `PotionExtraHealing`, `ScrollCharging`), 신규 몬스터 3종(`Kobold`, `Orc`, `Ogre`)을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## P4`, 의사결정은 `ADR-P4-01`, 실행 계획은 `tasks/plan.md`를 따른다.
+
 ### P1–P3 캠페인 확장 (2026-09-05)
 
 사용자가 P3까지 구현을 요청했다. 역할·성장→seed 생성 탐험→아뮬렛 귀환·승천의 현재 계약은 `docs/campaign_spec.md`, 실행 계획은 `tasks/plan.md`다. 기존 2층 run은 저장/시나리오 호환 경로다. 기존 release 감사 권위/게시 HOLD는 별개다.

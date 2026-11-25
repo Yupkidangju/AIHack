@@ -19,6 +19,9 @@ pub enum MonsterKind {
     Jackal,
     Goblin,
     FloatingEye,
+    Kobold,
+    Orc,
+    Ogre,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,15 +42,18 @@ impl MonsterKind {
     pub fn ai_kind(self) -> MonsterAiKind {
         match self {
             Self::Jackal => MonsterAiKind::Wander,
-            Self::Goblin => MonsterAiKind::ChaseVisiblePlayer,
+            Self::Goblin | Self::Kobold | Self::Orc | Self::Ogre => {
+                MonsterAiKind::ChaseVisiblePlayer
+            }
             Self::FloatingEye => MonsterAiKind::Stationary,
         }
     }
     pub fn difficulty(self) -> u8 {
         match self {
             Self::Jackal => 1,
-            Self::Goblin => 2,
-            Self::FloatingEye => 5,
+            Self::Goblin | Self::Kobold => 2,
+            Self::Orc => 3,
+            Self::FloatingEye | Self::Ogre => 5,
         }
     }
 }

@@ -14,7 +14,7 @@ fn start(seed: u64, role: Role) -> GameSession {
 
 #[test]
 fn selected_role_bootstraps_real_campaign_and_v2_save() {
-    for role in [Role::Knight, Role::Scout, Role::Mage] {
+    for role in [Role::Knight, Role::Scout, Role::Mage, Role::Cleric] {
         let session = start(42, role);
         assert_eq!(session.world().campaign.unwrap().role, role);
         assert_eq!(session.observation().player.max_hp, role.base_hp());
@@ -31,8 +31,13 @@ fn selected_role_bootstraps_real_campaign_and_v2_save() {
 
 #[test]
 fn roles_and_level_thresholds_are_bounded_and_distinct() {
-    assert!(Role::Knight.base_hp() > Role::Mage.base_hp());
+    assert!(Role::Knight.base_hp() > Role::Cleric.base_hp());
+    assert!(Role::Cleric.base_hp() > Role::Scout.base_hp());
+    assert!(Role::Scout.base_hp() > Role::Mage.base_hp());
     assert!(Role::Scout.base_hit() > Role::Knight.base_hit());
+    assert_eq!(Role::Cleric.base_hp(), 24);
+    assert_eq!(Role::Cleric.base_hit(), 3);
+    assert_eq!(Role::Cleric.base_damage(), 1);
     for (xp, level) in [(0, 1), (19, 1), (20, 2), (179, 9), (180, 10)] {
         let state = CampaignState {
             role: Role::Knight,
@@ -199,7 +204,13 @@ fn route(
             let next = pos.offset(dir.delta());
             if matches!(
                 session.world().current_map().tile(next),
-                Ok(TileKind::Floor | TileKind::StairsUp | TileKind::StairsDown)
+                Ok(TileKind::Floor
+                    | TileKind::StairsUp
+                    | TileKind::StairsDown
+                    | TileKind::Door(_)
+                    | TileKind::HiddenDoor
+                    | TileKind::Trap(_)
+                    | TileKind::HiddenTrap(_))
             ) && !seen.contains_key(&next)
             {
                 seen.insert(next, Some((pos, dir)));
@@ -219,7 +230,10 @@ fn route(
 }
 
 fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
-    use aihack_core::domain::item::ItemKind;
+    use aihack_core::domain::{
+        item::ItemKind,
+        tile::{DoorState, TileKind},
+    };
     for _ in 0..1000 {
         if session.world().player_pos() == target {
             return;
@@ -230,10 +244,16 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             "player died at {:?}",
             session.world().current_level()
         );
-        let healing = observation
-            .inventory
-            .iter()
-            .find(|i| i.kind == ItemKind::PotionHealing);
+        if observation.player.paralysis_turns > 0 {
+            assert!(session.submit(C::Wait).accepted);
+            continue;
+        }
+        let healing = observation.inventory.iter().find(|i| {
+            matches!(
+                i.kind,
+                ItemKind::PotionHealing | ItemKind::PotionExtraHealing
+            )
+        });
         if session.world().carried_weight() > session.world().carrying_capacity() {
             if let Some(item) = healing {
                 assert!(session.submit(C::Quaff { item: item.item }).accepted);
@@ -254,7 +274,12 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             }
         }
         let dir = route(session, target)[0];
-        let outcome = session.submit(C::Move(dir));
+        let next = session.world().player_pos().offset(dir.delta());
+        let outcome = match session.world().current_map().tile(next) {
+            Ok(TileKind::HiddenDoor) => session.submit(C::Search),
+            Ok(TileKind::Door(DoorState::Closed)) => session.submit(C::Open(dir)),
+            _ => session.submit(C::Move(dir)),
+        };
         assert!(outcome.accepted, "{:?}", outcome.events);
     }
     panic!("route did not progress");
@@ -411,7 +436,12 @@ fn tour(seed: u64, role: Role) -> GameSession {
 
 #[test]
 fn actual_command_tour_reaches_amulet_and_ascension_without_fixture_mutation() {
-    for (seed, role) in [(42, Role::Knight), (7, Role::Scout), (1234, Role::Mage)] {
+    for (seed, role) in [
+        (42, Role::Knight),
+        (7, Role::Scout),
+        (1234, Role::Mage),
+        (99, Role::Cleric),
+    ] {
         tour(seed, role);
     }
 }
@@ -481,6 +511,7 @@ fn actual_ui_role_buttons_and_victory_restart_work_at_minimum_size() {
         ("[1] Knight", Role::Knight),
         ("[2] Scout", Role::Scout),
         ("[3] Mage", Role::Mage),
+        ("[4] Cleric", Role::Cleric),
     ] {
         let mut app = TuiApp::new(
             GameSession::try_new(42).unwrap(),
@@ -508,7 +539,12 @@ fn actual_ui_role_buttons_and_victory_restart_work_at_minimum_size() {
 fn creation_keyboard_roles_are_press_only_and_out_of_phase_start_is_rejected() {
     use aihack_tui::tui::{runtime_event_to_candidate, TuiApp, UiRuntimeConfig};
     use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-    for (key, role) in [('1', Role::Knight), ('2', Role::Scout), ('3', Role::Mage)] {
+    for (key, role) in [
+        ('1', Role::Knight),
+        ('2', Role::Scout),
+        ('3', Role::Mage),
+        ('4', Role::Cleric),
+    ] {
         let mut session = GameSession::try_new(42).unwrap();
         session.submit(C::Wait);
         let mut app = TuiApp::new(session, UiRuntimeConfig::default());
