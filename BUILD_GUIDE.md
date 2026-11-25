@@ -233,7 +233,7 @@ Linux와 Windows에서 command 의미가 같아야 한다. OS별 shell 차이 �
 
 CI tool 설치는 `cargo install --locked cargo-audit --version 0.22.1`과 `cargo install --locked cargo-deny --version 0.19.4`로 고정한다. `deny.toml`은 crates.io만 허용하고 license allowlist와 crossterm duplicate deny를 정의한다. exception은 crate, version, 이유, owner, 만료일을 가져야 하며 최대 90일이다.
 
-현재 license exception은 `dependency-exceptions.json`의 `DEP-EXC-0001` 하나이며 `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception`만 허용한다. capability filesystem의 Windows backend에 필요한 shipped dependency이며 owner는 Dependency owner / Release manager, 만료일은 2026-10-31이다. `winx` 또는 `cap-primitives`/`cap-std`/`cap-fs-ext`/`cap-tempfile` version 변경 시 만료일 전이라도 machine checker가 실패한다. 다른 crate에는 이 exception을 확장하지 않는다.
+현재 license exception은 `dependency-exceptions.json`의 `DEP-EXC-0001` 하나이며 `winx 0.36.4`의 `Apache-2.0 WITH LLVM-exception`만 허용한다. capability filesystem의 Windows backend에 필요한 shipped dependency이며 owner는 Dependency owner / Release manager, 만료일은 2027-02-20이다. `winx` 또는 `cap-primitives`/`cap-std`/`cap-fs-ext`/`cap-tempfile` version 변경 시 만료일 전이라도 machine checker가 실패한다. 다른 crate에는 이 exception을 확장하지 않는다.
 
 `cargo test --locked -p aihack --test dependency_exception_gate`는 ledger, TOML AST로 parse한 `deny.toml`, exact resolved graph trigger 집합, dependency path와 현재 UTC 날짜를 함께 대조한다. comment decoy, deny table crate swap, trigger key 삭제, invalid calendar date, 미래 approval, expiry, version/path drift는 각각 실패해야 하며, 이 gate와 cargo-deny 0.19.4가 함께 PASS해야 dependency license gate가 닫힌다. `tests/build_contract.rs`는 dev-only `saphyr`로 `.github/**/*.yml|yaml`의 모든 mapping node를 순회해 local/docker action을 제외한 원격 `uses` ref가 40자리 commit인지 검사한다.
 
