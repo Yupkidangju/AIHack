@@ -3,7 +3,7 @@
   "owner": "Dependency owner / Release manager",
   "reason": "workspace all-target graph의 의도된 platform, proc-macro, dev-only ConPTY와 YAML parser 전이 중복을 exact set으로 제한",
   "shipped_scope": "workspace --all-targets resolved dependency graph; dev-only family는 release binary 비포함 여부를 별도 검토",
-  "reviewed_on": "2026-08-24",
+  "reviewed_on": "2026-11-26",
   "review_triggers": [
     "Cargo.lock change",
     "target matrix change",

@@ -8,7 +8,7 @@ EXPECTED_CANDIDATE_DATE=${3:-$(git -C "$ROOT" show -s --format=%cs "$EXPECTED_CO
 REPOSITORY_ROOT=${4:-$ROOT}
 ARCHIVE="$OUTPUT_DIR/aihack-0.3.0-source.tar.gz"
 OWNER_APPROVAL_ID="AIHACK-OWNER-2026-07-20-NGPL-01"
-MODIFICATION_NOTICE_ID="AIHACK-MODIFICATIONS-2026-08-25-01"
+MODIFICATION_NOTICE_ID="AIHACK-MODIFICATIONS-2026-11-26-01"
 
 fail() {
     printf '%s\n' "$1" >&2
@@ -183,6 +183,12 @@ require_text "$output_modifications" "Notice ID: \`$MODIFICATION_NOTICE_ID\`" "o
     || fail 'PROJECT_OWNER_LICENSE_APPROVAL.md differs between output and source archive'
 [[ "$archive_modifications" == "$output_modifications" ]] \
     || fail 'MODIFICATIONS.md differs between output and source archive'
+for approval_doc in "$archive_approval" "$output_approval"; do
+    while IFS= read -r notice_ref; do
+        [[ -z "$notice_ref" || "$notice_ref" == "$MODIFICATION_NOTICE_ID" ]] \
+            || fail "PROJECT_OWNER_LICENSE_APPROVAL.md references stale modification notice: $notice_ref"
+    done < <(grep -Eo 'AIHACK-MODIFICATIONS-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}' <<<"$approval_doc" || true)
+done
 period=$(sed -n 's/^Covered change period: `\([0-9][0-9-]*\)\.\.\([0-9][0-9-]*\)`$/\1 \2/p' \
     <<<"$output_modifications")
 [[ $(wc -l <<<"$period") -eq 1 ]] \
