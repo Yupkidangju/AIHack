@@ -46,21 +46,56 @@ pub(crate) fn campaign_world(
     for id in crate::campaign_map::level_ids() {
         let (level, centers) = crate::campaign_map::generate(seed, id)?;
         state.levels.levels.push(level);
-        let kind = if id.depth < 3 {
-            MonsterKind::Jackal
-        } else {
-            MonsterKind::Goblin
+        let mut monster_spawns = match (id.branch, id.depth) {
+            (aihack_core::ids::BranchId::Main, 1 | 2) => {
+                vec![(MonsterKind::Jackal, centers[2])]
+            }
+            (aihack_core::ids::BranchId::Main, 3) => vec![(MonsterKind::Goblin, centers[2])],
+            (aihack_core::ids::BranchId::Main, 4) => vec![
+                (MonsterKind::Orc, centers[2]),
+                (
+                    MonsterKind::FloatingEye,
+                    Pos {
+                        x: centers[2].x + 1,
+                        y: centers[2].y - 1,
+                    },
+                ),
+            ],
+            (aihack_core::ids::BranchId::Main, 5) => vec![(MonsterKind::Orc, centers[2])],
+            (aihack_core::ids::BranchId::Main, 6) => vec![(MonsterKind::Ogre, centers[2])],
+            (aihack_core::ids::BranchId::Mines, 1) => vec![
+                (MonsterKind::Kobold, centers[2]),
+                (
+                    MonsterKind::FloatingEye,
+                    Pos {
+                        x: centers[2].x + 1,
+                        y: centers[2].y - 1,
+                    },
+                ),
+            ],
+            _ => vec![
+                (MonsterKind::Orc, centers[2]),
+                (
+                    MonsterKind::Kobold,
+                    Pos {
+                        x: centers[2].x + 1,
+                        y: centers[2].y + 1,
+                    },
+                ),
+            ],
         };
-        let monster = state
-            .entities
-            .spawn_monster_with_template(
-                kind,
-                try_monster_template_from_registry(kind, registry)?,
-                centers[2],
-            )
-            .map_err(allocation_content_error)?;
-        state.entities.set_actor_location(monster, id, centers[2]);
-        for (kind, pos) in [
+        for (kind, pos) in monster_spawns.drain(..) {
+            let monster = state
+                .entities
+                .spawn_monster_with_template(
+                    kind,
+                    try_monster_template_from_registry(kind, registry)?,
+                    pos,
+                )
+                .map_err(allocation_content_error)?;
+            state.entities.set_actor_location(monster, id, pos);
+        }
+        let mut floor_items = vec![
             (ItemKind::FoodRation, centers[1]),
             (
                 ItemKind::PotionHealing,
@@ -69,7 +104,50 @@ pub(crate) fn campaign_world(
                     y: centers[1].y,
                 },
             ),
-        ] {
+        ];
+        match (id.branch, id.depth) {
+            (aihack_core::ids::BranchId::Main, 2 | 5) => floor_items.push((
+                ItemKind::ScrollCharging,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+            )),
+            (aihack_core::ids::BranchId::Main, 3) | (aihack_core::ids::BranchId::Mines, 1) => {
+                floor_items.push((
+                    ItemKind::ShortSword,
+                    Pos {
+                        x: centers[1].x,
+                        y: centers[1].y + 1,
+                    },
+                ))
+            }
+            (aihack_core::ids::BranchId::Main, 4 | 6) => floor_items.push((
+                ItemKind::PotionExtraHealing,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+            )),
+            (aihack_core::ids::BranchId::Mines, 2) => {
+                floor_items.push((
+                    ItemKind::ArmorChainMail,
+                    Pos {
+                        x: centers[1].x,
+                        y: centers[1].y + 1,
+                    },
+                ));
+                floor_items.push((
+                    ItemKind::Mace,
+                    Pos {
+                        x: centers[1].x + 1,
+                        y: centers[1].y + 1,
+                    },
+                ));
+            }
+            _ => {}
+        }
+        for (kind, pos) in floor_items {
             spawn_item(
                 &mut state.entities,
                 registry,
@@ -96,6 +174,11 @@ pub(crate) fn campaign_world(
             ItemKind::WandMagicMissile,
             ItemKind::PotionHealing,
             ItemKind::PotionHealing,
+        ],
+        Role::Cleric => vec![
+            ItemKind::Mace,
+            ItemKind::PotionExtraHealing,
+            ItemKind::ScrollIdentify,
         ],
     };
     for kind in [

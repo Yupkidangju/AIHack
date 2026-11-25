@@ -379,13 +379,15 @@ impl GameSession {
                     from,
                     to,
                 }];
-                events.extend(traps::trigger_player_trap(&mut self.inner.world));
+                let (trap_events, triggered_trap) =
+                    traps::trigger_player_trap_with_kind(&mut self.inner.world);
+                events.extend(trap_events);
                 let player_id = self.world.player_id();
                 let death_events = match death::collect_death_events_if_hp_depleted(
                     &mut self.inner.world,
                     player_id,
                     DeathCause::Trap {
-                        trap: TrapKind::Pit,
+                        trap: triggered_trap.unwrap_or(TrapKind::Pit),
                     },
                 ) {
                     Ok(events) => events,

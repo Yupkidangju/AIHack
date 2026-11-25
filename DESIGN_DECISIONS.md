@@ -12,6 +12,30 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-P4-01: 생성 던전 문·함정 전이 검증 및 P4 역할·콘텐츠 확장
+
+Status: Accepted (2026-11-26); 구현 및 전체 로컬 게이트 검증 진행 중. 기준 계약: `docs/campaign_spec.md` P4.
+
+Context:
+
+P1–P3 첫 캠페인은 생성 맵의 문과 함정을 비워 둔 채 `level.map == expected.map` 완전 일치로 V2 저장을 검증했고, 역할 3종과 초기 몬스터/장비 3·11종에 한정됐다. P4에서는 생성 던전에 닫힌 문·비밀문·다종 함정 상호작용을 도입하고 4번째 역할(`Cleric`)과 중·후반 아이템/몬스터를 추가한다.
+
+Decision:
+
+- `TrapKind`에 `Dart`(피해 2)와 `Bear`(피해 2 + 1턴 마비)를 추가하고, `submit_move`의 함정 사망 원인이 실제 발동한 `TrapKind`를 기록하도록 연결한다.
+- `campaign_map::generate`는 1칸 폭 출입구 문(홀수 층 닫힌 문, 짝수 층 `HiddenDoor`)과 방 내부 회피 가능 숨겨진 함정(`Pit`/`Dart`/`Bear`)을 결정론적으로 배치한다.
+- V2 저장 검증은 `campaign_map::validate_persisted_map`으로 변경하여 정당한 런타임 전이(`Door(Closed)<->Door(Open)`, `HiddenDoor->Door(*)`, `HiddenTrap(k)->Trap(k)`)만 허용하고 지형·계단·함정·문 위조를 거부한다.
+- `Role::Cleric`, 신규 5개 아이템(`ShortSword`, `Mace`, `ArmorChainMail`, `PotionExtraHealing`, `ScrollCharging`), 신규 3종 몬스터(`Kobold`, `Orc`, `Ogre`)를 추가하되 기존 11개 아이템·3종 몬스터 정의와 V1 저장·2층 호환 경로는 변경하지 않는다.
+
+Alternatives:
+
+- 생성 맵 검증을 생략하고 V2 맵 전체를 신뢰: 임의 벽 제거·계단 위조가 통과하므로 기각한다.
+- 기존 `items.toml`의 `Dagger`/`ArmorLeather` 수치를 수정: R7/R9 및 `P8-G01..G20` 회귀 기준과 충돌하므로 신규 아이템 추가만 허용한다.
+
+Consequences:
+
+`ContentRegistry::content_hash()`와 `docs/provenance/r7-content.sha256`가 P4 콘텐츠 기준으로 갱신되며 `PROVENANCE.md`에 변경 기록을 남긴다. V1 저장과 `campaign = None` 해시는 불변이다.
+
 ## ADR-MA2-02: P1–P3 캠페인과 명시적 save 버전
 
 Status: Implemented with local verification; independent re-audit required (2026-09-05). 증거: `docs/campaign_implementation.md`.

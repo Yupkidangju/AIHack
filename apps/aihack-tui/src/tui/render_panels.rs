@@ -334,6 +334,9 @@ fn entity_kind_label(kind: EntityKind) -> &'static str {
         EntityKind::Monster(crate::domain::monster::MonsterKind::Jackal) => "jackal",
         EntityKind::Monster(crate::domain::monster::MonsterKind::Goblin) => "goblin",
         EntityKind::Monster(crate::domain::monster::MonsterKind::FloatingEye) => "floating eye",
+        EntityKind::Monster(crate::domain::monster::MonsterKind::Kobold) => "kobold",
+        EntityKind::Monster(crate::domain::monster::MonsterKind::Orc) => "orc",
+        EntityKind::Monster(crate::domain::monster::MonsterKind::Ogre) => "ogre",
         EntityKind::Item(kind) => item_label(kind),
     }
 }
@@ -342,10 +345,13 @@ fn tile_label(tile: TileKind) -> &'static str {
     match tile {
         TileKind::Wall => "wall",
         TileKind::Floor => "floor",
-        TileKind::Door(_) => "door",
+        TileKind::Door(aihack_ai_contract::DoorState::Closed) => "closed door",
+        TileKind::Door(aihack_ai_contract::DoorState::Open) => "open door",
         TileKind::StairsDown => "stairs down",
         TileKind::StairsUp => "stairs up",
-        TileKind::Trap(_) => "trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Pit) => "pit trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Dart) => "dart trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Bear) => "bear trap",
         TileKind::HiddenDoor => "hidden door",
         TileKind::HiddenTrap(_) => "hidden trap",
     }
@@ -379,6 +385,7 @@ pub fn character_creation_lines() -> Vec<String> {
         "         [1] Knight - HP28, melee".to_string(),
         "         [2] Scout - HP22, accuracy".to_string(),
         "         [3] Mage - HP18, wands".to_string(),
+        "         [4] Cleric - HP24, mace/heal".to_string(),
         "         Campaign: Main 6 + Mines 2; return the Amulet".to_string(),
         "         Main 3 up stairs: B enters the Mines".to_string(),
         "         Enter: legacy two-floor Adventurer".to_string(),

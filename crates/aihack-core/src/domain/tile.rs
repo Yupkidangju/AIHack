@@ -9,6 +9,8 @@ pub enum DoorState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrapKind {
     Pit,
+    Dart,
+    Bear,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

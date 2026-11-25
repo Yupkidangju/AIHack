@@ -8,3 +8,12 @@
 - [x] P3a 목표: 고유 AmuletAscension item. pickup/drop/recover와 forged save 거부.
 - [x] P3b 승천: Ascend→Victory→결과→새 게임. 조기/중복 성공 거부와 실제 명령 완주.
 - [x] 최종: 기존 478 회귀 포함 총 491 tests, fmt/clippy/release PASS. 증거: `docs/campaign_implementation.md`.
+
+# P4 체크리스트 (2026-11-26)
+
+- [x] P4-doc: `docs/campaign_spec.md`, `spec.md`, `DESIGN_DECISIONS.md` (`ADR-P4-01`), `tasks/plan.md`, `tasks/todo.md` 문서 선행 확정.
+- [x] P4a: `TrapKind::Dart/Bear`, `campaign_map` 문/비밀문/함정 배치, `validate_persisted_map` 전이 검증.
+- [x] P4b: `Role::Cleric`, 신규 5아이템(`RechargeWand` 포함), 신규 3몬스터, `PROVENANCE.md`·`r7-content.sha256`·`registry.rs` hash 동기화.
+- [x] P4c: TUI(`render_map`, `render_panels`, `input`, `labels`, `mod`) 및 Headless(`--role cleric`, `PotionExtraHealing`) 연동.
+- [x] P4d: `tests/campaign.rs` 4역할 완주 및 문/비밀문/함정/신규 아이템·몬스터/위조 저장 회귀 테스트.
+- [x] P4-verify: `fmt`, `clippy`, `test -j 4`, `release`, `cargo-audit`, `cargo-deny`, `r7_checkpoint`, `r8_checkpoint`, headless smoke & 최종 문서 마감.

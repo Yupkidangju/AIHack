@@ -282,6 +282,21 @@ impl Entity {
                 ..
             } => Some(AttackProfile::natural("gaze", stats.damage)),
             EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Kobold),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("spear", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Orc),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("scimitar", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Ogre),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("club", stats.damage)),
+            EntityPayload::Actor {
                 kind: ActorKind::Player,
                 ..
             } => None,

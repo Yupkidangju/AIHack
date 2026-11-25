@@ -323,7 +323,12 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         if let Some(item) = observation
             .inventory
             .iter()
-            .find(|item| item.kind == ItemKind::PotionHealing)
+            .find(|item| {
+                matches!(
+                    item.kind,
+                    ItemKind::PotionHealing | ItemKind::PotionExtraHealing
+                )
+            })
             .map(|item| item.item)
         {
             let command = CommandIntent::Quaff { item };

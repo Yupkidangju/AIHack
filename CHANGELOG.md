@@ -7,6 +7,8 @@
 - 기사·정찰자·마법사 선택과 처치 XP/최대 10레벨 성장, 캠페인 운반 한도 120 및 HUD를 추가했다.
 - seed 기반 Main 6층/Mines 2층 생성·분기 왕복, 고유 아뮬렛 획득 후 지상 귀환 Victory를 연결했다.
 - `--role` headless 시작, campaign wire save schema 2와 구형 V1 호환 읽기, 성장/목표/맵/승리 검증을 추가했다.
+- 제4역할 `Cleric`(`[4] Cleric`, `HP 24, hit +3, dmg +1`, `--role cleric`), 캠페인 생성 문/비밀문·`Dart`/`Bear` 함정(마비 및 실제 함정 사인 기록)·전이 인식 V2 맵 저장 검증을 추가했다.
+- 신규 5종 아이템(`ShortSword`, `Mace`, `ArmorChainMail`, `PotionExtraHealing`, 충전 주문서 `ScrollCharging`)과 신규 3종 몬스터(`Kobold`, `Orc`, `Ogre`), TUI 닫힌 문(`+`)/열린 문(`-`)·함정 라벨 구분 및 함정 위 근접 bump attack을 추가했다.
 
 ### Fixed
 

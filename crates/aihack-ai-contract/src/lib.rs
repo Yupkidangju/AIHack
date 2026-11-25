@@ -12,7 +12,7 @@ pub use aihack_core::{
         entity::EntityKind,
         item::ItemKind,
         monster::MonsterKind,
-        tile::{TileKind, TrapKind},
+        tile::{DoorState, TileKind, TrapKind},
     },
     event::GameEvent,
     hash::SnapshotHash,

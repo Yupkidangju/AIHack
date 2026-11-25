@@ -325,12 +325,18 @@ fn validate(
 
 fn canonical_item_kind(id: &str) -> Option<&'static str> {
     match id {
-        "item.weapon.dagger" | "item.weapon.rock" => Some("weapon"),
+        "item.weapon.dagger"
+        | "item.weapon.short_sword"
+        | "item.weapon.mace"
+        | "item.weapon.rock" => Some("weapon"),
         "item.food.ration" => Some("food"),
-        "item.potion.healing" => Some("potion"),
+        "item.potion.healing" | "item.potion.extra_healing" => Some("potion"),
         "item.wand.magic_missile" => Some("wand"),
-        "item.scroll.reveal" | "item.scroll.identify" | "item.scroll.teleport" => Some("scroll"),
-        "item.armor.leather" => Some("armor"),
+        "item.scroll.reveal"
+        | "item.scroll.identify"
+        | "item.scroll.teleport"
+        | "item.scroll.charging" => Some("scroll"),
+        "item.armor.leather" | "item.armor.chain_mail" => Some("armor"),
         "item.corpse.jackal" => Some("corpse"),
         "item.quest.ascension" => Some("quest"),
         _ => None,
@@ -377,7 +383,10 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
             item.slot.is_none()
                 && item.hit_bonus.is_none()
                 && item.damage.is_none()
-                && item.effect.as_deref() == Some("heal_1d8_plus_4")
+                && matches!(
+                    item.effect.as_deref(),
+                    Some("heal_1d8_plus_4" | "heal_2d8_plus_8")
+                )
                 && item.charges.is_none()
                 && item.nutrition.is_none()
                 && item.ac_bonus.is_none()
@@ -397,7 +406,7 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                 && item.damage.is_none()
                 && matches!(
                     item.effect.as_deref(),
-                    Some("reveal" | "identify" | "teleport")
+                    Some("reveal" | "identify" | "teleport" | "charging")
                 )
                 && item.charges.is_none()
                 && item.nutrition.is_none()

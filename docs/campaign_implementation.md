@@ -38,3 +38,31 @@ P1–P3의 명시된 첫 캠페인 범위는 local verified로 완료했다. 독
 첫 bounded campaign이며 NetHack 전체 직업/마법/종족/분기/신앙/원소계 구현을 뜻하지 않는다. 생성 map에는 현재 문·함정이 없고 V2는 generator v1 map을 검증한다. save의 semantic validator는 로컬 사용자의 완전한 파일 위조를 막는 암호학적 인증 수단이 아니다. XP cap은 180이며 실제 8층 콘텐츠의 보상 총량에 따라 도달 레벨은 더 낮을 수 있다.
 
 release/게시 승인, modification notice와 final-SHA bundle 갱신, 새 양 OS CI는 별도 작업이며 이번 기능 검증으로 승인하지 않는다. 커밋·푸시는 실행하지 않았다.
+
+## P4 확장 구현·검증 기록 (2026-11-26)
+
+### 구현
+
+- **P4a (문/비밀문·함정·전이 검증)**:
+  - `aihack-core::domain::tile::TrapKind`에 `Dart`(2 피해)·`Bear`(2 피해 + `paralysis_turns = 2`, 턴 종료 감소 후 다음 1턴 완전 마비)를 추가하고, `session::submit_move`가 발동한 실제 `TrapKind`를 `DeathCause::Trap { trap }`에 기록하도록 연결했다.
+  - `systems/movement.rs`가 `TileKind::Trap(_) | TileKind::HiddenTrap(_)` 위 적 몬스터에 대한 근접 bump attack을 허용한다.
+  - `campaign_map::generate`(generator v2)가 모든 캠페인 층 `(7, centers[0].y)`에 `Door(Closed)`, 홀수 층 `(17, centers[1].y)`에 `Door(Closed)`, 짝수 층에 `HiddenDoor`, `centers[1]-(1,0)`에 `Pit`(홀수 층)/`Dart`(짝수 층), Main 3/5/6 및 Mines 2 `centers[2]-(1,0)`에 `Bear` `HiddenTrap`을 결정적으로 배치한다.
+  - `save.rs`의 엄격 동일 맵 비교를 `campaign_map::validate_persisted_map`으로 교체해 정당한 문 개폐·비밀문 공개·함정 공개 전이만 허용하고 임의 변조(벽 뚫기, 계단 삭제/추가, 함정 제거/변형, 임의 문 위조)를 거부한다.
+- **P4b (성직자·신규 5아이템·신규 3몬스터)**:
+  - 제4역할 `Role::Cleric`(`HP 24, hit +3, dmg +1`, 추가 장비 `[Mace, PotionExtraHealing, ScrollIdentify]`, 초기 무게 `97/120`, TUI `[4] Cleric` 및 키 `'4'`, headless `--role cleric`)을 추가했다.
+  - `items.toml`에 `short_sword`, `mace`, `chain_mail`(`ac_bonus=3`), `potion.extra_healing`(`2d8+8`), `scroll.charging`(`ConsumableEffect::RechargeWand`) 5종을 추가했다.
+  - `monsters.toml`에 `kobold`(HP 5, 1d4, diff 2), `orc`(HP 10, 1d6, diff 3), `ogre`(HP 16, 1d8, diff 5) 3종을 추가하고, `entity::natural_attack_profile` 및 캠페인 8층 생성 테이블에 연결했다.
+  - 기존 11종 아이템·3종 몬스터·`main_1.toml`·`main_2.toml` 및 legacy V1 저장/해시는 변경하지 않았다.
+- **P4c (TUI·Headless·Provenance)**:
+  - `aihack-ai-contract`에서 `DoorState`를 재노출하고 `render_map.rs`/`render_panels.rs`가 닫힌 문(`+`, `"closed door"`)·열린 문(`-`, `"open door"`)·함정 라벨(`"pit trap"`, `"dart trap"`, `"bear trap"`)·신규 몬스터/아이템 및 60×24 `[4] Cleric`을 표시하도록 갱신했다.
+  - `docs/provenance/r7-content.sha256`와 `PROVENANCE.md`를 LF SHA-256으로 동기화했고, `crates/aihack-content/tests/registry.rs` golden content hash를 `f3767a7764223506`으로 갱신했다.
+
+### 검증 증거
+
+- `tests/campaign.rs`: 4역할(`Knight`, `Scout`, `Mage`, `Cleric`) 실제 명령 8층 왕복·승천 완주 및 60×24 UI/키보드 선택(**12 PASS / 0 FAIL**).
+- `tests/campaign_p4.rs`: 캠페인 문/비밀문(`Open`/`Close`/`Kick`/`Search`/V2 roundtrip), `Pit`/`Dart`/`Bear` 함정·마비·`ScrollReveal`·치명적 `DeathCause`, 전이 검증 허용 및 변조 거부, `Cleric` 초기 키트 및 실제 몬스터 처치 레벨 10 성장, 신규 5아이템(`ScrollCharging` 완드 충전/상한·`ArmorChainMail` AC `-3`)·3몬스터·함정 위 근접 공격, TUI 렌더링(**6 PASS / 0 FAIL**).
+- `apps/aihack-headless/tests/headless_contract.rs`: `--role cleric` V2 저장·리포트 생성 포함 **7 PASS / 0 FAIL**.
+- `tests/content_validation.rs`(신규 5종 ID 포함 **13 PASS / 0 FAIL**) 및 `tests/traps.rs`(**6 PASS / 0 FAIL**).
+- headless CLI smoke (`--seed 42 --role cleric --turns 10 --policy wait-v1`): `accepted_turns=10`, `final_state=Playing`, `final_hash=8e58029000b64cbb`.
+- `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo build -j 4 --workspace --all-targets --release --locked`, `cargo deny check licenses bans sources`, `cargo audit`(0 vulnerabilities), `scripts/r7_checkpoint.sh`(PASS), `scripts/r8_checkpoint.sh`(PASS).
+- 커밋·푸시는 실행하지 않았다.

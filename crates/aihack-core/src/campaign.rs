@@ -8,6 +8,7 @@ pub enum Role {
     Knight,
     Scout,
     Mage,
+    Cleric,
 }
 
 impl Role {
@@ -16,6 +17,7 @@ impl Role {
             Self::Knight => 28,
             Self::Scout => 22,
             Self::Mage => 18,
+            Self::Cleric => 24,
         }
     }
     pub const fn base_hit(self) -> i16 {
@@ -23,6 +25,7 @@ impl Role {
             Self::Knight => 4,
             Self::Scout => 5,
             Self::Mage => 3,
+            Self::Cleric => 3,
         }
     }
     pub const fn base_damage(self) -> i16 {
@@ -30,6 +33,7 @@ impl Role {
             Self::Knight => 2,
             Self::Scout => 1,
             Self::Mage => 0,
+            Self::Cleric => 1,
         }
     }
 }

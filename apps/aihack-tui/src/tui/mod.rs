@@ -741,15 +741,22 @@ impl TuiApp {
                 InventoryAction::Read => CommandIntent::Read { item: item.item },
             },
             _ => match item.kind {
-                ItemKind::Dagger => CommandIntent::Wield { item: item.item },
-                ItemKind::ArmorLeather => CommandIntent::Wear { item: item.item },
-                ItemKind::PotionHealing => CommandIntent::Quaff { item: item.item },
+                ItemKind::Dagger | ItemKind::ShortSword | ItemKind::Mace => {
+                    CommandIntent::Wield { item: item.item }
+                }
+                ItemKind::ArmorLeather | ItemKind::ArmorChainMail => {
+                    CommandIntent::Wear { item: item.item }
+                }
+                ItemKind::PotionHealing | ItemKind::PotionExtraHealing => {
+                    CommandIntent::Quaff { item: item.item }
+                }
                 ItemKind::FoodRation | ItemKind::CorpseJackal => {
                     CommandIntent::Eat { item: item.item }
                 }
                 ItemKind::ScrollReveal
                 | ItemKind::ScrollIdentify
-                | ItemKind::ScrollLevelTeleport => CommandIntent::Read { item: item.item },
+                | ItemKind::ScrollLevelTeleport
+                | ItemKind::ScrollCharging => CommandIntent::Read { item: item.item },
                 ItemKind::WandMagicMissile | ItemKind::Rock | ItemKind::AmuletAscension => {
                     return None
                 }
@@ -1674,12 +1681,13 @@ fn key_to_candidate_for_state(
             _ => None,
         },
         RunState::CharacterCreation => match ch {
-            '1' | '2' | '3' => Some(UiCommandCandidate::Command(
+            '1' | '2' | '3' | '4' => Some(UiCommandCandidate::Command(
                 aihack_ai_contract::CommandIntent::StartCampaign {
                     role: match ch {
                         '1' => aihack_ai_contract::Role::Knight,
                         '2' => aihack_ai_contract::Role::Scout,
-                        _ => aihack_ai_contract::Role::Mage,
+                        '3' => aihack_ai_contract::Role::Mage,
+                        _ => aihack_ai_contract::Role::Cleric,
                     },
                 },
             )),
@@ -1825,6 +1833,12 @@ fn modal_mouse_candidate(
                     "[3] Mage",
                     UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
                         role: aihack_ai_contract::Role::Mage,
+                    }),
+                ),
+                (
+                    "[4] Cleric",
+                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
+                        role: aihack_ai_contract::Role::Cleric,
                     }),
                 ),
                 (

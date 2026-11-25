@@ -2,7 +2,7 @@ use aihack_core::{
     domain::{
         level::GameLevel,
         map::{GameMap, MapLayout},
-        tile::TileKind,
+        tile::{DoorState, TileKind, TrapKind},
     },
     error::ContentError,
     ids::{BranchId, LevelId},
@@ -35,7 +35,7 @@ impl MapLayout for Layout {
     }
 }
 
-/// Combat RNG와 독립인 generator v1. 각 방을 L자 통로로 연결한다.
+/// Combat RNG와 독립인 generator v2. 방/L자 통로와 문·비밀문·함정을 배치한다.
 pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 4]), ContentError> {
     let mut state = seed
         ^ (id.depth as u64).wrapping_mul(0x9e3779b97f4a7c15)
@@ -77,6 +77,49 @@ pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 4]), 
             overrides.push((Pos { x: b.x, y }, TileKind::Floor));
         }
     }
+    overrides.push((
+        Pos {
+            x: 7,
+            y: centers[0].y,
+        },
+        TileKind::Door(DoorState::Closed),
+    ));
+    let second_door = if id.depth % 2 == 1 {
+        TileKind::Door(DoorState::Closed)
+    } else {
+        TileKind::HiddenDoor
+    };
+    overrides.push((
+        Pos {
+            x: 17,
+            y: centers[1].y,
+        },
+        second_door,
+    ));
+    let room1_trap = if id.depth % 2 == 1 {
+        TrapKind::Pit
+    } else {
+        TrapKind::Dart
+    };
+    overrides.push((
+        Pos {
+            x: centers[1].x - 1,
+            y: centers[1].y,
+        },
+        TileKind::HiddenTrap(room1_trap),
+    ));
+    if matches!(
+        (id.branch, id.depth),
+        (BranchId::Main, 3 | 5 | 6) | (BranchId::Mines, 2)
+    ) {
+        overrides.push((
+            Pos {
+                x: centers[2].x - 1,
+                y: centers[2].y,
+            },
+            TileKind::HiddenTrap(TrapKind::Bear),
+        ));
+    }
     overrides.push((centers[0], TileKind::StairsUp));
     if (id.branch == BranchId::Main && id.depth < 6)
         || (id.branch == BranchId::Mines && id.depth < 2)
@@ -90,4 +133,33 @@ pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 4]), 
         },
         centers,
     ))
+}
+
+/// 저장된 캠페인 지도가 생성 기준 맵의 정당한 런타임 상태 전이만 포함하는지 검사한다.
+pub(crate) fn validate_persisted_map(
+    seed: u64,
+    id: LevelId,
+    actual: &GameMap,
+) -> Result<(), String> {
+    let (expected, _) = generate(seed, id).map_err(|error| error.to_string())?;
+    if actual.width != expected.map.width || actual.height != expected.map.height {
+        return Err("campaign generator/map mismatch".to_owned());
+    }
+    for y in 0..expected.map.height {
+        for x in 0..expected.map.width {
+            let pos = Pos { x, y };
+            let exp_tile = expected.map.tile(pos).map_err(|error| error.to_string())?;
+            let act_tile = actual.tile(pos).map_err(|error| error.to_string())?;
+            let valid = match (exp_tile, act_tile) {
+                (TileKind::Door(_), TileKind::Door(_)) => true,
+                (TileKind::HiddenDoor, TileKind::HiddenDoor | TileKind::Door(_)) => true,
+                (TileKind::HiddenTrap(e), TileKind::HiddenTrap(a) | TileKind::Trap(a)) => e == a,
+                (e, a) => e == a,
+            };
+            if !valid {
+                return Err("campaign generator/map mismatch".to_owned());
+            }
+        }
+    }
+    Ok(())
 }
