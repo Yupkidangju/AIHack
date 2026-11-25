@@ -1,425 +1,436 @@
 # AGENTS.md (Global Rules - D3D Protocol)
 
 **Template Name:** D3D Protocol  
-**Template Version:** 1.3
+**Template Version:** 1.4  
 **Project Name:** ${PROJECT_NAME}  
 **Project Version:** ${CURRENT_VERSION}  
 **Environment:** ${ENV_TYPE}
 
 ## 0. Rule Priority and Interpretation
 
-이 문서는 현재 작업 공간의 기본 운영 정책이다. 실제 실행 시 다음 우선순위를 적용한다.
+This file defines the working policies for the current workspace. Apply this order of precedence:
 
-1. 플랫폼, 시스템, 보안 및 법적 제한
-2. 사용자의 현재 작업에 대한 명시적 요청
-3. 현재 프로젝트의 `spec.md`와 승인된 설계 문서
-4. 이 `AGENTS.md`
-5. 기존 코드베이스의 일관된 관례와 도구 제약
+1. Platform, system, security, and legal constraints
+2. The user's explicit request for the current task
+3. The project's `spec.md` and approved design documents
+4. This `AGENTS.md`
+5. Consistent codebase conventions and tool constraints
 
-규칙이 충돌할 경우 더 높은 우선순위와 더 구체적인 규칙을 적용한다. 최신 사용자 요구가 기존 `spec.md`를 변경하는 경우, 해당 요구를 거부하지 말고 `spec.md`를 먼저 또는 같은 작업 단위에서 갱신한 뒤 코드와 문서를 동기화한다.
+Resolve conflicts by priority and specificity. When the latest user request changes `spec.md`, do not reject the request: update `spec.md` first or within the same work unit, then synchronize code and documentation.
 
-`MUST`, `금지`, `절대`는 안전 또는 데이터 보존에 필요한 경우에만 사용한다. 서로 양립할 수 없는 규칙이 발견되면 작업 전체를 거부하지 말고, 안전한 범위에서 가능한 작업을 계속한 뒤 충돌과 처리 결과를 보고한다.
+Reserve emphatic terms such as `MUST`, `PROHIBITED`, and `NEVER` for safety or data-preservation needs. If rules cannot be reconciled, do not reject the entire task. Continue what can safely be done, then report the conflict and its resolution.
 
 ## 1. Project Metadata
 
-* **Name:** ${PROJECT_NAME}
-* **Version:** ${CURRENT_VERSION}
-* **Environment:** ${ENV_TYPE}
-* **Repository Type:** ${REPOSITORY_TYPE}
-* **Documentation Profile:** ${DOC_PROFILE}
-* **User-facing Languages:** ${SUPPORTED_LANGUAGES}
+- **Name:** ${PROJECT_NAME}
+- **Version:** ${CURRENT_VERSION}
+- **Environment:** ${ENV_TYPE}
+- **Repository Type:** ${REPOSITORY_TYPE}
+- **Documentation Profile:** ${DOC_PROFILE}
+- **User-facing Languages:** ${SUPPORTED_LANGUAGES}
 
-값이 비어 있으면 기존 프로젝트 구조와 파일에서 추론하되, 추론한 값은 문서에 `가정` 또는 `미확정`으로 표시한다.
+Infer missing values from existing project structure and files, but label inferred values as `Assumption` or `Unconfirmed` in the documentation.
 
 ## 2. Permissions
 
 ### 2.1 Filesystem Scope
 
-* 기본 읽기 및 쓰기 범위는 `project_root`이다.
-* 에이전트가 직접 만든 임시 디렉터리는 작업 중 사용할 수 있다.
-* 프로젝트 외부 경로는 사용자가 명시적으로 허용한 경우에만 쓴다.
-* 심볼릭 링크나 경로 정규화 결과가 허용 범위 밖을 가리키면 쓰기 또는 삭제하지 않는다.
+- The default read/write scope is `project_root`.
+- The agent may use temporary directories it creates for the task.
+- Write outside the project only with the user's explicit permission.
+- Do not write or delete through a symbolic link or normalized path that resolves outside the allowed scope.
 
 ### 2.2 Read Permission
 
-다음을 포함한 프로젝트 파일을 읽을 수 있다.
+The agent may read project files, including:
 
-* 소스 코드, 테스트, 문서, 설정, 스크립트, 에셋, 마이그레이션, 잠금 파일, 빌드 메타데이터
-* 숨김 파일과 도구 설정 파일
-* 오류 로그와 프로젝트 내 생성 결과물
+- Source, tests, documentation, configuration, scripts, assets, migrations, lock files, and build metadata
+- Hidden files and tool configuration
+- Error logs and generated output within the project
 
-단, `.env`, 인증서, 토큰, 개인 키 등 비밀정보는 필요한 범위에서만 읽고 응답, 로그, 문서, 커밋 또는 외부 검색에 노출하지 않는다.
+Read secrets such as `.env` files, certificates, tokens, and private keys only as needed. Do not expose them in responses, logs, documentation, commits, or external searches.
 
 ### 2.3 Write Permission
 
-사용자의 요청을 완료하기 위해 `project_root` 안에서 다음 항목을 생성, 수정, 이동, 이름 변경 또는 안전하게 삭제할 수 있다.
+To fulfill the user's request, the agent may create, modify, move, rename, or safely delete the following within `project_root`:
 
-* 문서 및 버전 파일
-* 소스 코드와 생성 코드
-* 테스트, 픽스처, 스냅샷
-* 이미지, 아이콘, 폰트 참조, 오디오, 정적 파일 등 프로젝트 에셋
-* 설정, 매니페스트, 잠금 파일, 빌드 파일
-* 스크립트, 도구 파일, 마이그레이션
-* 프로젝트 로컬 아카이브와 임시 작업물
+- Documentation and version files
+- Source and generated code
+- Tests, fixtures, and snapshots
+- Project assets such as images, icons, font references, audio, and static files
+- Configuration, manifests, lock files, and build files
+- Scripts, tool files, and migrations
+- Project-local archives and temporary work
 
-정상적인 소스 코드 및 에셋 쓰기는 별도 승인 없이 수행한다. 단, 대량 삭제, 복구 곤란한 데이터 변환, 비밀정보 변경, 운영 데이터 조작은 제13장의 승인 경계를 따른다.
+Routine source and asset writes do not require separate approval. Bulk deletion, hard-to-reverse data conversion, secret changes, and production-data operations follow Section 13's approval boundaries.
 
 ### 2.4 Execute Permission
 
-작업에 필요한 범위에서 다음을 실행할 수 있다.
+As needed for the task, the agent may run:
 
-* 셸과 파일 유틸리티
-* 패키지 매니저와 의존성 검사 도구
-* 컴파일러, 빌드 도구, 태스크 러너
-* 테스트 러너, 린터, 포매터, 타입 검사기
-* 코드 생성기, 마이그레이션 도구, 개발 서버
-* Git의 상태 확인, diff, 로그 등 읽기 작업
+- Shells and file utilities
+- Package managers and dependency inspection tools
+- Compilers, build tools, and task runners
+- Test runners, linters, formatters, and type checkers
+- Code generators, migration tools, and development servers
+- Read-only Git operations such as status, diff, and log
 
-커밋, 푸시, 태그, 릴리스, 강제 리셋, 히스토리 재작성은 사용자의 명시적 요청이나 프로젝트에 기록된 사전 승인 정책이 있을 때만 수행한다.
+Commit, push, tag, release, forced reset, and history rewriting require an explicit user request or a pre-approval policy recorded in the project.
 
 ### 2.5 Text and Binary Files
 
-* 텍스트 파일은 기본적으로 UTF-8을 사용한다.
-* 바이너리 에셋에는 문자 인코딩을 강제하지 않는다.
-* 기존 파일의 BOM, 줄바꿈 형식, 생성기 요구사항이 있으면 데이터 손상 없이 보존한다.
+- Use UTF-8 for text files by default.
+- Do not impose text encoding on binary assets.
+- Preserve existing BOMs, line endings, and generator requirements without corrupting data.
 
 ## 3. Initialization and Scaffolding Protocol
 
 ### 3.1 Project State Detection
 
-초기화 전에 다음 상태를 구분한다.
+Before initialization, distinguish:
 
-* **Empty Greenfield:** 의미 있는 파일이 없는 새 디렉터리
-* **Document-first Greenfield:** `spec.md`, `designs.md` 등 문서만 존재하는 새 프로젝트
-* **Brownfield:** 소스, 설정, Git 이력 또는 기존 애플리케이션이 존재하는 프로젝트
+- **Empty Greenfield:** A new directory with no meaningful files.
+- **Document-first Greenfield:** A new project containing only documents such as `spec.md` and `designs.md`.
+- **Brownfield:** A project with source, configuration, Git history, or an existing application.
 
-단순히 `.md` 파일 하나가 있다는 이유만으로 모든 스캐폴딩을 금지하지 않는다.
+The presence of a single `.md` file does not prohibit all scaffolding.
 
 ### 3.2 Protected Files
 
-다음 파일은 기본 보호 대상이다.
+Protect these by default:
 
-* `spec.md`, `designs.md`, `DESIGN_DECISIONS.md`
-* 기존 `README.md`, `CHANGELOG.md`
-* `.env`, 인증서, 키, 사용자 데이터
-* 기존 소스, 설정, 테스트, 에셋 및 사용자가 만든 파일
+- `spec.md`, `designs.md`, `DESIGN_DECISIONS.md`
+- Existing `README.md` and `CHANGELOG.md`
+- `.env`, certificates, keys, and user data
+- Existing source, configuration, tests, assets, and user-created files
 
-보호 대상은 명시적 병합 또는 사용자의 요청 없이 덮어쓰지 않는다.
+Do not overwrite protected files without an explicit merge or user request.
 
 ### 3.3 Safe Scaffolding
 
-* 빈 디렉터리이며 도구가 안전하게 동작하는 경우에는 루트 초기화를 허용한다.
-* 기존 파일이 있거나 도구의 덮어쓰기 동작이 불명확하면 임시 디렉터리에 생성한 뒤 병합한다.
-* 임시 생성물은 기존 파일 전체와 충돌을 검사한다. DNA 문서만 검사해서는 안 된다.
-* 병합은 기본적으로 no-clobber 방식으로 수행한다.
-* `.gitignore`, `.editorconfig` 등 필요한 숨김 파일은 포함하되, 기존 파일을 덮어쓰지 않고 병합한다.
-* 생성된 `.env`는 기존 `.env`를 덮어쓰지 않는다. 필요한 키는 `.env.example` 또는 안전한 병합 안내로 처리한다.
-* 임시 디렉터리 삭제는 에이전트가 이번 작업에서 만든 정확한 경로임을 검증한 뒤 허용한다.
+- Root initialization is allowed when the directory is empty and the tool can operate safely.
+- If files exist or overwrite behavior is unclear, scaffold in a temporary directory and merge.
+- Check generated output for conflicts with all existing files, not just DNA documents.
+- Merge in no-clobber mode by default.
+- Include required hidden files such as `.gitignore` and `.editorconfig`, merging rather than overwriting existing files.
+- Do not overwrite an existing `.env` with a generated one. Handle required keys through `.env.example` or safe merge instructions.
+- Delete a temporary directory only after verifying its exact path and that the agent created it for this task.
 
 ### 3.4 Destructive Command Policy
 
-다음은 금지한다.
+Prohibited:
 
-* 경로 확인 없이 프로젝트 루트나 상위 디렉터리에서 수행하는 재귀 삭제
-* 기존 파일에 대한 무차별 `--force`, `--overwrite`, `reset --hard`, `clean -fdx`
-* 백업, diff 또는 대상 검증 없이 수행하는 대량 덮어쓰기
+- Recursive deletion from the project root or an ancestor without path verification
+- Indiscriminate `--force`, `--overwrite`, `reset --hard`, or `clean -fdx` against existing files
+- Bulk overwrites without a backup, diff, or target verification
 
-다음은 허용한다.
+Allowed:
 
-* 이번 작업에서 만든 임시 디렉터리의 검증된 정리
-* 생성 결과물, 캐시, 빌드 디렉터리의 범위가 명확한 정리
-* 사용자가 구체적으로 요청하고 영향 범위가 확인된 교체 작업
+- Verified cleanup of temporary directories created for this task
+- Clearly scoped cleanup of generated output, caches, and build directories
+- Replacements specifically requested by the user with a verified impact scope
 
 ### 3.5 Master Plan Initialization
 
-* 새 프로젝트에 `spec.md`가 없으면 구현 전에 최소 실행 가능한 `spec.md`를 생성한다.
-* 사용자가 구현 또는 완성을 명시적으로 요청했고 중대한 모호성이 없다면, `spec.md` 생성 후 별도의 승인 대기 없이 구현을 계속할 수 있다.
-* 사용자가 기획이나 검토만 요청했다면 문서 작성에서 멈춘다.
-* 기존 프로젝트에 `spec.md`가 없으면 현재 코드, 설정, 테스트를 바탕으로 역추론하여 작성한다. 단순 버그 수정이나 작은 유지보수는 관련 통제 문서에 최소 변경 계획과 검증 기준을 먼저 기록한 뒤 진행할 수 있다.
-* 데이터 모델 파괴, 외부 공개 API 변경, 운영 마이그레이션 등 되돌리기 어려운 결정만 명시적 승인을 요구한다.
+- If a new project lacks `spec.md`, create a minimum actionable `spec.md` before implementation.
+- When the user explicitly requests implementation or completion and no material ambiguity remains, implementation may continue after creating `spec.md` without waiting for separate approval.
+- When the user requests only planning or review, stop at documentation.
+- If an existing project lacks `spec.md`, reconstruct it from current code, configuration, and tests. For a simple bug fix or small maintenance task, first record a minimal change plan and verification criteria in the relevant governing document, then proceed.
+- Require explicit approval for hard-to-reverse decisions such as destructive data-model changes, public API changes, or production migrations, rather than for routine planning decisions.
 
 ## 4. Document-First Workflow and Reference Standards
 
-기획, 설계, 구현, 수정, 리팩터링 및 자동화 개발은 코드 변경 전에 목표, 범위, 주요 결정, 구현 순서와 검증 기준을 관련 프로젝트 문서에 먼저 기록하고 작업 기준으로 확정한다.
+Before changing code for planning, design, implementation, fixes, refactoring, or automated development, record the objective, scope, key decisions, implementation order, and verification criteria in the relevant project documents and establish them as the working baseline.
 
-`plan`, `grill-me`, `goal` 등 어떤 계획 또는 자동화 방식을 사용하더라도 그 결과를 `AI_IMPLEMENTATION_DOC_STANDARD.md`에 따라 필요한 수준으로 문서에 반영한 뒤, 해당 문서를 기준으로 구현한다.
+Whatever planning or automation method is used, including `plan`, `grill-me`, or `goal`, document its outcome at the appropriate depth under `AI_IMPLEMENTATION_DOC_STANDARD.md`, then implement against those documents.
 
-문서화 깊이는 변경 규모에 비례한다. 작은 수정은 관련 문서의 짧은 갱신으로 충분하지만, 문서화되지 않은 계획을 근거로 코드를 먼저 변경하지 않는다. 구현 중 목표, 계약 또는 로드맵이 바뀌면 코드를 계속하기 전에 문서를 먼저 갱신한다.
+Documentation depth is proportional to the change. A small fix may need only a brief update, but do not change code before documenting its plan. If the objective, contract, or roadmap changes during implementation, update the documents before continuing the code changes.
 
-여기서 문서의 확정은 현재 구현 기준을 문서에 닫는다는 뜻이며, 별도의 승인 대상이 아니라면 사용자 승인을 기다리라는 의미가 아니다.
+Establishing this baseline means settling the current implementation criteria in writing. It does not mean waiting for user approval unless the decision separately requires it.
 
-모든 작업자는 이 `AGENTS.md`와 현재 프로젝트 문서를 공통 기준으로 사용한다. 작업자는 작업 성격, 프로젝트 상태, 필요한 검증 수준을 판단하여 아래 표준 중 관련 문서를 필요한 범위에서 참조한다.
+All workers use this `AGENTS.md` and current project documents as their shared baseline. Select relevant portions of these references according to the task, project state, and required verification depth:
 
-* 기획, 스펙, 설계, 구현 가이드, 로드맵 문서의 작성·복구·보강: `AI_IMPLEMENTATION_DOC_STANDARD.md`
-* 코드 작성, 수정, 리팩터링, 테스트와 구현 증거 정리: `AI_CODING_STANDARD.md`
-* 감사, 재감사, 정합성·엔지니어링 품질·보안 검토: `AI_AUDIT_DOC_STANDARD.md`
+- Planning, specifications, design, implementation guides, and roadmaps: `AI_IMPLEMENTATION_DOC_STANDARD.md`
+- Code, fixes, refactoring, tests, and implementation evidence: `AI_CODING_STANDARD.md`
+- Audits, re-audits, consistency, engineering quality, and security reviews: `AI_AUDIT_DOC_STANDARD.md`
 
-한 작업에 여러 성격이 섞이면 둘 이상의 표준을 함께 참조할 수 있다. 이 연결은 역할을 고정하거나 문서 전체를 일괄 적용하라는 명령이 아니다. 관련성, 프로젝트 규모, 현재 Phase, 가용 증거에 따라 적용 범위와 순서를 스스로 결정한다.
+A mixed task may use multiple references. These links do not fix worker roles or require wholesale application of every document. Determine scope and order from relevance, project size, current Phase, and available evidence.
 
-이 표준들은 제0장의 권한 순서를 바꾸지 않는다. 여러 프로젝트의 산출물과 감사 결과를 역분석하여 수정·보강되는 유동적 참고 기준이며, 과거 사례의 패턴을 현재 프로젝트에 기계적으로 강제하지 않는다. 표준과 프로젝트 문서 또는 실제 증거가 맞지 않으면 불일치를 기록하고 제0장의 우선순위에 따라 판단한다.
+These standards do not change Section 0's precedence. They are evolving references refined by analyzing multiple projects and audit results, not rules for mechanically imposing past patterns on the current project. Record discrepancies between a standard, project documents, and actual evidence, and decide under Section 0.
 
-관련 표준이 없거나 일부만 유효해도 작업을 중단하지 않는다. 가용한 근거로 안전하게 진행하고, 참조하지 못한 기준과 판단 한계를 결과에 기록한다.
+Do not stop solely because a reference is absent or only partly applicable. Proceed safely with available evidence and report unused references and judgment limits.
 
 ## 5. Error Handling and Grounding
 
 ### 5.1 Local-first Diagnosis
 
-오류 수정 시 먼저 다음을 확인한다.
+Before fixing an error, inspect:
 
-1. 오류 재현 가능 여부
-2. 로그, 스택 트레이스, 실패 테스트
-3. 실제 설치 버전, 잠금 파일, 설정
-4. 관련 코드와 최근 변경사항
+1. Whether the error is reproducible
+2. Logs, stack traces, and failing tests
+3. Actual installed versions, lock files, and configuration
+4. Relevant code and recent changes
 
-단순한 문법 오류나 프로젝트 내부 로직 오류는 불필요한 웹 검색 없이 수정할 수 있다.
+Simple syntax errors and internal logic errors may be fixed without unnecessary web searches.
 
 ### 5.2 Grounding Conditions
 
-다음 중 하나에 해당하면 최신 공식 자료를 확인한다.
+Consult current official sources when any of these apply:
 
-* 라이브러리, 프레임워크, API 또는 플랫폼 버전에 따라 동작이 달라질 수 있음
-* 오류 메시지나 기술이 낯설거나 확신이 부족함
-* 로컬 문서와 코드만으로 원인을 특정하기 어려움
-* 첫 번째 표적 수정과 검증이 실패함
-* 보안, 호환성, 마이그레이션 정확도가 중요함
+- Behavior may depend on a library, framework, API, or platform version.
+- The error or technology is unfamiliar or uncertain.
+- Local documents and code are insufficient to isolate the cause.
+- The first targeted fix and verification fail.
+- Security, compatibility, or migration accuracy matters.
 
-자료 우선순위는 공식 문서, 릴리스 노트, 표준 문서, 공식 저장소 순으로 한다.
+Prefer official documentation, release notes, standards, and official repositories, in that order.
 
 ### 5.3 Offline and Privacy Fallback
 
-웹 접근이 불가능하면 설치된 문서, 패키지 메타데이터, 도움말, 잠금 파일, 테스트 결과를 사용하고 그 한계를 보고한다. 외부 검색에는 비밀정보, 사내 코드, 고객 데이터 또는 식별 가능한 경로를 그대로 전송하지 않는다.
+If web access is unavailable, use installed documentation, package metadata, help, lock files, and test results; report the limitation. Do not send secrets, proprietary code, customer data, or identifiable paths verbatim to external searches.
 
 ### 5.4 Bounded Recovery Loop
 
-진단, 수정, 검증을 제한된 횟수로 반복한다. 같은 실패를 근거 없이 반복하지 않는다. 해결되지 않으면 재현 결과, 시도한 변경, 남은 가설과 다음 안전한 조치를 기록한다.
+Bound diagnosis/fix/verification iterations. Do not repeat the same failure without new grounds. If unresolved, record the reproduction, attempted changes, remaining hypotheses, and next safe action.
 
 ## 6. Documentation Rules
 
 ### 6.1 Source of Truth
 
-`spec.md`는 현재 승인된 제품 목표와 범위의 주된 기준이다. 다만 최신 사용자 요구는 `spec.md`를 수정할 수 있으며, 이 경우 관련 문서를 먼저 또는 동일 작업 단위에서 갱신한다.
+`spec.md` is the primary baseline for approved product goals and scope. The latest user request may change it; update related documents first or within the same work unit.
 
 ### 6.2 Proportional Documentation
 
-문서 갱신은 변경 영향에 비례한다.
+Keep document updates proportional to change impact.
 
-* 사용자 기능, 공개 API, 아키텍처, 설치법, 설정, 운영 절차가 바뀌면 관련 문서를 갱신한다.
-* 오탈자, 내부 구현 세부사항, 동작 불변 리팩터링은 영향받는 문서가 있을 때만 갱신한다.
-* 장황한 문서 작업 때문에 명백한 소스 수정이 무기한 중단되어서는 안 된다. 문서 갱신은 변경 규모에 맞게 간결하게 수행할 수 있지만 생략하지 않는다.
+- Update relevant documents when user-facing features, public APIs, architecture, installation, configuration, or operating procedures change.
+- For typos, internal implementation details, or behavior-preserving refactoring, update documents only when affected.
+- Lengthy documentation work must not indefinitely block an obvious code fix. Keep the required update brief and proportional, but do not omit it.
 
 ### 6.3 Encoding
 
-* 프로젝트가 소유한 텍스트 문서는 UTF-8을 기본으로 한다.
-* 바이너리 파일과 도구가 관리하는 특수 형식에는 UTF-8을 강제하지 않는다.
-* 기존 인코딩을 변경할 때는 내용 손상 여부를 검증한다.
+- Use UTF-8 by default for project-owned text documents.
+- Do not force UTF-8 onto binary files or special tool-managed formats.
+- Verify content integrity when changing an existing encoding.
 
 ### 6.4 Language Policy
 
-* 프로젝트 소유의 서술형 내부 문서는 기본적으로 한국어로 작성한다.
-* 공개 API 문서, 코드 생성 파일, 스키마, 번역 리소스, 도구 규약, 외부 기여 문서는 해당 생태계의 요구를 따른다.
-* README 다국어 범위는 `${DOC_PROFILE}`과 `${SUPPORTED_LANGUAGES}`를 따른다.
-* 다국어 README가 요구된 경우 기본 순서는 한국어, 영어, 일본어, 중국어 번체, 중국어 간체이다.
-* 기존 프로젝트가 다른 언어 정책을 명확히 사용하면 일관성을 우선한다.
+- The language of these instruction/reference files does not determine the language of project deliverables. Select the language for new project-owned narrative documents in this order: the user's explicit language instruction for the task or deliverable; the existing project's documented language policy or established document-language convention; the verified display language of the user's operating system; otherwise, the user's current conversation language.
+- Use the user's environment, not the agent VM, container, build server, or shell locale, to determine the OS display language. If it cannot be verified with available information, use the conversation-language fallback without blocking work; do not claim to have detected the OS language.
+- Preserve the language of existing documents unless the user requests a translation or a project language-policy change. Continue to follow existing project conventions when no override is requested.
+- Public API documentation, generated code, schemas, translation resources, tool conventions, and external contribution documents follow their ecosystem's requirements. Keep identifiers, paths, machine-readable formats, and contract-defined literal values unchanged unless their contracts are deliberately revised.
+- README language coverage follows `${DOC_PROFILE}` and `${SUPPORTED_LANGUAGES}`. When multilingual READMEs are required, retain this default order unless the project specifies another: Korean, English, Japanese, Traditional Chinese, Simplified Chinese.
 
 ### 6.5 Document Synchronization
 
-* 새 사용자 기능은 README의 기능 설명에 반영한다.
-* 릴리스 가치가 있는 변경은 CHANGELOG에 기록한다.
-* API 또는 아키텍처 변경은 `spec.md`, `DESIGN_DECISIONS.md`, 관련 설계 문서를 갱신한다.
-* 설치 또는 사용자 설정에 영향을 주는 의존성 변경은 README나 BUILD_GUIDE에 반영한다.
-* UI 또는 디자인 변경 시 `designs.md`를 갱신한다.
-* 추론으로 생성한 설계는 `가정`, `초안`, `미확정`으로 표시한다.
+- Reflect new user-facing features in the README's feature description.
+- Record release-worthy changes in CHANGELOG.
+- For API or architecture changes, update `spec.md`, `DESIGN_DECISIONS.md`, and related design documents.
+- Reflect dependency changes affecting installation or configuration in README or BUILD_GUIDE.
+- Update `designs.md` for UI or design changes.
+- Label inferred designs as `Assumption`, `Draft`, or `Unconfirmed`.
 
 ### 6.6 Design Document Content
 
-UI 또는 구조 설계가 있는 프로젝트의 `designs.md`에는 다음을 포함한다.
+For a project with UI or structural design, `designs.md` includes:
 
-1. ASCII 또는 Mermaid 기반 구조도
-2. 주요 영역과 컴포넌트의 역할
-3. 구현 제약과 주의사항
-4. 접근성, 반응형, 상태 및 오류 처리 기준
+1. An ASCII or Mermaid structural diagram
+2. Roles of major areas and components
+3. Implementation constraints and cautions
+4. Accessibility, responsive behavior, state, and error-handling criteria
 
-UI가 없는 라이브러리나 단일 스크립트에서는 불필요한 화면 설계를 강제하지 않는다.
+Do not impose unnecessary screen designs on a UI-less library or single script.
 
 ## 7. Git Management Rules
 
-* 프로젝트가 관리하는 소스, 테스트, 문서, 설정, 스크립트, 마이그레이션, 필요한 에셋과 잠금 파일을 버전 관리 대상으로 삼는다.
-* `.gitignore`와 저장소의 기존 정책을 존중한다.
-* `.env`, 토큰, 개인 키, 인증서, 고객 데이터, 비밀 설정은 커밋하지 않는다.
-* 의존성 디렉터리, 캐시, 빌드 결과물, 대용량 생성 파일은 프로젝트가 의도적으로 추적하는 경우에만 포함한다.
-* 커밋, 푸시, 태그, 릴리스는 사용자가 명시적으로 요청하거나 사전 승인 정책이 있을 때만 수행한다.
-* 강제 푸시, 히스토리 재작성, 브랜치 삭제는 별도의 명시적 승인 없이는 수행하지 않는다.
+- Version project-managed source, tests, documentation, configuration, scripts, migrations, required assets, and lock files.
+- Respect `.gitignore` and existing repository policy.
+- Do not commit `.env`, tokens, private keys, certificates, customer data, or secret configuration.
+- Include dependency directories, caches, build output, and large generated files only when the project intentionally tracks them.
+- Commit, push, tag, and release only on an explicit user request or under a pre-approval policy.
+- Forced pushes, history rewriting, and branch deletion require separate explicit approval.
 
 ## 8. Source Code Annotation and i18n Rules
 
 ### 8.1 Internationalization
 
-* 사용자에게 노출되는 문자열은 프로젝트 요구 언어와 로케일 구조를 지원하도록 외부화한다.
-* 백엔드, 라이브러리, CLI, 테스트 도구 등 사용자 UI가 없는 코드에 불필요한 5개 언어 구현을 강제하지 않는다.
-* 지원 언어는 `${SUPPORTED_LANGUAGES}` 또는 기존 프로젝트 설정을 따른다.
+- Externalize user-facing strings to support required languages and the project's locale structure.
+- Do not impose unnecessary five-language support on backend, library, CLI, test, or other code without a user UI.
+- Supported languages follow `${SUPPORTED_LANGUAGES}` or existing project settings.
 
 ### 8.2 Comments and Docstrings
 
-* 새로 작성하는 프로젝트 소유 설명 주석은 기존 프로젝트 관례가 없다면 한국어를 기본으로 한다.
-* 기존 코드의 언어 스타일, 공개 API 문서 규약, 린터 및 문서 생성 도구의 요구가 있으면 이를 우선한다.
-* 생성 코드와 외부 코드에는 주석 언어 규칙을 강제하지 않는다.
-* 주석은 코드가 무엇을 하는지 반복하기보다 의도, 불변조건, 위험, 선택 이유를 설명한다.
-* 과도한 주석으로 코드 가독성을 떨어뜨리지 않는다.
+- For new project-owned explanatory comments with no existing project convention, use the narrative-document language selected in Section 6.4.
+- Prefer existing code language style, public API documentation conventions, and linter or generator requirements where present.
+- Do not impose comment-language rules on generated or external code.
+- Explain intent, invariants, risks, and reasons for choices rather than repeating what the code does.
+- Do not impair readability with excessive comments.
 
 ### 8.3 Change History
 
-* 코드 주석에 매 변경마다 `[vX.X.X]`를 삽입하지 않는다.
-* 변경 이력은 Git, CHANGELOG, DESIGN_DECISIONS에서 관리한다.
-* 삭제된 기능의 흔적을 빈 자리 주석으로 남기지 않는다.
-* 호환성 유지가 필요한 deprecation, 마이그레이션 경고, 비직관적 제약에만 주석을 남긴다.
+- Do not insert `[vX.X.X]` into code comments on every change.
+- Keep change history in Git, CHANGELOG, and DESIGN_DECISIONS.
+- Do not leave placeholder comments marking removed features.
+- Keep comments for compatibility-related deprecations, migration warnings, and non-obvious constraints.
 
 ## 9. Documentation Sync Checklist
 
-체크리스트는 해당 변경에 실제로 관련된 항목만 적용한다.
+Apply only checklist items actually relevant to the change.
 
 ### Feature Add
 
-* 코드와 문서 정합성 확인
-* 사용자 기능이면 README 갱신
-* 릴리스 가치가 있으면 CHANGELOG `Added` 기록
-* 범위 또는 계약이 바뀌면 `spec.md` 갱신
-* 필요한 테스트와 사용자 문자열 번역 갱신
+- Check code/document consistency.
+- Update README for user-facing features.
+- Record release-worthy changes under CHANGELOG `Added`.
+- Update `spec.md` if scope or contracts change.
+- Update necessary tests and user-facing translations.
 
 ### Bug Fix
 
-* 재현과 원인 확인
-* 버전 의존성이 있으면 최신 공식 자료 확인
-* 회귀 테스트 추가 또는 수정
-* 사용자에게 알려야 할 수정이면 CHANGELOG 기록
-* 비직관적 재발 방지 조건만 코드 또는 관련 문서에 기록
+- Reproduce the issue and establish its cause.
+- Consult current official sources for version-dependent behavior.
+- Add or update regression tests.
+- Update CHANGELOG when the fix should be communicated to users.
+- Record only non-obvious recurrence-prevention conditions in code or related documents.
 
 ### Refactor
 
-* 동작 불변 여부 검증
-* 공개 계약이나 아키텍처가 바뀌지 않으면 불필요한 문서와 버전 변경을 만들지 않음
-* 구조가 바뀌면 관련 구현 또는 설계 문서 갱신
+- Verify behavior is preserved.
+- Avoid unnecessary document or version changes when public contracts and architecture are unchanged.
+- Update implementation or design documents if structure changes.
 
 ### Architecture Change
 
-* `spec.md` 갱신
-* `DESIGN_DECISIONS.md`에 선택 이유와 대안 기록
-* 관련 `designs.md`와 `IMPLEMENTATION_SUMMARY.md` 갱신
-* 마이그레이션과 호환성 검증
+- Update `spec.md`.
+- Record the rationale and alternatives in `DESIGN_DECISIONS.md`.
+- Update related `designs.md` and `IMPLEMENTATION_SUMMARY.md`.
+- Verify migration and compatibility.
 
 ### Config or Dependency Change
 
-* 사용자 설치, 실행, 환경변수에 영향이 있을 때 README, BUILD_GUIDE, `.env.example` 갱신
-* 잠금 파일과 설정 파일 동기화
-* 비밀정보가 문서나 Git에 들어가지 않았는지 확인
+- Update README, BUILD_GUIDE, and `.env.example` when installation, execution, or environment variables are affected.
+- Synchronize lock files and configuration.
+- Check that no secrets entered documentation or Git.
 
 ### UI Design Change
 
-* `designs.md`와 실제 구현 정합성 확인
-* 접근성, 반응형, 상태와 오류 표현 검증
-* 제품 범위가 바뀌면 `spec.md` 갱신
+- Check consistency between `designs.md` and implementation.
+- Verify accessibility, responsive behavior, state, and error presentation.
+- Update `spec.md` if product scope changes.
 
 ## 10. Semantic Versioning
 
-* 버전이 있는 프로젝트는 `MAJOR.MINOR.PATCH`를 기본으로 한다.
-* **MAJOR:** 호환되지 않는 공개 계약 변경
-* **MINOR:** 하위 호환 새 기능
-* **PATCH:** 하위 호환 버그 수정과 소규모 개선
-* 모든 코드 수정에 자동으로 버전을 올리지 않는다.
-* 버전 변경은 릴리스 정책, 사용자 요청 또는 프로젝트 자동화에 따라 수행한다.
-* 프리릴리스와 빌드 메타데이터는 프로젝트 규칙이 있을 때 사용한다.
+- Default to `MAJOR.MINOR.PATCH` for versioned projects.
+- **MAJOR:** Incompatible public contract changes.
+- **MINOR:** Backward-compatible new features.
+- **PATCH:** Backward-compatible bug fixes and small improvements.
+- Do not automatically increment the version for every code change.
+- Change versions according to release policy, user requests, or project automation.
+- Use prerelease and build metadata according to project conventions.
 
 ## 11. Documentation Standards
 
-* 기본 형식은 Markdown이다.
-* CHANGELOG가 존재하면 Keep a Changelog 형식을 우선한다.
-* 저장소가 Conventional Commits를 사용하면 해당 형식을 따른다.
-* 기존 프로젝트의 검증된 문서 및 커밋 관례가 이 기본값보다 우선한다.
-* 기계 생성 문서는 수동 편집하지 않고 생성 원본을 수정한다.
+- Markdown is the default format.
+- Prefer Keep a Changelog when CHANGELOG exists.
+- Follow Conventional Commits if used by the repository.
+- Existing, proven project document and commit conventions take precedence over these defaults.
+- Edit a generated document's source, not the generated document by hand.
 
 ## 12. Required Files and Profiles
 
 ### 12.1 Core Files
 
-D3D 프로젝트의 기본 핵심 파일은 다음과 같다.
+The basic D3D project documents are:
 
-* `spec.md`
-* `README.md`
+- `spec.md`
+- `README.md`
 
 ### 12.2 Extended Files
 
-프로젝트 규모와 작업 성격에 따라 다음을 생성하거나 유지한다.
+Create or maintain these according to project size and task needs:
 
-* `CHANGELOG.md`: 릴리스 또는 사용자 변경 이력이 있을 때
-* `BUILD_GUIDE.md`: 빌드와 배포 절차가 단순하지 않을 때
-* `IMPLEMENTATION_SUMMARY.md`: 구현 구조 인수인계가 필요할 때
-* `LESSONS_LEARNED.md`: 마일스톤 또는 프로젝트 종료 시
-* `DESIGN_DECISIONS.md`: 중요한 기술 선택이 있을 때
-* `audit_roadmap.md`: 반복 감사 프로세스를 운영할 때
-* `designs.md`: UI 또는 구조 설계가 있을 때
+- `CHANGELOG.md`: Release or user-facing change history.
+- `BUILD_GUIDE.md`: Nontrivial build or deployment procedures.
+- `IMPLEMENTATION_SUMMARY.md`: Implementation-structure handoff.
+- `LESSONS_LEARNED.md`: Milestone or project closeout.
+- `DESIGN_DECISIONS.md`: Important technical decisions.
+- `audit_roadmap.md`: An ongoing audit process.
+- `designs.md`: UI or structural design.
 
-빈 껍데기 파일을 목록 충족만을 위해 만들지 않는다. 기존 파일명이 다르면 프로젝트 관례를 유지하고 대응 관계를 문서화한다.
+Do not create empty shells merely to satisfy a list. Preserve different existing filenames and document their correspondence.
 
 ## 13. Automation and Approval Boundaries
 
 ### 13.1 Autonomous Routine Work
 
-다음은 별도 승인 없이 수행한다.
+No separate approval is required for:
 
-* 소스, 테스트, 문서, 설정, 에셋의 정상적인 생성과 수정
-* 포매팅, 린트, 빌드, 테스트
-* 작업 중 생성한 임시 파일과 안전한 생성 결과물 정리
-* 영향 범위가 명확한 소규모 리팩터링과 버그 수정
+- Routine creation or modification of source, tests, documentation, configuration, and assets
+- Formatting, linting, building, and testing
+- Cleanup of task-created temporary files and safe generated output
+- Small, clearly scoped refactoring and bug fixes
 
 ### 13.2 Explicit Approval Required
 
-다음은 사용자 요청이나 사전 승인 정책이 필요하다.
+A user request or pre-approval policy is required for:
 
-* 프로젝트 외부 경로 쓰기
-* 운영 데이터 삭제 또는 비가역 마이그레이션
-* 비밀정보, 인증, 권한 체계 변경
-* 유료 외부 서비스 호출 또는 비용이 큰 작업
-* 외부 게시, 배포, 릴리스, 이메일 또는 메시지 전송
-* Git 커밋, 푸시, 태그, 강제 리셋, 히스토리 재작성
-* 대량 삭제나 전체 프로젝트 교체
+- Writing outside the project
+- Deleting production data or performing irreversible migrations
+- Changing secrets, authentication, or authorization systems
+- Paid external service calls or expensive operations
+- External publication, deployment, release, email, or message sending
+- Git commit, push, tag, forced reset, or history rewriting
+- Bulk deletion or complete project replacement
 
 ### 13.3 Completion and Loop Control
 
-* 사용자가 중단하지 않는 한 요청된 범위의 완료를 지향한다.
-* 같은 실패를 무한 반복하지 않는다.
-* 반복 작업에는 종료 조건, 최대 시도 또는 완료 게이트를 둔다.
-* 일부 단계가 막혀도 독립적으로 완료 가능한 작업은 계속한다.
-* 마지막에 변경 파일, 검증 결과, 남은 위험과 미완료 항목을 보고한다.
+- Aim to complete the requested scope unless the user stops the task.
+- Do not repeat the same failure indefinitely.
+- Give repeated work a termination condition, attempt limit, or completion gate.
+- Continue independently completable work even when another step is blocked.
+- Conclude with changed files, verification results, remaining risks, and unfinished items.
 
 ## 14. Learning and Recovery DNA
 
 ### 14.1 Local Archive
 
-기본 아카이브 경로는 프로젝트 내부의 `./.antigravity/archive`이다. 프로젝트 외부의 전역 지식 저장소는 사용자가 명시적으로 허용하고 쓰기 범위를 부여한 경우에만 사용한다.
+The default archive is `./.antigravity/archive` inside the project. Use an external global knowledge store only when the user explicitly permits it and grants write scope.
 
 ### 14.2 Privacy and Security
 
-* 아카이브에 비밀정보, 개인 데이터, 고객 데이터, 인증정보를 기록하지 않는다.
-* 외부 서비스나 모델 학습용으로 자동 업로드하지 않는다.
-* `AI 학습 데이터`는 기본적으로 프로젝트 내부에서 재사용하는 로컬 지식 문서를 뜻한다.
-* 다른 프로젝트의 자료는 접근 권한과 사용자 허용이 있을 때만 참조한다.
+- Do not archive secrets, personal data, customer data, or credentials.
+- Do not automatically upload archives to external services or model-training systems.
+- `AI training data` means reusable project-local knowledge documents by default.
+- Refer to another project's material only with access rights and user permission.
 
 ### 14.3 Recovery Content
 
-복구 문서는 다음을 재구성할 수 있을 만큼 구체적으로 작성한다.
+Write recovery documentation specifically enough to reconstruct:
 
-* 디렉터리와 컴포넌트 구조
-* 핵심 로직과 데이터 흐름
-* 주요 의사결정과 기각한 대안
-* 알려진 함정과 복구 절차
-* UI 또는 설계 구조
-* 빌드, 테스트, 배포 방법
+- Directory and component structure
+- Core logic and data flow
+- Key decisions and rejected alternatives
+- Known pitfalls and recovery procedures
+- UI or design structure
+- Build, test, and deployment procedures
 
-`95% 복구`는 품질 목표이지 검증되지 않은 보장으로 표현하지 않는다.
+Treat `95% recovery` as a quality target, not an unverified guarantee.
 
 ## 15. Self-update Rules
 
-* 주요 마일스톤이나 프로젝트 종료 시 유의미한 교훈이 있으면 `LESSONS_LEARNED.md`를 생성하거나 갱신한다.
-* 버전 변경 시 `audit_roadmap.md`를 무조건 재작성하지 않고, 새 위험과 변경 범위에 맞춰 필요한 부분만 검토하고 갱신한다.
-* `AGENTS.md` 자체의 정책 변경은 사용자의 명시적 요청이 있을 때만 수행한다.
-* 프로젝트 산출물에서 반복 가능한 성공·실패 패턴이 발견되면 관련 표준 문서의 개선 후보로 기록하되, 단일 사례를 즉시 전역 강제 규칙으로 승격하지 않는다.
-* 자동 생성 문서에는 생성 시점, 근거 파일, 가정과 미확정 사항을 기록한다.
+- Create or update `LESSONS_LEARNED.md` when a major milestone or project closeout yields meaningful lessons.
+- Do not rewrite `audit_roadmap.md` on every version change. Review only what new risks and change scope require.
+- Change `AGENTS.md` policy itself only on the user's explicit request.
+- Record repeatable success/failure patterns as candidates for improving related standards; do not immediately promote one case into a universal mandatory rule.
+- State generation time, source files, assumptions, and unconfirmed matters in automatically generated documents.
+
+## 16. Work-Unit Closure and Proportional Verification
+
+This section follows Section 0's precedence and Section 13's approval boundaries. It does not lower quality, safety, or required verification criteria, or permit unverified work to be reported as complete.
+
+- Use the existing work records under Section 4 to define each work unit's objective, direct and indirect impact, completion criteria, and required verification. Do not create separate forms or approval steps just for this section.
+- Match verification to change impact, specific risks, and the project's verification plan. Reuse evidence and artifacts whose applicability remains valid; briefly record the reason for expanding verification scope, repetitions, or artifacts in the existing work record.
+- Close a work unit once its completion criteria are met, then proceed to the next task within the requested scope. Mark unresolved blockers as blocked or on hold and separate out-of-scope improvements into follow-up work. Do not add completion criteria or reopen closed work without relevant grounds.
+- At handoff, distinguish completed and incomplete work, actually verified scope and unverified scope, and key materials that are currently referenced, historical records, or unreferenced, as needed. Mark unknowns separately; classification alone does not justify routine exhaustive inventories.
+- Distinguish verification needed for the current product, compatibility, or audit from preserving or reproducing development history. A reference in a historical record alone does not require re-verifying or re-copying the entire history for routine work.
+- Before cleaning up intermediate artifacts, check actual use, references, and reproducibility; retain necessary conclusions and reproduction conditions. Lack of references alone does not authorize deletion. Preserve current inputs, evidence of unresolved failures, and irreplaceable originals.

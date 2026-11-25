@@ -1,65 +1,64 @@
 # AI Coding Standard
-## AI 코딩 표준
 
 **Draft Version:** 0.1
 
 ## 0. Purpose
 
-이 문서는 D3D 프로젝트에서 AI가 코드를 생성·수정할 때 사용하는 짧은 구현 기준이다.
+This is a concise implementation reference for AI-generated or AI-modified code in D3D projects.
 
-목표는 구현 방식을 획일화하는 것이 아니라, 문서 계약 안에서 자유롭게 구현하면서도 다음 작업자와 감사자가 코드, 주석, 테스트, 실행 증거만으로 의도와 검증 상태를 추적할 수 있게 하는 것이다.
+The goal is not to standardize implementation methods. It is to allow free implementation within documented contracts while enabling subsequent workers and auditors to trace intent and verification status through code, comments, tests, and execution evidence.
 
 ## 1. Document Contract
 
-- 코드 변경 전 현재 사용자 요구와 관련 프로젝트 문서(`spec.md`, `designs.md`, `DESIGN_DECISIONS.md`, `IMPLEMENTATION_SUMMARY.md` 등), 현재 Phase와 로드맵을 확인한다.
-- 현재 목표, 범위, 주요 결정, 구현 순서, 검증 기준이 `AI_IMPLEMENTATION_DOC_STANDARD.md`에 따라 변경 규모에 맞는 수준으로 프로젝트 문서에 반영된 뒤 구현한다.
-- 대화, `plan`, `grill-me`, `goal` 안에만 존재하는 계획은 구현 기준으로 간주하지 않는다.
-- 구현 중 계약이나 로드맵이 달라지면 코드를 계속하기 전에 문서를 먼저 갱신한다.
-- 문서와 충돌하거나 현재 범위를 넘는 구현은 임의로 섞지 않고 문서 수정, 미확정 사항, 후속 제안 중 하나로 분리한다.
+- Before changing code, review the current user request, relevant project documents (`spec.md`, `designs.md`, `DESIGN_DECISIONS.md`, `IMPLEMENTATION_SUMMARY.md`, etc.), current Phase, and roadmap.
+- Implement after the current objective, scope, key decisions, implementation order, and verification criteria are documented at a depth proportional to the change under `AI_IMPLEMENTATION_DOC_STANDARD.md`.
+- A plan existing only in conversation, `plan`, `grill-me`, or `goal` is not an implementation baseline.
+- If the contract or roadmap changes during implementation, update the documents before continuing code changes.
+- Do not silently mix in work that conflicts with the documents or exceeds current scope. Separate it into a document revision, an unconfirmed matter, or a follow-up proposal.
 
 ## 2. Implementation Autonomy
 
-- 확정된 계약 안에서 문서가 동결하지 않은 아키텍처 세부, 알고리즘, 작업 순서, 도구와 분해 방식은 코더가 판단한다.
-- 특정 패턴, 프레임워크, 주석 양, 테스트 형식을 이 문서가 일률적으로 강제하지 않는다.
-- 기존 프로젝트 관례를 존중하되, 품질·안전·계약 정합성을 위해 더 나은 방식이 필요하면 근거를 남기고 변경할 수 있다. 계약에 영향이 있으면 문서를 먼저 갱신한다.
-- 요청되지 않은 대규모 리팩터링, 최적화, 기능 확장은 현재 변경과 분리한다.
-- diff 크기 자체보다 책임과 경계가 명확한 일관된 변경을 우선하되, 범위를 불필요하게 넓히지 않는다.
+- Within the established contract, the coder chooses architectural details, algorithms, work order, tools, and decomposition not fixed by the documents.
+- This standard does not impose a uniform pattern, framework, amount of commentary, or test format.
+- Respect existing conventions, but change them with a recorded rationale when quality, safety, or contract consistency calls for a better approach. Update the documents first when the contract is affected.
+- Separate unrequested large refactoring, optimization, and feature expansion from the current change.
+- Prefer coherent changes with clear responsibilities and boundaries over a small diff for its own sake, without unnecessarily widening scope.
 
 ## 3. Traceable Code
 
-- 이름, 타입, 모듈, 인터페이스는 문서의 도메인 용어와 책임 경계를 드러내게 한다.
-- 상태 변경, 외부 I/O, 입력 검증, 오류 변환, 설정 해석, 보안 경계는 호출 흐름에서 추적 가능하게 유지한다.
-- 보안상 강제되는 경계와 경고·heuristic·fallback을 코드에서 구분한다.
-- 같은 규칙, 설정, 상태에 중복된 진실원을 만들지 않는다.
-- 숨은 부작용, 암묵적 fallback, 호출되지 않는 범위 밖 구현을 최소화한다.
-- 복잡한 상태, AI, 비동기 로직은 필요에 따라 순수 함수, fixture, seed, schema, hash, headless 경로, 진단기 등 재현 가능한 표면을 제공한다.
+- Make names, types, modules, and interfaces expose the documented domain vocabulary and responsibility boundaries.
+- Keep state changes, external I/O, input validation, error conversion, configuration interpretation, and security boundaries traceable through the call flow.
+- Distinguish enforced security boundaries from warnings, heuristics, and fallbacks in code.
+- Do not create duplicate sources of truth for the same rule, configuration, or state.
+- Minimize hidden side effects, implicit fallbacks, and unreachable out-of-scope implementation.
+- For complex state, AI, or asynchronous logic, provide reproducible interfaces as needed: pure functions, fixtures, seeds, schemas, hashes, headless paths, or diagnostic tools.
 
 ## 4. Comments as Audit Anchors
 
-- 주석은 코드가 이미 말하는 `무엇`이 아니라 `왜`, 불변조건, 위험, 보안·호환성 제약, 비직관적 선택을 설명한다.
-- 중요 경계에는 감사자가 문서 → 코드 → 테스트를 연결할 수 있을 만큼의 추적 단서를 남긴다.
-- 프로젝트에 추적 ID가 있으면 `Spec:`, `Decision:`, `Invariant:`, `Risk:`, `Verified by:` 같은 짧은 표지를 선택적으로 사용할 수 있으며, 형식을 강제하지 않는다.
-- 임시 우회에는 제거 조건이나 추적 가능한 작업 ID를 남긴다.
-- 주석은 문서와 테스트를 대신하지 않으며, 코드와 어긋난 주석은 즉시 갱신하거나 제거한다.
-- 자명한 코드에 형식적인 주석을 채우지 않는다.
+- Explain why, invariants, risks, security/compatibility constraints, and non-obvious choices, rather than what the code already says.
+- Leave enough traceability at important boundaries for an auditor to connect documents, code, and tests.
+- When the project uses trace IDs, optional short labels such as `Spec:`, `Decision:`, `Invariant:`, `Risk:`, and `Verified by:` may be used; no format is mandatory.
+- Give temporary workarounds a removal condition or traceable task ID.
+- Comments do not replace documents or tests. Immediately update or remove comments that contradict the code.
+- Do not fill self-explanatory code with ceremonial comments.
 
 ## 5. Verification
 
-- 변경과 관련된 정상, 실패, 경계 경로를 검증한다.
-- 버그 수정에는 가능한 경우 구체적 실패 모드를 고정하는 회귀 테스트를 추가한다.
-- 테스트 이름과 assertion은 방어하는 계약 또는 실패 모드를 드러내게 한다.
-- 빌드, 테스트, 린트, 수동 검증은 재현 가능한 명령과 조건으로 수행한다.
-- 실행하지 않은 검증을 통과했다고 주장하지 않으며, 실행할 수 없었던 항목과 위험을 기록한다.
+- Verify normal, failure, and boundary paths relevant to the change.
+- When feasible, add a regression test that captures the specific failure mode of a bug fix.
+- Make test names and assertions reveal the contract or failure mode they protect.
+- Use reproducible commands and conditions for builds, tests, linting, and manual checks.
+- Do not claim unexecuted verification passed. Record checks that could not be run and their risks.
 
 ## 6. Completion Evidence
 
-- 완료 시 관련 문서와 코드, 테스트, 설정, 빌드 경로를 동기화한다.
-- `IMPLEMENTATION_SUMMARY.md` 또는 관련 프로젝트 문서에 변경 파일, 동작 변화, 검증 명령과 결과, 미실행 검증, 잔여 위험을 필요한 수준으로 남긴다.
-- 완료 주장은 다음 코더와 감사자가 세션 대화 없이 프로젝트 산출물만으로 재현할 수 있어야 한다.
-- 코더의 완료 보고는 감사 PASS를 대신하지 않는다.
+- At completion, synchronize relevant documents, code, tests, configuration, and build paths.
+- Record changed files, behavior changes, verification commands and results, unexecuted checks, and remaining risks at the necessary depth in `IMPLEMENTATION_SUMMARY.md` or a relevant project document.
+- Completion claims must be reproducible by subsequent coders and auditors from project artifacts without the session conversation.
+- A coder's completion report does not replace an audit PASS.
 
 ## 7. Final Principle
 
-계약 안에서는 자유롭게 구현하되, 의도, 경계, 부작용, 검증 근거를 숨기지 않는다.
+Implement freely within the contract, without hiding intent, boundaries, side effects, or verification evidence.
 
-문서는 구현 권한이고, 코드는 실행 증거이며, 테스트는 재현 증거이고, 주석은 감사의 탐색 표지다.
+Documents authorize implementation; code is execution evidence; tests are reproduction evidence; comments are navigation markers for audits.
