@@ -575,7 +575,7 @@ fn winx_license_exception_is_version_scoped_and_time_bounded() {
     }
     for contract in [
         "Dependency owner / Release manager",
-        "2026-10-31",
+        "2027-02-20",
         "winx 0.36.4",
         "다른 crate에는 이 exception을 확장하지 않는다",
     ] {
@@ -584,8 +584,8 @@ fn winx_license_exception_is_version_scoped_and_time_bounded() {
     for contract in [
         "DEP-EXC-0001",
         "\"winx\": \"0.36.4\"",
-        "\"expires_on\": \"2026-10-31\"",
-        "\"cap-primitives\": \"4.0.2\"",
+        "\"expires_on\": \"2027-02-20\"",
+        "\"cap-primitives\": \"4.0.3\"",
     ] {
         assert!(
             ledger.contains(contract),

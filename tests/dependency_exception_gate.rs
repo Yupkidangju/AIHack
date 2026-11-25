@@ -13,10 +13,10 @@ struct DependencyGraph {
 }
 
 const EXPECTED_TRIGGER_VERSIONS: [(&str, &str); 5] = [
-    ("cap-fs-ext", "4.0.2"),
-    ("cap-primitives", "4.0.2"),
-    ("cap-std", "4.0.2"),
-    ("cap-tempfile", "4.0.2"),
+    ("cap-fs-ext", "4.0.3"),
+    ("cap-primitives", "4.0.3"),
+    ("cap-std", "4.0.3"),
+    ("cap-tempfile", "4.0.3"),
     ("winx", "0.36.4"),
 ];
 
@@ -222,19 +222,19 @@ fn expired_version_drift_and_unrelated_crate_fixtures_fail_closed() {
     let graph = cargo_graph();
 
     assert!(
-        validate_exception_gate(&live, &deny, &graph, date_days("2026-11-01").unwrap()).is_err()
+        validate_exception_gate(&live, &deny, &graph, date_days("2027-02-21").unwrap()).is_err()
     );
 
     let mut drift = live.clone();
     drift["exceptions"][0]["trigger_versions"]["winx"] = serde_json::json!("0.36.5");
     assert!(
-        validate_exception_gate(&drift, &deny, &graph, date_days("2026-08-23").unwrap()).is_err()
+        validate_exception_gate(&drift, &deny, &graph, date_days("2026-11-26").unwrap()).is_err()
     );
 
     let mut unrelated = live;
     unrelated["exceptions"][0]["crate"] = serde_json::json!("serde");
     assert!(
-        validate_exception_gate(&unrelated, &deny, &graph, date_days("2026-08-23").unwrap())
+        validate_exception_gate(&unrelated, &deny, &graph, date_days("2026-11-26").unwrap())
             .is_err()
     );
 }
@@ -257,7 +257,7 @@ version = "=1.0.0"
 allow = ["MIT"]
 "#;
     assert!(
-        validate_exception_gate(&live, decoy, &graph, date_days("2026-08-23").unwrap()).is_err(),
+        validate_exception_gate(&live, decoy, &graph, date_days("2026-11-26").unwrap()).is_err(),
         "comment text must not satisfy the structural deny exception contract"
     );
 
@@ -270,7 +270,7 @@ allow = ["MIT"]
         &missing_trigger,
         &project_file("deny.toml"),
         &graph,
-        date_days("2026-08-23").unwrap(),
+        date_days("2026-11-26").unwrap(),
     )
     .is_err());
 
@@ -286,14 +286,14 @@ allow = ["MIT"]
 
     let mut future_approval: serde_json::Value =
         serde_json::from_str(&project_file("dependency-exceptions.json")).unwrap();
-    future_approval["exceptions"][0]["approved_on"] = serde_json::json!("2026-09-01");
-    future_approval["exceptions"][0]["expires_on"] = serde_json::json!("2026-10-31");
+    future_approval["exceptions"][0]["approved_on"] = serde_json::json!("2026-12-01");
+    future_approval["exceptions"][0]["expires_on"] = serde_json::json!("2027-02-20");
     assert!(
         validate_exception_gate(
             &future_approval,
             &project_file("deny.toml"),
             &graph,
-            date_days("2026-08-24").unwrap(),
+            date_days("2026-11-26").unwrap(),
         )
         .is_err(),
         "감사일보다 미래인 approval date를 허용하면 안 됩니다"

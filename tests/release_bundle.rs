@@ -9,8 +9,8 @@ use std::{
 
 static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 const OWNER_APPROVAL_ID: &str = "AIHACK-OWNER-2026-07-20-NGPL-01";
-const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-08-25-01";
-const CANDIDATE_DATE: &str = "2026-08-25";
+const MODIFICATION_NOTICE_ID: &str = "AIHACK-MODIFICATIONS-2026-11-26-01";
+const CANDIDATE_DATE: &str = "2026-11-26";
 
 fn project_path(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(path)
@@ -30,6 +30,7 @@ enum BundleCase {
     MismatchedOwnerRecord,
     MissingModificationMetadata,
     MismatchedModificationRecord,
+    StaleApprovalNotice,
     IncludedLegacy,
     SimilarLegacyName,
     MinimumYearCalendar,
@@ -98,17 +99,23 @@ impl BundleFixture {
                 "AIHACK-MODIFICATIONS-MISMATCH",
             );
         }
+        if matches!(case, BundleCase::StaleApprovalNotice) {
+            let approval_path = root.join("PROJECT_OWNER_LICENSE_APPROVAL.md");
+            let mut approval = fs::read_to_string(&approval_path).unwrap();
+            approval.push_str("\nStale ref: AIHACK-MODIFICATIONS-2026-08-24-01\n");
+            fs::write(approval_path, approval).unwrap();
+        }
         if matches!(case, BundleCase::StaleModificationPeriod) {
             replace_in_file(
                 &root.join("MODIFICATIONS.md"),
-                "Covered change period: `2025-05-20..2026-08-25`",
-                "Covered change period: `2025-05-20..2026-08-24`",
+                "Covered change period: `2025-05-20..2026-11-26`",
+                "Covered change period: `2025-05-20..2026-11-25`",
             );
         }
         let candidate_date = match case {
             BundleCase::MinimumYearCalendar => "0001-06-15",
             BundleCase::MaximumYearCalendar => "9999-06-15",
-            BundleCase::CandidateBeforePeriodEnd => "2026-08-24",
+            BundleCase::CandidateBeforePeriodEnd => "2026-11-25",
             _ => CANDIDATE_DATE,
         };
         let edge_period = match case {
@@ -119,7 +126,7 @@ impl BundleFixture {
         if let Some(period) = edge_period {
             replace_in_file(
                 &root.join("MODIFICATIONS.md"),
-                "2025-05-20..2026-08-25",
+                "2025-05-20..2026-11-26",
                 period,
             );
             replace_in_file(
@@ -194,8 +201,8 @@ impl BundleFixture {
         }
         let status = Command::new("git")
             .args(["commit", "-qm", "release fixture"])
-            .env("GIT_AUTHOR_DATE", "2026-08-25T12:00:00+09:00")
-            .env("GIT_COMMITTER_DATE", "2026-08-25T12:00:00+09:00")
+            .env("GIT_AUTHOR_DATE", "2026-11-26T12:00:00+09:00")
+            .env("GIT_COMMITTER_DATE", "2026-11-26T12:00:00+09:00")
             .current_dir(&root)
             .status()
             .unwrap();
@@ -346,7 +353,7 @@ impl BundleFixture {
         let output = self.root.join("output");
         replace_in_file(
             &output.join("MODIFICATIONS.md"),
-            "Covered change period: `2025-05-20..2026-08-25`",
+            "Covered change period: `2025-05-20..2026-11-26`",
             &format!("Covered change period: `{start}..{end}`"),
         );
         replace_in_file(
@@ -369,7 +376,7 @@ impl BundleFixture {
             .success());
         replace_in_file(
             &unpacked.join("MODIFICATIONS.md"),
-            "Covered change period: `2025-05-20..2026-08-25`",
+            "Covered change period: `2025-05-20..2026-11-26`",
             &format!("Covered change period: `{start}..{end}`"),
         );
         replace_in_file(
@@ -508,6 +515,7 @@ fn verifier_rejects_missing_or_mismatched_authority_references() {
             "modification_notice",
         ),
         (BundleCase::MismatchedModificationRecord, "Notice ID"),
+        (BundleCase::StaleApprovalNotice, "stale modification notice"),
     ] {
         let fixture = BundleFixture::new(case);
         let output = fixture.verify();
@@ -576,8 +584,8 @@ fn verifier_rejects_non_calendar_candidate_and_period_matrix() {
         ("2026-13-01", "2025-05-20", "2026-12-31"),
         ("2026-02-30", "2025-05-20", "2026-12-31"),
         ("2025-02-29", "2025-01-01", "2025-12-31"),
-        ("2026-08-24", "2026-00-00", "2026-99-99"),
-        ("2026-08-24", "2026-08-25", "2026-08-24"),
+        ("2026-11-25", "2026-00-00", "2026-99-99"),
+        ("2026-11-25", "2026-11-26", "2026-11-25"),
         ("0000-06-15", "0000-01-01", "0000-12-31"),
     ] {
         let fixture = BundleFixture::new(BundleCase::Complete);

@@ -183,6 +183,29 @@ fn root_uses_the_verified_official_ngpl_text_and_derivative_notice() {
     assert!(!notice.contains("distributed Git history"));
 }
 
+fn validate_approval_modification_references(
+    approval: &str,
+    expected_notice_id: &str,
+) -> Result<(), String> {
+    let prefix = "AIHACK-MODIFICATIONS-";
+    let mut rest = approval;
+    while let Some(index) = rest.find(prefix) {
+        let candidate = &rest[index..];
+        let token_len = candidate
+            .bytes()
+            .take_while(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+            .count();
+        let token = &candidate[..token_len];
+        if token != expected_notice_id {
+            return Err(format!(
+                "approval record가 현재와 다른 modification notice를 참조합니다: {token}"
+            ));
+        }
+        rest = &candidate[token_len..];
+    }
+    Ok(())
+}
+
 #[test]
 fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
     let approval = project_file("PROJECT_OWNER_LICENSE_APPROVAL.md");
@@ -200,7 +223,7 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
 
     let modifications = project_file("MODIFICATIONS.md");
     for phrase in [
-        "2025-05-20..2026-08-25",
+        "2025-05-20..2026-11-26",
         "src/**",
         "crates/**",
         "apps/**",
@@ -219,7 +242,25 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
     assert!(metadata.contains("commit=$Format:%H$"));
     assert!(metadata.contains("candidate_date=$Format:%cs$"));
     assert!(metadata.contains("owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01"));
-    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-08-25-01"));
+    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-11-26-01"));
+    validate_approval_modification_references(&approval, "AIHACK-MODIFICATIONS-2026-11-26-01")
+        .unwrap();
+}
+
+#[test]
+fn approval_record_rejects_stale_modification_notice_reference() {
+    let approval = project_file("PROJECT_OWNER_LICENSE_APPROVAL.md");
+    assert!(validate_approval_modification_references(
+        &approval,
+        "AIHACK-MODIFICATIONS-2026-11-26-01"
+    )
+    .is_ok());
+    let stale = format!("{approval}\nstale ref: AIHACK-MODIFICATIONS-2026-08-24-01\n");
+    assert!(validate_approval_modification_references(
+        &stale,
+        "AIHACK-MODIFICATIONS-2026-11-26-01"
+    )
+    .is_err());
 }
 
 #[test]
@@ -397,7 +438,7 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     );
     for reference in [
         "owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01",
-        "modification_notice=AIHACK-MODIFICATIONS-2026-08-25-01",
+        "modification_notice=AIHACK-MODIFICATIONS-2026-11-26-01",
     ] {
         assert!(linux.contains(reference), "build.sh 누락: {reference}");
         assert!(windows.contains(reference), "build.bat 누락: {reference}");

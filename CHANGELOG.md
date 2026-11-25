@@ -14,6 +14,8 @@
 - 시작·생성·게임 종료 화면과 명령/선택 메뉴에 내부 마우스 조작을 연결하고 UI 선택 취소의 turn/RNG 보존을 검증했다.
 - production TUI 저장소를 `--save-dir`로 구성 가능한 지속 경로로 전환했다. 저장은 명시적 S이며 자동 저장하지 않는다.
 - 마비·기도 cooldown·문 조건에 legal action을 정렬하고 headless의 legal Wait fallback 및 loaded turn보다 낮은 target 거부를 추가했다.
+- `cap-primitives` 4.0.3(`RUSTSEC-2026-0482`) 및 `url` 2.5.9(`RUSTSEC-2026-0592`) 취약점을 패치하고 `DEP-EXC-0001` 만료·트리거 버전과 duplicate budget 리뷰 일자를 갱신했다.
+- `PROJECT_OWNER_LICENSE_APPROVAL.md`의 `R33-DOC-F001` stale modification 참조를 관계 계약으로 교체하고, `MODIFICATIONS.md`/`RELEASE-METADATA`/빌드·검증 스크립트와 회귀 테스트를 `AIHACK-MODIFICATIONS-2026-11-26-01`(`2025-05-20..2026-11-26`) 및 stale approval notice 거부 검증으로 정렬했다.
 
 ## [0.3.0] - 2026-08-25
 

@@ -41,7 +41,7 @@ fn validate_budget(
         }
     }
     if budget["owner"] != "Dependency owner / Release manager"
-        || budget["reviewed_on"] != "2026-08-24"
+        || budget["reviewed_on"] != "2026-11-26"
         || !budget["shipped_scope"]
             .as_str()
             .is_some_and(|scope| scope.contains("workspace --all-targets"))

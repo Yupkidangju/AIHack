@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $OwnerApprovalId = 'AIHACK-OWNER-2026-07-20-NGPL-01'
-$ModificationNoticeId = 'AIHACK-MODIFICATIONS-2026-08-25-01'
+$ModificationNoticeId = 'AIHACK-MODIFICATIONS-2026-11-26-01'
 $ArchiveName = 'aihack-0.3.0-source.zip'
 $ChecksumNames = @(
     'aihack.exe',
@@ -260,6 +260,14 @@ if ($outputApproval -cne $archiveApproval) {
 }
 if ($outputModifications -cne $archiveModifications) {
     Fail 'MODIFICATIONS.md differs between output and source archive'
+}
+$noticeRefPattern = 'AIHACK-MODIFICATIONS-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}'
+foreach ($approvalDoc in @($outputApproval, $archiveApproval)) {
+    foreach ($match in [regex]::Matches($approvalDoc, $noticeRefPattern)) {
+        if ($match.Value -cne $ModificationNoticeId) {
+            Fail "PROJECT_OWNER_LICENSE_APPROVAL.md references stale modification notice: $($match.Value)"
+        }
+    }
 }
 $periodPattern = '(?m)^Covered change period: `(?<start>[0-9]{4}-[0-9]{2}-[0-9]{2})\.\.(?<end>[0-9]{4}-[0-9]{2}-[0-9]{2})`$'
 $periodMatches = [regex]::Matches($outputModifications, $periodPattern)

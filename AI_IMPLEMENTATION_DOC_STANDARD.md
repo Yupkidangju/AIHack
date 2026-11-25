@@ -1,320 +1,316 @@
 # AI Implementation Documentation Standard
-## AI 구현 문서 표준
 
 ## 0. Purpose
 
-이 문서는 AI가 기획, 스펙, 설계, 구현 가이드, 로드맵 문서를 만들 때 따라야 하는 기준 문서다.
-목표는 "읽기 좋은 문서"가 아니라 "이 문서만 보고 구현자가 바로 만들 수 있는 문서"를 강제하는 것이다.
+This standard governs AI-produced plans, specifications, designs, implementation guides, and roadmaps. The target is not merely readable documentation, but documentation from which an implementer can build immediately.
 
-이 표준의 핵심 질문은 하나다.
+The central question is:
 
-- 이 문서를 받은 구현자가 추가 기획 회의 없이 실제 구현에 들어갈 수 있는가
+- Can the recipient start implementation without another planning meeting?
 
-그 답이 `예`가 아니면 문서는 아직 부족하다.
+Unless the answer is `Yes`, the document is not yet sufficient.
 
 ## 1. What "Reference Grade" Means
 
-이 문서가 요구하는 품질은 아래와 같다.
+Required qualities:
 
-- 범위가 닫혀 있다.
-- 비목표가 명확하다.
-- 열린 결정보다 동결된 결정이 많다.
-- 상태, 타입, 데이터, 공식, 이벤트, 화면 흐름이 서로 연결된다.
-- 문서에 등장하는 고유명사와 ID가 실제 정의로 닫힌다.
-- 구현 순서와 검증 방법이 있다.
-- 리스크는 남길 수 있지만, 리스크가 구현 착수 자체를 막아서는 안 된다.
+- Scope is settled.
+- Non-goals are explicit.
+- Settled decisions outnumber open decisions.
+- States, types, data, formulas, events, and screen flows connect.
+- Every named concept and ID resolves to an actual definition.
+- Implementation order and verification methods are specified.
+- Residual risks may remain, but must not themselves prevent implementation from starting.
 
-즉, `아이디어 문서`가 아니라 `구현 참조 문서`여야 한다.
+Produce an implementation reference, not an idea document.
 
 ## 2. Minimum Document Set
 
-AI가 실전급 문서 세트를 만든다면 최소 아래 묶음을 목표로 한다.
+For a production-grade document set, target at least:
 
-| 문서 | 역할 | 없으면 생기는 문제 |
+| Document | Role | Consequence of Absence |
 | --- | --- | --- |
-| `spec.md` | 마스터 스펙, 범위, 계약, 공식, 실데이터 | 전체 기준점이 없음 |
-| `designs.md` | UI/UX, 화면 흐름, 레이어, 데이터 연결 | 구현자가 화면을 임의 해석함 |
-| `implementation_summary.md` | 시스템 분해, 파일 책임, 구현 순서 | 구현 시작점이 흐려짐 |
-| `DESIGN_DECISIONS.md` | 왜 이렇게 정했는지, 무엇을 기각했는지 | 나중에 같은 논쟁 반복 |
-| `BUILD_GUIDE.md` | 스캐폴딩, 빌드, 런타임 경로, 실행 절차 | 첫 실행에서 막힘 |
-| `audit_roadmap.md` | 단계별 목표, 검증 포인트, 감사 기준 | 구현이 산만해짐 |
-| `CHANGELOG.md` | 문서 변경 이력 | 무엇이 언제 바뀌었는지 추적 불가 |
+| `spec.md` | Master specification, scope, contracts, formulas, real data | No overall baseline |
+| `designs.md` | UI/UX, screen flow, layers, data connections | Implementers improvise screen behavior |
+| `implementation_summary.md` | System decomposition, file responsibilities, implementation order | Unclear implementation starting point |
+| `DESIGN_DECISIONS.md` | Reasons for decisions and rejected alternatives | The same debates recur |
+| `BUILD_GUIDE.md` | Scaffolding, builds, runtime paths, execution procedures | First-run failures |
+| `audit_roadmap.md` | Phase objectives, verification points, audit criteria | Unfocused implementation |
+| `CHANGELOG.md` | Document change history | Changes and their timing cannot be traced |
 
-도메인에 따라 이름은 바꿔도 되지만 역할은 유지한다.
+Names may vary by domain, but preserve these roles.
 
 ## 3. Non-Negotiable Requirements
 
-어떤 문서든 아래 항목은 반드시 만족해야 한다.
+Documents must satisfy the following requirements.
 
 ### 3.1 Scope Closure
 
-- 목표를 적는다.
-- 성공 기준을 적는다.
-- 비목표를 적는다.
-- "나중에 생각" 항목은 최대한 제거하고, 남긴다면 후속 Phase나 잔여 리스크로 격리한다.
+- State the objective.
+- State success criteria.
+- State non-goals.
+- Eliminate "decide later" items as far as possible. Isolate any remaining items in a later Phase or as residual risks.
 
 ### 3.2 Frozen Decisions
 
-- 구현을 좌우하는 큰 결정은 동결한다.
-- 예시
-  - 런타임 구조
-  - 저장 방식
-  - 입력 범위
-  - 렌더링 경계
-  - 애니메이션/리소스 파이프라인
-  - 핵심 UI 정책
+- Settle major decisions that determine implementation.
+- Examples:
+  - Runtime structure
+  - Persistence approach
+  - Input scope
+  - Rendering boundaries
+  - Animation/resource pipelines
+  - Core UI policy
 
-"A일 수도 있고 B일 수도 있다"는 문장은 구현 문서에서 실패다.
+"It could be A or B" is a failure in an implementation document.
 
 ### 3.3 Typed Contracts
 
-문서에 등장하는 핵심 계약은 타입이나 스키마로 고정한다.
+Fix core documented contracts as types or schemas.
 
-- 상태 타입
-- 결과 타입
-- 저장 타입
-- 설정 타입
-- 이벤트 타입
-- 데이터 정의 타입
-- 브리지/API 메서드 시그니처
+- State types
+- Result types
+- Persistence types
+- Configuration types
+- Event types
+- Data-definition types
+- Bridge/API method signatures
 
-문서에 나온 필드는 모두 의미가 설명돼야 한다.
+Explain the meaning of every documented field.
 
 ### 3.4 Concrete Numbers
 
-좋은 문서는 형용사보다 수치가 많다.
+Good documents contain more concrete values than adjectives.
 
-- "빠른 이동"이 아니라 `moveSpeed: 260`
-- "짧은 선딜"이 아니라 `startup: 4f`
-- "잠깐 흔들림"이 아니라 `80ms ~ 120ms`
-- "짧은 무적"이 아니라 `invincible: 120ms`
+- Use `moveSpeed: 260`, not "fast movement."
+- Use `startup: 4f`, not "a short startup."
+- Use `80ms ~ 120ms`, not "a brief shake."
+- Use `invincible: 120ms`, not "short invincibility."
 
-수치가 없으면 구현자는 자기 판단으로 메운다.
+Without numbers, implementers fill the gaps with their own judgment.
 
 ### 3.5 Real Data Samples
 
-타입만 있어서는 부족하다. 최소 1세트 이상의 실데이터가 있어야 한다.
+Types alone are insufficient. Supply at least one set of real data.
 
-- 플레이어 기본값
-- 핵심 액션/공격 데이터
-- 적 1세트 이상
-- 스테이지/플로우 예시 1세트 이상
-- 저장 기본값
+- Player defaults
+- Core action/attack data
+- At least one enemy data set
+- At least one stage/flow example
+- Save defaults
 
-"예시 데이터"가 아니라 "바로 코드로 옮길 수 있는 데이터"여야 한다.
+Provide data ready to move into code, not merely illustrative placeholders.
 
 ### 3.6 Execution Path
 
-문서는 반드시 구현 순서를 제시해야 한다.
+Documents must specify implementation order.
 
-- 무엇부터 만들지
-- 어떤 파일이 필요한지
-- 어떤 시스템이 먼저 서야 하는지
-- 어디서 검증할지
+- What to build first
+- Which files are needed
+- Which systems must exist first
+- Where verification occurs
 
-구현 순서가 없으면 문서는 설명서에 머문다.
+Without implementation order, the document remains an explanation rather than an execution guide.
 
 ### 3.7 Verification Path
 
-문서는 반드시 검증 기준을 가져야 한다.
+Documents must define verification criteria.
 
-- 어떤 명령을 실행할지
-- 어떤 수동 검증을 할지
-- 어느 단계에서 무엇이 통과되어야 하는지
-- 어떤 산출물이 생성되어야 하는지
+- Commands to run
+- Manual checks to perform
+- What must pass at each stage
+- Artifacts to produce
 
-"완료"는 구현자의 감각이 아니라 검증 결과로 정의해야 한다.
+Define completion by verification results, not the implementer's intuition.
 
 ## 4. Master Spec Blueprint
 
-마스터 스펙은 최소 아래 구조를 가져야 한다.
+The master specification includes at least:
 
-1. 문서 운영 규칙
-2. 프로젝트 정체성
-3. 목표와 성공 기준
-4. 비목표
-5. 동결된 핵심 결정
-6. 기술 스택과 아키텍처 원칙
-7. 런타임/빌드 파이프라인
-8. 디렉터리 구조
-9. 핵심 동작 정의
-10. 시스템 명세
-11. 경계 타입과 계약
-12. 저장/설정/진행 정책
-13. 동결된 공식
-14. 실데이터 기준표
-15. 단계별 로드맵
-16. 명령어와 검증 기준
-17. 보안/구현 경계
-18. 잔여 리스크
+1. Document operating rules
+2. Project identity
+3. Objectives and success criteria
+4. Non-goals
+5. Settled key decisions
+6. Technology stack and architectural principles
+7. Runtime/build pipeline
+8. Directory structure
+9. Core behavior definitions
+10. System specifications
+11. Boundary types and contracts
+12. Persistence/configuration/progression policies
+13. Settled formulas
+14. Real-data reference tables
+15. Phased roadmap
+16. Commands and verification criteria
+17. Security/implementation boundaries
+18. Residual risks
 
-특히 아래는 빠지면 안 된다.
+In particular, do not omit:
 
-- 상태 전이
-- 데이터 구조
-- 결과 타입
-- 브리지/API 계약
-- 기본 저장값
-- 보상/비용/레벨업 공식
-- 최소 1개 이상의 실제 콘텐츠 데이터
+- State transitions
+- Data structures
+- Result types
+- Bridge/API contracts
+- Save defaults
+- Reward/cost/level-up formulas
+- At least one actual content data set
 
 ## 5. Design Doc Blueprint
 
-디자인 문서는 보기 좋은 설명이 아니라 구현 지시서여야 한다.
+A design document is an implementation guide, not a decorative description.
 
-반드시 포함할 것:
+Required contents:
 
-- 핵심 경험
-- 전체 화면 흐름
-- 전투/핵심 화면 레이어 구조
-- 컬러/타이포 토큰
-- 레이아웃 기준
-- HUD/화면 요소 목록
-- 데이터 연결 기준
-- 화면별 버튼 정책
-- 타격감/모션 규칙
-- React/Canvas 또는 UI/코어 역할 분리
-- 동결된 디자인 결정
+- Core experience
+- Complete screen flow
+- Combat/core-screen layer structure
+- Color/typography tokens
+- Layout criteria
+- HUD/screen-element inventory
+- Data-connection criteria
+- Per-screen button policies
+- Hit-feedback/motion rules
+- React/Canvas or UI/core responsibility split
+- Settled design decisions
 
-좋은 디자인 문서는 "예쁘게 만들어라"라고 쓰지 않는다.
-대신 "어디에 무엇이 있고, 어떤 데이터만 읽고, 어떤 상황에서 어떻게 반응하는지"를 적는다.
+Do not merely say "make it look good." Specify what goes where, which data it reads, and how it reacts under each condition.
 
 ## 6. Implementation Summary Blueprint
 
-구현 요약 문서는 시작점 역할을 해야 한다.
+The implementation summary provides a starting point.
 
-반드시 포함할 것:
+Required contents:
 
-- 전체 런타임 흐름
-- 시스템 분해표
-- 경계 계약 요약
-- 파일 책임
-- 알고리즘 메모
-- 동결된 공식 요약
-- 첫 플레이어블의 최소 범위
-- 구현 순서 권장
-- 유지보수 규칙
+- Overall runtime flow
+- System decomposition table
+- Boundary-contract summary
+- File responsibilities
+- Algorithm notes
+- Summary of settled formulas
+- Minimum scope of the first playable version
+- Recommended implementation order
+- Maintenance rules
 
-이 문서는 "처음 코드를 여는 구현자"를 위한 문서다.
+Write for the implementer opening the code for the first time.
 
 ## 7. Decision Record Blueprint
 
-결정 문서는 반드시 `왜`를 남겨야 한다.
+Decision records must explain why.
 
-각 결정은 아래를 포함한다.
+Each decision includes:
 
-- 배경
-- 결정
-- 대안과 기각 사유
-- 결과
+- Context
+- Decision
+- Alternatives and reasons for rejection
+- Consequences
 
-좋은 결정 문서는 "이렇게 했다"로 끝나지 않는다.
-"왜 다른 길을 버렸는지"를 남긴다.
+Do not stop at "we did this." Explain why other options were rejected.
 
 ## 8. Build Guide Blueprint
 
-빌드 가이드는 실제로 첫 실행을 성공시켜야 한다.
+The build guide must actually enable a successful first run.
 
-반드시 포함할 것:
+Required contents:
 
-- 사전 준비
-- 안전한 스캐폴딩 절차
-- 필수 설치 항목
-- 런타임 출력 경로
-- 엔트리 파일 연결 방식
-- 루트 `package.json` 필수 스크립트
-- 최소 `main/preload` 예시
-- 전역 타입 선언 예시
-- 첫 실행 명령
-- 빌드 후 확인할 산출물
-- 배포 전 체크리스트
+- Prerequisites
+- Safe scaffolding procedures
+- Required installations
+- Runtime output paths
+- Entry-file wiring
+- Required scripts in the root `package.json`
+- Minimal `main/preload` examples
+- Global type-declaration examples
+- First-run commands
+- Build artifacts to inspect
+- Pre-deployment checklist
 
-특히 아래 실패를 막아야 한다.
+Prevent these failures in particular:
 
-- "명령은 있는데 실제 엔트리가 연결되지 않음"
-- "renderer는 뜨는데 main/preload 산출물이 없음"
-- "보안 옵션은 말했지만 코드 예시는 없음"
+- A command exists, but the actual entrypoint is not connected.
+- The renderer starts, but main/preload artifacts are missing.
+- Security options are described, but code examples are absent.
 
 ## 9. Audit Roadmap Blueprint
 
-로드맵 문서는 일정표가 아니라 구현 감사 프레임이어야 한다.
+A roadmap is an implementation-audit framework, not merely a schedule.
 
-반드시 포함할 것:
+Required contents:
 
-- 정합성 감사
-- 위험요소 감사
-- 아키텍처 감사
-- 로드맵 감사
-- Phase별 목표
-- Phase별 구현 항목
-- Phase별 실제 알고리즘 메모
-- Phase별 검증 포인트
-- 체크포인트 정책
-- 현재 남은 핵심 리스크
+- Consistency audit
+- Risk audit
+- Architecture audit
+- Roadmap audit
+- Objectives per Phase
+- Implementation items per Phase
+- Actual algorithm notes per Phase
+- Verification points per Phase
+- Checkpoint policy
+- Current key residual risks
 
-좋은 로드맵은 "다음에 뭐 하지?"가 아니라 "지금 이 페이즈를 넘겨도 되는가?"를 판단하게 해준다.
+A good roadmap answers "Can this Phase pass now?", not just "What comes next?"
 
 ## 10. Cross-Document Closure Rules
 
-문서 세트는 서로 물려 있어야 한다.
+The document set must form a connected whole.
 
-아래 규칙을 만족해야 한다.
+Required relationships:
 
-- `designs.md`에서 말한 이벤트는 `spec.md` 타입에 존재해야 한다.
-- `spec.md`에서 정의한 타입은 `implementation_summary.md` 파일 책임에 반영돼야 한다.
-- `BUILD_GUIDE.md` 스크립트는 `spec.md` 런타임 파이프라인과 일치해야 한다.
-- `audit_roadmap.md`의 구현 항목은 `spec.md`의 데이터와 타입으로 바로 구현 가능해야 한다.
-- `CHANGELOG.md`는 큰 문서 구조 변경을 기록해야 한다.
+- Events described in `designs.md` exist as types in `spec.md`.
+- Types defined in `spec.md` appear in the file responsibilities in `implementation_summary.md`.
+- `BUILD_GUIDE.md` scripts agree with the runtime pipeline in `spec.md`.
+- `audit_roadmap.md` implementation items can be implemented directly from the data and types in `spec.md`.
+- `CHANGELOG.md` records major changes to document structure.
 
-한 문서에서만 존재하는 개념은 위험 신호다.
+A concept appearing in only one document is a warning sign.
 
 ## 11. Closure Rules for IDs, Flags, CTAs, and APIs
 
-AI가 가장 자주 놓치는 구간이다. 반드시 닫아야 한다.
+These are common AI omissions; resolve them explicitly.
 
 ### 11.1 IDs
 
-문서에 등장한 ID는 모두 정의돼야 한다.
+Define every ID appearing in the documents.
 
-- 스테이지 ID
-- 적 ID
-- 공격 ID
-- 이벤트 ID
-- 상태 이름
+- Stage IDs
+- Enemy IDs
+- Attack IDs
+- Event IDs
+- State names
 
-참조만 있고 정의가 없으면 문서 실패다.
+A reference without a definition is a documentation failure.
 
 ### 11.2 Flags
 
-불리언이나 상태 플래그는 의미와 생성 조건이 있어야 한다.
+Specify the meaning and creation conditions of Boolean or state flags.
 
-- 이름
-- 의미
-- 계산 조건
-- 소비 위치
+- Name
+- Meaning
+- Calculation conditions
+- Consumer location
 
-예시:
+Example:
 
 - `flawlessBonus = damageTaken === 0`
 
-이 정도로 닫혀 있어야 한다.
+Make definitions at least this concrete.
 
 ### 11.3 CTAs
 
-화면 버튼은 존재만 적지 말고 활성화 조건과 후속 상태를 적어야 한다.
+Do not merely list screen buttons. Define their activation conditions and subsequent state.
 
-예시:
+For example:
 
-- 버튼 이름
-- 언제 활성화되는지
-- 누르면 어디로 가는지
-- 어떤 상태를 갱신하는지
+- Button name
+- When it becomes active
+- Where it leads when pressed
+- Which state it updates
 
 ### 11.4 Bridge / API
 
-브리지나 API는 "존재한다"가 아니라 메서드 계약으로 써야 한다.
+Describe bridges and APIs as method contracts, not merely as existing components.
 
-예시:
+Example:
 
 ```ts
 type AppBridge = {
@@ -325,59 +321,59 @@ type AppBridge = {
 
 ## 12. Anti-Patterns
 
-아래 문장은 구현 문서에서 금지에 가깝다.
+The following vague expressions are close to prohibited in implementation documents:
 
-- "적당히"
-- "필요시"
-- "원하면"
-- "추후 고려"
-- "게임답게"
-- "자연스럽게"
-- "유연하게"
-- "대충 이 정도"
+- "Appropriately"
+- "As needed"
+- "When desired"
+- "Consider later"
+- "Make it game-like"
+- "Naturally"
+- "Flexibly"
+- "Roughly this much"
 
-이 표현들은 방향은 있어 보여도 구현을 닫지 못한다.
+They may suggest a direction, but do not settle implementation.
 
-아래 구조도 위험하다.
+These structures are also risky:
 
-- 타입 없는 설명
-- 수치 없는 밸런스
-- 버튼은 있는데 상태 갱신 규칙이 없음
-- 이벤트 이름은 있는데 payload가 없음
-- 공격 ID는 있는데 히트박스/공식이 없음
-- 빌드 명령은 있는데 출력 엔트리 연결이 없음
-- 저장 구조는 있는데 초기값/리셋 정책이 없음
+- Explanations without types
+- Balance rules without numbers
+- Buttons without state-update rules
+- Event names without payloads
+- Attack IDs without hitboxes/formulas
+- Build commands without output-entrypoint connections
+- Persistence structures without defaults/reset policies
 
 ## 13. Quality Checklist
 
-AI가 문서를 제출하기 전에 아래를 체크해야 한다.
+Before submitting documents, check:
 
-- 목표와 비목표가 모두 적혀 있는가
-- 핵심 결정이 동결됐는가
-- 큰 타입 계약이 정의돼 있는가
-- 고유 ID가 모두 실데이터로 닫혔는가
-- 공식이 수치와 함께 정의돼 있는가
-- 최소 1세트 이상의 실제 데이터가 있는가
-- 구현 순서가 있는가
-- 검증 명령과 체크포인트가 있는가
-- 화면 버튼의 정책이 있는가
-- 저장/설정/브리지 정책이 있는가
-- 문서 간 용어와 타입이 일치하는가
-- 남은 리스크가 구현 불가 수준이 아닌가
+- Are both objectives and non-goals stated?
+- Are key decisions settled?
+- Are major typed contracts defined?
+- Do all unique IDs resolve to real data?
+- Are formulas defined with concrete values?
+- Is there at least one real data set?
+- Is implementation order specified?
+- Are verification commands and checkpoints specified?
+- Are screen-button policies defined?
+- Are persistence/configuration/bridge policies defined?
+- Are terms and types consistent across documents?
+- Are residual risks below the level that prevents implementation?
 
-하나라도 `아니오`면 아직 참조용 설계도로 부족하다.
+Any `No` means the document is not yet sufficient as a reference blueprint.
 
 ## 14. Acceptance Standard
 
-아래 세 가지를 모두 만족하면 실전급 참조 문서로 본다.
+A document set is a production-grade reference when all three hold:
 
-1. 구현자가 문서만 보고 첫 플레이어블 버전을 만들 수 있다.
-2. 검증자가 문서만 보고 무엇이 완료/미완료인지 판단할 수 있다.
-3. 후속 AI가 문서를 읽고 같은 개념을 더 낮은 품질로 다시 쓰지 않는다.
+1. An implementer can build the first playable version from the documents alone.
+2. A verifier can determine what is complete and incomplete from the documents alone.
+3. A subsequent AI can read the documents without rewriting the same concepts at a lower quality.
 
 ## 15. Copy-Paste Instruction Block for GPTs, Gems, and Skills
 
-아래 블록은 GPTs/Gems/skills의 참조 지침으로 바로 붙여 넣을 수 있다.
+Use this block directly as reference instructions for GPTs, Gems, or skills.
 
 ```md
 You are generating implementation-grade documentation, not brainstorming notes.
@@ -404,13 +400,12 @@ Target output quality: reference-grade implementation docs.
 
 ## 16. Final Principle
 
-좋은 구현 문서는 "멋진 문장"보다 "닫힌 결정"이 많다.
+Good implementation documents contain more settled decisions than impressive prose.
 
-AI가 문서를 만들 때 목표는 감탄이 아니라 착수 가능성이다.
-이 문서를 기준으로 삼는다면, 결과물은 최소한 아래 질문에 버티어야 한다.
+AI documentation aims to make implementation possible, not merely impress the reader. At minimum, the result must answer:
 
-- "이걸 지금 바로 만들 수 있는가"
-- "문서에 나온 모든 개념이 정의돼 있는가"
-- "검증 기준 없이 완료를 주장할 수 없게 되어 있는가"
+- Can this be built immediately?
+- Is every documented concept defined?
+- Do the criteria prevent unsupported claims of completion?
 
-이 세 질문에 버티지 못하면 다시 써야 한다.
+Rewrite documents that cannot meet these three tests.
