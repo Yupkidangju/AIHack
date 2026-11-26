@@ -243,6 +243,10 @@ fn wire_command_value(command: CommandIntent) -> Value {
         CommandIntent::ShowInventory => json!({ "type": "SHOW_INVENTORY" }),
         CommandIntent::Wield { item } => item_action("WIELD", item.0),
         CommandIntent::Wear { item } => item_action("WEAR", item.0),
+        CommandIntent::PutOn { item } => item_action("PUT_ON", item.0),
+        CommandIntent::RemoveRing => json!({ "type": "REMOVE_RING" }),
+        CommandIntent::Buy { kind } => json!({ "type": "BUY", "kind": kind }),
+        CommandIntent::Sell { item } => item_action("SELL", item.0),
         CommandIntent::Quaff { item } => item_action("QUAFF", item.0),
         CommandIntent::Eat { item } => item_action("EAT", item.0),
         CommandIntent::Zap { item, direction } => json!({

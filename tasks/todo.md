@@ -25,3 +25,11 @@
 - [x] P5b: `poison_turns`/`DeathCause::Poison`, `PotionCure`, `WandFire`, `GiantSpider`/`GnollArcher`/`Troll`, `PROVENANCE.md`·`r7-content.sha256`·`registry.rs` hash 동기화.
 - [x] P5c: TUI(잠긴 문, `POIS:`, BUC/인챈트 라벨, 신규 몬스터/아이템, `DeathCause::Poison`) 및 Headless `survival-v1` 연동.
 - [x] P5d: `tests/campaign.rs`, `tests/content_validation.rs`, `tests/campaign_p5.rs` 회귀·통합 테스트 및 전체 검증(`fmt`, `clippy`, `test -j 4`, `release`, `audit`, `deny`, `r7/r8`)·최종 문서 마감.
+
+# P6 체크리스트 (2026-11-26)
+
+- [x] P6-doc: `docs/campaign_spec.md`, `spec.md`, `DESIGN_DECISIONS.md` (`ADR-P6-01`), `tasks/plan.md`, `tasks/todo.md` 문서 선행 확정.
+- [x] P6a: `Ring` 슬롯·`RingEffect`·반지 3종·`FireAnt`(`FireOnMelee`), 통합 AC 계산·독/화염 저항·`Cursed` 반지 가드.
+- [x] P6b: `TileKind::Shop`, `Main 2`/`Mines 1` 상점, 캠페인 골드(초기 50 + 처치 `diff*25`), `systems/shop.rs` 구매·판매 및 content/provenance 동기화.
+- [x] P6c: TUI(`$`/`shop`, `G<gold>`, `RES:F|P|FP`, `a`/`fire ant`, `=`, `'P'`/`'T'`/`'$'` 메뉴) 및 Headless `survival-v1` 연동.
+- [x] P6d: `tests/content_validation.rs`, `tests/campaign.rs`, `tests/campaign_p6.rs` 테스트 및 전체 검증(`fmt`, `clippy`, `test -j 4`, `release`, `audit`, `deny`, `r7/r8`)·최종 문서 마감.

@@ -94,22 +94,55 @@ pub fn apply_monster_turn(
                 };
                 let hit = resolution.hit;
                 events.push(combat::attack_event(&resolution));
-                if hit
-                    && defender == world.player_id
-                    && matches!(
-                        world
-                            .entities
-                            .get(attacker)
-                            .and_then(|entity| entity.monster_passive()),
-                        Some(MonsterPassive::PoisonOnMelee)
-                    )
-                {
-                    let next_poison = world.poison_turns.max(3);
-                    world.state_mut().poison_turns = next_poison;
-                    events.push(GameEvent::PassiveAttackTriggered {
-                        source: attacker,
-                        target: defender,
-                    });
+                if hit && defender == world.player_id {
+                    match world
+                        .entities
+                        .get(attacker)
+                        .and_then(|entity| entity.monster_passive())
+                    {
+                        Some(MonsterPassive::PoisonOnMelee) => {
+                            if crate::systems::items::has_poison_resistance(world) {
+                                events.push(GameEvent::Message {
+                                    priority: aihack_core::event::MessagePriority::Info,
+                                    text: "You resist the poison!".to_string(),
+                                });
+                            } else {
+                                let next_poison = world.poison_turns.max(3);
+                                world.state_mut().poison_turns = next_poison;
+                                events.push(GameEvent::PassiveAttackTriggered {
+                                    source: attacker,
+                                    target: defender,
+                                });
+                            }
+                        }
+                        Some(MonsterPassive::FireOnMelee) => {
+                            if crate::systems::items::has_fire_resistance(world) {
+                                events.push(GameEvent::Message {
+                                    priority: aihack_core::event::MessagePriority::Info,
+                                    text: "You resist the fire!".to_string(),
+                                });
+                            } else {
+                                let fire_dmg = combat::roll_die(rng, 6);
+                                if let Some(stats) =
+                                    world.state_mut().entities.actor_stats_mut(defender)
+                                {
+                                    stats.hp = stats.hp.saturating_sub(fire_dmg);
+                                }
+                                events.push(GameEvent::PassiveAttackTriggered {
+                                    source: attacker,
+                                    target: defender,
+                                });
+                                events.push(GameEvent::Message {
+                                    priority: aihack_core::event::MessagePriority::Warning,
+                                    text: format!(
+                                        "The fire ant burns you for {fire_dmg} fire damage!"
+                                    ),
+                                });
+                            }
+                        }
+                        Some(MonsterPassive::ParalyzeOnMelee | MonsterPassive::Regenerate)
+                        | None => {}
+                    }
                 }
                 events.extend(death::collect_death_events_after_attack(
                     world, attacker, defender,

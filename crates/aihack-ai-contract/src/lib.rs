@@ -10,7 +10,7 @@ pub use aihack_core::{
     domain::{
         combat::DeathCause,
         entity::EntityKind,
-        item::{BucStatus, ItemKind},
+        item::{BucStatus, ItemKind, RingEffect},
         monster::MonsterKind,
         tile::{DoorState, TileKind, TrapKind},
     },

@@ -19,6 +19,10 @@ P1–P3 당시 로컬 검증은 전체 491 tests, fmt/clippy/release PASS를 기
 
 플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P4 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
 
+### P6 게임플레이 확장 (2026-11-26)
+
+현재 content registry hash는 `aa720d339c7f0c77`이다(`items.toml` 반지 3종·`monsters.toml` `FireAnt` 추가 반영, provenance/SHA-256 manifest 동기화 완료). `ItemClass::Ring`/`EquipmentSlot::Ring`/`RingEffect`와 반지 3종(`RingPoisonResistance`, `RingFireResistance`, `RingProtection`) 및 `Inventory::equipped_ring`(optional serde omission)을 추가하고, `recompute_player_ac`와 `save::validate_inventory`가 갑옷+반지 합산 AC를 검증하며 `Cursed` 반지의 해제·교체·버리기·판매를 차단한다. `MonsterKind::FireAnt`(`a`, `FireOnMelee` 추가 `1d6` 화염 피해)와 독·화염 저항 반지를 연결했다. `TileKind::Shop`을 `Main 2`와 `Mines 1`에 생성(임의 상점 타일 변조 거부)하고 캠페인 골드(초기 `50`, 처치 `difficulty * 25`; legacy 모드 `0`/`difficulty` 보존) 및 `systems/shop.rs` 9종 구매/판매를 구현했다. `PlayerObservation` optional 필드(`gold`, `fire_resistant`, `poison_resistant`), `crates/aihack-llm` wire command 매핑, TUI(`$`/`shop`, `a`/`fire ant`, `=`, `G`/`RES:` HUD, `'P'`/`'T'`/`'$'` 메뉴), Headless `survival-v1` 반지 자동 착용까지 통합 완료했다.
+
 ### P5 게임플레이 확장 (2026-11-26)
 
 현재 content registry hash는 `5b9ee4946ebf05d7`이다(`items.toml` 5종·`monsters.toml` 3종 추가 반영). `EntityPayload::Item`에 optional serde `buc`(`Blessed`/`Uncursed`/`Cursed`)·`enchantment`(`-3..=+5`)와 별도 `Entity`/`EntityStore` 접근자를 추가해 `Entity::item()` 5-튜플과 V1 저장/해시를 보존하면서 무기 명중/피해·방어구 AC·물약/주문서 BUC 효과와 `Cursed` 장착 해제/버리기/던지기 금지를 연결했다. `DoorState::Locked`를 추가해 `Mines 2` 입구 `(7, centers[0].y)`에 생성하고 `Kick` 해제 및 `validate_persisted_map` 변조 거부를 구현했다. 독 상태이상(`poison_turns`)·`DeathCause::Poison`, 치료 물약(`PotionCure`)·화염 지팡이(`WandFire`, `2d6+2`), 강화/저주 해제 주문서 3종(`ScrollEnchantWeapon`/`ScrollEnchantArmor`/`ScrollRemoveCurse`), 신규 몬스터 3종(`GiantSpider` 독, `GnollArcher` 직교 원거리, `Troll` 재생), TUI(`POIS:<n>`, `locked door`, BUC/인챈트 라벨, 사인)·Headless `survival-v1` 연동을 완료했다.

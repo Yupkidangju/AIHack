@@ -120,6 +120,9 @@ fn player_observation(world: &GameWorld) -> PlayerObservation {
         paralysis_turns: world.paralysis_turns,
         hallucinating: world.hallucinating,
         poison_turns: world.poison_turns,
+        gold: world.gold,
+        fire_resistant: crate::systems::items::has_fire_resistance(world),
+        poison_resistant: crate::systems::items::has_poison_resistance(world),
     }
 }
 
@@ -185,6 +188,8 @@ fn inventory_observations(world: &GameWorld) -> Vec<ItemObservation> {
                     Some(EquipmentSlot::Melee)
                 } else if world.inventory.equipped_body == Some(entry.item) {
                     Some(EquipmentSlot::Body)
+                } else if world.inventory.equipped_ring == Some(entry.item) {
+                    Some(EquipmentSlot::Ring)
                 } else {
                     None
                 },
@@ -256,6 +261,20 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
                             actions.push(CommandIntent::Read { item });
                         }
                     }
+                    InventoryAction::PutOn => {
+                        if item_has_class(world, item, ItemClass::Ring) {
+                            actions.push(CommandIntent::PutOn { item });
+                        }
+                    }
+                    InventoryAction::Sell => {
+                        if crate::systems::shop::is_on_shop(world)
+                            && world.entities.item_data(item).is_some_and(|data| {
+                                data.kind != aihack_core::domain::item::ItemKind::AmuletAscension
+                            })
+                        {
+                            actions.push(CommandIntent::Sell { item });
+                        }
+                    }
                 }
             }
             actions.push(CommandIntent::Quit);
@@ -301,6 +320,19 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
         }
         _ => {}
     }
+    if world.inventory.equipped_ring.is_some() {
+        actions.push(CommandIntent::RemoveRing);
+    }
+    if crate::systems::shop::is_on_shop(world) && world.inventory.next_letter_index < 26 {
+        for kind in crate::systems::shop::SHOP_CATALOG {
+            if crate::systems::shop::buy_price(kind, world.content_registry())
+                .is_ok_and(|price| world.gold >= price)
+            {
+                actions.push(CommandIntent::Buy { kind });
+            }
+        }
+    }
+    let on_shop = crate::systems::shop::is_on_shop(world);
     for entry in &world.inventory.entries {
         if let Some(data) = world.entities.item_data(entry.item) {
             if data.class == ItemClass::Weapon {
@@ -308,6 +340,9 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             }
             if data.class == ItemClass::Armor {
                 actions.push(CommandIntent::Wear { item: entry.item });
+            }
+            if data.class == ItemClass::Ring {
+                actions.push(CommandIntent::PutOn { item: entry.item });
             }
             if data.class == ItemClass::Potion {
                 actions.push(CommandIntent::Quaff { item: entry.item });
@@ -319,6 +354,9 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             }
             if data.class == ItemClass::Scroll {
                 actions.push(CommandIntent::Read { item: entry.item });
+            }
+            if on_shop && data.kind != aihack_core::domain::item::ItemKind::AmuletAscension {
+                actions.push(CommandIntent::Sell { item: entry.item });
             }
             if matches!(data.class, ItemClass::Weapon | ItemClass::Rock) {
                 for direction in Direction::ALL {

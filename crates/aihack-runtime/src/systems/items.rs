@@ -84,27 +84,12 @@ pub fn wear(world: &mut GameWorld, item: EntityId) -> Result<Option<GameEvent>, 
     if data.class != ItemClass::Armor {
         return Err("item is not armor".to_string());
     }
-    let enchant = world
-        .entities
-        .get(item)
-        .and_then(|entity| entity.item_enchantment())
-        .unwrap_or(0);
-    let ac_bonus = data.ac_bonus.saturating_add(i16::from(enchant));
-    let derived_ac = adventurer_template()
-        .ac
-        .checked_sub(ac_bonus)
-        .ok_or_else(|| "armor AC exceeds the supported range".to_string())?;
+    let _ = compute_ac_with(world, Some(item), world.inventory.equipped_ring)?;
     if let Some(previous) = world.inventory.equipped_body {
         unequip_body(world, previous)?;
     }
     world.state_mut().inventory.equip_body(item);
-    let player_id = world.player_id;
-    let stats = world
-        .state_mut()
-        .entities
-        .actor_stats_mut(player_id)
-        .ok_or_else(|| "player actor stats are missing".to_string())?;
-    stats.ac = derived_ac;
+    recompute_player_ac(world)?;
     Ok(Some(GameEvent::ItemEquipped {
         entity: world.player_id,
         item,
@@ -418,20 +403,16 @@ pub fn read(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
         }
         ConsumableEffect::EnchantArmor => {
             if let Some(armor_id) = world.inventory.equipped_body {
-                let (current_enchant, current_buc, ac_bonus) = world
+                let (current_enchant, current_buc) = world
                     .entities
                     .get(armor_id)
                     .map(|entity| {
                         (
                             entity.item_enchantment().unwrap_or(0),
                             entity.item_buc().unwrap_or(BucStatus::Uncursed),
-                            entity
-                                .item()
-                                .map(|(_, data, _, _, _)| data.ac_bonus)
-                                .unwrap_or(0),
                         )
                     })
-                    .unwrap_or((0, BucStatus::Uncursed, 0));
+                    .unwrap_or((0, BucStatus::Uncursed));
                 if current_buc == BucStatus::Cursed {
                     world
                         .state_mut()
@@ -439,18 +420,15 @@ pub fn read(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
                         .set_item_buc(armor_id, BucStatus::Uncursed);
                 }
                 let next_enchant = (current_enchant + 1).min(MAX_ITEM_ENCHANTMENT);
-                if let Some(derived_ac) = adventurer_template()
-                    .ac
-                    .checked_sub(ac_bonus.saturating_add(i16::from(next_enchant)))
-                {
+                world
+                    .state_mut()
+                    .entities
+                    .set_item_enchantment(armor_id, next_enchant);
+                if recompute_player_ac(world).is_err() {
                     world
                         .state_mut()
                         .entities
-                        .set_item_enchantment(armor_id, next_enchant);
-                    let player_id = world.player_id;
-                    if let Some(stats) = world.state_mut().entities.actor_stats_mut(player_id) {
-                        stats.ac = derived_ac;
-                    }
+                        .set_item_enchantment(armor_id, current_enchant);
                 }
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
@@ -505,12 +483,119 @@ pub(crate) fn remove_inventory_item(world: &mut GameWorld, item: EntityId) -> Re
     if world.inventory.equipped_body == Some(item) {
         unequip_body(world, item)?;
     }
+    if world.inventory.equipped_ring == Some(item) {
+        unequip_ring(world, item)?;
+    }
     world
         .state_mut()
         .inventory
         .remove(item)
         .ok_or_else(|| "item is not in player inventory".to_string())?;
     Ok(())
+}
+
+pub fn put_on(world: &mut GameWorld, item: EntityId) -> Result<Option<GameEvent>, String> {
+    if world.inventory.equipped_ring == Some(item) {
+        return Ok(None);
+    }
+    if !world.inventory.contains(item) {
+        return Err("item is not in player inventory".to_string());
+    }
+    let data = world
+        .entities
+        .item_data(item)
+        .ok_or_else(|| "entity is not an item".to_string())?;
+    if data.class != ItemClass::Ring {
+        return Err("item is not a ring".to_string());
+    }
+    let _ = compute_ac_with(world, world.inventory.equipped_body, Some(item))?;
+    if let Some(previous) = world.inventory.equipped_ring {
+        unequip_ring(world, previous)?;
+    }
+    world.state_mut().inventory.equip_ring(item);
+    recompute_player_ac(world)?;
+    Ok(Some(GameEvent::ItemEquipped {
+        entity: world.player_id,
+        item,
+        slot: EquipmentSlot::Ring,
+    }))
+}
+
+pub fn remove_ring(world: &mut GameWorld) -> Result<GameEvent, String> {
+    let item = world
+        .inventory
+        .equipped_ring
+        .ok_or_else(|| "no ring is equipped".to_string())?;
+    unequip_ring(world, item)?;
+    Ok(GameEvent::Message {
+        priority: MessagePriority::Info,
+        text: "You take off your ring.".to_string(),
+    })
+}
+
+pub(crate) fn unequip_ring(world: &mut GameWorld, item: EntityId) -> Result<(), String> {
+    if world
+        .entities
+        .get(item)
+        .and_then(|entity| entity.item_buc())
+        == Some(BucStatus::Cursed)
+    {
+        return Err("equipped ring is cursed and cannot be removed".to_string());
+    }
+    world.state_mut().inventory.equipped_ring = None;
+    recompute_player_ac(world)
+}
+
+pub(crate) fn compute_ac_with(
+    world: &GameWorld,
+    equipped_body: Option<EntityId>,
+    equipped_ring: Option<EntityId>,
+) -> Result<i16, String> {
+    let mut total_bonus: i16 = 0;
+    for equipped in [equipped_body, equipped_ring].into_iter().flatten() {
+        if let Some(data) = world.entities.item_data(equipped) {
+            let enchant = world
+                .entities
+                .get(equipped)
+                .and_then(|entity| entity.item_enchantment())
+                .unwrap_or(0);
+            total_bonus =
+                total_bonus.saturating_add(data.ac_bonus.saturating_add(i16::from(enchant)));
+        }
+    }
+    adventurer_template()
+        .ac
+        .checked_sub(total_bonus)
+        .ok_or_else(|| "armor AC exceeds the supported range".to_string())
+}
+
+pub(crate) fn recompute_player_ac(world: &mut GameWorld) -> Result<(), String> {
+    let derived_ac = compute_ac_with(
+        world,
+        world.inventory.equipped_body,
+        world.inventory.equipped_ring,
+    )?;
+    let player_id = world.player_id;
+    if let Some(stats) = world.state_mut().entities.actor_stats_mut(player_id) {
+        stats.ac = derived_ac;
+    }
+    Ok(())
+}
+
+pub(crate) fn has_poison_resistance(world: &GameWorld) -> bool {
+    equipped_ring_effect(world) == Some(aihack_core::domain::item::RingEffect::PoisonResistance)
+}
+
+pub(crate) fn has_fire_resistance(world: &GameWorld) -> bool {
+    equipped_ring_effect(world) == Some(aihack_core::domain::item::RingEffect::FireResistance)
+}
+
+fn equipped_ring_effect(world: &GameWorld) -> Option<aihack_core::domain::item::RingEffect> {
+    let ring = world.inventory.equipped_ring?;
+    world
+        .entities
+        .item_data(ring)
+        .and_then(|data| data.ring_effect)
 }
 
 fn unequip_body(world: &mut GameWorld, item: EntityId) -> Result<(), String> {
@@ -527,13 +612,9 @@ fn unequip_body(world: &mut GameWorld, item: EntityId) -> Result<(), String> {
     {
         return Err("equipped armor is cursed and cannot be removed".to_string());
     }
-    let player_id = world.player_id;
-    let stats = world
-        .state_mut()
-        .entities
-        .actor_stats_mut(player_id)
-        .ok_or_else(|| "player actor stats are missing".to_string())?;
-    stats.ac = adventurer_template().ac;
+    if world.entities.actor_stats(world.player_id).is_none() {
+        return Err("player actor stats are missing".to_string());
+    }
     world.state_mut().inventory.equipped_body = None;
-    Ok(())
+    recompute_player_ac(world)
 }

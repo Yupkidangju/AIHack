@@ -12,6 +12,30 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-P6-01: P6 반지 슬롯·저항·화염 개미·상점/골드 경제 및 V1/스냅샷 호환성
+
+Status: Accepted (2026-11-26); 구현 시작. 기준 계약: `docs/campaign_spec.md` P6.
+
+Context:
+
+P5까지 BUC·인챈트·잠긴 문·독·특수 몬스터를 추가했으나, 장신구(`Ring`) 슬롯, 화염/독 저항, 누적 골드의 소비처가 없었다. 이를 추가하면서도 기존 V1 저장, `campaign = None` 해시·골드 공식(`difficulty`), `observation_v1.json` 직렬화 및 `Entity::item()` 5-튜플 시그니처를 깨지 않아야 한다.
+
+Decision:
+
+- `Inventory`/`InventorySnapshot`에 `equipped_ring: Option<EntityId>`를, `ItemData`에 `ring_effect: Option<RingEffect>`를, `PlayerObservation`에 `gold`/`fire_resistant`/`poison_resistant`를 모두 `#[serde(default, skip_serializing_if = ...)]`로 추가하여 기본값이 V1 저장·스냅샷·관찰 JSON에서 생략되게 한다.
+- AC 계산은 `items::recompute_player_ac` 단일 헬퍼로 통합하여 `adventurer_template().ac - (body_ac + body_enchant + ring_ac + ring_enchant)`를 일관되게 유지하고 `save::validate_inventory`에서도 동일 공식을 검증한다.
+- 캠페인 전용 초기 `50`골드와 처치 골드 `difficulty * 25`는 `world.campaign.is_some()`에만 적용하여 legacy/R9(`difficulty`) 점수와 해시를 보존한다.
+- `TileKind::Shop`은 `Main 2`·`Mines 1` 생성 위치에만 배치하고 `validate_persisted_map`으로 임의 위치 위조를 거부한다.
+
+Alternatives:
+
+- legacy 모드에서도 처치 골드를 `difficulty * 25`로 변경: R9 `GoldScore` witness와 기존 장기 테스트를 깨므로 기각한다.
+- `Ring` AC를 `worn` 별도 필드에 저장: `body`와 이중 진실원이 생기므로 단일 `recompute_player_ac` 공식을 선택한다.
+
+Consequences:
+
+`ContentRegistry::content_hash()`와 `docs/provenance/r7-content.sha256`가 P6 콘텐츠(신규 반지 3종·`FireAnt`) 기준으로 갱신되며, 기존 V1 저장/해시 및 `campaign = None` 경로는 불변으로 유지된다.
+
 ## ADR-P5-01: P5 BUC·인챈트·잠긴 문·독·특수 몬스터 및 V1/스냅샷 호환성
 
 Status: Accepted (2026-11-26); 구현 시작. 기준 계약: `docs/campaign_spec.md` P5.

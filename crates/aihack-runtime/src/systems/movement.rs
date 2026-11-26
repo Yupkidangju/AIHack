@@ -87,6 +87,7 @@ fn is_walkable_or_attackable_destination(
             | TileKind::Trap(_)
             | TileKind::HiddenTrap(_)
             | TileKind::StairsDown
-            | TileKind::StairsUp)
+            | TileKind::StairsUp
+            | TileKind::Shop)
     ) && aihack_core::movement::validate_path(world, actor, level, from, direction).is_ok()
 }

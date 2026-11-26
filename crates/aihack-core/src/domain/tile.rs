@@ -24,6 +24,7 @@ pub enum TileKind {
     HiddenTrap(TrapKind),
     StairsDown,
     StairsUp,
+    Shop,
 }
 
 impl TileKind {
@@ -36,6 +37,7 @@ impl TileKind {
                 | Self::HiddenTrap(_)
                 | Self::StairsDown
                 | Self::StairsUp
+                | Self::Shop
         )
     }
     pub fn is_los_transparent(self) -> bool {

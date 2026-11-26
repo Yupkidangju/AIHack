@@ -21,7 +21,9 @@ pub use schema::{
 use aihack_core::domain::map::MapLayout;
 use aihack_core::domain::{
     combat::{AttackProfile, DamageRoll},
-    item::{ConsumableEffect, ItemClass, ItemData as CoreItemData, ItemKind, WandEffect},
+    item::{
+        ConsumableEffect, ItemClass, ItemData as CoreItemData, ItemKind, RingEffect, WandEffect,
+    },
     monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
     tile::{DoorState, TileKind, TrapKind},
 };
@@ -87,6 +89,7 @@ pub fn monster_template_from_registry(
         MonsterKind::GiantSpider => "monster.giant_spider",
         MonsterKind::GnollArcher => "monster.gnoll_archer",
         MonsterKind::Troll => "monster.troll",
+        MonsterKind::FireAnt => "monster.fire_ant",
     };
     let definition = registry
         .monster(id)
@@ -111,6 +114,7 @@ pub fn monster_template_from_registry(
         Some("paralyze_on_melee") => Some(MonsterPassive::ParalyzeOnMelee),
         Some("poison_on_melee") => Some(MonsterPassive::PoisonOnMelee),
         Some("regenerate_hp") => Some(MonsterPassive::Regenerate),
+        Some("fire_on_melee") => Some(MonsterPassive::FireOnMelee),
         None => None,
         Some(value) => {
             return Err(ContentError::UnknownReference {
@@ -129,6 +133,7 @@ pub fn monster_template_from_registry(
         MonsterKind::GiantSpider => "fangs",
         MonsterKind::GnollArcher => "arrow",
         MonsterKind::Troll => "claw",
+        MonsterKind::FireAnt => "fire bite",
     };
     Ok(MonsterTemplate {
         kind,
@@ -186,6 +191,9 @@ pub fn item_data_from_registry(
         ItemKind::Rock => "item.weapon.rock",
         ItemKind::ArmorLeather => "item.armor.leather",
         ItemKind::ArmorChainMail => "item.armor.chain_mail",
+        ItemKind::RingPoisonResistance => "item.ring.poison_resistance",
+        ItemKind::RingFireResistance => "item.ring.fire_resistance",
+        ItemKind::RingProtection => "item.ring.protection",
         ItemKind::CorpseJackal => "item.corpse.jackal",
         ItemKind::AmuletAscension => "item.quest.ascension",
     };
@@ -202,6 +210,7 @@ pub fn item_data_from_registry(
         "wand" => ItemClass::Wand,
         "scroll" => ItemClass::Scroll,
         "armor" => ItemClass::Armor,
+        "ring" => ItemClass::Ring,
         "corpse" => ItemClass::Corpse,
         "quest" => ItemClass::Quest,
         other => {
@@ -240,6 +249,12 @@ pub fn item_data_from_registry(
             })
         })
         .transpose()?;
+    let ring_effect = match definition.effect.as_deref() {
+        Some("poison_resistance") => Some(RingEffect::PoisonResistance),
+        Some("fire_resistance") => Some(RingEffect::FireResistance),
+        Some("protection") => Some(RingEffect::Protection),
+        _ => None,
+    };
     let consumable_effect = match definition.effect.as_deref() {
         Some("heal_1d8_plus_4") => Some(ConsumableEffect::Heal {
             dice: 1,
@@ -259,7 +274,12 @@ pub fn item_data_from_registry(
         Some("enchant_armor") => Some(ConsumableEffect::EnchantArmor),
         Some("remove_curse") => Some(ConsumableEffect::RemoveCurse),
         Some("cure_status") => Some(ConsumableEffect::CureStatus),
-        Some("magic_missile") | Some("fire") | None => None,
+        Some("magic_missile")
+        | Some("fire")
+        | Some("poison_resistance")
+        | Some("fire_resistance")
+        | Some("protection")
+        | None => None,
         Some(effect) => {
             return Err(ContentError::UnknownReference {
                 owner: id.to_owned(),
@@ -285,6 +305,7 @@ pub fn item_data_from_registry(
             Some("fire") => Some(WandEffect::Fire),
             _ => None,
         },
+        ring_effect,
         max_charges: definition.charges,
         nutrition: definition.nutrition,
     })

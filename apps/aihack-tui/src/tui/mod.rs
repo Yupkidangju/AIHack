@@ -739,6 +739,8 @@ impl TuiApp {
                 InventoryAction::Quaff => CommandIntent::Quaff { item: item.item },
                 InventoryAction::Eat => CommandIntent::Eat { item: item.item },
                 InventoryAction::Read => CommandIntent::Read { item: item.item },
+                InventoryAction::PutOn => CommandIntent::PutOn { item: item.item },
+                InventoryAction::Sell => CommandIntent::Sell { item: item.item },
             },
             _ => match item.kind {
                 ItemKind::Dagger | ItemKind::ShortSword | ItemKind::Mace => {
@@ -747,6 +749,9 @@ impl TuiApp {
                 ItemKind::ArmorLeather | ItemKind::ArmorChainMail => {
                     CommandIntent::Wear { item: item.item }
                 }
+                ItemKind::RingPoisonResistance
+                | ItemKind::RingFireResistance
+                | ItemKind::RingProtection => CommandIntent::PutOn { item: item.item },
                 ItemKind::PotionHealing | ItemKind::PotionExtraHealing | ItemKind::PotionCure => {
                     CommandIntent::Quaff { item: item.item }
                 }
@@ -1494,6 +1499,8 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
                 crate::core::action::InventoryAction::Quaff => "quaff",
                 crate::core::action::InventoryAction::Eat => "eat",
                 crate::core::action::InventoryAction::Read => "read",
+                crate::core::action::InventoryAction::PutOn => "put on",
+                crate::core::action::InventoryAction::Sell => "sell",
             };
             Some(render_panels::awaiting_inventory_lines(action_name))
         }

@@ -251,6 +251,10 @@ impl GameSession {
             CommandIntent::ShowInventory => self.accept_without_turn(Vec::new()),
             CommandIntent::Wield { item } => self.submit_wield(item),
             CommandIntent::Wear { item } => self.submit_wear(item),
+            CommandIntent::PutOn { item } => self.submit_put_on(item),
+            CommandIntent::RemoveRing => self.submit_remove_ring(),
+            CommandIntent::Buy { kind } => self.submit_buy(kind),
+            CommandIntent::Sell { item } => self.submit_sell(item),
             CommandIntent::Quaff { item } => self.submit_quaff(item),
             CommandIntent::Eat { item } => self.submit_eat(item),
             CommandIntent::Zap { item, direction } => self.submit_zap(item, direction),
@@ -300,6 +304,12 @@ impl GameSession {
             }
             CommandIntent::Wear { item } if action == InventoryAction::Wear => {
                 self.submit_wear(item)
+            }
+            CommandIntent::PutOn { item } if action == InventoryAction::PutOn => {
+                self.submit_put_on(item)
+            }
+            CommandIntent::Sell { item } if action == InventoryAction::Sell => {
+                self.submit_sell(item)
             }
             CommandIntent::Quaff { item } if action == InventoryAction::Quaff => {
                 self.submit_quaff(item)
@@ -586,6 +596,34 @@ impl GameSession {
         }
     }
 
+    fn submit_put_on(&mut self, item: EntityId) -> TurnOutcome {
+        match items::put_on(&mut self.inner.world, item) {
+            Ok(event) => self.accept_turn(event.into_iter().collect()),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_remove_ring(&mut self) -> TurnOutcome {
+        match items::remove_ring(&mut self.inner.world) {
+            Ok(event) => self.accept_turn(vec![event]),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_buy(&mut self, kind: aihack_core::domain::item::ItemKind) -> TurnOutcome {
+        match crate::systems::shop::buy(&mut self.inner.world, kind) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_sell(&mut self, item: EntityId) -> TurnOutcome {
+        match crate::systems::shop::sell(&mut self.inner.world, item) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
     fn submit_quit(&mut self) -> TurnOutcome {
         // Quit는 모든 상태에서 종료 요청이며, 기존 GameOver 원인은 보존한다.
         if !matches!(
@@ -618,26 +656,34 @@ impl GameSession {
             RunState::GameOver { .. } | RunState::Victory { .. }
         ) && self.world.poison_turns > 0
         {
-            let state = &mut self.inner;
-            state.world.state_mut().poison_turns -= 1;
-            let player_id = state.world.player_id();
-            if let Some(stats) = state.world.state_mut().entities.actor_stats_mut(player_id) {
-                stats.hp = stats.hp.saturating_sub(1);
+            if crate::systems::items::has_poison_resistance(&self.world) {
+                self.inner.world.state_mut().poison_turns -= 1;
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: "You resist the poison.".to_string(),
+                });
+            } else {
+                let state = &mut self.inner;
+                state.world.state_mut().poison_turns -= 1;
+                let player_id = state.world.player_id();
+                if let Some(stats) = state.world.state_mut().entities.actor_stats_mut(player_id) {
+                    stats.hp = stats.hp.saturating_sub(1);
+                }
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Warning,
+                    text: "You suffer from poison!".to_string(),
+                });
+                let death_events = match death::collect_death_events_if_hp_depleted(
+                    &mut state.world,
+                    player_id,
+                    DeathCause::Poison,
+                ) {
+                    Ok(death_events) => death_events,
+                    Err(error) => return self.abort_transaction(error),
+                };
+                events.extend(death_events);
+                state.state = death::state_after_deaths_at(&state.world, next_turn);
             }
-            events.push(GameEvent::Message {
-                priority: MessagePriority::Warning,
-                text: "You suffer from poison!".to_string(),
-            });
-            let death_events = match death::collect_death_events_if_hp_depleted(
-                &mut state.world,
-                player_id,
-                DeathCause::Poison,
-            ) {
-                Ok(death_events) => death_events,
-                Err(error) => return self.abort_transaction(error),
-            };
-            events.extend(death_events);
-            state.state = death::state_after_deaths_at(&state.world, next_turn);
         }
         if !matches!(
             self.state,

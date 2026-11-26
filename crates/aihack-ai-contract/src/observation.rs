@@ -22,6 +22,14 @@ fn is_zero_i8(value: &i8) -> bool {
     *value == 0
 }
 
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RunStateSummary {
     Title,
@@ -48,6 +56,12 @@ pub struct PlayerObservation {
     #[serde(default, skip_serializing_if = "is_zero_u8")]
     pub poison_turns: u8,
     pub hallucinating: bool,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub gold: u32,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub fire_resistant: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub poison_resistant: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

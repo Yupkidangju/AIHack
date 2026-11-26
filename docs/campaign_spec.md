@@ -106,3 +106,29 @@ P1–P4 캠페인 위에 NetHack식 BUC(Blessed/Uncursed/Cursed)·인챈트, 잠
 
 - TUI는 `DoorState::Locked`를 `+` / `"locked door"`, `POIS:<n>` HUD, 비기본 BUC/인챈트 라벨(`+1 blessed ...`, `-1 cursed ...`), 신규 몬스터/아이템 글리프 및 `DeathCause::Poison`("Killed by poison")을 표시한다.
 - Headless `survival-v1`은 중독 시 `PotionCure`를 우선 음용하고 `Door(Locked)`를 발로 차 여는 후보를 지원한다.
+
+## P6 캠페인 확장 (2026-11-26)
+
+P1–P5 캠페인 위에 반지 슬롯·화염/독 저항·화염 개미(`FireAnt`)와 상점·골드 경제를 확장한다. 기존 legacy V1 저장/해시, `Entity::item()` 5-튜플, `observation_v1.json` 기본 직렬화 형태 및 `NH367-C001..C010`/`P8-G01..G20` 호환성은 그대로 보존한다.
+
+### P6a 반지 슬롯·화염/독 저항·신규 몬스터
+
+- 반지 슬롯(`ItemClass::Ring`, `EquipmentSlot::Ring`, `Inventory::equipped_ring` optional serde 생략) 및 `RingEffect::{PoisonResistance, FireResistance, Protection}`(`ItemData::ring_effect` optional serde 생략)을 추가한다.
+- 신규 반지 3종(glyph `=`, weight `3`, slot `"ring"`):
+  - `item.ring.poison_resistance` (`RingPoisonResistance`, `poison_resistance`, price `150`): `GiantSpider`의 `PoisonOnMelee` 및 매 턴 독 틱 피해를 막는다(`poison_turns`만 감소, HP 피해 0).
+  - `item.ring.fire_resistance` (`RingFireResistance`, `fire_resistance`, price `150`): `FireAnt`의 `FireOnMelee` 화염 추가 피해를 무효화한다.
+  - `item.ring.protection` (`RingProtection`, `protection`, `ac_bonus=1`, price `120`): 착용 방어구(`equipped_body`)와 동일한 통합 AC 공식(`adventurer_template().ac - (body_ac + body_enchant + ring_ac + ring_enchant)`)에 합산된다.
+- 장착/해제 명령: `CommandIntent::PutOn { item }` / `CommandIntent::RemoveRing` (및 `InventoryAction::PutOn`). `Cursed` 반지는 `ScrollRemoveCurse` 해저주 전까지 `RemoveRing`/`PutOn` 교체/`Drop`/`Sell`을 거부한다.
+- 신규 몬스터 `monster.fire_ant` (`FireAnt`, `a`, HP `12`, AC `3`, hit `+2`, `1d6`, `chase_on_sight`, passive `fire_on_melee` -> `MonsterPassive::FireOnMelee`, speed `12`, diff `5`): 근접 적중 시 비저항 플레이어에게 추가 `1d6` 화염 피해(`PassiveAttackTriggered` + 경고 메시지)를 입힌다.
+
+### P6b 상점 타일·골드 경제
+
+- `TileKind::Shop`을 추가해 통과·시야 투과를 허용하고, `campaign_map`이 `Main 2` `(centers[1].x, centers[1].y - 1)`와 `Mines 1` `(centers[1].x + 1, centers[1].y - 1)`에 배치한다. `validate_persisted_map`은 생성 위치 외 임의 `TileKind::Shop` 변조를 거부한다.
+- 캠페인 전용 골드 스케일링: 캠페인은 초기 소지금 `50`골드 및 처치당 `difficulty * 25` 골드를 지급하고, legacy 2층 모드는 기존 `difficulty` 골드 규칙을 보존한다.
+- 상점 카탈로그 9종(`FoodRation`, `PotionHealing`, `PotionCure`, `ScrollEnchantWeapon`, `ScrollEnchantArmor`, `ScrollRemoveCurse`, `RingProtection`, `RingPoisonResistance`, `RingFireResistance`) 구매(`CommandIntent::Buy { kind }`, 가격 `base_price.max(10)`)와 판매(`CommandIntent::Sell { item }`/`InventoryAction::Sell`, 가격 `(base_price / 2).max(1)`, `AmuletAscension` 및 `Cursed` 장착 아이템 판매 거부)를 구현한다.
+
+### P6c TUI·Headless·캠페인 배치
+
+- 캠페인 배치: `Mines 1`에 `RingPoisonResistance`, `Main 4`에 `RingFireResistance`, `Mines 2`에 `+1 RingProtection`, `Main 5`·`Main 6`에 `FireAnt`를 배치한다.
+- TUI는 `TileKind::Shop`을 `$`/`"shop"`, `FireAnt`를 `a`/`"fire ant"`, 반지를 `=`/`"ring of ..."`, 캠페인 상태 줄 `G<gold>`, 저항 배지 `RES:F`/`RES:P`/`RES:FP`로 표시하며 `'P'`(착용)·`'T'`(반지 해제)·`'$'`(상점 메뉴)를 제공한다.
+- Headless `survival-v1`은 반지 슬롯이 비어 있을 때 소지 반지를 우선 착용(`PutOn`)한다.

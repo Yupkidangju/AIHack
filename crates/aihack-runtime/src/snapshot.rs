@@ -54,6 +54,8 @@ pub struct InventorySnapshot {
     pub entries: Vec<InventoryEntry>,
     pub equipped_melee: Option<EntityId>,
     pub equipped_body: Option<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equipped_ring: Option<EntityId>,
     pub next_letter_index: u8,
 }
 
@@ -160,6 +162,7 @@ impl GameSnapshot {
                 entries: world.inventory.entries.clone(),
                 equipped_melee: world.inventory.equipped_melee,
                 equipped_body: world.inventory.equipped_body,
+                equipped_ring: world.inventory.equipped_ring,
                 next_letter_index: world.inventory.next_letter_index,
             },
             nutrition: world.nutrition,

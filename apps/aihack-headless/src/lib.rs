@@ -367,6 +367,26 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         }
     }
 
+    if !observation
+        .inventory
+        .iter()
+        .any(|item| item.equipped_slot == Some(aihack_runtime::domain::item::EquipmentSlot::Ring))
+    {
+        if let Some(item) = observation.inventory.iter().find(|item| {
+            matches!(
+                item.kind,
+                ItemKind::RingPoisonResistance
+                    | ItemKind::RingFireResistance
+                    | ItemKind::RingProtection
+            )
+        }) {
+            let command = CommandIntent::PutOn { item: item.item };
+            if observation.legal_actions.contains(&command) {
+                return vec![command];
+            }
+        }
+    }
+
     if observation.legal_actions.contains(&CommandIntent::Pickup) {
         return vec![CommandIntent::Pickup];
     }

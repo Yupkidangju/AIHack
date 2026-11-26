@@ -6,6 +6,7 @@ pub(crate) mod monster_ai;
 pub(crate) mod movement;
 pub(crate) mod projectiles;
 pub mod score;
+pub(crate) mod shop;
 pub(crate) mod stairs;
 pub(crate) mod traps;
 pub mod vision;

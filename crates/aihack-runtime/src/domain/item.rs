@@ -5,8 +5,8 @@ use aihack_core::{
 };
 
 pub use aihack_core::domain::item::{
-    BucStatus, ConsumableEffect, EquipmentSlot, ItemClass, ItemData, ItemKind, WandEffect,
-    MAX_ITEM_ENCHANTMENT, MIN_ITEM_ENCHANTMENT,
+    BucStatus, ConsumableEffect, EquipmentSlot, ItemClass, ItemData, ItemKind, RingEffect,
+    WandEffect, MAX_ITEM_ENCHANTMENT, MIN_ITEM_ENCHANTMENT,
 };
 
 pub fn item_data(kind: ItemKind) -> ItemData {
@@ -45,6 +45,9 @@ pub fn item_kind_from_id(id: &str) -> Result<ItemKind, ContentError> {
         "item.scroll.remove_curse" => Ok(ItemKind::ScrollRemoveCurse),
         "item.armor.leather" => Ok(ItemKind::ArmorLeather),
         "item.armor.chain_mail" => Ok(ItemKind::ArmorChainMail),
+        "item.ring.poison_resistance" => Ok(ItemKind::RingPoisonResistance),
+        "item.ring.fire_resistance" => Ok(ItemKind::RingFireResistance),
+        "item.ring.protection" => Ok(ItemKind::RingProtection),
         "item.corpse.jackal" => Ok(ItemKind::CorpseJackal),
         "item.quest.ascension" => Ok(ItemKind::AmuletAscension),
         _ => Err(ContentError::UnknownReference {

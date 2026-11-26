@@ -129,6 +129,28 @@ pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 4]), 
             TileKind::HiddenTrap(TrapKind::Bear),
         ));
     }
+    if id == LevelId::main(2) {
+        overrides.push((
+            Pos {
+                x: centers[1].x,
+                y: centers[1].y - 1,
+            },
+            TileKind::Shop,
+        ));
+    } else if id
+        == (LevelId {
+            branch: BranchId::Mines,
+            depth: 1,
+        })
+    {
+        overrides.push((
+            Pos {
+                x: centers[1].x + 1,
+                y: centers[1].y - 1,
+            },
+            TileKind::Shop,
+        ));
+    }
     overrides.push((centers[0], TileKind::StairsUp));
     if (id.branch == BranchId::Main && id.depth < 6)
         || (id.branch == BranchId::Mines && id.depth < 2)

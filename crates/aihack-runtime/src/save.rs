@@ -690,6 +690,7 @@ fn item_data_matches_registry(
         && persisted.wand_effect == expected.wand_effect
         && persisted.max_charges == expected.max_charges
         && persisted.nutrition == expected.nutrition
+        && persisted.ring_effect == expected.ring_effect
 }
 
 fn validate_actor_stats(
@@ -793,22 +794,27 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
     }
     validate_equipped_item(world, world.inventory.equipped_melee, ItemClass::Weapon)?;
     validate_equipped_item(world, world.inventory.equipped_body, ItemClass::Armor)?;
-    let bonus = if let Some(body) = world.inventory.equipped_body {
+    validate_equipped_item(world, world.inventory.equipped_ring, ItemClass::Ring)?;
+    let mut bonus: i16 = 0;
+    for equipped in [world.inventory.equipped_body, world.inventory.equipped_ring]
+        .into_iter()
+        .flatten()
+    {
         let base = world
             .entities
-            .item_data(body)
+            .item_data(equipped)
             .map(|data| data.ac_bonus)
-            .ok_or_else(|| invalid_world_error("equipped body item is missing"))?;
+            .ok_or_else(|| invalid_world_error("equipped item is missing"))?;
         let enchant = world
             .entities
-            .get(body)
+            .get(equipped)
             .and_then(|entity| entity.item_enchantment())
             .unwrap_or(0);
-        base.checked_add(i16::from(enchant))
-            .ok_or_else(|| invalid_world_error("equipped body armor AC overflows"))?
-    } else {
-        0
-    };
+        bonus = bonus
+            .checked_add(base)
+            .and_then(|acc| acc.checked_add(i16::from(enchant)))
+            .ok_or_else(|| invalid_world_error("equipped armor/ring AC overflows"))?;
+    }
     let player_ac = world
         .entities
         .actor_stats(world.player_id)
@@ -817,7 +823,7 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
     let derived_ac = i32::from(adventurer_template().ac)
         .checked_sub(i32::from(bonus))
         .and_then(|value| i16::try_from(value).ok())
-        .ok_or_else(|| invalid_world_error("equipped body armor AC overflows"))?;
+        .ok_or_else(|| invalid_world_error("equipped armor/ring AC overflows"))?;
     if player_ac != derived_ac {
         return invalid_world("equipped body armor and player AC disagree".to_string());
     }

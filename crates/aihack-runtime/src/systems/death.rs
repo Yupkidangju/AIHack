@@ -60,9 +60,14 @@ pub fn collect_death_events_if_hp_depleted(
     if entity == world.player_id {
         world.state_mut().last_death_cause = Some(cause);
     } else {
+        let gold_gain = if world.campaign.is_some() {
+            u32::from(difficulty).saturating_mul(25)
+        } else {
+            u32::from(difficulty)
+        };
         let state = world.state_mut();
         state.kill_count = state.kill_count.saturating_add(1);
-        state.gold = state.gold.saturating_add(u32::from(difficulty));
+        state.gold = state.gold.saturating_add(gold_gain);
     }
     let mut events = vec![GameEvent::EntityDied { entity, cause }];
     if entity != world.player_id
