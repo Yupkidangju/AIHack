@@ -15,6 +15,7 @@ pub enum MonsterPassive {
     ParalyzeOnMelee,
     PoisonOnMelee,
     Regenerate,
+    FireOnMelee,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -28,6 +29,7 @@ pub enum MonsterKind {
     GiantSpider,
     GnollArcher,
     Troll,
+    FireAnt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +55,8 @@ impl MonsterKind {
             | Self::Orc
             | Self::Ogre
             | Self::GiantSpider
-            | Self::Troll => MonsterAiKind::ChaseVisiblePlayer,
+            | Self::Troll
+            | Self::FireAnt => MonsterAiKind::ChaseVisiblePlayer,
             Self::FloatingEye => MonsterAiKind::Stationary,
             Self::GnollArcher => MonsterAiKind::RangedOnSight,
         }
@@ -64,7 +67,7 @@ impl MonsterKind {
             Self::Goblin | Self::Kobold => 2,
             Self::Orc | Self::GiantSpider => 3,
             Self::GnollArcher => 4,
-            Self::FloatingEye | Self::Ogre => 5,
+            Self::FloatingEye | Self::Ogre | Self::FireAnt => 5,
             Self::Troll => 6,
         }
     }

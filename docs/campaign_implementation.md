@@ -89,3 +89,27 @@ release/게시 승인, modification notice와 final-SHA bundle 갱신, 새 양 O
 - `tests/campaign.rs`(**12 PASS / 0 FAIL**, 4역할 8층 왕복·승천 완주 포함), `tests/campaign_p4.rs`(**6 PASS / 0 FAIL**, `Mines 2` 입구 `Door(Locked)` 정렬), `tests/content_validation.rs`(**13 PASS / 0 FAIL**), `tests/r8_documentation.rs`(**PASS**).
 - 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy --workspace --all-targets --locked -- -D warnings` PASS, `cargo test -j 4 --workspace --all-targets --locked --no-fail-fast` (**505 PASS / 0 FAIL / 0 ignored**, 92 test results), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS, `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix`/`tokio` warning 2건), `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
 - 커밋·푸시는 실행하지 않았다.
+
+## P6 확장 구현·검증 기록 (2026-11-26)
+
+### 구현
+
+- **P6a (반지 슬롯·독/화염 저항·`FireAnt`)**:
+  - `aihack-core::domain::item`에 `ItemClass::Ring`, `EquipmentSlot::Ring`, `RingEffect::{PoisonResistance, FireResistance, Protection}`, `ItemKind::{RingPoisonResistance, RingFireResistance, RingProtection}`, `ItemData::ring_effect`(optional serde omission), `Inventory::equipped_ring`(optional serde omission), `CommandIntent::{PutOn { item }, RemoveRing}`, `InventoryAction::PutOn`을 추가했다. `Entity::item()` 5-튜플과 legacy V1 JSON 호환성은 그대로 보존했다.
+  - `systems/items.rs`의 `recompute_player_ac`와 `save::validate_inventory`가 통합 방어력 공식 `adventurer_template().ac - (body_ac + body_enchant + ring_ac + ring_enchant)`을 적용·검증하며, `Cursed` 반지는 `ScrollRemoveCurse` 해제 전까지 `RemoveRing`·`PutOn` 교체·`Drop`·`Sell`을 차단한다.
+  - `monsters.toml`/`domain/monster.rs`에 `MonsterKind::FireAnt`(`a`, HP 12, AC 3, hit `+2`, `1d6`, `MonsterPassive::FireOnMelee`, speed 12, diff 5)를 추가하고 `Main 5`/`Main 6`에 배치했으며, `Main 4`(`RingFireResistance`), `Mines 1`(`RingPoisonResistance`), `Mines 2`(`+1 RingProtection`)에 반지를 스폰한다. `FireOnMelee`는 화염 저항이 없으면 추가 `1d6` 화염 피해(`PassiveAttackTriggered` + 경고)를 입히고, 독 저항은 `GiantSpider`의 `PoisonOnMelee`를 차단하며 기존 `poison_turns` 틱 피해를 0으로 줄인다.
+- **P6b (`TileKind::Shop`·골드 경제·상점 구매/판매·Provenance)**:
+  - `TileKind::Shop`(이동/시야 통과 가능)을 추가해 `campaign_map`이 `Main 2` `(centers[1].x, centers[1].y - 1)`와 `Mines 1` `(centers[1].x + 1, centers[1].y - 1)`에 결정적으로 배치하고 `validate_persisted_map`이 비인가 `Shop` 변조를 거부하도록 유지했다.
+  - 캠페인 전용 골드 스케일링을 적용해 `campaign_world` 시작 골드 `50` 및 처치 골드 `difficulty * 25`를 지급한다(`campaign.is_none()` legacy 모드는 초기 `0` 및 `difficulty` 유지).
+  - `systems/shop.rs`가 9종 `SHOP_CATALOG`, `Buy { kind }` (`base_price.max(10)`), `Sell { item }` / `InventoryAction::Sell` (`(base_price / 2).max(1)`, `AmuletAscension`·저주 장착 아이템 거부)을 처리하며, `crates/aihack-content/tests/registry.rs` golden hash(`aa720d339c7f0c77`)·`docs/provenance/r7-content.sha256`·`PROVENANCE.md`를 동기화했다.
+- **P6c (TUI·Headless `survival-v1`·AI 계약/LLM 어댑터)**:
+  - `PlayerObservation`에 serde-omitted `gold`, `fire_resistant`, `poison_resistant`를 추가하고 `crates/aihack-llm/src/decision.rs` `wire_command_value`에 `PutOn`·`RemoveRing`·`Buy`·`Sell` 직렬화를 연결했다.
+  - `apps/aihack-tui`가 `Shop` (`'$'`, `"shop"`), `FireAnt` (`'a'`, `"fire ant"`), 반지 (`'='`, `"ring of ..."`), 상태 HUD(`G<gold>`, `RES:F|P|FP`), `'P'`(착용)·`'T'`(해제)·`'$'`(상점 구매/판매 `PlayMenu`)를 렌더링·처리한다.
+  - `apps/aihack-headless` `survival-v1`은 반지 슬롯이 비어 있을 때 소지 반지를 우선 `PutOn`하도록 확장했다.
+
+### 검증 증거
+
+- `tests/campaign_p6.rs`: 반지 AC 스택/해제/저장 검증·저주 가드, `FireAnt` `FireOnMelee`/독 저항·화염 저항, `Main 2`/`Mines 1` `Shop` 배치/위조 거부·캠페인/legacy 처치 골드 차등·9종 카탈로그 구매/판매(자금 부족/인벤토리 포화/아뮬렛/저주 거부), TUI(`$`/`a`/`=`/HUD/상점 메뉴 구매)·Headless `PutOn`·legacy V1 `PlayerObservation` serde 생략 보존(**4 PASS / 0 FAIL**).
+- `tests/campaign.rs`(**12 PASS / 0 FAIL**, `Main 4` `RingFireResistance` 장착 포함 4역할 8층 완주), `tests/content_validation.rs`(**13 PASS / 0 FAIL**, 반지 3종 ID 포함), `crates/aihack-content/tests/registry.rs`(**1 PASS / 0 FAIL**, `aa720d339c7f0c77`), `tests/r8_documentation.rs`(**PASS**).
+- 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy --workspace --all-targets --locked -- -D warnings` PASS, `cargo test -j 4 --workspace --all-targets --locked --no-fail-fast` (**509 PASS / 0 FAIL / 0 ignored**, 93 test results), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS, `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix`/`tokio` warning 2건), `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
+- 커밋·푸시는 실행하지 않았으며 `feat/p5-gameplay-expansion` 브랜치도 삭제하지 않았다.

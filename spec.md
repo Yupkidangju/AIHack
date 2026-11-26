@@ -16,6 +16,10 @@ Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c0
 
 ## 1. 문서 운영 규칙
 
+### P6 캠페인 확장 (2026-11-26)
+
+P1–P5 캠페인 위에 반지 슬롯(`ItemClass::Ring`, `EquipmentSlot::Ring`, `Inventory::equipped_ring`), 신규 반지 3종(`RingPoisonResistance`, `RingFireResistance`, `RingProtection`), 화염 개미(`FireAnt`, `FireOnMelee`), 상점 타일(`TileKind::Shop`) 및 `Buy`/`Sell` 골드 경제를 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## P6`, 의사결정은 `ADR-P6-01`, 실행 계획은 `tasks/plan.md`를 따른다.
+
 ### P5 캠페인 확장 (2026-11-26)
 
 P1–P4 캠페인 위에 아이템 BUC/인챈트(`-3..=+5`), 인챈트/저주 해제 두루마리 3종, `DoorState::Locked`, 독 상태이상(`poison_turns`·`DeathCause::Poison`), 치료 물약(`PotionCure`)·화염 완드(`WandFire`), 특수 몬스터 3종(`GiantSpider`·`GnollArcher`·`Troll`, `RangedOnSight`/`PoisonOnMelee`/`Regenerate`)을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## P5`, 의사결정은 `ADR-P5-01`, 실행 계획은 `tasks/plan.md`를 따른다.

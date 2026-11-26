@@ -68,6 +68,7 @@ pub fn collect_auto_labels(observation: &Observation, current_time_ms: u64) -> V
                     | crate::domain::monster::MonsterKind::GiantSpider
                     | crate::domain::monster::MonsterKind::GnollArcher
                     | crate::domain::monster::MonsterKind::Troll
+                    | crate::domain::monster::MonsterKind::FireAnt
             );
             if is_hostile && is_adjacent {
                 candidates.push(AutoLabel {
@@ -84,6 +85,7 @@ pub fn collect_auto_labels(observation: &Observation, current_time_ms: u64) -> V
                             crate::domain::monster::MonsterKind::GiantSpider => "s",
                             crate::domain::monster::MonsterKind::GnollArcher => "G",
                             crate::domain::monster::MonsterKind::Troll => "T",
+                            crate::domain::monster::MonsterKind::FireAnt => "a",
                             _ => "?",
                         }
                     ),

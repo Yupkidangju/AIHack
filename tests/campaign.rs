@@ -218,6 +218,7 @@ fn route(
                 && matches!(
                     session.world().current_map().tile(next),
                     Ok(TileKind::Floor
+                        | TileKind::Shop
                         | TileKind::StairsUp
                         | TileKind::StairsDown
                         | TileKind::Door(_)
@@ -491,6 +492,30 @@ fn tour(seed: u64, role: Role) -> GameSession {
         for pos in potions {
             walk(&mut session, pos);
             assert!(session.submit(C::Pickup).accepted);
+        }
+        if depth == 4 {
+            if let Some((ring_id, ring_pos)) = session
+                .world()
+                .entities()
+                .entities()
+                .iter()
+                .find_map(|entity| {
+                    let (kind, _, location, _, _) = entity.item()?;
+                    match location {
+                        EntityLocation::OnMap { level, pos }
+                            if level == LevelId::main(4)
+                                && kind == ItemKind::RingFireResistance =>
+                        {
+                            Some((entity.id, pos))
+                        }
+                        _ => None,
+                    }
+                })
+            {
+                walk(&mut session, ring_pos);
+                assert!(session.submit(C::Pickup).accepted);
+                assert!(session.submit(C::PutOn { item: ring_id }).accepted);
+            }
         }
         if depth < 6 {
             let pos = session

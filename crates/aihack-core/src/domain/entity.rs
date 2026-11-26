@@ -335,6 +335,11 @@ impl Entity {
                 ..
             } => Some(AttackProfile::natural("claw", stats.damage)),
             EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::FireAnt),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("fire bite", stats.damage)),
+            EntityPayload::Actor {
                 kind: ActorKind::Player,
                 ..
             } => None,

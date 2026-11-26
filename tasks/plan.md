@@ -31,3 +31,14 @@
 | P5b | `poison_turns`/`DeathCause::Poison`, 신규 5아이템(인챈트/해저주 두루마리 3종·`PotionCure`·`WandFire`), 신규 3몬스터(`GiantSpider`·`GnollArcher`·`Troll`), content/provenance 동기화 | `core/world.rs`, `core/save.rs`, `aihack-content/*`, `runtime/systems/monster_ai.rs`, `runtime/session.rs`, `runtime/bootstrap.rs`, `PROVENANCE.md`, `r7-content.sha256` |
 | P5c | TUI(`locked door`, `POIS:`, BUC/인챈트 라벨, 몬스터/아이템, `DeathCause::Poison`) 및 Headless `survival-v1` 연동 | `aihack-ai-contract/*`, `apps/aihack-tui/*`, `apps/aihack-headless/*` |
 | P5d | 회귀/통합 테스트, 전체 gate(`fmt`, `clippy`, `test -j 4`, `release`, `audit`, `deny`, `r7/r8`) 및 문서 동기화 | `tests/campaign.rs`, `tests/content_validation.rs`, `tests/campaign_p5.rs`, `docs/campaign_implementation.md`, `IMPLEMENTATION_SUMMARY.md`, `README.md`, `CHANGELOG.md`, `tasks/todo.md` |
+
+# P6 구현 계획 (2026-11-26)
+
+기준: `spec.md`, `docs/campaign_spec.md` (P6), `DESIGN_DECISIONS.md` (`ADR-P6-01`). 커밋·푸시는 수행하지 않는다.
+
+| 단계 | 책임 | 핵심 대상 |
+| --- | --- | --- |
+| P6a | `Ring` 슬롯/`RingEffect`/반지 3종, `FireAnt`/`FireOnMelee`, 통합 AC 및 화염·독 저항, `PutOn`/`RemoveRing` | `core/domain/*`, `core/action.rs`, `aihack-content/*`, `runtime/systems/{items,monster_ai}.rs`, `runtime/session.rs`, `runtime/save.rs` |
+| P6b | `TileKind::Shop`, `Main 2`/`Mines 1` 상점 배치, 캠페인 50g/`difficulty * 25`, `Buy`/`Sell` 카탈로그·거래 | `core/domain/tile.rs`, `runtime/systems/{shop,death,movement}.rs`, `runtime/campaign_map.rs`, `runtime/bootstrap.rs`, `runtime/observation.rs` |
+| P6c | TUI(`$`/`shop`, `a`/`fire ant`, `=`, `G<gold>`, `RES:F|P|FP`, `'P'`/`'T'`/`'$'`) 및 Headless `survival-v1` 반지 착용 | `aihack-ai-contract/*`, `apps/aihack-tui/*`, `apps/aihack-headless/*` |
+| P6d | 회귀/통합 테스트, 전체 gate(`fmt`, `clippy`, `test -j 4`, `release`, `audit`, `deny`, `r7/r8`) 및 문서 동기화 | `tests/campaign.rs`, `tests/content_validation.rs`, `tests/campaign_p6.rs`, `PROVENANCE.md`, `r7-content.sha256`, 문서 일체 |

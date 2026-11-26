@@ -30,6 +30,7 @@ impl Widget for MapWidget<'_> {
                     crate::domain::tile::TileKind::Trap(_) => '^',
                     crate::domain::tile::TileKind::HiddenDoor => '#',
                     crate::domain::tile::TileKind::HiddenTrap(_) => '.',
+                    crate::domain::tile::TileKind::Shop => '$',
                 };
                 buf[(cx, cy)]
                     .set_char(glyph)
@@ -54,9 +55,13 @@ impl Widget for MapWidget<'_> {
                     EntityKind::Monster(MonsterKind::GiantSpider) => 's',
                     EntityKind::Monster(MonsterKind::GnollArcher) => 'G',
                     EntityKind::Monster(MonsterKind::Troll) => 'T',
+                    EntityKind::Monster(MonsterKind::FireAnt) => 'a',
                     EntityKind::Item(kind) => match kind {
                         ItemKind::Dagger | ItemKind::ShortSword | ItemKind::Mace => ')',
                         ItemKind::ArmorLeather | ItemKind::ArmorChainMail => '[',
+                        ItemKind::RingPoisonResistance
+                        | ItemKind::RingFireResistance
+                        | ItemKind::RingProtection => '=',
                         ItemKind::PotionHealing
                         | ItemKind::PotionExtraHealing
                         | ItemKind::PotionCure => '!',

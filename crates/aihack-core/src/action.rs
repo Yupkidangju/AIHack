@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{ids::EntityId, position::Direction};
+use crate::{domain::item::ItemKind, ids::EntityId, position::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NarrativeTopic {
@@ -22,6 +22,8 @@ pub enum InventoryAction {
     Quaff,
     Eat,
     Read,
+    PutOn,
+    Sell,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -50,6 +52,16 @@ pub enum CommandIntent {
         item: EntityId,
     },
     Wear {
+        item: EntityId,
+    },
+    PutOn {
+        item: EntityId,
+    },
+    RemoveRing,
+    Buy {
+        kind: ItemKind,
+    },
+    Sell {
         item: EntityId,
     },
     Quaff {

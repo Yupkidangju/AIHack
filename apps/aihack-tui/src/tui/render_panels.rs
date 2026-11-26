@@ -129,9 +129,18 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
             campaign.carrying_capacity,
             if campaign.has_amulet { " A" } else { "" }
         );
+        let res = match (
+            observation.player.fire_resistant,
+            observation.player.poison_resistant,
+        ) {
+            (true, true) => " RES:FP",
+            (true, false) => " RES:F",
+            (false, true) => " RES:P",
+            (false, false) => "",
+        };
         lines.push(format!(
-            "{:?} L{} X{}",
-            campaign.role, campaign.level, campaign.xp
+            "{:?} L{} X{} G{}{}",
+            campaign.role, campaign.level, campaign.xp, observation.player.gold, res
         ));
     }
     lines
@@ -347,6 +356,7 @@ fn entity_kind_label(kind: EntityKind) -> &'static str {
         EntityKind::Monster(crate::domain::monster::MonsterKind::GiantSpider) => "giant spider",
         EntityKind::Monster(crate::domain::monster::MonsterKind::GnollArcher) => "gnoll archer",
         EntityKind::Monster(crate::domain::monster::MonsterKind::Troll) => "troll",
+        EntityKind::Monster(crate::domain::monster::MonsterKind::FireAnt) => "fire ant",
         EntityKind::Item(kind) => item_label(kind),
     }
 }
@@ -365,6 +375,7 @@ fn tile_label(tile: TileKind) -> &'static str {
         TileKind::Trap(aihack_ai_contract::TrapKind::Bear) => "bear trap",
         TileKind::HiddenDoor => "hidden door",
         TileKind::HiddenTrap(_) => "hidden trap",
+        TileKind::Shop => "shop",
     }
 }
 

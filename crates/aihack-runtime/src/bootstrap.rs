@@ -77,8 +77,24 @@ pub(crate) fn campaign_world(
                         y: centers[2].y + 1,
                     },
                 ),
+                (
+                    MonsterKind::FireAnt,
+                    Pos {
+                        x: centers[3].x - 1,
+                        y: centers[3].y + 1,
+                    },
+                ),
             ],
-            (aihack_core::ids::BranchId::Main, 6) => vec![(MonsterKind::Ogre, centers[2])],
+            (aihack_core::ids::BranchId::Main, 6) => vec![
+                (MonsterKind::Ogre, centers[2]),
+                (
+                    MonsterKind::FireAnt,
+                    Pos {
+                        x: centers[2].x + 1,
+                        y: centers[2].y + 1,
+                    },
+                ),
+            ],
             (aihack_core::ids::BranchId::Mines, 1) => vec![
                 (MonsterKind::Kobold, centers[2]),
                 (
@@ -199,6 +215,15 @@ pub(crate) fn campaign_world(
                     BucStatus::Uncursed,
                     0,
                 ));
+                floor_items.push((
+                    ItemKind::RingFireResistance,
+                    Pos {
+                        x: centers[1].x - 1,
+                        y: centers[1].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
             (aihack_core::ids::BranchId::Main, 5) => {
                 floor_items.push((
@@ -257,6 +282,15 @@ pub(crate) fn campaign_world(
                     BucStatus::Cursed,
                     -1,
                 ));
+                floor_items.push((
+                    ItemKind::RingPoisonResistance,
+                    Pos {
+                        x: centers[1].x - 1,
+                        y: centers[1].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
             (aihack_core::ids::BranchId::Mines, 2) => {
                 floor_items.push((
@@ -273,6 +307,15 @@ pub(crate) fn campaign_world(
                     Pos {
                         x: centers[1].x + 1,
                         y: centers[1].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    1,
+                ));
+                floor_items.push((
+                    ItemKind::RingProtection,
+                    Pos {
+                        x: centers[1].x,
+                        y: centers[1].y - 1,
                     },
                     BucStatus::Uncursed,
                     1,
@@ -354,6 +397,7 @@ pub(crate) fn campaign_world(
     stats.hit_bonus = campaign.hit_bonus();
     stats.damage_bonus = campaign.damage_bonus();
     state.campaign = Some(campaign);
+    state.gold = 50;
     Ok(state)
 }
 

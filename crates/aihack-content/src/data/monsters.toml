@@ -91,3 +91,14 @@ ai="chase_on_sight"
 passive="regenerate_hp"
 speed=10
 difficulty=6
+[[monster]]
+id="monster.fire_ant"
+glyph="a"
+hp=12
+ac=3
+hit_bonus=2
+damage="1d6"
+ai="chase_on_sight"
+passive="fire_on_melee"
+speed=12
+difficulty=5

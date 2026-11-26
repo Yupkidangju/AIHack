@@ -40,6 +40,9 @@ pub enum ItemKind {
     Rock,
     ArmorLeather,
     ArmorChainMail,
+    RingPoisonResistance,
+    RingFireResistance,
+    RingProtection,
     CorpseJackal,
     AmuletAscension,
 }
@@ -53,6 +56,7 @@ pub enum ItemClass {
     Scroll,
     Rock,
     Armor,
+    Ring,
     Corpse,
     Quest,
 }
@@ -61,6 +65,14 @@ pub enum ItemClass {
 pub enum EquipmentSlot {
     Melee,
     Body,
+    Ring,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RingEffect {
+    PoisonResistance,
+    FireResistance,
+    Protection,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -94,6 +106,8 @@ pub struct ItemData {
     pub attack_profile: Option<AttackProfile>,
     pub consumable_effect: Option<ConsumableEffect>,
     pub wand_effect: Option<WandEffect>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ring_effect: Option<RingEffect>,
     pub max_charges: Option<u8>,
     pub nutrition: Option<i16>,
 }

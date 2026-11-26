@@ -95,12 +95,14 @@ fn belongs(command: C, key: char) -> bool {
             | ('K', C::Kick(_))
             | ('w', C::Wield { .. })
             | ('e', C::Wear { .. })
+            | ('P', C::PutOn { .. })
             | ('q', C::Quaff { .. })
             | ('f', C::Eat { .. })
             | ('d', C::Drop { .. })
             | ('t', C::Throw { .. })
             | ('z', C::Zap { .. })
             | ('r', C::Read { .. })
+            | ('$', C::Buy { .. } | C::Sell { .. })
     )
 }
 
@@ -108,6 +110,8 @@ fn item_of(command: C) -> Option<EntityId> {
     match command {
         C::Wield { item }
         | C::Wear { item }
+        | C::PutOn { item }
+        | C::Sell { item }
         | C::Quaff { item }
         | C::Eat { item }
         | C::Drop { item }
@@ -155,6 +159,34 @@ pub(super) fn action_menu(
         }
         return PlayMenu::new("Choose direction", entries);
     }
+    if key == '$' {
+        let mut buy_index = 0u8;
+        for command in &commands {
+            if let C::Buy { kind } = command {
+                buy_index += 1;
+                if buy_index <= 9 {
+                    entries.push(Entry {
+                        key: char::from(b'0' + buy_index),
+                        label: format!("Buy {}", super::input::item_label(*kind)),
+                        candidate: U::Command(*command),
+                    });
+                }
+            }
+        }
+        for item in &observation.inventory {
+            if let Some(command) = commands.iter().find(|c| item_of(**c) == Some(item.item)) {
+                entries.push(Entry {
+                    key: item.letter.0,
+                    label: format!("Sell {}", item_observation_label(item)),
+                    candidate: U::Command(*command),
+                });
+            }
+        }
+        return PlayMenu::new(
+            &format!("Shop (Gold: {})", observation.player.gold),
+            entries,
+        );
+    }
     for item in &observation.inventory {
         if let Some(command) = commands.iter().find(|c| item_of(**c) == Some(item.item)) {
             entries.push(Entry {
@@ -198,12 +230,14 @@ pub(super) fn item_menu(observation: &Observation, item: EntityId) -> PlayMenu {
         [
             ('w', "Wield"),
             ('e', "Wear"),
+            ('P', "Put on"),
             ('q', "Quaff"),
             ('f', "Eat"),
             ('r', "Read"),
             ('d', "Drop"),
             ('t', "Throw"),
             ('z', "Zap"),
+            ('$', "Sell"),
         ]
         .into_iter()
         .filter_map(|(key, label)| {
@@ -231,6 +265,7 @@ pub(super) fn commands_menu(observation: &Observation) -> PlayMenu {
         ('s', "Search", C::Search),
         (',', "Pickup", C::Pickup),
         ('p', "Pray", C::Pray),
+        ('T', "Remove ring", C::RemoveRing),
         ('D', "Descend", C::Descend),
         ('U', "Ascend", C::Ascend),
         ('.', "Wait", C::Wait),
@@ -260,8 +295,10 @@ pub(super) fn commands_menu(observation: &Observation) -> PlayMenu {
         ('z', "Zap"),
         ('w', "Wield"),
         ('e', "Wear"),
+        ('P', "Put on"),
         ('f', "Eat"),
         ('r', "Read"),
+        ('$', "Shop"),
     ] {
         entries.push(Entry {
             key,

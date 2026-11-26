@@ -17,6 +17,8 @@ pub struct Inventory {
     pub entries: Vec<InventoryEntry>,
     pub equipped_melee: Option<EntityId>,
     pub equipped_body: Option<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equipped_ring: Option<EntityId>,
     pub next_letter_index: u8,
 }
 
@@ -27,6 +29,7 @@ impl Inventory {
             entries: Vec::new(),
             equipped_melee: None,
             equipped_body: None,
+            equipped_ring: None,
             next_letter_index: 0,
         }
     }
@@ -44,6 +47,9 @@ impl Inventory {
         if self.equipped_body == Some(item) {
             self.equipped_body = None;
         }
+        if self.equipped_ring == Some(item) {
+            self.equipped_ring = None;
+        }
         Some(self.entries.remove(idx))
     }
     pub fn contains(&self, item: EntityId) -> bool {
@@ -60,6 +66,9 @@ impl Inventory {
     }
     pub fn equip_body(&mut self, item: EntityId) {
         self.equipped_body = Some(item);
+    }
+    pub fn equip_ring(&mut self, item: EntityId) {
+        self.equipped_ring = Some(item);
     }
     fn next_letter(&self) -> Option<InventoryLetter> {
         (self.next_letter_index < 26)

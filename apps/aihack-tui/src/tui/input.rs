@@ -204,9 +204,15 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
             .contains(&CommandIntent::EnterBranch)
             .then_some(UiCommandCandidate::Command(CommandIntent::EnterBranch));
     }
+    if key == 'T' {
+        return observation
+            .legal_actions
+            .contains(&CommandIntent::RemoveRing)
+            .then_some(UiCommandCandidate::Command(CommandIntent::RemoveRing));
+    }
     if matches!(
         key,
-        'o' | 'c' | 'K' | 'w' | 'e' | 'q' | 'f' | 'd' | 't' | 'z' | 'r'
+        'o' | 'c' | 'K' | 'w' | 'e' | 'q' | 'f' | 'd' | 't' | 'z' | 'r' | 'P' | '$'
     ) {
         return Some(UiCommandCandidate::BeginAction(key));
     }
@@ -380,6 +386,11 @@ fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
         | crate::domain::item::ItemKind::ArmorChainMail => {
             Some(CommandIntent::Wear { item: item.item })
         }
+        crate::domain::item::ItemKind::RingPoisonResistance
+        | crate::domain::item::ItemKind::RingFireResistance
+        | crate::domain::item::ItemKind::RingProtection => {
+            Some(CommandIntent::PutOn { item: item.item })
+        }
         crate::domain::item::ItemKind::PotionHealing
         | crate::domain::item::ItemKind::PotionExtraHealing
         | crate::domain::item::ItemKind::PotionCure => {
@@ -435,6 +446,9 @@ pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> &'static str {
         crate::domain::item::ItemKind::ArmorChainMail => "chain mail",
         crate::domain::item::ItemKind::CorpseJackal => "jackal corpse",
         crate::domain::item::ItemKind::AmuletAscension => "Amulet of Ascension",
+        crate::domain::item::ItemKind::RingPoisonResistance => "ring of poison resistance",
+        crate::domain::item::ItemKind::RingFireResistance => "ring of fire resistance",
+        crate::domain::item::ItemKind::RingProtection => "ring of protection",
     }
 }
 

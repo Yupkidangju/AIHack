@@ -11,6 +11,7 @@
 - 신규 5종 아이템(`ShortSword`, `Mace`, `ArmorChainMail`, `PotionExtraHealing`, 충전 주문서 `ScrollCharging`)과 신규 3종 몬스터(`Kobold`, `Orc`, `Ogre`), TUI 닫힌 문(`+`)/열린 문(`-`)·함정 라벨 구분 및 함정 위 근접 bump attack을 추가했다.
 - P5 BUC(`Blessed`/`Uncursed`/`Cursed`)·인챈트(`-3..=+5`)·별도 `Entity` 접근자, 무기 명중/피해 및 방어구 AC 반영(저장 검증 포함), 물약/충전 주문서 BUC 효과, `Cursed` 장착 아이템 교체/버리기/던지기 금지, 잠긴 문(`DoorState::Locked`) 생성·`Kick` 해제·변조 거부를 추가했다.
 - 독 상태이상(`poison_turns`)·`DeathCause::Poison`, 치료 물약(`PotionCure`)·화염 지팡이(`WandFire`, `2d6+2`)·강화/저주 해제 주문서 3종(`ScrollEnchantWeapon`, `ScrollEnchantArmor`, `ScrollRemoveCurse`), 신규 몬스터 3종(`GiantSpider` 독 근접, `GnollArcher` 직교 원거리, `Troll` 턴당 재생), TUI(`POIS:<n>`, `"locked door"`, BUC/인챈트 라벨, `"Killed by poison"`)·Headless `survival-v1` 연동을 추가했다.
+- P6 반지 슬롯(`ItemClass::Ring`, `EquipmentSlot::Ring`, `RingEffect`), 반지 3종(`RingPoisonResistance`, `RingFireResistance`, `RingProtection`), 통합 방어력 계산·`Cursed` 반지 가드, 신규 몬스터 `FireAnt`(`FireOnMelee` 화염 추가 피해)·화염/독 저항, `TileKind::Shop`(`Main 2`/`Mines 1` 생성 및 비인가 변조 거부), 캠페인 골드(초기 `50`·처치 `difficulty * 25`) 및 `Buy`/`Sell` 9종 카탈로그 상점, TUI(`$`/`shop`, `a`/`fire ant`, `=`, `G`/`RES:` HUD, `'P'`/`'T'`/`'$'` 메뉴)·Headless `survival-v1` 반지 자동 착용을 추가했다.
 
 ### Fixed
 

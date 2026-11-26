@@ -340,6 +340,9 @@ fn canonical_item_kind(id: &str) -> Option<&'static str> {
         | "item.scroll.enchant_armor"
         | "item.scroll.remove_curse" => Some("scroll"),
         "item.armor.leather" | "item.armor.chain_mail" => Some("armor"),
+        "item.ring.poison_resistance" | "item.ring.fire_resistance" | "item.ring.protection" => {
+            Some("ring")
+        }
         "item.corpse.jackal" => Some("corpse"),
         "item.quest.ascension" => Some("quest"),
         _ => None,
@@ -431,6 +434,18 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                 && item.effect.is_none()
                 && item.charges.is_none()
                 && item.nutrition.is_none()
+        }
+        "ring" => {
+            item.slot.as_deref() == Some("ring")
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+                && match item.effect.as_deref() {
+                    Some("poison_resistance" | "fire_resistance") => item.ac_bonus.is_none(),
+                    Some("protection") => item.ac_bonus.is_some(),
+                    _ => false,
+                }
         }
         _ => false,
     };
