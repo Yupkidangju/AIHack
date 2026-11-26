@@ -19,6 +19,7 @@ fn saved_world_roundtrip_preserves_persisted_state_and_resets_runtime_death_caus
         prayer_cooldown: 3,
         paralysis_turns: 2,
         hallucinating: true,
+        poison_turns: 0,
         kill_count: 7,
         gold: 42,
         identified_items: Vec::new(),

@@ -185,7 +185,10 @@ fn route(
     session: &GameSession,
     target: aihack_core::position::Pos,
 ) -> Vec<aihack_core::position::Direction> {
-    use aihack_core::{domain::tile::TileKind, position::Direction};
+    use aihack_core::{
+        domain::{entity::ActorKind, monster::MonsterKind, tile::TileKind},
+        position::Direction,
+    };
     use std::collections::{HashMap, VecDeque};
     let origin = session.world().player_pos();
     let mut seen = HashMap::new();
@@ -202,16 +205,27 @@ fn route(
             Direction::West,
         ] {
             let next = pos.offset(dir.delta());
-            if matches!(
-                session.world().current_map().tile(next),
-                Ok(TileKind::Floor
-                    | TileKind::StairsUp
-                    | TileKind::StairsDown
-                    | TileKind::Door(_)
-                    | TileKind::HiddenDoor
-                    | TileKind::Trap(_)
-                    | TileKind::HiddenTrap(_))
-            ) && !seen.contains_key(&next)
+            let floating_eye_blocking = next != target
+                && session
+                    .world()
+                    .entities()
+                    .alive_hostile_at(session.world().current_level(), next)
+                    .and_then(|id| session.world().entities().get(id))
+                    .is_some_and(|e| {
+                        e.actor_kind() == Some(ActorKind::Monster(MonsterKind::FloatingEye))
+                    });
+            if !floating_eye_blocking
+                && matches!(
+                    session.world().current_map().tile(next),
+                    Ok(TileKind::Floor
+                        | TileKind::StairsUp
+                        | TileKind::StairsDown
+                        | TileKind::Door(_)
+                        | TileKind::HiddenDoor
+                        | TileKind::Trap(_)
+                        | TileKind::HiddenTrap(_))
+                )
+                && !seen.contains_key(&next)
             {
                 seen.insert(next, Some((pos, dir)));
                 queue.push_back(next);
@@ -230,9 +244,14 @@ fn route(
 }
 
 fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
-    use aihack_core::domain::{
-        item::ItemKind,
-        tile::{DoorState, TileKind},
+    use aihack_core::{
+        domain::{
+            entity::ActorKind,
+            item::ItemKind,
+            monster::MonsterKind,
+            tile::{DoorState, TileKind},
+        },
+        position::Direction,
     };
     for _ in 0..1000 {
         if session.world().player_pos() == target {
@@ -241,17 +260,33 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
         let observation = session.observation();
         assert!(
             session.world().player_alive(),
-            "player died at {:?}",
-            session.world().current_level()
+            "player died at {:?} pos={:?} turn={} hp={}/{} pois={} cause={:?}",
+            session.world().current_level(),
+            observation.player_pos,
+            session.turn(),
+            observation.player.hp,
+            observation.player.max_hp,
+            observation.player.poison_turns,
+            session.world().last_death_cause
         );
         if observation.player.paralysis_turns > 0 {
             assert!(session.submit(C::Wait).accepted);
             continue;
         }
+        if observation.player.poison_turns > 0 {
+            if let Some(cure) = observation
+                .inventory
+                .iter()
+                .find(|i| i.kind == ItemKind::PotionCure)
+            {
+                assert!(session.submit(C::Quaff { item: cure.item }).accepted);
+                continue;
+            }
+        }
         let healing = observation.inventory.iter().find(|i| {
             matches!(
                 i.kind,
-                ItemKind::PotionHealing | ItemKind::PotionExtraHealing
+                ItemKind::PotionHealing | ItemKind::PotionExtraHealing | ItemKind::PotionCure
             )
         });
         if session.world().carried_weight() > session.world().carrying_capacity() {
@@ -267,17 +302,65 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             assert!(session.submit(C::Drop { item: item.item }).accepted);
             continue;
         }
-        if observation.player.hp * 2 < observation.player.max_hp {
+        if observation.player.hp * 3 < observation.player.max_hp * 2 {
             if let Some(item) = healing {
                 assert!(session.submit(C::Quaff { item: item.item }).accepted);
                 continue;
             }
+        }
+        let mut fought = false;
+        for dir in Direction::ALL {
+            let adj = session.world().player_pos().offset(dir.delta());
+            let Some(monster_id) = session
+                .world()
+                .entities()
+                .alive_hostile_at(session.world().current_level(), adj)
+            else {
+                continue;
+            };
+            let is_floating_eye = session.world().entities().get(monster_id).is_some_and(|e| {
+                e.actor_kind() == Some(ActorKind::Monster(MonsterKind::FloatingEye))
+            });
+            if is_floating_eye || !observation.legal_actions.contains(&C::Move(dir)) {
+                continue;
+            }
+            if let Some(wand_cmd) = observation
+                .inventory
+                .iter()
+                .filter(|i| matches!(i.kind, ItemKind::WandMagicMissile | ItemKind::WandFire))
+                .filter(|i| {
+                    session
+                        .world()
+                        .entities()
+                        .get(i.item)
+                        .and_then(|e| e.item())
+                        .and_then(|(_, _, _, _, ch)| ch)
+                        .unwrap_or(0)
+                        > 0
+                })
+                .map(|i| C::Zap {
+                    item: i.item,
+                    direction: dir,
+                })
+                .find(|cmd| observation.legal_actions.contains(cmd))
+            {
+                assert!(session.submit(wand_cmd).accepted);
+                fought = true;
+                break;
+            }
+            assert!(session.submit(C::Move(dir)).accepted);
+            fought = true;
+            break;
+        }
+        if fought {
+            continue;
         }
         let dir = route(session, target)[0];
         let next = session.world().player_pos().offset(dir.delta());
         let outcome = match session.world().current_map().tile(next) {
             Ok(TileKind::HiddenDoor) => session.submit(C::Search),
             Ok(TileKind::Door(DoorState::Closed)) => session.submit(C::Open(dir)),
+            Ok(TileKind::Door(DoorState::Locked)) => session.submit(C::Kick(dir)),
             _ => session.submit(C::Move(dir)),
         };
         assert!(outcome.accepted, "{:?}", outcome.events);
@@ -312,6 +395,33 @@ fn tour(seed: u64, role: Role) -> GameSession {
     for depth in 1..=6 {
         assert_eq!(session.world().current_level(), LevelId::main(depth));
         if depth == 3 {
+            let short_sword_pos = session
+                .world()
+                .entities()
+                .entities()
+                .iter()
+                .find_map(|entity| {
+                    let (kind, _, location, _, _) = entity.item()?;
+                    match location {
+                        EntityLocation::OnMap { level, pos }
+                            if level == LevelId::main(3) && kind == ItemKind::ShortSword =>
+                        {
+                            Some((entity.id, pos))
+                        }
+                        _ => None,
+                    }
+                });
+            if let Some((sword_id, sword_pos)) = short_sword_pos {
+                walk(&mut session, sword_pos);
+                assert!(session.submit(C::Pickup).accepted);
+                assert!(session.submit(C::Wield { item: sword_id }).accepted);
+                let main3_up = session
+                    .world()
+                    .levels
+                    .stairs_up_pos(LevelId::main(3))
+                    .unwrap();
+                walk(&mut session, main3_up);
+            }
             assert!(session
                 .observation()
                 .legal_actions
@@ -322,6 +432,31 @@ fn tour(seed: u64, role: Role) -> GameSession {
                 depth: 1,
             };
             assert_eq!(session.world().current_level(), mines);
+            let mines_potions: Vec<_> = session
+                .world()
+                .entities
+                .entities()
+                .iter()
+                .filter_map(|entity| {
+                    let (kind, _, location, _, _) = entity.item()?;
+                    match location {
+                        EntityLocation::OnMap { level, pos }
+                            if level == mines
+                                && matches!(
+                                    kind,
+                                    ItemKind::PotionHealing | ItemKind::PotionCure
+                                ) =>
+                        {
+                            Some(pos)
+                        }
+                        _ => None,
+                    }
+                })
+                .collect();
+            for pos in mines_potions {
+                walk(&mut session, pos);
+                assert!(session.submit(C::Pickup).accepted);
+            }
             let down = session.world().levels.stairs_down_pos(mines).unwrap();
             walk(&mut session, down);
             assert!(session.submit(C::Descend).accepted);
@@ -340,7 +475,12 @@ fn tour(seed: u64, role: Role) -> GameSession {
                 match location {
                     EntityLocation::OnMap { level, pos }
                         if level == session.world().current_level()
-                            && kind == ItemKind::PotionHealing =>
+                            && matches!(
+                                kind,
+                                ItemKind::PotionHealing
+                                    | ItemKind::PotionExtraHealing
+                                    | ItemKind::PotionCure
+                            ) =>
                     {
                         Some(pos)
                     }

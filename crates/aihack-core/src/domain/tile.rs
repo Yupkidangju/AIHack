@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum DoorState {
     Closed,
     Open,
+    Locked,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

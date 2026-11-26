@@ -4,7 +4,7 @@ use crate::{
     domain::{
         combat::{AttackProfile, DamageRoll},
         inventory::InventoryLetter,
-        item::{ItemData, ItemKind},
+        item::{BucStatus, ItemData, ItemKind},
         monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
         player::adventurer_template,
     },
@@ -14,6 +14,10 @@ use crate::{
 };
 
 pub const MAX_ABSOLUTE_ACTOR_STAT: i32 = 10_000;
+
+fn is_zero_i8(value: &i8) -> bool {
+    *value == 0
+}
 
 /// Actor payload 내부 종류다. Item은 별도 payload로 분리한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -113,6 +117,10 @@ pub enum EntityPayload {
         location: EntityLocation,
         assigned_letter: Option<InventoryLetter>,
         charges: Option<u8>,
+        #[serde(default, skip_serializing_if = "BucStatus::is_uncursed")]
+        buc: BucStatus,
+        #[serde(default, skip_serializing_if = "is_zero_i8")]
+        enchantment: i8,
     },
 }
 
@@ -246,7 +254,22 @@ impl Entity {
                 location,
                 assigned_letter,
                 charges,
+                ..
             } => Some((*kind, data, *location, *assigned_letter, *charges)),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_buc(&self) -> Option<BucStatus> {
+        match &self.payload {
+            EntityPayload::Item { buc, .. } => Some(*buc),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_enchantment(&self) -> Option<i8> {
+        match &self.payload {
+            EntityPayload::Item { enchantment, .. } => Some(*enchantment),
             EntityPayload::Actor { .. } => None,
         }
     }
@@ -296,6 +319,21 @@ impl Entity {
                 stats,
                 ..
             } => Some(AttackProfile::natural("club", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::GiantSpider),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("fangs", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::GnollArcher),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("arrow", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Troll),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("claw", stats.damage)),
             EntityPayload::Actor {
                 kind: ActorKind::Player,
                 ..
@@ -412,6 +450,8 @@ impl EntityStore {
                 location,
                 assigned_letter: None,
                 charges: data.max_charges,
+                buc: BucStatus::Uncursed,
+                enchantment: 0,
             },
         });
         Ok(id)
@@ -616,6 +656,28 @@ impl EntityStore {
             return false;
         };
         *charges_ref = charges;
+        true
+    }
+
+    pub fn set_item_buc(&mut self, id: EntityId, next: BucStatus) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { buc, .. } = &mut entity.payload else {
+            return false;
+        };
+        *buc = next;
+        true
+    }
+
+    pub fn set_item_enchantment(&mut self, id: EntityId, next: i8) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { enchantment, .. } = &mut entity.payload else {
+            return false;
+        };
+        *enchantment = next;
         true
     }
 

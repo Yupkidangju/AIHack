@@ -263,6 +263,11 @@ fn embedded_known_item_ids_keep_the_canonical_declared_kind_table() {
         ("item.armor.chain_mail", "armor"),
         ("item.potion.extra_healing", "potion"),
         ("item.scroll.charging", "scroll"),
+        ("item.potion.cure", "potion"),
+        ("item.wand.fire", "wand"),
+        ("item.scroll.enchant_weapon", "scroll"),
+        ("item.scroll.enchant_armor", "scroll"),
+        ("item.scroll.remove_curse", "scroll"),
     ] {
         assert_eq!(registry.item(id).unwrap().kind, expected_kind, "id={id}");
     }

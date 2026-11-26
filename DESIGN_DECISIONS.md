@@ -12,6 +12,31 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-P5-01: P5 BUC·인챈트·잠긴 문·독·특수 몬스터 및 V1/스냅샷 호환성
+
+Status: Accepted (2026-11-26); 구현 시작. 기준 계약: `docs/campaign_spec.md` P5.
+
+Context:
+
+P4까지 캠페인 던전의 문/비밀문/함정·4역할·16아이템·6몬스터를 구축했으나, 아이템 축복/저주(BUC)와 강화 수치(`-3..=+5`), 잠긴 문(`Locked`), 독 상태이상과 `DeathCause::Poison`, 원거리 사격/재생 몬스터 AI가 없었다. 이를 추가하면서도 기존 V1 저장, `campaign = None` 해시, `tests/ai_api_schema.rs`, `Entity::item()` 5-튜플 시그니처와 기존 회귀 계약을 깨지 않아야 한다.
+
+Decision:
+
+- `EntityPayload::Item`에 `buc: BucStatus`(기본 `Uncursed`)·`enchantment: i8`(기본 `0`)를, `WorldState`/`SavedWorldV1`/`GameSnapshot`/`PlayerObservation`/`ItemObservation`에 각각 `poison_turns`/`buc`/`enchantment`를 `#[serde(default, skip_serializing_if = ...)]`로 추가하여 기본값이 V1 저장/스냅샷 JSON과 해시에서 완전히 생략되게 한다.
+- `Entity::item()` 5-튜플(`ItemView`)을 유지하고 `item_buc`/`item_enchantment`/`set_item_buc`/`set_item_enchantment` 별도 접근자를 둔다.
+- 무기 BUC/인챈트 피해 보너스는 `AttackProfile` wire 구조를 바꾸지 않고 `resolve_attack_with_profile_and_bonus(..., extra_damage_bonus)`로 전달한다.
+- `DoorState::Locked`는 `Kick`으로만 개방하며, `campaign_map`은 `Mines 2` 입구 문을 `Locked`로 생성하고 `validate_persisted_map`은 `Locked`로 생성된 타일에 한해 `Locked -> Open <-> Closed` 전이만 허용한다.
+
+Alternatives:
+
+- `Entity::item()` 튜플을 7-튜플로 변경: 기존 모든 호출처와 테스트를 불필요하게 깨므로 기각한다.
+- `AttackProfile` struct에 `damage_bonus` 직렬화 필드 추가: `ItemData` 직렬화 해시/형태를 불필요하게 바꾸므로 기각한다.
+- V3 save schema 도입: 기존 V1/V2 호환 읽기만으로 무기본값 필드 확장이 가능하므로 기각한다.
+
+Consequences:
+
+`ContentRegistry::content_hash()`와 `docs/provenance/r7-content.sha256`가 P5 콘텐츠(신규 5아이템·3몬스터) 기준으로 갱신되며, 기존 V1 저장/해시 및 `campaign = None` 경로는 불변으로 유지된다.
+
 ## ADR-P4-01: 생성 던전 문·함정 전이 검증 및 P4 역할·콘텐츠 확장
 
 Status: Accepted (2026-11-26); 구현 및 전체 로컬 게이트 검증 진행 중. 기준 계약: `docs/campaign_spec.md` P4.

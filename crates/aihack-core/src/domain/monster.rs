@@ -7,11 +7,14 @@ pub enum MonsterAiKind {
     Wander,
     ChaseVisiblePlayer,
     Stationary,
+    RangedOnSight,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MonsterPassive {
     ParalyzeOnMelee,
+    PoisonOnMelee,
+    Regenerate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -22,6 +25,9 @@ pub enum MonsterKind {
     Kobold,
     Orc,
     Ogre,
+    GiantSpider,
+    GnollArcher,
+    Troll,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,18 +48,24 @@ impl MonsterKind {
     pub fn ai_kind(self) -> MonsterAiKind {
         match self {
             Self::Jackal => MonsterAiKind::Wander,
-            Self::Goblin | Self::Kobold | Self::Orc | Self::Ogre => {
-                MonsterAiKind::ChaseVisiblePlayer
-            }
+            Self::Goblin
+            | Self::Kobold
+            | Self::Orc
+            | Self::Ogre
+            | Self::GiantSpider
+            | Self::Troll => MonsterAiKind::ChaseVisiblePlayer,
             Self::FloatingEye => MonsterAiKind::Stationary,
+            Self::GnollArcher => MonsterAiKind::RangedOnSight,
         }
     }
     pub fn difficulty(self) -> u8 {
         match self {
             Self::Jackal => 1,
             Self::Goblin | Self::Kobold => 2,
-            Self::Orc => 3,
+            Self::Orc | Self::GiantSpider => 3,
+            Self::GnollArcher => 4,
             Self::FloatingEye | Self::Ogre => 5,
+            Self::Troll => 6,
         }
     }
 }

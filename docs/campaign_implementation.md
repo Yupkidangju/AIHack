@@ -66,3 +66,26 @@ release/게시 승인, modification notice와 final-SHA bundle 갱신, 새 양 O
 - headless CLI smoke (`--seed 42 --role cleric --turns 10 --policy wait-v1`): `accepted_turns=10`, `final_state=Playing`, `final_hash=8e58029000b64cbb`.
 - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo build -j 4 --workspace --all-targets --release --locked`, `cargo deny check licenses bans sources`, `cargo audit`(0 vulnerabilities), `scripts/r7_checkpoint.sh`(PASS), `scripts/r8_checkpoint.sh`(PASS).
 - 커밋·푸시는 실행하지 않았다.
+
+## P5 확장 구현·검증 기록 (2026-11-26)
+
+### 구현
+
+- **P5a (BUC·인챈트·잠긴 문·강화/해저주 두루마리)**:
+  - `aihack-core::domain::item`에 `BucStatus`(`Blessed`/`Uncursed`/`Cursed`, 기본 `Uncursed`), `MIN_ITEM_ENCHANTMENT = -3`, `MAX_ITEM_ENCHANTMENT = 5`, `ConsumableEffect::{EnchantWeapon, EnchantArmor, RemoveCurse}`, `EntityPayload::Item`의 serde-omitted optional 필드 `buc`·`enchantment` 및 별도 접근자(`Entity::item_buc`, `Entity::item_enchantment`, `EntityStore::set_item_buc`, `EntityStore::set_item_enchantment`)를 추가했다. `Entity::item()` 5-튜플 시그니처와 V1 기본 JSON 직렬화 생략 계약을 그대로 보존했다.
+  - `systems/combat.rs`·`systems/items.rs`·`save.rs`에서 장착 무기 인챈트(`+enchant` 명중/피해, `Blessed` 명중 `+1`), 장착 방어구 인챈트(`adventurer_template().ac - (ac_bonus + enchant)`), 물약/충전 주문서 BUC 효과(`Heal` Blessed `+4` / Cursed `-4` 최소 1, `ScrollCharging` Blessed 해저주+충전 / Cursed 0 소진), `Cursed` 장착 아이템 `Wield`/`Wear`/`Drop`/`Throw` 금지, 강화/해저주 두루마리 3종(`ScrollEnchantWeapon`, `ScrollEnchantArmor`, `ScrollRemoveCurse`), 저장 범위/AC 검증을 구현했다.
+  - `DoorState::Locked` 및 `doors::kick_door` 해제를 추가하고 `campaign_map`이 `Mines 2` `(7, centers[0].y)`에 `Door(Locked)`를 생성하도록 연결했으며, `validate_persisted_map`이 생성된 `Locked` 위치에서만 `Locked -> Open <-> Closed` 전이를 허용하고 임의 `Closed`/바닥 타일의 `Locked` 변조를 거부하도록 강화했다.
+- **P5b (독 상태이상·치료 물약·화염 지팡이·신규 몬스터 3종·Provenance)**:
+  - `WorldState`/`SavedWorldV1`/`PlayerObservation`/`GameSnapshot`에 serde-omitted `poison_turns: u8`과 `DeathCause::Poison`을 추가하고 `session::accept_turn`에서 중독 틱(-1 HP, 경고 메시지, 0 HP 시 `DeathCause::Poison`)을 처리했다.
+  - `items.toml`에 `PotionCure`(`cure_status`, `1d6+4`·BUC 보정, 독/마비/환각 해제), `WandFire`(`fire`, `charges=4`, `2d6+2`), `ScrollEnchantWeapon`, `ScrollEnchantArmor`, `ScrollRemoveCurse` 5종을, `monsters.toml`에 `GiantSpider`(`s`, HP 8, `poison_on_melee`), `GnollArcher`(`G`, HP 11, `ranged_on_sight` 거리 5 직교 투사), `Troll`(`T`, HP 22, `regenerate_hp`) 3종을 추가하고 `docs/provenance/r7-content.sha256`, `PROVENANCE.md`, `crates/aihack-content/tests/registry.rs` golden hash(`5b9ee4946ebf05d7`)를 동기화했다.
+  - `bootstrap.rs` `campaign_world`가 `Mines 1`(`GiantSpider`, `PotionCure`, `Cursed -1 Dagger`), `Main 4`(`GnollArcher`, `PotionCure`), `Main 5`(`Troll`, `WandFire`), `Main 1/2/3`(`ScrollEnchantWeapon`, `ScrollRemoveCurse`, `Blessed +1 ShortSword`, `ScrollEnchantArmor`), `Mines 2`(`+1 Mace`)를 배치한다.
+- **P5c (TUI·Headless `survival-v1`)**:
+  - `aihack-ai-contract`에서 `BucStatus`를 재노출하고 `apps/aihack-tui`(`labels.rs`, `render_map.rs`, `render_panels.rs`, `input.rs`, `play_menu.rs`, `mod.rs`)가 잠긴 문(`+`, `"locked door"`), `POIS:<n>` HUD, 비기본 BUC/인챈트 라벨(`+1 blessed ...`, `-1 cursed ...`), 신규 몬스터/아이템, `"Killed by poison"` 사인을 표시하도록 연결했다.
+  - `apps/aihack-headless` `survival-v1`은 `poison_turns > 0` 시 `PotionCure` 우선 음용과 `Door(Locked)` 대상 `Kick` 후보를 지원한다.
+
+### 검증 증거
+
+- `tests/campaign_p5.rs`: BUC/인챈트 전투/AC/저주 해제/강화 상한/물약·주문서 BUC/범위·AC 변조 거부, `Mines 2` 잠긴 문 생성/`Open`·`Move` 거부/`Kick` 해제/변조 거부, `GiantSpider` 중독·독 틱·`PotionCure` 해독·`DeathCause::Poison` 저장·`GnollArcher` 직교 사격/차단·`Troll` 재생·`WandFire`, TUI(`POIS:3`, `"locked door"`, BUC/인챈트 라벨, 글리프, `"Killed by poison"`)·Headless `survival-v1`·V1 기본 JSON 생략 보존(**4 PASS / 0 FAIL**).
+- `tests/campaign.rs`(**12 PASS / 0 FAIL**, 4역할 8층 왕복·승천 완주 포함), `tests/campaign_p4.rs`(**6 PASS / 0 FAIL**, `Mines 2` 입구 `Door(Locked)` 정렬), `tests/content_validation.rs`(**13 PASS / 0 FAIL**), `tests/r8_documentation.rs`(**PASS**).
+- 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy --workspace --all-targets --locked -- -D warnings` PASS, `cargo test -j 4 --workspace --all-targets --locked --no-fail-fast` (**505 PASS / 0 FAIL / 0 ignored**, 92 test results), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS, `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix`/`tokio` warning 2건), `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
+- 커밋·푸시는 실행하지 않았다.

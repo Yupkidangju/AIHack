@@ -747,7 +747,7 @@ impl TuiApp {
                 ItemKind::ArmorLeather | ItemKind::ArmorChainMail => {
                     CommandIntent::Wear { item: item.item }
                 }
-                ItemKind::PotionHealing | ItemKind::PotionExtraHealing => {
+                ItemKind::PotionHealing | ItemKind::PotionExtraHealing | ItemKind::PotionCure => {
                     CommandIntent::Quaff { item: item.item }
                 }
                 ItemKind::FoodRation | ItemKind::CorpseJackal => {
@@ -756,10 +756,14 @@ impl TuiApp {
                 ItemKind::ScrollReveal
                 | ItemKind::ScrollIdentify
                 | ItemKind::ScrollLevelTeleport
-                | ItemKind::ScrollCharging => CommandIntent::Read { item: item.item },
-                ItemKind::WandMagicMissile | ItemKind::Rock | ItemKind::AmuletAscension => {
-                    return None
-                }
+                | ItemKind::ScrollCharging
+                | ItemKind::ScrollEnchantWeapon
+                | ItemKind::ScrollEnchantArmor
+                | ItemKind::ScrollRemoveCurse => CommandIntent::Read { item: item.item },
+                ItemKind::WandMagicMissile
+                | ItemKind::WandFire
+                | ItemKind::Rock
+                | ItemKind::AmuletAscension => return None,
             },
         };
         observation
@@ -1644,6 +1648,7 @@ fn render_game_over_screen(
         crate::domain::combat::DeathCause::Trap { trap } => {
             format!("Killed by {:?}", trap)
         }
+        crate::domain::combat::DeathCause::Poison => "Killed by poison".to_string(),
     };
     let observation = app.observation();
     let lines = render_panels::game_over_lines(

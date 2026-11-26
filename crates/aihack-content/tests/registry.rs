@@ -8,5 +8,5 @@ fn content_crate_owns_the_embedded_registry_contract() {
     assert!(registry.item("item.weapon.dagger").is_some());
     assert!(registry.monster("monster.jackal").is_some());
     assert!(registry.level("main:1").is_some());
-    assert_eq!(registry.content_hash(), "f3767a7764223506");
+    assert_eq!(registry.content_hash(), "5b9ee4946ebf05d7");
 }

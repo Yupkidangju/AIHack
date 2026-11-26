@@ -1,5 +1,8 @@
 use aihack_core::{
-    domain::monster::MonsterAiKind,
+    domain::{
+        monster::{MonsterAiKind, MonsterPassive},
+        tile::{DoorState, TileKind},
+    },
     event::GameEvent,
     ids::EntityId,
     position::{Direction, Pos},
@@ -20,6 +23,10 @@ pub enum MonsterIntent {
         direction: Direction,
     },
     MeleeAttack {
+        attacker: EntityId,
+        defender: EntityId,
+    },
+    RangedAttack {
         attacker: EntityId,
         defender: EntityId,
     },
@@ -85,10 +92,66 @@ pub fn apply_monster_turn(
                 else {
                     continue;
                 };
+                let hit = resolution.hit;
+                events.push(combat::attack_event(&resolution));
+                if hit
+                    && defender == world.player_id
+                    && matches!(
+                        world
+                            .entities
+                            .get(attacker)
+                            .and_then(|entity| entity.monster_passive()),
+                        Some(MonsterPassive::PoisonOnMelee)
+                    )
+                {
+                    let next_poison = world.poison_turns.max(3);
+                    world.state_mut().poison_turns = next_poison;
+                    events.push(GameEvent::PassiveAttackTriggered {
+                        source: attacker,
+                        target: defender,
+                    });
+                }
+                events.extend(death::collect_death_events_after_attack(
+                    world, attacker, defender,
+                )?);
+            }
+            MonsterIntent::RangedAttack { attacker, defender } => {
+                if !ranged_intent_is_still_valid(world, attacker, defender) {
+                    continue;
+                }
+                let Some(resolution) = combat::resolve_attack(world, rng, attacker, defender)
+                else {
+                    continue;
+                };
                 events.push(combat::attack_event(&resolution));
                 events.extend(death::collect_death_events_after_attack(
                     world, attacker, defender,
                 )?);
+            }
+        }
+    }
+    if world.player_alive() {
+        for monster_id in world.current_level_hostile_monsters() {
+            let Some(passive) = world
+                .entities
+                .get(monster_id)
+                .and_then(|entity| entity.monster_passive())
+            else {
+                continue;
+            };
+            if passive != MonsterPassive::Regenerate {
+                continue;
+            }
+            if let Some(stats) = world.state_mut().entities.actor_stats_mut(monster_id) {
+                if stats.hp > 0 && stats.hp < stats.max_hp {
+                    stats.hp += 1;
+                    let hp_after = stats.hp;
+                    events.push(GameEvent::EntityHealed {
+                        entity: monster_id,
+                        amount: 1,
+                        hp_after,
+                    });
+                }
             }
         }
     }
@@ -133,6 +196,16 @@ fn decide_monster_intent(
         MonsterAiKind::Wander => choose_wander_intent(world, rng, actor),
         MonsterAiKind::ChaseVisiblePlayer => {
             choose_chase_intent(world, actor, actor_pos, player_pos)
+        }
+        MonsterAiKind::RangedOnSight => {
+            if ranged_shot_has_clear_line(world, actor_pos, player_pos) {
+                MonsterIntent::RangedAttack {
+                    attacker: actor,
+                    defender: player_id,
+                }
+            } else {
+                choose_chase_intent(world, actor, actor_pos, player_pos)
+            }
         }
         MonsterAiKind::Stationary => MonsterIntent::Wait,
     }
@@ -200,6 +273,50 @@ fn melee_intent_is_still_valid(world: &GameWorld, attacker: EntityId, defender: 
         return false;
     };
     attacker_level == defender_level && attacker_pos.chebyshev_distance(defender_pos) <= 1
+}
+
+fn ranged_shot_has_clear_line(world: &GameWorld, from: Pos, to: Pos) -> bool {
+    let delta = from.delta_to(to);
+    if (delta.dx != 0 && delta.dy != 0) || (delta.dx == 0 && delta.dy == 0) {
+        return false;
+    }
+    let distance = delta.dx.abs().max(delta.dy.abs());
+    if distance > 5 {
+        return false;
+    }
+    let step_x = delta.dx.signum();
+    let step_y = delta.dy.signum();
+    let level = world.current_level();
+    let map = world.current_map();
+    for step in 1..distance {
+        let pos = Pos {
+            x: from.x + step_x * step,
+            y: from.y + step_y * step,
+        };
+        let blocked = matches!(
+            map.tile(pos),
+            Ok(TileKind::Wall
+                | TileKind::Door(DoorState::Closed | DoorState::Locked)
+                | TileKind::HiddenDoor)
+                | Err(_)
+        );
+        if blocked || world.entities.alive_hostile_at(level, pos).is_some() {
+            return false;
+        }
+    }
+    true
+}
+
+fn ranged_intent_is_still_valid(world: &GameWorld, attacker: EntityId, defender: EntityId) -> bool {
+    let Some((attacker_level, attacker_pos)) = world.entities.actor_location(attacker) else {
+        return false;
+    };
+    let Some((defender_level, defender_pos)) = world.entities.actor_location(defender) else {
+        return false;
+    };
+    attacker_level == defender_level
+        && attacker_level == world.current_level()
+        && ranged_shot_has_clear_line(world, attacker_pos, defender_pos)
 }
 
 fn manhattan_distance(from: Pos, to: Pos) -> i16 {

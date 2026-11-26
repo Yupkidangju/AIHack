@@ -1,5 +1,9 @@
 # AIHack Provenance and License Gate
 
+## P5 콘텐츠 확장 기록 (2026-11-26)
+
+`item.scroll.enchant_weapon`, `item.scroll.enchant_armor`, `item.scroll.remove_curse`, `item.potion.cure`, `item.wand.fire` 및 `monster.giant_spider`, `monster.gnoll_archer`, `monster.troll`은 AIHack 캠페인 P5 확장용으로 AI-assisted semantic rewrite 규약과 `docs/campaign_spec.md` `## P5` 계약에 따라 새로 추가한 데이터다. 기존 16개 item 정의, 6종 monster 정의, `main_1.toml`, `main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `a315ceabc460432984a50cc23c9416976319130ff95c015503864b48559f498a`에서 `267b50ccfca56a5a9278ba0a75239267a6f27cf7b2f8b0a6ea98fbf2f973f62d`로, LF `monsters.toml` SHA256은 `df9623efa19fefca153ffaf346252464b567c0844c4c2ca43d41c7ddc5f01ea0`에서 `296a9b8a96f192dc002330ae480e14a324f52847f3fe3df43981ee05c06ff341`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
 ## P4 콘텐츠 확장 기록 (2026-11-26)
 
 `item.weapon.short_sword`, `item.weapon.mace`, `item.armor.chain_mail`, `item.potion.extra_healing`, `item.scroll.charging` 및 `monster.kobold`, `monster.orc`, `monster.ogre`는 AIHack 캠페인 P4 확장용으로 AI-assisted semantic rewrite 규약과 `docs/campaign_spec.md` `## P4` 계약에 따라 새로 추가한 데이터다. 기존 11개 item 정의, 3종 monster 정의, `main_1.toml`, `main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `12f4a178a457ff64fa739dea8e683e77ccf7c828b4653fca33c0791633ea6018`에서 `a315ceabc460432984a50cc23c9416976319130ff95c015503864b48559f498a`로, LF `monsters.toml` SHA256은 `2525bcde3a0eb26212ff64209b3370879176f7d37b8e9fa9b0f867ca39b90122`에서 `df9623efa19fefca153ffaf346252464b567c0844c4c2ca43d41c7ddc5f01ea0`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.

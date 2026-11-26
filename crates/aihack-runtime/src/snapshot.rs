@@ -2,7 +2,7 @@ use aihack_core::{
     domain::{
         entity::{EntityKind, EntityLocation},
         inventory::{InventoryEntry, InventoryLetter},
-        item::ItemKind,
+        item::{BucStatus, ItemKind},
         tile::TileKind,
     },
     event::GameEvent,
@@ -10,6 +10,7 @@ use aihack_core::{
     ids::{EntityId, LevelId},
     position::Pos,
     run_state::RunState,
+    world::is_zero_u8,
 };
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,10 @@ use crate::world::GameWorld;
 
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+fn is_zero_i8(value: &i8) -> bool {
+    *value == 0
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntitySnapshot {
@@ -29,6 +34,10 @@ pub struct EntitySnapshot {
     pub location: Option<EntityLocation>,
     pub assigned_letter: Option<InventoryLetter>,
     pub charges: Option<u8>,
+    #[serde(default, skip_serializing_if = "BucStatus::is_uncursed")]
+    pub buc: BucStatus,
+    #[serde(default, skip_serializing_if = "is_zero_i8")]
+    pub enchantment: i8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,6 +75,8 @@ pub struct GameSnapshot {
     pub luck: i16,
     pub prayer_cooldown: u16,
     pub paralysis_turns: u8,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub poison_turns: u8,
     pub hallucinating: bool,
     pub kill_count: u32,
     pub gold: u32,
@@ -96,6 +107,8 @@ impl GameSnapshot {
                         location: Some(EntityLocation::OnMap { level, pos }),
                         assigned_letter: None,
                         charges: None,
+                        buc: BucStatus::Uncursed,
+                        enchantment: 0,
                     }
                 } else {
                     let (kind, _, location, assigned_letter, charges) =
@@ -110,6 +123,8 @@ impl GameSnapshot {
                         location: Some(location),
                         assigned_letter,
                         charges,
+                        buc: entity.item_buc().unwrap_or(BucStatus::Uncursed),
+                        enchantment: entity.item_enchantment().unwrap_or(0),
                     }
                 }
             })
@@ -151,6 +166,7 @@ impl GameSnapshot {
             luck: world.luck,
             prayer_cooldown: world.prayer_cooldown,
             paralysis_turns: world.paralysis_turns,
+            poison_turns: world.poison_turns,
             hallucinating: world.hallucinating,
             kill_count: world.kill_count,
             gold: world.gold,

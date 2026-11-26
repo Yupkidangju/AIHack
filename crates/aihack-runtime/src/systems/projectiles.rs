@@ -87,9 +87,9 @@ pub fn zap_wand(
     if !world.inventory.contains(item) {
         return Err("item is not in player inventory".to_string());
     }
-    if data.wand_effect != Some(WandEffect::MagicMissile) {
+    let Some(wand_effect) = data.wand_effect else {
         return Err("item is not a wand".to_string());
-    }
+    };
     let Some(charges_before) = charges else {
         return Err("wand has no charge state".to_string());
     };
@@ -110,10 +110,24 @@ pub fn zap_wand(
         charges_after,
     }];
     if let Some(target) = outcome.hit_target {
-        let profile = AttackProfile::natural("magic missile", DamageRoll::new(1, 6));
-        if let Some(resolution) =
-            combat::resolve_attack_with_profile(world, rng, world.player_id, target, profile)
-        {
+        let (profile, extra_damage_bonus) = match wand_effect {
+            WandEffect::MagicMissile => (
+                AttackProfile::natural("magic missile", DamageRoll::new(1, 6)),
+                0,
+            ),
+            WandEffect::Fire => (
+                AttackProfile::natural("fire bolt", DamageRoll::new(2, 6)),
+                2,
+            ),
+        };
+        if let Some(resolution) = combat::resolve_attack_with_profile_and_bonus(
+            world,
+            rng,
+            world.player_id,
+            target,
+            profile,
+            extra_damage_bonus,
+        ) {
             events.push(combat::attack_event(&resolution));
             events.extend(death::collect_death_events_after_attack(
                 world,
@@ -158,7 +172,9 @@ fn trace_path(world: &GameWorld, from: Pos, direction: Direction) -> ProjectileO
         };
         if matches!(
             tile,
-            TileKind::Wall | TileKind::Door(DoorState::Closed) | TileKind::HiddenDoor
+            TileKind::Wall
+                | TileKind::Door(DoorState::Closed | DoorState::Locked)
+                | TileKind::HiddenDoor
         ) {
             return ProjectileOutcome {
                 landing: current,

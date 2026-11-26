@@ -1,7 +1,9 @@
 use serde::Serialize;
 use thiserror::Error;
 
-use aihack_ai_contract::{CommandIntent, Direction, EntityKind, ItemKind, RunState, SnapshotHash};
+use aihack_ai_contract::{
+    CommandIntent, Direction, DoorState, EntityKind, ItemKind, RunState, SnapshotHash, TileKind,
+};
 use aihack_runtime::{save::ReplayLineV1, GameClient};
 
 /// Headless runner가 한 accepted turn을 만들기 위해 시도할 command 후보를 제공한다.
@@ -319,6 +321,20 @@ impl HeadlessPolicy {
 fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent> {
     let observation = session.observation();
 
+    if observation.player.poison_turns > 0 {
+        if let Some(item) = observation
+            .inventory
+            .iter()
+            .find(|item| item.kind == ItemKind::PotionCure)
+            .map(|item| item.item)
+        {
+            let command = CommandIntent::Quaff { item };
+            if observation.legal_actions.contains(&command) {
+                return vec![command];
+            }
+        }
+    }
+
     if observation.player.hp.saturating_mul(2) <= observation.player.max_hp {
         if let Some(item) = observation
             .inventory
@@ -326,7 +342,7 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
             .find(|item| {
                 matches!(
                     item.kind,
-                    ItemKind::PotionHealing | ItemKind::PotionExtraHealing
+                    ItemKind::PotionHealing | ItemKind::PotionExtraHealing | ItemKind::PotionCure
                 )
             })
             .map(|item| item.item)
@@ -353,6 +369,20 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
 
     if observation.legal_actions.contains(&CommandIntent::Pickup) {
         return vec![CommandIntent::Pickup];
+    }
+
+    for direction in priority_directions() {
+        let target = observation.player_pos.offset(direction.delta());
+        if observation
+            .visible_tiles
+            .iter()
+            .any(|tile| tile.pos == target && tile.tile == TileKind::Door(DoorState::Locked))
+        {
+            let command = CommandIntent::Kick(direction);
+            if observation.legal_actions.contains(&command) {
+                return vec![command];
+            }
+        }
     }
 
     for direction in priority_directions() {

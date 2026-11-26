@@ -126,7 +126,7 @@ fn campaign_doors_and_hidden_doors_work_across_depths_and_save_roundtrip() {
     assert_eq!(tile7, TileKind::Door(DoorState::Closed));
     assert_eq!(tile17, TileKind::Door(DoorState::Closed));
 
-    // 짝수 층 Main 2 & Mines 2: x=7 Door(Closed), x=17 HiddenDoor
+    // 짝수 층 Main 2: x=7 Door(Closed), x=17 HiddenDoor; Mines 2: x=7 Door(Locked), x=17 HiddenDoor
     let (_, tile2_7) = find_door_y(&session, LevelId::main(2), 7).unwrap();
     let (y2_17, tile2_17) = find_door_y(&session, LevelId::main(2), 17).unwrap();
     let (_, mines2_7) = find_door_y(
@@ -149,7 +149,7 @@ fn campaign_doors_and_hidden_doors_work_across_depths_and_save_roundtrip() {
     .unwrap();
     assert_eq!(tile2_7, TileKind::Door(DoorState::Closed));
     assert_eq!(tile2_17, TileKind::HiddenDoor);
-    assert_eq!(mines2_7, TileKind::Door(DoorState::Closed));
+    assert_eq!(mines2_7, TileKind::Door(DoorState::Locked));
     assert_eq!(mines2_17, TileKind::HiddenDoor);
     assert!(find_hidden_trap(
         &session,

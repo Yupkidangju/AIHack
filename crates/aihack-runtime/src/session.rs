@@ -616,6 +616,32 @@ impl GameSession {
         if !matches!(
             self.state,
             RunState::GameOver { .. } | RunState::Victory { .. }
+        ) && self.world.poison_turns > 0
+        {
+            let state = &mut self.inner;
+            state.world.state_mut().poison_turns -= 1;
+            let player_id = state.world.player_id();
+            if let Some(stats) = state.world.state_mut().entities.actor_stats_mut(player_id) {
+                stats.hp = stats.hp.saturating_sub(1);
+            }
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Warning,
+                text: "You suffer from poison!".to_string(),
+            });
+            let death_events = match death::collect_death_events_if_hp_depleted(
+                &mut state.world,
+                player_id,
+                DeathCause::Poison,
+            ) {
+                Ok(death_events) => death_events,
+                Err(error) => return self.abort_transaction(error),
+            };
+            events.extend(death_events);
+            state.state = death::state_after_deaths_at(&state.world, next_turn);
+        }
+        if !matches!(
+            self.state,
+            RunState::GameOver { .. } | RunState::Victory { .. }
         ) {
             let state = &mut self.inner;
             let monster_events = match monster_ai::run_monster_turn(

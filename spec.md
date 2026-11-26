@@ -16,6 +16,10 @@ Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c0
 
 ## 1. 문서 운영 규칙
 
+### P5 캠페인 확장 (2026-11-26)
+
+P1–P4 캠페인 위에 아이템 BUC/인챈트(`-3..=+5`), 인챈트/저주 해제 두루마리 3종, `DoorState::Locked`, 독 상태이상(`poison_turns`·`DeathCause::Poison`), 치료 물약(`PotionCure`)·화염 완드(`WandFire`), 특수 몬스터 3종(`GiantSpider`·`GnollArcher`·`Troll`, `RangedOnSight`/`PoisonOnMelee`/`Regenerate`)을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## P5`, 의사결정은 `ADR-P5-01`, 실행 계획은 `tasks/plan.md`를 따른다.
+
 ### P4 캠페인 확장 (2026-11-26)
 
 P1–P3 첫 캠페인 위에 생성 던전의 문/비밀문/다종 함정(`Pit`/`Dart`/`Bear`) 상호작용 및 전이-인식 V2 저장 검증, 4번째 역할 `Cleric`, 신규 아이템 5종(`ShortSword`, `Mace`, `ArmorChainMail`, `PotionExtraHealing`, `ScrollCharging`), 신규 몬스터 3종(`Kobold`, `Orc`, `Ogre`)을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## P4`, 의사결정은 `ADR-P4-01`, 실행 계획은 `tasks/plan.md`를 따른다.
