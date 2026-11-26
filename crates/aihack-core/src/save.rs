@@ -9,7 +9,7 @@ use crate::{
     rng::RngStateV1,
     run_state::RunState,
     turn::TurnOutcome,
-    world::WorldState,
+    world::{is_zero_u8, WorldState},
 };
 
 pub const SAVE_SCHEMA_VERSION_V1: u16 = 1;
@@ -28,6 +28,8 @@ pub struct SavedWorldV1<E> {
     pub luck: i16,
     pub prayer_cooldown: u16,
     pub paralysis_turns: u8,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub poison_turns: u8,
     pub hallucinating: bool,
     pub kill_count: u32,
     pub gold: u32,
@@ -47,6 +49,7 @@ impl<E: Clone> From<&WorldState<E>> for SavedWorldV1<E> {
             luck: world.luck,
             prayer_cooldown: world.prayer_cooldown,
             paralysis_turns: world.paralysis_turns,
+            poison_turns: world.poison_turns,
             hallucinating: world.hallucinating,
             kill_count: world.kill_count,
             gold: world.gold,
@@ -68,6 +71,7 @@ impl<E> From<SavedWorldV1<E>> for WorldState<E> {
             luck: saved.luck,
             prayer_cooldown: saved.prayer_cooldown,
             paralysis_turns: saved.paralysis_turns,
+            poison_turns: saved.poison_turns,
             hallucinating: saved.hallucinating,
             kill_count: saved.kill_count,
             gold: saved.gold,

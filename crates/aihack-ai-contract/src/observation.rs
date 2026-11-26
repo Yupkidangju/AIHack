@@ -3,7 +3,7 @@ use aihack_core::{
     domain::{
         entity::EntityKind,
         inventory::InventoryLetter,
-        item::{EquipmentSlot, ItemKind},
+        item::{BucStatus, EquipmentSlot, ItemKind},
         tile::TileKind,
     },
     event::GameEvent,
@@ -13,6 +13,14 @@ use aihack_core::{
 use serde::{Deserialize, Serialize};
 
 pub const OBSERVATION_SCHEMA_VERSION: u16 = 1;
+
+fn is_zero_u8(value: &u8) -> bool {
+    *value == 0
+}
+
+fn is_zero_i8(value: &i8) -> bool {
+    *value == 0
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RunStateSummary {
@@ -37,6 +45,8 @@ pub struct PlayerObservation {
     pub luck: i16,
     pub prayer_cooldown: u16,
     pub paralysis_turns: u8,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub poison_turns: u8,
     pub hallucinating: bool,
 }
 
@@ -90,6 +100,10 @@ pub struct ItemObservation {
     pub letter: InventoryLetter,
     pub equipped_slot: Option<EquipmentSlot>,
     pub identified: bool,
+    #[serde(default, skip_serializing_if = "BucStatus::is_uncursed")]
+    pub buc: BucStatus,
+    #[serde(default, skip_serializing_if = "is_zero_i8")]
+    pub enchantment: i8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

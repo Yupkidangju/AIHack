@@ -93,8 +93,15 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
     let mut lines = vec![
         format!("turn {}", observation.turn),
         format!(
-            "hp {}/{} {}",
-            observation.player.hp, observation.player.max_hp, danger
+            "hp {}/{} {}{}",
+            observation.player.hp,
+            observation.player.max_hp,
+            danger,
+            if observation.player.poison_turns > 0 {
+                format!(" POIS:{}", observation.player.poison_turns)
+            } else {
+                String::new()
+            }
         ),
         format!(
             "level {}:{}",
@@ -337,6 +344,9 @@ fn entity_kind_label(kind: EntityKind) -> &'static str {
         EntityKind::Monster(crate::domain::monster::MonsterKind::Kobold) => "kobold",
         EntityKind::Monster(crate::domain::monster::MonsterKind::Orc) => "orc",
         EntityKind::Monster(crate::domain::monster::MonsterKind::Ogre) => "ogre",
+        EntityKind::Monster(crate::domain::monster::MonsterKind::GiantSpider) => "giant spider",
+        EntityKind::Monster(crate::domain::monster::MonsterKind::GnollArcher) => "gnoll archer",
+        EntityKind::Monster(crate::domain::monster::MonsterKind::Troll) => "troll",
         EntityKind::Item(kind) => item_label(kind),
     }
 }
@@ -347,6 +357,7 @@ fn tile_label(tile: TileKind) -> &'static str {
         TileKind::Floor => "floor",
         TileKind::Door(aihack_ai_contract::DoorState::Closed) => "closed door",
         TileKind::Door(aihack_ai_contract::DoorState::Open) => "open door",
+        TileKind::Door(aihack_ai_contract::DoorState::Locked) => "locked door",
         TileKind::StairsDown => "stairs down",
         TileKind::StairsUp => "stairs up",
         TileKind::Trap(aihack_ai_contract::TrapKind::Pit) => "pit trap",
@@ -486,6 +497,7 @@ pub fn debug_observation_lines(observation: &Observation) -> Vec<String> {
         format!("luck: {}", observation.player.luck),
         format!("prayer_cooldown: {}", observation.player.prayer_cooldown),
         format!("paralysis_turns: {}", observation.player.paralysis_turns),
+        format!("poison_turns: {}", observation.player.poison_turns),
         format!("hallucinating: {}", observation.player.hallucinating),
         format!("visible_tiles: {}", observation.visible_tiles.len()),
         format!("visible_entities: {}", observation.visible_entities.len()),

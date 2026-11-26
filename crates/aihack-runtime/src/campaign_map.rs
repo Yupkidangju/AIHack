@@ -77,12 +77,21 @@ pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 4]), 
             overrides.push((Pos { x: b.x, y }, TileKind::Floor));
         }
     }
+    let first_door = if id
+        == (LevelId {
+            branch: BranchId::Mines,
+            depth: 2,
+        }) {
+        TileKind::Door(DoorState::Locked)
+    } else {
+        TileKind::Door(DoorState::Closed)
+    };
     overrides.push((
         Pos {
             x: 7,
             y: centers[0].y,
         },
-        TileKind::Door(DoorState::Closed),
+        first_door,
     ));
     let second_door = if id.depth % 2 == 1 {
         TileKind::Door(DoorState::Closed)
@@ -151,8 +160,15 @@ pub(crate) fn validate_persisted_map(
             let exp_tile = expected.map.tile(pos).map_err(|error| error.to_string())?;
             let act_tile = actual.tile(pos).map_err(|error| error.to_string())?;
             let valid = match (exp_tile, act_tile) {
-                (TileKind::Door(_), TileKind::Door(_)) => true,
-                (TileKind::HiddenDoor, TileKind::HiddenDoor | TileKind::Door(_)) => true,
+                (TileKind::Door(DoorState::Locked), TileKind::Door(_)) => true,
+                (
+                    TileKind::Door(DoorState::Closed | DoorState::Open),
+                    TileKind::Door(DoorState::Closed | DoorState::Open),
+                ) => true,
+                (
+                    TileKind::HiddenDoor,
+                    TileKind::HiddenDoor | TileKind::Door(DoorState::Closed | DoorState::Open),
+                ) => true,
                 (TileKind::HiddenTrap(e), TileKind::HiddenTrap(a) | TileKind::Trap(a)) => e == a,
                 (e, a) => e == a,
             };

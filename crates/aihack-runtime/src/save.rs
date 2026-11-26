@@ -9,7 +9,7 @@ use aihack_core::{
     domain::{
         combat::DeathCause,
         entity::{ActorKind, EntityLocation, EntityPayload, MAX_ABSOLUTE_ACTOR_STAT},
-        item::ItemClass,
+        item::{ItemClass, MAX_ITEM_ENCHANTMENT, MIN_ITEM_ENCHANTMENT},
         player::adventurer_template,
     },
     error::{GameError, SaveValidationError},
@@ -587,10 +587,17 @@ fn validate_saved_world_inner(
                 data,
                 location,
                 charges,
+                enchantment,
                 ..
             } => {
                 if data.kind != *kind {
                     return invalid_world(format!("item {} kind/data mismatch", entity.id.0));
+                }
+                if !(MIN_ITEM_ENCHANTMENT..=MAX_ITEM_ENCHANTMENT).contains(enchantment) {
+                    return invalid_world(format!(
+                        "item {} has out-of-range enchantment {}",
+                        entity.id.0, enchantment
+                    ));
                 }
                 let expected = crate::domain::item::try_item_data_from_registry(*kind, registry)?;
                 if !item_data_matches_registry(data, &expected) {
@@ -787,11 +794,18 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
     validate_equipped_item(world, world.inventory.equipped_melee, ItemClass::Weapon)?;
     validate_equipped_item(world, world.inventory.equipped_body, ItemClass::Armor)?;
     let bonus = if let Some(body) = world.inventory.equipped_body {
-        world
+        let base = world
             .entities
             .item_data(body)
             .map(|data| data.ac_bonus)
-            .ok_or_else(|| invalid_world_error("equipped body item is missing"))?
+            .ok_or_else(|| invalid_world_error("equipped body item is missing"))?;
+        let enchant = world
+            .entities
+            .get(body)
+            .and_then(|entity| entity.item_enchantment())
+            .unwrap_or(0);
+        base.checked_add(i16::from(enchant))
+            .ok_or_else(|| invalid_world_error("equipped body armor AC overflows"))?
     } else {
         0
     };

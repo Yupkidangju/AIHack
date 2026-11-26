@@ -2,6 +2,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::combat::AttackProfile;
 
+pub const MIN_ITEM_ENCHANTMENT: i8 = -3;
+pub const MAX_ITEM_ENCHANTMENT: i8 = 5;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum BucStatus {
+    Blessed,
+    #[default]
+    Uncursed,
+    Cursed,
+}
+
+impl BucStatus {
+    pub fn is_uncursed(&self) -> bool {
+        matches!(self, Self::Uncursed)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ItemKind {
     Dagger,
@@ -10,11 +27,16 @@ pub enum ItemKind {
     FoodRation,
     PotionHealing,
     PotionExtraHealing,
+    PotionCure,
     WandMagicMissile,
+    WandFire,
     ScrollReveal,
     ScrollIdentify,
     ScrollLevelTeleport,
     ScrollCharging,
+    ScrollEnchantWeapon,
+    ScrollEnchantArmor,
+    ScrollRemoveCurse,
     Rock,
     ArmorLeather,
     ArmorChainMail,
@@ -48,11 +70,16 @@ pub enum ConsumableEffect {
     IdentifySingle,
     LevelTeleport,
     RechargeWand,
+    EnchantWeapon,
+    EnchantArmor,
+    RemoveCurse,
+    CureStatus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WandEffect {
     MagicMissile,
+    Fire,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

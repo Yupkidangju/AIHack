@@ -131,6 +131,18 @@ impl EntityStore {
         self.0.set_item_charges(id, charges)
     }
 
+    pub fn set_item_buc(
+        &mut self,
+        id: EntityId,
+        buc: aihack_core::domain::item::BucStatus,
+    ) -> bool {
+        self.0.set_item_buc(id, buc)
+    }
+
+    pub fn set_item_enchantment(&mut self, id: EntityId, enchantment: i8) -> bool {
+        self.0.set_item_enchantment(id, enchantment)
+    }
+
     pub fn clear_monsters(&mut self) {
         self.0.clear_monsters();
     }

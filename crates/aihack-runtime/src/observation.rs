@@ -2,7 +2,7 @@ use aihack_core::{
     action::{ActionIntent, CommandIntent, InventoryAction},
     domain::{
         entity::EntityLocation,
-        item::{EquipmentSlot, ItemClass},
+        item::{BucStatus, EquipmentSlot, ItemClass},
         tile::{DoorState, TileKind},
     },
     event::GameEvent,
@@ -119,6 +119,7 @@ fn player_observation(world: &GameWorld) -> PlayerObservation {
         prayer_cooldown: world.prayer_cooldown,
         paralysis_turns: world.paralysis_turns,
         hallucinating: world.hallucinating,
+        poison_turns: world.poison_turns,
     }
 }
 
@@ -167,7 +168,8 @@ fn inventory_observations(world: &GameWorld) -> Vec<ItemObservation> {
         .entries
         .iter()
         .filter_map(|entry| {
-            let (kind, _, location, _, _) = world.entities.get(entry.item)?.item()?;
+            let entity = world.entities.get(entry.item)?;
+            let (kind, _, location, _, _) = entity.item()?;
             if location
                 != (EntityLocation::Inventory {
                     owner: world.player_id,
@@ -187,6 +189,8 @@ fn inventory_observations(world: &GameWorld) -> Vec<ItemObservation> {
                     None
                 },
                 identified: world.is_item_identified(kind),
+                buc: entity.item_buc().unwrap_or(BucStatus::Uncursed),
+                enchantment: entity.item_enchantment().unwrap_or(0),
             })
         })
         .collect()
@@ -345,13 +349,13 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
         match door_state_in_direction(world, direction) {
             Some(DoorState::Closed) => actions.push(CommandIntent::Open(direction)),
             Some(DoorState::Open) => actions.push(CommandIntent::Close(direction)),
-            None => {}
+            Some(DoorState::Locked) | None => {}
         }
         if matches!(
             world
                 .current_map()
                 .tile(world.player_pos().offset(direction.delta())),
-            Ok(TileKind::Door(DoorState::Closed) | TileKind::HiddenDoor)
+            Ok(TileKind::Door(DoorState::Closed | DoorState::Locked) | TileKind::HiddenDoor)
         ) {
             actions.push(CommandIntent::Kick(direction));
         }

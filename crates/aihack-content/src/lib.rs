@@ -84,6 +84,9 @@ pub fn monster_template_from_registry(
         MonsterKind::Kobold => "monster.kobold",
         MonsterKind::Orc => "monster.orc",
         MonsterKind::Ogre => "monster.ogre",
+        MonsterKind::GiantSpider => "monster.giant_spider",
+        MonsterKind::GnollArcher => "monster.gnoll_archer",
+        MonsterKind::Troll => "monster.troll",
     };
     let definition = registry
         .monster(id)
@@ -95,6 +98,7 @@ pub fn monster_template_from_registry(
         "wander" => MonsterAiKind::Wander,
         "chase_on_sight" => MonsterAiKind::ChaseVisiblePlayer,
         "stationary" => MonsterAiKind::Stationary,
+        "ranged_on_sight" => MonsterAiKind::RangedOnSight,
         ai => {
             return Err(ContentError::UnknownReference {
                 owner: id.to_owned(),
@@ -105,6 +109,8 @@ pub fn monster_template_from_registry(
     let damage = parse_damage(&definition.damage)?;
     let passive = match definition.passive.as_deref() {
         Some("paralyze_on_melee") => Some(MonsterPassive::ParalyzeOnMelee),
+        Some("poison_on_melee") => Some(MonsterPassive::PoisonOnMelee),
+        Some("regenerate_hp") => Some(MonsterPassive::Regenerate),
         None => None,
         Some(value) => {
             return Err(ContentError::UnknownReference {
@@ -120,6 +126,9 @@ pub fn monster_template_from_registry(
         MonsterKind::Kobold => "spear",
         MonsterKind::Orc => "scimitar",
         MonsterKind::Ogre => "club",
+        MonsterKind::GiantSpider => "fangs",
+        MonsterKind::GnollArcher => "arrow",
+        MonsterKind::Troll => "claw",
     };
     Ok(MonsterTemplate {
         kind,
@@ -164,11 +173,16 @@ pub fn item_data_from_registry(
         ItemKind::FoodRation => "item.food.ration",
         ItemKind::PotionHealing => "item.potion.healing",
         ItemKind::PotionExtraHealing => "item.potion.extra_healing",
+        ItemKind::PotionCure => "item.potion.cure",
         ItemKind::WandMagicMissile => "item.wand.magic_missile",
+        ItemKind::WandFire => "item.wand.fire",
         ItemKind::ScrollReveal => "item.scroll.reveal",
         ItemKind::ScrollIdentify => "item.scroll.identify",
         ItemKind::ScrollLevelTeleport => "item.scroll.teleport",
         ItemKind::ScrollCharging => "item.scroll.charging",
+        ItemKind::ScrollEnchantWeapon => "item.scroll.enchant_weapon",
+        ItemKind::ScrollEnchantArmor => "item.scroll.enchant_armor",
+        ItemKind::ScrollRemoveCurse => "item.scroll.remove_curse",
         ItemKind::Rock => "item.weapon.rock",
         ItemKind::ArmorLeather => "item.armor.leather",
         ItemKind::ArmorChainMail => "item.armor.chain_mail",
@@ -241,7 +255,11 @@ pub fn item_data_from_registry(
         Some("identify") => Some(ConsumableEffect::IdentifySingle),
         Some("teleport") => Some(ConsumableEffect::LevelTeleport),
         Some("charging") => Some(ConsumableEffect::RechargeWand),
-        Some("magic_missile") | None => None,
+        Some("enchant_weapon") => Some(ConsumableEffect::EnchantWeapon),
+        Some("enchant_armor") => Some(ConsumableEffect::EnchantArmor),
+        Some("remove_curse") => Some(ConsumableEffect::RemoveCurse),
+        Some("cure_status") => Some(ConsumableEffect::CureStatus),
+        Some("magic_missile") | Some("fire") | None => None,
         Some(effect) => {
             return Err(ContentError::UnknownReference {
                 owner: id.to_owned(),
@@ -262,8 +280,11 @@ pub fn item_data_from_registry(
         ac_bonus: definition.ac_bonus.unwrap_or_default(),
         attack_profile,
         consumable_effect,
-        wand_effect: (definition.effect.as_deref() == Some("magic_missile"))
-            .then_some(WandEffect::MagicMissile),
+        wand_effect: match definition.effect.as_deref() {
+            Some("magic_missile") => Some(WandEffect::MagicMissile),
+            Some("fire") => Some(WandEffect::Fire),
+            _ => None,
+        },
         max_charges: definition.charges,
         nutrition: definition.nutrition,
     })

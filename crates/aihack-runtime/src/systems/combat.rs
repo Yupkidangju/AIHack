@@ -1,5 +1,5 @@
 use aihack_core::{
-    domain::{combat::AttackProfile, entity::Entity},
+    domain::{combat::AttackProfile, entity::Entity, item::BucStatus},
     event::GameEvent,
     ids::EntityId,
     rng::GameRng,
@@ -17,10 +17,30 @@ pub fn resolve_attack(
 ) -> Option<AttackResolution> {
     let attacker = world.entities.get(attacker_id)?.clone();
     let mut profile = attack_profile_for(world, attacker_id, &attacker);
+    let mut extra_damage_bonus = 0_i16;
     if attacker_id == world.player_id {
         profile.hit_bonus = profile.hit_bonus.saturating_add(world.luck);
+        if let Some(weapon_id) = world.inventory.equipped_melee {
+            if let Some(weapon) = world.entities.get(weapon_id) {
+                let enchant = i16::from(weapon.item_enchantment().unwrap_or(0));
+                let buc = weapon.item_buc().unwrap_or(BucStatus::Uncursed);
+                let bless_hit = if buc == BucStatus::Blessed { 1 } else { 0 };
+                profile.hit_bonus = profile
+                    .hit_bonus
+                    .saturating_add(enchant)
+                    .saturating_add(bless_hit);
+                extra_damage_bonus = extra_damage_bonus.saturating_add(enchant);
+            }
+        }
     }
-    resolve_attack_with_profile(world, rng, attacker_id, defender_id, profile)
+    resolve_attack_with_profile_and_bonus(
+        world,
+        rng,
+        attacker_id,
+        defender_id,
+        profile,
+        extra_damage_bonus,
+    )
 }
 
 pub fn resolve_attack_with_profile(
@@ -30,12 +50,24 @@ pub fn resolve_attack_with_profile(
     defender_id: EntityId,
     profile: AttackProfile,
 ) -> Option<AttackResolution> {
-    aihack_core::domain::combat::resolve_attack_with_profile(
+    resolve_attack_with_profile_and_bonus(world, rng, attacker_id, defender_id, profile, 0)
+}
+
+pub fn resolve_attack_with_profile_and_bonus(
+    world: &mut GameWorld,
+    rng: &mut GameRng,
+    attacker_id: EntityId,
+    defender_id: EntityId,
+    profile: AttackProfile,
+    extra_damage_bonus: i16,
+) -> Option<AttackResolution> {
+    aihack_core::domain::combat::resolve_attack_with_profile_and_bonus(
         world.state_mut().entities.inner_mut(),
         rng,
         attacker_id,
         defender_id,
         profile,
+        extra_damage_bonus,
     )
 }
 

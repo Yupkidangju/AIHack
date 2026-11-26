@@ -139,7 +139,7 @@ pub fn inventory_panel_ctas(observation: &Observation) -> Vec<PanelCta> {
             let label = format!(
                 "{} {}{}{}",
                 item.letter.0,
-                item_label(item.kind),
+                item_observation_label(item),
                 slot,
                 identified
             );
@@ -381,17 +381,35 @@ fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
             Some(CommandIntent::Wear { item: item.item })
         }
         crate::domain::item::ItemKind::PotionHealing
-        | crate::domain::item::ItemKind::PotionExtraHealing => {
+        | crate::domain::item::ItemKind::PotionExtraHealing
+        | crate::domain::item::ItemKind::PotionCure => {
             Some(CommandIntent::Quaff { item: item.item })
         }
         crate::domain::item::ItemKind::ScrollReveal
         | crate::domain::item::ItemKind::ScrollIdentify
         | crate::domain::item::ItemKind::ScrollLevelTeleport
-        | crate::domain::item::ItemKind::ScrollCharging => {
+        | crate::domain::item::ItemKind::ScrollCharging
+        | crate::domain::item::ItemKind::ScrollEnchantWeapon
+        | crate::domain::item::ItemKind::ScrollEnchantArmor
+        | crate::domain::item::ItemKind::ScrollRemoveCurse => {
             Some(CommandIntent::Read { item: item.item })
         }
         _ => None,
     }
+}
+
+pub(crate) fn item_observation_label(item: &ItemObservation) -> String {
+    let mut parts = Vec::new();
+    if item.enchantment != 0 {
+        parts.push(format!("{:+}", item.enchantment));
+    }
+    match item.buc {
+        aihack_ai_contract::BucStatus::Blessed => parts.push("blessed".to_string()),
+        aihack_ai_contract::BucStatus::Cursed => parts.push("cursed".to_string()),
+        aihack_ai_contract::BucStatus::Uncursed => {}
+    }
+    parts.push(item_label(item.kind).to_string());
+    parts.join(" ")
 }
 
 pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> &'static str {
@@ -402,11 +420,16 @@ pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> &'static str {
         crate::domain::item::ItemKind::FoodRation => "food ration",
         crate::domain::item::ItemKind::PotionHealing => "healing potion",
         crate::domain::item::ItemKind::PotionExtraHealing => "extra healing potion",
+        crate::domain::item::ItemKind::PotionCure => "cure potion",
         crate::domain::item::ItemKind::WandMagicMissile => "wand",
+        crate::domain::item::ItemKind::WandFire => "wand of fire",
         crate::domain::item::ItemKind::ScrollReveal => "reveal scroll",
         crate::domain::item::ItemKind::ScrollIdentify => "identify scroll",
         crate::domain::item::ItemKind::ScrollLevelTeleport => "teleport scroll",
         crate::domain::item::ItemKind::ScrollCharging => "charging scroll",
+        crate::domain::item::ItemKind::ScrollEnchantWeapon => "enchant weapon scroll",
+        crate::domain::item::ItemKind::ScrollEnchantArmor => "enchant armor scroll",
+        crate::domain::item::ItemKind::ScrollRemoveCurse => "remove curse scroll",
         crate::domain::item::ItemKind::Rock => "rock",
         crate::domain::item::ItemKind::ArmorLeather => "leather armor",
         crate::domain::item::ItemKind::ArmorChainMail => "chain mail",

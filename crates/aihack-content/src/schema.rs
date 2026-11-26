@@ -330,12 +330,15 @@ fn canonical_item_kind(id: &str) -> Option<&'static str> {
         | "item.weapon.mace"
         | "item.weapon.rock" => Some("weapon"),
         "item.food.ration" => Some("food"),
-        "item.potion.healing" | "item.potion.extra_healing" => Some("potion"),
-        "item.wand.magic_missile" => Some("wand"),
+        "item.potion.healing" | "item.potion.extra_healing" | "item.potion.cure" => Some("potion"),
+        "item.wand.magic_missile" | "item.wand.fire" => Some("wand"),
         "item.scroll.reveal"
         | "item.scroll.identify"
         | "item.scroll.teleport"
-        | "item.scroll.charging" => Some("scroll"),
+        | "item.scroll.charging"
+        | "item.scroll.enchant_weapon"
+        | "item.scroll.enchant_armor"
+        | "item.scroll.remove_curse" => Some("scroll"),
         "item.armor.leather" | "item.armor.chain_mail" => Some("armor"),
         "item.corpse.jackal" => Some("corpse"),
         "item.quest.ascension" => Some("quest"),
@@ -385,7 +388,7 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                 && item.damage.is_none()
                 && matches!(
                     item.effect.as_deref(),
-                    Some("heal_1d8_plus_4" | "heal_2d8_plus_8")
+                    Some("heal_1d8_plus_4" | "heal_2d8_plus_8" | "cure_status")
                 )
                 && item.charges.is_none()
                 && item.nutrition.is_none()
@@ -395,7 +398,7 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
             item.slot.is_none()
                 && item.hit_bonus.is_none()
                 && item.damage.is_none()
-                && item.effect.as_deref() == Some("magic_missile")
+                && matches!(item.effect.as_deref(), Some("magic_missile" | "fire"))
                 && item.charges.is_some_and(|charges| charges > 0)
                 && item.nutrition.is_none()
                 && item.ac_bonus.is_none()
@@ -406,7 +409,15 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                 && item.damage.is_none()
                 && matches!(
                     item.effect.as_deref(),
-                    Some("reveal" | "identify" | "teleport" | "charging")
+                    Some(
+                        "reveal"
+                            | "identify"
+                            | "teleport"
+                            | "charging"
+                            | "enchant_weapon"
+                            | "enchant_armor"
+                            | "remove_curse"
+                    )
                 )
                 && item.charges.is_none()
                 && item.nutrition.is_none()

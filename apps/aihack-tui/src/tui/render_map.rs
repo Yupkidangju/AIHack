@@ -20,9 +20,10 @@ impl Widget for MapWidget<'_> {
                 let glyph = match tile.tile {
                     crate::domain::tile::TileKind::Wall => '#',
                     crate::domain::tile::TileKind::Floor => '.',
-                    crate::domain::tile::TileKind::Door(aihack_ai_contract::DoorState::Closed) => {
-                        '+'
-                    }
+                    crate::domain::tile::TileKind::Door(
+                        aihack_ai_contract::DoorState::Closed
+                        | aihack_ai_contract::DoorState::Locked,
+                    ) => '+',
                     crate::domain::tile::TileKind::Door(aihack_ai_contract::DoorState::Open) => '-',
                     crate::domain::tile::TileKind::StairsDown => '>',
                     crate::domain::tile::TileKind::StairsUp => '<',
@@ -50,18 +51,26 @@ impl Widget for MapWidget<'_> {
                     EntityKind::Monster(MonsterKind::Kobold) => 'k',
                     EntityKind::Monster(MonsterKind::Orc) => 'o',
                     EntityKind::Monster(MonsterKind::Ogre) => 'O',
+                    EntityKind::Monster(MonsterKind::GiantSpider) => 's',
+                    EntityKind::Monster(MonsterKind::GnollArcher) => 'G',
+                    EntityKind::Monster(MonsterKind::Troll) => 'T',
                     EntityKind::Item(kind) => match kind {
                         ItemKind::Dagger | ItemKind::ShortSword | ItemKind::Mace => ')',
                         ItemKind::ArmorLeather | ItemKind::ArmorChainMail => '[',
-                        ItemKind::PotionHealing | ItemKind::PotionExtraHealing => '!',
-                        ItemKind::WandMagicMissile => '/',
+                        ItemKind::PotionHealing
+                        | ItemKind::PotionExtraHealing
+                        | ItemKind::PotionCure => '!',
+                        ItemKind::WandMagicMissile | ItemKind::WandFire => '/',
                         ItemKind::Rock => '*',
                         ItemKind::FoodRation | ItemKind::CorpseJackal => '%',
                         ItemKind::AmuletAscension => '"',
                         ItemKind::ScrollReveal
                         | ItemKind::ScrollIdentify
                         | ItemKind::ScrollLevelTeleport
-                        | ItemKind::ScrollCharging => '?',
+                        | ItemKind::ScrollCharging
+                        | ItemKind::ScrollEnchantWeapon
+                        | ItemKind::ScrollEnchantArmor
+                        | ItemKind::ScrollRemoveCurse => '?',
                     },
                 };
                 if let Some((x, y)) = self.viewport.world_to_terminal(entity.pos, area) {

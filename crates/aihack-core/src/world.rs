@@ -5,6 +5,10 @@ use crate::{
     ids::{EntityId, LevelId},
 };
 
+pub fn is_zero_u8(value: &u8) -> bool {
+    *value == 0
+}
+
 /// UI, content bootstrap, 파일 I/O와 분리된 게임 world의 저장 가능 상태다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorldState<E> {
@@ -19,6 +23,8 @@ pub struct WorldState<E> {
     pub luck: i16,
     pub prayer_cooldown: u16,
     pub paralysis_turns: u8,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub poison_turns: u8,
     pub hallucinating: bool,
     pub kill_count: u32,
     pub gold: u32,

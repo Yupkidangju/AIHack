@@ -50,6 +50,7 @@ impl AttackProfile {
 pub enum DeathCause {
     Combat { attacker: EntityId },
     Trap { trap: TrapKind },
+    Poison,
 }
 
 pub fn roll_die(rng: &mut GameRng, sides: i16) -> i16 {
@@ -103,6 +104,17 @@ pub fn resolve_attack_with_profile(
     defender_id: EntityId,
     profile: AttackProfile,
 ) -> Option<AttackResolution> {
+    resolve_attack_with_profile_and_bonus(entities, rng, attacker_id, defender_id, profile, 0)
+}
+
+pub fn resolve_attack_with_profile_and_bonus(
+    entities: &mut EntityStore,
+    rng: &mut GameRng,
+    attacker_id: EntityId,
+    defender_id: EntityId,
+    profile: AttackProfile,
+    extra_damage_bonus: i16,
+) -> Option<AttackResolution> {
     let attacker = entities.get(attacker_id)?.clone();
     let defender = entities.get(defender_id)?.clone();
     let (_, _, _, _, attacker_stats, attacker_alive) = attacker.actor()?;
@@ -121,7 +133,9 @@ pub fn resolve_attack_with_profile(
         roll_damage(
             rng,
             profile.damage,
-            attacker_stats.damage_bonus,
+            attacker_stats
+                .damage_bonus
+                .saturating_add(extra_damage_bonus),
             defender_stats.damage_reduction,
         )
     } else {

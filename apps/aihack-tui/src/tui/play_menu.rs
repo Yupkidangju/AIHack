@@ -1,4 +1,4 @@
-use super::input::{item_label, UiCommandCandidate as U};
+use super::input::{item_observation_label, UiCommandCandidate as U};
 use aihack_ai_contract::{CommandIntent as C, EntityId, Observation};
 use ratatui::layout::Rect;
 
@@ -159,7 +159,7 @@ pub(super) fn action_menu(
         if let Some(command) = commands.iter().find(|c| item_of(**c) == Some(item.item)) {
             entries.push(Entry {
                 key: item.letter.0,
-                label: item_label(item.kind).into(),
+                label: item_observation_label(item),
                 candidate: if matches!(key, 't' | 'z') {
                     U::ChooseItem {
                         action: key,
@@ -182,7 +182,7 @@ pub(super) fn inventory_menu(observation: &Observation) -> PlayMenu {
             .iter()
             .map(|item| Entry {
                 key: item.letter.0,
-                label: item_label(item.kind).into(),
+                label: item_observation_label(item),
                 candidate: U::ChooseItem {
                     action: 'i',
                     item: item.item,

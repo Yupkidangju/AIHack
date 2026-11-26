@@ -45,13 +45,17 @@ pub fn kick_door(map: &mut GameMap, pos: Pos) -> Result<Vec<GameEvent>, GameErro
                 },
             ])
         }
-        TileKind::Door(DoorState::Closed) => {
+        TileKind::Door(DoorState::Closed | DoorState::Locked) => {
+            let from = match map.tile(pos)? {
+                TileKind::Door(state) => state,
+                _ => unreachable!(),
+            };
             map.set_tile(pos, TileKind::Door(DoorState::Open))?;
             Ok(vec![
                 GameEvent::DoorKicked { pos },
                 GameEvent::DoorChanged {
                     pos,
-                    from: DoorState::Closed,
+                    from,
                     to: DoorState::Open,
                 },
             ])

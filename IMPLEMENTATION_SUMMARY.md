@@ -19,6 +19,10 @@ P1–P3 당시 로컬 검증은 전체 491 tests, fmt/clippy/release PASS를 기
 
 플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P4 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
 
+### P5 게임플레이 확장 (2026-11-26)
+
+현재 content registry hash는 `5b9ee4946ebf05d7`이다(`items.toml` 5종·`monsters.toml` 3종 추가 반영). `EntityPayload::Item`에 optional serde `buc`(`Blessed`/`Uncursed`/`Cursed`)·`enchantment`(`-3..=+5`)와 별도 `Entity`/`EntityStore` 접근자를 추가해 `Entity::item()` 5-튜플과 V1 저장/해시를 보존하면서 무기 명중/피해·방어구 AC·물약/주문서 BUC 효과와 `Cursed` 장착 해제/버리기/던지기 금지를 연결했다. `DoorState::Locked`를 추가해 `Mines 2` 입구 `(7, centers[0].y)`에 생성하고 `Kick` 해제 및 `validate_persisted_map` 변조 거부를 구현했다. 독 상태이상(`poison_turns`)·`DeathCause::Poison`, 치료 물약(`PotionCure`)·화염 지팡이(`WandFire`, `2d6+2`), 강화/저주 해제 주문서 3종(`ScrollEnchantWeapon`/`ScrollEnchantArmor`/`ScrollRemoveCurse`), 신규 몬스터 3종(`GiantSpider` 독, `GnollArcher` 직교 원거리, `Troll` 재생), TUI(`POIS:<n>`, `locked door`, BUC/인챈트 라벨, 사인)·Headless `survival-v1` 연동을 완료했다.
+
 ### P4 게임플레이 확장 (2026-11-26)
 
 현재 content registry hash는 `f3767a7764223506`이다(`items.toml` 5종·`monsters.toml` 3종 추가 반영). 생성 캠페인 맵은 generator v2로 문(`Door`)·비밀문(`HiddenDoor`)·함정 3종(`Pit`/`Dart`/`Bear`, `Dart`/`Bear` 사인과 Bear 마비 반영)을 배치하며 `campaign_map::validate_persisted_map`으로 정당한 런타임 전이만 허용한다. 제4역할 `Role::Cleric`(`HP 24, hit +3, dmg +1`, `[4] Cleric`, `--role cleric`), 신규 5아이템(`ShortSword`, `Mace`, `ArmorChainMail`, `PotionExtraHealing`, `ScrollCharging`), 신규 3몬스터(`Kobold`, `Orc`, `Ogre`)를 추가하고 기존 11아이템·3몬스터·V1 저장/해시는 그대로 유지했다.

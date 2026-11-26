@@ -5,7 +5,8 @@ use aihack_core::{
 };
 
 pub use aihack_core::domain::item::{
-    ConsumableEffect, EquipmentSlot, ItemClass, ItemData, ItemKind, WandEffect,
+    BucStatus, ConsumableEffect, EquipmentSlot, ItemClass, ItemData, ItemKind, WandEffect,
+    MAX_ITEM_ENCHANTMENT, MIN_ITEM_ENCHANTMENT,
 };
 
 pub fn item_data(kind: ItemKind) -> ItemData {
@@ -37,6 +38,11 @@ pub fn item_kind_from_id(id: &str) -> Result<ItemKind, ContentError> {
         "item.scroll.teleport" => Ok(ItemKind::ScrollLevelTeleport),
         "item.scroll.charging" => Ok(ItemKind::ScrollCharging),
         "item.weapon.rock" => Ok(ItemKind::Rock),
+        "item.potion.cure" => Ok(ItemKind::PotionCure),
+        "item.wand.fire" => Ok(ItemKind::WandFire),
+        "item.scroll.enchant_weapon" => Ok(ItemKind::ScrollEnchantWeapon),
+        "item.scroll.enchant_armor" => Ok(ItemKind::ScrollEnchantArmor),
+        "item.scroll.remove_curse" => Ok(ItemKind::ScrollRemoveCurse),
         "item.armor.leather" => Ok(ItemKind::ArmorLeather),
         "item.armor.chain_mail" => Ok(ItemKind::ArmorChainMail),
         "item.corpse.jackal" => Ok(ItemKind::CorpseJackal),

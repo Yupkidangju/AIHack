@@ -1,7 +1,9 @@
 use aihack_content::ContentRegistry;
 use aihack_core::error::ContentError;
 
-pub use aihack_core::domain::monster::{MonsterAiKind, MonsterKind, MonsterTemplate};
+pub use aihack_core::domain::monster::{
+    MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate,
+};
 
 pub fn monster_template(kind: MonsterKind) -> MonsterTemplate {
     try_monster_template(kind)
@@ -27,6 +29,9 @@ pub fn monster_kind_from_id(id: &str) -> Result<MonsterKind, ContentError> {
         "monster.kobold" => Ok(MonsterKind::Kobold),
         "monster.orc" => Ok(MonsterKind::Orc),
         "monster.ogre" => Ok(MonsterKind::Ogre),
+        "monster.giant_spider" => Ok(MonsterKind::GiantSpider),
+        "monster.gnoll_archer" => Ok(MonsterKind::GnollArcher),
+        "monster.troll" => Ok(MonsterKind::Troll),
         _ => Err(ContentError::UnknownReference {
             owner: "monster kind".to_owned(),
             target: id.to_owned(),
