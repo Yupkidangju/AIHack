@@ -8,7 +8,7 @@ use std::{
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
-const CANDIDATE_DATE: &str = "2026-11-26";
+const CANDIDATE_DATE: &str = "2026-11-27";
 
 #[derive(Clone, Copy, Debug)]
 enum Fault {
@@ -82,11 +82,11 @@ impl Fixture {
             Fault::YearZeroCalendar => "0000-06-15",
             Fault::MinimumYearCalendar => "0001-06-15",
             Fault::MaximumYearCalendar => "9999-06-15",
-            Fault::CandidateBeforePeriodEnd => "2026-11-25",
+            Fault::CandidateBeforePeriodEnd => "2026-11-26",
             _ => CANDIDATE_DATE,
         };
         let metadata = format!(
-            "product=AIHack\nversion=0.3.0\ncommit=$Format:%H$\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-11-26-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
+            "product=AIHack\nversion=0.3.0\ncommit=$Format:%H$\ncandidate_date={candidate_date}\nsource_license=NGPL\nmodification_notice=AIHACK-MODIFICATIONS-2026-11-27-01\nowner_approval=AIHACK-OWNER-2026-07-20-NGPL-01\n"
         );
         fs::write(source.join("RELEASE-METADATA"), &metadata).unwrap();
         fs::write(
@@ -104,8 +104,8 @@ impl Fixture {
             let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
                 .unwrap()
                 .replace(
+                    "Covered change period: `2025-05-20..2026-11-27`",
                     "Covered change period: `2025-05-20..2026-11-26`",
-                    "Covered change period: `2025-05-20..2026-11-25`",
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
         }
@@ -119,14 +119,14 @@ impl Fixture {
             let replacement = match fault {
                 Fault::InvalidCalendarPeriod => "Covered change period: `2026-00-00..2026-99-99`",
                 Fault::InvalidCalendarDay => "Covered change period: `2026-02-30..2026-12-31`",
-                Fault::InvalidLeapDay => "Covered change period: `2025-02-29..2026-11-25`",
-                Fault::ReverseCalendarPeriod => "Covered change period: `2026-11-26..2026-11-25`",
+                Fault::InvalidLeapDay => "Covered change period: `2025-02-29..2026-11-26`",
+                Fault::ReverseCalendarPeriod => "Covered change period: `2026-11-27..2026-11-26`",
                 _ => unreachable!(),
             };
             let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
                 .unwrap()
                 .replace(
-                    "Covered change period: `2025-05-20..2026-11-26`",
+                    "Covered change period: `2025-05-20..2026-11-27`",
                     replacement,
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
@@ -141,7 +141,7 @@ impl Fixture {
             let modifications = fs::read_to_string(source.join("MODIFICATIONS.md"))
                 .unwrap()
                 .replace(
-                    "Covered change period: `2025-05-20..2026-11-26`",
+                    "Covered change period: `2025-05-20..2026-11-27`",
                     edge_period,
                 );
             fs::write(source.join("MODIFICATIONS.md"), modifications).unwrap();
@@ -178,8 +178,8 @@ impl Fixture {
         }
         let status = Command::new("git")
             .args(["commit", "-qm", "release fixture"])
-            .env("GIT_AUTHOR_DATE", "2026-11-26T12:00:00+09:00")
-            .env("GIT_COMMITTER_DATE", "2026-11-26T12:00:00+09:00")
+            .env("GIT_AUTHOR_DATE", "2026-11-27T12:00:00+09:00")
+            .env("GIT_COMMITTER_DATE", "2026-11-27T12:00:00+09:00")
             .current_dir(&source)
             .status()
             .unwrap();
