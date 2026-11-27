@@ -90,12 +90,50 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
     } else {
         "stable"
     };
+    let mut status_flags = Vec::new();
+    if observation.player.blind_turns > 0 {
+        status_flags.push("BLIND");
+    }
+    if observation.player.blindfolded {
+        status_flags.push("BLINDFOLD");
+    }
+    if observation.player.confused_turns > 0 {
+        status_flags.push("CONF");
+    }
+    if observation.player.stunned_turns > 0 {
+        status_flags.push("STUN");
+    }
+    if observation.player.hallucinating {
+        status_flags.push("HALL");
+    }
+    if observation.player.fast_turns > 0 {
+        status_flags.push("FAST");
+    }
+    if observation.player.levitation_turns > 0 {
+        status_flags.push("LEV");
+    }
+    if observation.player.invisible_turns > 0 {
+        status_flags.push("INV");
+    }
+    let flags_suffix = if status_flags.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", status_flags.join(","))
+    };
     let mut lines = vec![
-        format!("turn {}", observation.turn),
+        format!("turn {}{flags_suffix}", observation.turn),
         format!(
-            "hp {}/{} {}{}",
+            "hp {}/{} {}{}{}",
             observation.player.hp,
             observation.player.max_hp,
+            if observation.player.max_mp > 0 {
+                format!(
+                    "mp {}/{} ",
+                    observation.player.mp, observation.player.max_mp
+                )
+            } else {
+                String::new()
+            },
             danger,
             if observation.player.poison_turns > 0 {
                 format!(" POIS:{}", observation.player.poison_turns)
@@ -104,16 +142,15 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
             }
         ),
         format!(
-            "level {}:{}",
-            match observation.current_level.branch {
-                crate::core::BranchId::Main => "Main",
-                crate::core::BranchId::Mines => "Mines",
-            },
-            observation.current_level.depth
+            "level {}:{} AC:{}",
+            observation.current_level.branch.display_name(),
+            observation.current_level.depth,
+            observation.player.ac
         ),
         format!(
-            "food {}{}",
+            "food {}{}{}",
             observation.player.hunger,
+            hunger_badge(observation.player.hunger),
             if observation.campaign.as_ref().is_some_and(|c| c.has_amulet) {
                 " Amulet!"
             } else {
@@ -123,25 +160,37 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
     ];
     if let Some(campaign) = &observation.campaign {
         lines[3] = format!(
-            "food{} w{}/{}{}",
+            "food{}{} w{}/{}{}",
             observation.player.hunger,
+            hunger_badge(observation.player.hunger),
             campaign.carried_weight,
             campaign.carrying_capacity,
             if campaign.has_amulet { " A" } else { "" }
         );
-        let res = match (
-            observation.player.fire_resistant,
-            observation.player.poison_resistant,
-        ) {
-            (true, true) => " RES:FP",
-            (true, false) => " RES:F",
-            (false, true) => " RES:P",
-            (false, false) => "",
+        let badges = aihack_ai_contract::Resistances(observation.player.resistances).badge_string();
+        let res = if !badges.is_empty() {
+            format!(" RES:{badges}")
+        } else {
+            match (
+                observation.player.fire_resistant,
+                observation.player.poison_resistant,
+            ) {
+                (true, true) => " RES:FP".to_string(),
+                (true, false) => " RES:F".to_string(),
+                (false, true) => " RES:P".to_string(),
+                (false, false) => String::new(),
+            }
         };
         lines.push(format!(
             "{:?} L{} X{} G{}{}",
             campaign.role, campaign.level, campaign.xp, observation.player.gold, res
         ));
+        if let Some(attrs) = campaign.attributes {
+            lines.push(format!(
+                "St:{} Dx:{} Co:{} In:{} Wi:{} Ch:{}",
+                attrs.str_, attrs.dex, attrs.con, attrs.int, attrs.wis, attrs.cha
+            ));
+        }
     }
     lines
 }
@@ -232,10 +281,32 @@ fn request_kind_label(kind: &LlmRequestKind) -> &'static str {
     }
 }
 
+fn hunger_badge(nutrition: i16) -> &'static str {
+    match nutrition {
+        i16::MIN..=0 => " FAINT",
+        1..=50 => " WEAK",
+        51..=150 => " HUNGRY",
+        _ => "",
+    }
+}
+
 pub fn log_lines(observation: &Observation, narrative_lines: &[String]) -> Vec<String> {
     let mut out = recent_priority_messages(observation);
     if out.len() < 4 {
         out.extend(narrative_lines.iter().take(4 - out.len()).cloned());
+    }
+    if observation.player.hallucinating {
+        if out.is_empty() {
+            out.push(aihack_runtime::systems::score::hallucination_message(
+                "The dungeon",
+                true,
+            ));
+        } else {
+            out = out
+                .into_iter()
+                .map(|line| aihack_runtime::systems::score::hallucination_message(&line, true))
+                .collect();
+        }
     }
     out
 }
@@ -261,10 +332,11 @@ pub fn inspect_lines(
 }
 
 fn hovered_inspect_lines(observation: &Observation, pos: Pos) -> Vec<String> {
-    let tile = observation
+    let tile_obs = observation
         .visible_tiles
         .iter()
-        .find(|tile| tile.pos == pos)
+        .find(|tile| tile.pos == pos);
+    let tile = tile_obs
         .map(|tile| tile_label(tile.tile))
         .unwrap_or("unknown");
     let entity = observation
@@ -273,12 +345,17 @@ fn hovered_inspect_lines(observation: &Observation, pos: Pos) -> Vec<String> {
         .find(|entity| entity.pos == pos)
         .map(entity_line)
         .unwrap_or_else(|| "entity none".to_string());
-    vec![
+    let mut lines = vec![
         format!("hover {},{}", pos.x, pos.y),
         format!("tile {}", tile),
         entity,
-        "read-only inspect".to_string(),
-    ]
+    ];
+    if let Some(engraving) = tile_obs.and_then(|t| t.engraving.as_deref()) {
+        lines.push(format!("engraving \"{engraving}\""));
+    } else {
+        lines.push("read-only inspect".to_string());
+    }
+    lines
 }
 
 fn inventory_lines(observation: &Observation) -> Vec<String> {
@@ -335,28 +412,29 @@ fn event_line(event: &GameEvent) -> String {
         GameEvent::DoorChanged { to, .. } => format!("> door {to:?}"),
         GameEvent::CommandRejected { reason } => format!("x {reason}"),
         GameEvent::TrapTriggered { damage, .. } => format!("! trap {damage}"),
+        GameEvent::SpellCast {
+            spell, mp_after, ..
+        } => format!("* cast {spell:?} (mp {mp_after})"),
         _ => format!("{event:?}"),
     }
 }
 
 fn entity_line(entity: &EntityObservation) -> String {
+    if let Some(appearance) = &entity.appearance {
+        return format!("entity {appearance}");
+    }
+    let label = entity
+        .name
+        .clone()
+        .unwrap_or_else(|| entity_kind_label(entity.kind));
     let hp = entity.hp.map(|hp| format!(" hp {hp}")).unwrap_or_default();
-    format!("entity {}{}", entity_kind_label(entity.kind), hp)
+    format!("entity {label}{hp}")
 }
 
-fn entity_kind_label(kind: EntityKind) -> &'static str {
+fn entity_kind_label(kind: EntityKind) -> String {
     match kind {
-        EntityKind::Player => "player",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::Jackal) => "jackal",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::Goblin) => "goblin",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::FloatingEye) => "floating eye",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::Kobold) => "kobold",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::Orc) => "orc",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::Ogre) => "ogre",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::GiantSpider) => "giant spider",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::GnollArcher) => "gnoll archer",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::Troll) => "troll",
-        EntityKind::Monster(crate::domain::monster::MonsterKind::FireAnt) => "fire ant",
+        EntityKind::Player => "player".to_string(),
+        EntityKind::Monster(kind) => aihack_runtime::monster_display_name(kind),
         EntityKind::Item(kind) => item_label(kind),
     }
 }
@@ -373,9 +451,24 @@ fn tile_label(tile: TileKind) -> &'static str {
         TileKind::Trap(aihack_ai_contract::TrapKind::Pit) => "pit trap",
         TileKind::Trap(aihack_ai_contract::TrapKind::Dart) => "dart trap",
         TileKind::Trap(aihack_ai_contract::TrapKind::Bear) => "bear trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Hole) => "hole",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Teleport) => "teleport trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::SleepingGas) => "sleeping gas trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Rust) => "rust trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Polymorph) => "polymorph trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::AntiMagic) => "anti-magic trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::FallingRock) => "falling rock trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Magic) => "magic trap",
+        TileKind::Trap(aihack_ai_contract::TrapKind::Fire) => "fire trap",
         TileKind::HiddenDoor => "hidden door",
         TileKind::HiddenTrap(_) => "hidden trap",
         TileKind::Shop => "shop",
+        TileKind::Altar => "altar",
+        TileKind::Fountain => "fountain",
+        TileKind::DryFountain => "dry fountain",
+        TileKind::Sink => "sink",
+        TileKind::Water => "water",
+        TileKind::Lava => "lava",
     }
 }
 
@@ -398,23 +491,45 @@ pub fn title_lines() -> Vec<String> {
 
 /// Character Creation 화면 텍스트 라인 생성
 pub fn character_creation_lines() -> Vec<String> {
+    let k = aihack_ai_contract::Role::Knight.base_attributes();
+    let s = aihack_ai_contract::Role::Scout.base_attributes();
+    let m = aihack_ai_contract::Role::Mage.base_attributes();
+    let c = aihack_ai_contract::Role::Cleric.base_attributes();
     vec![
         "".to_string(),
         "".to_string(),
         "         Character Creation".to_string(),
         "".to_string(),
         "         Class: Adventurer".to_string(),
-        "         [1] Knight - HP28, melee".to_string(),
-        "         [2] Scout - HP22, accuracy".to_string(),
-        "         [3] Mage - HP18, wands".to_string(),
-        "         [4] Cleric - HP24, mace/heal".to_string(),
+        format!(
+            "         [1] Knight - HP{}, melee (St{} Co{})",
+            aihack_ai_contract::Role::Knight.base_hp(),
+            k.str_,
+            k.con
+        ),
+        format!(
+            "         [2] Scout - HP{}, accuracy (Dx{} St{})",
+            aihack_ai_contract::Role::Scout.base_hp(),
+            s.dex,
+            s.str_
+        ),
+        format!(
+            "         [3] Mage - HP{}, wands (In{} Wi{})",
+            aihack_ai_contract::Role::Mage.base_hp(),
+            m.int,
+            m.wis
+        ),
+        format!(
+            "         [4] Cleric - HP{}, mace/heal (Wi{} Co{})",
+            aihack_ai_contract::Role::Cleric.base_hp(),
+            c.wis,
+            c.con
+        ),
         "         Campaign: Main 6 + Mines 2; return the Amulet".to_string(),
         "         Main 3 up stairs: B enters the Mines".to_string(),
         "         Enter: legacy two-floor Adventurer".to_string(),
         "         HP: 16/16".to_string(),
-        "         Strength: 10".to_string(),
-        "         Dexterity: 10".to_string(),
-        "         AC: 0".to_string(),
+        "         AC: 10".to_string(),
         "".to_string(),
         "         Press Enter to confirm".to_string(),
         "         Esc - Back to Title".to_string(),
@@ -504,6 +619,7 @@ pub fn debug_observation_lines(observation: &Observation) -> Vec<String> {
             "player_hp: {}/{}",
             observation.player.hp, observation.player.max_hp
         ),
+        format!("player_ac: {}", observation.player.ac),
         format!("hunger: {}", observation.player.hunger),
         format!("luck: {}", observation.player.luck),
         format!("prayer_cooldown: {}", observation.player.prayer_cooldown),

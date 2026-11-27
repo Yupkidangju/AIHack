@@ -23,7 +23,7 @@ fn p8_g02_monster_difficulty_snapshot() {
 }
 
 #[test]
-fn p8_g03_inventory_letter_policy_not_reused_after_drop() {
+fn p8_g03_inventory_letter_policy_reuses_freed_slot_after_drop() {
     let mut session = GameSession::new_for_playing(42);
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.saved().entities.clear_monsters()
@@ -31,6 +31,11 @@ fn p8_g03_inventory_letter_policy_not_reused_after_drop() {
     aihack::testing::SessionBuilder::mutate(&mut session, |world| {
         world.set_player_pos(Pos { x: 8, y: 5 })
     });
+    let dropped_letter = session
+        .world()
+        .inventory()
+        .letter_for(EntityId(5))
+        .expect("EntityId(5) starts in inventory");
     assert!(
         session
             .submit(CommandIntent::Drop { item: EntityId(5) })
@@ -50,7 +55,7 @@ fn p8_g03_inventory_letter_policy_not_reused_after_drop() {
     assert!(outcome.accepted);
     assert!(matches!(
         outcome.events.iter().find(|event| matches!(event, GameEvent::ItemPickedUp { .. })),
-        Some(GameEvent::ItemPickedUp { letter, .. }) if *letter == aihack::domain::inventory::InventoryLetter('f')
+        Some(GameEvent::ItemPickedUp { letter, .. }) if *letter == dropped_letter
     ));
 }
 

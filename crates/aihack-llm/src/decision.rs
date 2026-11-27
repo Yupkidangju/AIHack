@@ -1,7 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use aihack_ai_contract::{
-    ActionIntent, ActionSpace, ClientRevision, CommandIntent, Direction, Observation,
+    ActionIntent, ActionSpace, ClientRevision, CommandIntent, DipTarget, Direction,
+    EngravingMethod, Observation, SpellKind,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -245,6 +246,7 @@ fn wire_command_value(command: CommandIntent) -> Value {
         CommandIntent::Wear { item } => item_action("WEAR", item.0),
         CommandIntent::PutOn { item } => item_action("PUT_ON", item.0),
         CommandIntent::RemoveRing => json!({ "type": "REMOVE_RING" }),
+        CommandIntent::TakeOff { slot } => json!({ "type": "TAKE_OFF", "slot": slot }),
         CommandIntent::Buy { kind } => json!({ "type": "BUY", "kind": kind }),
         CommandIntent::Sell { item } => item_action("SELL", item.0),
         CommandIntent::Quaff { item } => item_action("QUAFF", item.0),
@@ -255,7 +257,50 @@ fn wire_command_value(command: CommandIntent) -> Value {
             "direction": direction_name(direction),
         }),
         CommandIntent::Read { item } => item_action("READ", item.0),
+        CommandIntent::Identify { scroll, target } => json!({
+            "type": "IDENTIFY",
+            "scroll": scroll.0,
+            "target": target.0,
+        }),
+        CommandIntent::Offer { item } => item_action("OFFER", item.0),
+        CommandIntent::Cast { spell, direction } => json!({
+            "type": "CAST",
+            "spell": spell_name(spell),
+            "direction": direction.map(direction_name),
+        }),
         CommandIntent::Pray => json!({ "type": "PRAY" }),
+        CommandIntent::Apply { item, direction } => json!({
+            "type": "APPLY",
+            "item": item.0,
+            "direction": direction.map(direction_name),
+        }),
+        CommandIntent::ContainerPut { container, item } => json!({
+            "type": "CONTAINER_PUT",
+            "container": container.0,
+            "item": item.0,
+        }),
+        CommandIntent::ContainerTake { container, item } => json!({
+            "type": "CONTAINER_TAKE",
+            "container": container.0,
+            "item": item.0,
+        }),
+        CommandIntent::Dip { item, target } => json!({
+            "type": "DIP",
+            "item": item.0,
+            "target": match target {
+                DipTarget::Tile => json!({ "type": "TILE" }),
+                DipTarget::Item(id) => json!({ "type": "ITEM", "item": id.0 }),
+            },
+        }),
+        CommandIntent::Engrave { method, text } => json!({
+            "type": "ENGRAVE",
+            "method": match method {
+                EngravingMethod::Fingers => json!({ "type": "FINGERS" }),
+                EngravingMethod::Item(id) => json!({ "type": "ITEM", "item": id.0 }),
+            },
+            "text": text.as_str(),
+        }),
+        CommandIntent::Drink => json!({ "type": "DRINK" }),
         CommandIntent::Descend => json!({ "type": "DESCEND" }),
         CommandIntent::Ascend => json!({ "type": "ASCEND" }),
         CommandIntent::AcknowledgeMore => json!({ "type": "ACKNOWLEDGE_MORE" }),
@@ -268,6 +313,14 @@ fn direction_action(kind: &str, direction: Direction) -> Value {
 
 fn item_action(kind: &str, item: u32) -> Value {
     json!({ "type": kind, "item": item })
+}
+
+fn spell_name(spell: SpellKind) -> &'static str {
+    match spell {
+        SpellKind::ForceBolt => "FORCE_BOLT",
+        SpellKind::Heal => "HEAL",
+        SpellKind::Detect => "DETECT",
+    }
 }
 
 fn direction_name(direction: Direction) -> &'static str {

@@ -55,6 +55,11 @@ pub enum UiCommandCandidate {
         action: char,
         item: aihack_ai_contract::EntityId,
     },
+    ChooseSpell(aihack_ai_contract::SpellKind),
+    ChooseIdentifyTarget(aihack_ai_contract::EntityId),
+    ChooseContainer(aihack_ai_contract::EntityId),
+    ChooseDipSource(aihack_ai_contract::EntityId),
+    ChooseEngraveMethod(aihack_ai_contract::EngravingMethod),
     MenuPage(bool),
     ConfirmQuit,
     OpenCommands,
@@ -210,9 +215,33 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
             .contains(&CommandIntent::RemoveRing)
             .then_some(UiCommandCandidate::Command(CommandIntent::RemoveRing));
     }
+    if key == 'g' {
+        return observation
+            .legal_actions
+            .contains(&CommandIntent::Drink)
+            .then_some(UiCommandCandidate::Command(CommandIntent::Drink));
+    }
     if matches!(
         key,
-        'o' | 'c' | 'K' | 'w' | 'e' | 'q' | 'f' | 'd' | 't' | 'z' | 'r' | 'P' | '$'
+        'o' | 'c'
+            | 'K'
+            | 'w'
+            | 'e'
+            | 'P'
+            | 'q'
+            | 'f'
+            | 'd'
+            | 't'
+            | 'z'
+            | 'r'
+            | '$'
+            | 'Z'
+            | 'O'
+            | 'x'
+            | 'a'
+            | 'C'
+            | 'v'
+            | 'E'
     ) {
         return Some(UiCommandCandidate::BeginAction(key));
     }
@@ -378,78 +407,78 @@ fn command_panel_click_candidate(
 }
 
 fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
-    match item.kind {
-        crate::domain::item::ItemKind::Dagger
-        | crate::domain::item::ItemKind::ShortSword
-        | crate::domain::item::ItemKind::Mace => Some(CommandIntent::Wield { item: item.item }),
-        crate::domain::item::ItemKind::ArmorLeather
-        | crate::domain::item::ItemKind::ArmorChainMail => {
-            Some(CommandIntent::Wear { item: item.item })
+    match item
+        .item_class
+        .or_else(|| aihack_runtime::item_class(item.kind))
+    {
+        Some(aihack_ai_contract::ItemClass::Weapon) => {
+            Some(CommandIntent::Wield { item: item.item })
         }
-        crate::domain::item::ItemKind::RingPoisonResistance
-        | crate::domain::item::ItemKind::RingFireResistance
-        | crate::domain::item::ItemKind::RingProtection => {
+        Some(aihack_ai_contract::ItemClass::Armor) => Some(CommandIntent::Wear { item: item.item }),
+        Some(aihack_ai_contract::ItemClass::Ring | aihack_ai_contract::ItemClass::Amulet) => {
             Some(CommandIntent::PutOn { item: item.item })
         }
-        crate::domain::item::ItemKind::PotionHealing
-        | crate::domain::item::ItemKind::PotionExtraHealing
-        | crate::domain::item::ItemKind::PotionCure => {
+        Some(aihack_ai_contract::ItemClass::Potion) => {
             Some(CommandIntent::Quaff { item: item.item })
         }
-        crate::domain::item::ItemKind::ScrollReveal
-        | crate::domain::item::ItemKind::ScrollIdentify
-        | crate::domain::item::ItemKind::ScrollLevelTeleport
-        | crate::domain::item::ItemKind::ScrollCharging
-        | crate::domain::item::ItemKind::ScrollEnchantWeapon
-        | crate::domain::item::ItemKind::ScrollEnchantArmor
-        | crate::domain::item::ItemKind::ScrollRemoveCurse => {
+        Some(aihack_ai_contract::ItemClass::Scroll) => {
             Some(CommandIntent::Read { item: item.item })
         }
+        Some(aihack_ai_contract::ItemClass::Tool) => Some(CommandIntent::Apply {
+            item: item.item,
+            direction: None,
+        }),
         _ => None,
     }
 }
 
 pub(crate) fn item_observation_label(item: &ItemObservation) -> String {
     let mut parts = Vec::new();
-    if item.enchantment != 0 {
+    if item.quantity > 1 {
+        parts.push(format!("{}x", item.quantity));
+    }
+    if item.enchant_known && item.enchantment != 0 {
         parts.push(format!("{:+}", item.enchantment));
     }
-    match item.buc {
-        aihack_ai_contract::BucStatus::Blessed => parts.push("blessed".to_string()),
-        aihack_ai_contract::BucStatus::Cursed => parts.push("cursed".to_string()),
-        aihack_ai_contract::BucStatus::Uncursed => {}
+    if item.buc_known {
+        match item.buc {
+            aihack_ai_contract::BucStatus::Blessed => parts.push("blessed".to_string()),
+            aihack_ai_contract::BucStatus::Cursed => parts.push("cursed".to_string()),
+            aihack_ai_contract::BucStatus::Uncursed => {}
+        }
     }
-    parts.push(item_label(item.kind).to_string());
+    match item.erosion {
+        1 => parts.push("rusty".to_string()),
+        2 => parts.push("very rusty".to_string()),
+        3.. => parts.push("thoroughly rusty".to_string()),
+        0 => {}
+    }
+    if let Some(appearance) = &item.appearance {
+        parts.push(appearance.clone());
+    } else if let Some(name) = &item.name {
+        parts.push(name.clone());
+    } else {
+        parts.push(item_label(item.kind));
+    }
+    if item.tool_active {
+        let tag = if item.kind == crate::domain::item::ItemKind::Blindfold {
+            "(worn)"
+        } else {
+            "(lit)"
+        };
+        parts.push(tag.to_string());
+    }
+    if item.container_locked {
+        parts.push("(locked)".to_string());
+    }
+    if item.contained_count > 0 {
+        parts.push(format!("({} items)", item.contained_count));
+    }
     parts.join(" ")
 }
 
-pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> &'static str {
-    match kind {
-        crate::domain::item::ItemKind::Dagger => "dagger",
-        crate::domain::item::ItemKind::ShortSword => "short sword",
-        crate::domain::item::ItemKind::Mace => "mace",
-        crate::domain::item::ItemKind::FoodRation => "food ration",
-        crate::domain::item::ItemKind::PotionHealing => "healing potion",
-        crate::domain::item::ItemKind::PotionExtraHealing => "extra healing potion",
-        crate::domain::item::ItemKind::PotionCure => "cure potion",
-        crate::domain::item::ItemKind::WandMagicMissile => "wand",
-        crate::domain::item::ItemKind::WandFire => "wand of fire",
-        crate::domain::item::ItemKind::ScrollReveal => "reveal scroll",
-        crate::domain::item::ItemKind::ScrollIdentify => "identify scroll",
-        crate::domain::item::ItemKind::ScrollLevelTeleport => "teleport scroll",
-        crate::domain::item::ItemKind::ScrollCharging => "charging scroll",
-        crate::domain::item::ItemKind::ScrollEnchantWeapon => "enchant weapon scroll",
-        crate::domain::item::ItemKind::ScrollEnchantArmor => "enchant armor scroll",
-        crate::domain::item::ItemKind::ScrollRemoveCurse => "remove curse scroll",
-        crate::domain::item::ItemKind::Rock => "rock",
-        crate::domain::item::ItemKind::ArmorLeather => "leather armor",
-        crate::domain::item::ItemKind::ArmorChainMail => "chain mail",
-        crate::domain::item::ItemKind::CorpseJackal => "jackal corpse",
-        crate::domain::item::ItemKind::AmuletAscension => "Amulet of Ascension",
-        crate::domain::item::ItemKind::RingPoisonResistance => "ring of poison resistance",
-        crate::domain::item::ItemKind::RingFireResistance => "ring of fire resistance",
-        crate::domain::item::ItemKind::RingProtection => "ring of protection",
-    }
+pub(crate) fn item_label(kind: crate::domain::item::ItemKind) -> String {
+    aihack_runtime::item_display_name(kind)
 }
 
 fn direction_from_delta(dx: i16, dy: i16) -> Option<crate::core::Direction> {

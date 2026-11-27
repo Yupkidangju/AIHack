@@ -13,6 +13,21 @@ pub struct LevelId {
 pub enum BranchId {
     Main,
     Mines,
+    Sokoban,
+    Quest,
+    Gehennom,
+}
+
+impl BranchId {
+    pub const fn display_name(self) -> &'static str {
+        match self {
+            Self::Main => "Main",
+            Self::Mines => "Mines",
+            Self::Sokoban => "Sokoban",
+            Self::Quest => "Quest",
+            Self::Gehennom => "Gehennom",
+        }
+    }
 }
 
 impl LevelId {
@@ -21,5 +36,9 @@ impl LevelId {
             branch: BranchId::Main,
             depth,
         }
+    }
+
+    pub const fn new(branch: BranchId, depth: i16) -> Self {
+        Self { branch, depth }
     }
 }

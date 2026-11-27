@@ -1,5 +1,21 @@
 # AIHack Provenance and License Gate
 
+## Stage 3 (P9) 콘텐츠 확장 기록 (2026-11-27)
+
+`ADR-P9-01` 및 `docs/campaign_spec.md` `## Stage 3 (P9)`에 따라 `crates/aihack-content/src/data/items.toml`에 신규 13종 아이템(도구 8종 `SkeletonKey`/`LockPick`/`PickAxe`/`DwarvishMattock`/`TinWhistle`/`OilLamp`/`Blindfold`/`UnicornHorn`, 컨테이너 3종 `Sack`/`BagOfHolding`/`Chest`, 물약/두루마리 2종 `PotionWater`/`ScrollBlank`)을 추가했다. 기존 37개 item, 13종 monster, `main_1.toml`, `main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `503687fa5688c986f7669c3ff6fa71ed26dcc9b1455c9b9650e16ffdb18777e3`에서 `b45ed709b09768670536e1d6a65e171c1787104ecd3078ee1e696e6470b340a3`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
+## Stage 2 (P8-A) 콘텐츠 확장 기록 (2026-11-27)
+
+`ADR-P8-01` 및 `docs/campaign_spec.md` `## Stage 2 (P8)`에 따라 기존 24개 item과 12종 monster의 레거시 필드를 보존한 채 `name`/`color`/`material`/`stackable`/`unidentified_pool`/`resistances`/`corpse_chance`/`corpse_nutrition`/`corpse_effects`/`ai_flags`/`spawn_depth_range`/`spawn_weight`/`tags` 메타데이터를 추가하고, 신규 13아이템(`ArmorShield`, `ArmorHelm`, `ArmorCloak`, `ArmorGloves`, `ArmorBoots`, `AmuletEsp`, `PotionSpeed`, `PotionBlindness`, `PotionConfusion`, `PotionHallucination`, `PotionInvisibility`, `PotionLevitation`, `Corpse`)과 `monster.bat`(`B`, `speed=24`)을 추가했다. NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았으며 `main_1.toml`·`main_2.toml`은 변경하지 않았다. LF `items.toml` SHA256은 `0d716a4a9758d9e120259d8ce6d90c49816896d5310b0b8d1d3fcab0f8d90b0b`에서 `503687fa5688c986f7669c3ff6fa71ed26dcc9b1455c9b9650e16ffdb18777e3`로, LF `monsters.toml` SHA256은 `ff7f0cd1e98550038909f19a395434ecb8057700f5dfc60bef442e74ca949c71`에서 `1c73ddab91eeb8c1852885d6ad886357d341f64fb4aafc937160c79f6a9ee9b0`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
+## Stage 1 (P7-Fix) 콘텐츠 변경 기록 (2026-11-27)
+
+`DEF-01` 하강 AC 전면 통일(`ADR-P7-02`, `defense = 20 - defender.ac`)에 따라 `crates/aihack-content/src/data/monsters.toml`의 기존 12종 몬스터 `ac` 필드를 `10 - old_ac`(Jackal 10, Goblin 9, FloatingEye 8, Kobold 9, Orc 8, Ogre 7, GiantSpider 8, GnollArcher 8, Troll 7, FireAnt 7, Minotaur 6, Dragon 5)로 변환했다. `items.toml`, `main_1.toml`, `main_2.toml` 및 기타 스탯·문구는 변경하지 않았으며 NetHack 원본이나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `monsters.toml` SHA256은 `6b32f63454368d64bb24a509072132f1e9aaaffee7a0616f10382cb4d76106e9`에서 `ff7f0cd1e98550038909f19a395434ecb8057700f5dfc60bef442e74ca949c71`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
+## P7 콘텐츠 확장 기록 (2026-11-26)
+
+`monster.minotaur`와 `monster.dragon`은 AIHack 캠페인 P7 확장용으로 AI-assisted semantic rewrite 규약과 `docs/campaign_spec.md` `## P7` 계약에 따라 새로 추가한 데이터다. 기존 24개 item 정의, 10종 monster 정의, `main_1.toml`, `main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `monsters.toml` SHA256은 `bce19618bdd63f505a42fa5187ae71d5858f1c67881d4b4e468d9426c5583b40`에서 `6b32f63454368d64bb24a509072132f1e9aaaffee7a0616f10382cb4d76106e9`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
 ## P6 콘텐츠 확장 기록 (2026-11-26)
 
 `item.ring.poison_resistance`, `item.ring.fire_resistance`, `item.ring.protection` 및 `monster.fire_ant`는 AIHack 캠페인 P6 확장용으로 AI-assisted semantic rewrite 규약과 `docs/campaign_spec.md` `## P6` 계약에 따라 새로 추가한 데이터다. 기존 21개 item 정의, 9종 monster 정의, `main_1.toml`, `main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `267b50ccfca56a5a9278ba0a75239267a6f27cf7b2f8b0a6ea98fbf2f973f62d`에서 `0d716a4a9758d9e120259d8ce6d90c49816896d5310b0b8d1d3fcab0f8d90b0b`로, LF `monsters.toml` SHA256은 `296a9b8a96f192dc002330ae480e14a324f52847f3fe3df43981ee05c06ff341`에서 `bce19618bdd63f505a42fa5187ae71d5858f1c67881d4b4e468d9426c5583b40`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.

@@ -3,11 +3,20 @@ use std::ops::Deref;
 use aihack_ai_contract::{ClientRevision, Observation};
 use aihack_content::ContentRegistry;
 use aihack_core::{
-    action::{CommandIntent, DirectionalAction, InventoryAction},
-    domain::{combat::DeathCause, monster::MonsterPassive, tile::TrapKind},
+    action::{
+        CommandIntent, DipTarget, DirectionalAction, EngravingMethod, EngravingText,
+        InventoryAction,
+    },
+    campaign::SpellKind,
+    domain::{
+        combat::DeathCause,
+        monster::MonsterPassive,
+        status::{HungerState, STARVATION_THRESHOLD},
+        tile::TrapKind,
+    },
     error::ContentError,
     event::{GameEvent, MessagePriority},
-    ids::EntityId,
+    ids::{BranchId, EntityId},
     position::Direction,
     rng::GameRng,
     session::SessionState,
@@ -20,7 +29,8 @@ use crate::{
     observation,
     snapshot::GameSnapshot,
     systems::{
-        combat, death, doors, items, monster_ai, movement, projectiles, score, stairs, traps,
+        altar, ascension, combat, containers, death, dip, doors, engrave, items, monster_ai,
+        movement, projectiles, score, spells, stairs, terrain, tools, traps,
     },
     world::GameWorld,
 };
@@ -253,15 +263,29 @@ impl GameSession {
             CommandIntent::Wear { item } => self.submit_wear(item),
             CommandIntent::PutOn { item } => self.submit_put_on(item),
             CommandIntent::RemoveRing => self.submit_remove_ring(),
+            CommandIntent::TakeOff { slot } => self.submit_take_off(slot),
             CommandIntent::Buy { kind } => self.submit_buy(kind),
             CommandIntent::Sell { item } => self.submit_sell(item),
             CommandIntent::Quaff { item } => self.submit_quaff(item),
             CommandIntent::Eat { item } => self.submit_eat(item),
             CommandIntent::Zap { item, direction } => self.submit_zap(item, direction),
             CommandIntent::Read { item } => self.submit_read(item),
+            CommandIntent::Identify { scroll, target } => self.submit_identify(scroll, target),
+            CommandIntent::Offer { item } => self.submit_offer(item),
+            CommandIntent::Cast { spell, direction } => self.submit_cast(spell, direction),
             CommandIntent::Pray => self.submit_pray(),
             CommandIntent::Descend => self.submit_descend(),
             CommandIntent::Ascend => self.submit_ascend(),
+            CommandIntent::Apply { item, direction } => self.submit_apply(item, direction),
+            CommandIntent::ContainerPut { container, item } => {
+                self.submit_container_put(container, item)
+            }
+            CommandIntent::ContainerTake { container, item } => {
+                self.submit_container_take(container, item)
+            }
+            CommandIntent::Dip { item, target } => self.submit_dip(item, target),
+            CommandIntent::Engrave { method, text } => self.submit_engrave(method, text),
+            CommandIntent::Drink => self.submit_drink(),
             CommandIntent::AcknowledgeMore => {
                 self.reject("no more prompt to acknowledge".to_string())
             }
@@ -318,6 +342,9 @@ impl GameSession {
             CommandIntent::Read { item } if action == InventoryAction::Read => {
                 self.submit_read(item)
             }
+            CommandIntent::Offer { item } if action == InventoryAction::Offer => {
+                self.submit_offer(item)
+            }
             CommandIntent::AcknowledgeMore => self.accept_without_turn(Vec::new()),
             CommandIntent::Quit => self.submit_quit(),
             _ => {
@@ -370,6 +397,23 @@ impl GameSession {
     }
 
     fn submit_move(&mut self, direction: Direction) -> TurnOutcome {
+        let (direction, stagger_event) =
+            if self.world.status_timers.confused > 0 || self.world.status_timers.stunned > 0 {
+                if self.inner.rng.next_u64().is_multiple_of(2) {
+                    let idx = (self.inner.rng.next_u64() as usize) % Direction::ALL.len();
+                    (
+                        Direction::ALL[idx],
+                        Some(GameEvent::Message {
+                            priority: MessagePriority::Info,
+                            text: "You stagger in your confusion!".to_string(),
+                        }),
+                    )
+                } else {
+                    (direction, None)
+                }
+            } else {
+                (direction, None)
+            };
         let from = self.world.player_pos();
         let to = from.offset(direction.delta());
         if let Some(defender) = self
@@ -384,13 +428,19 @@ impl GameSession {
         match movement::move_player(&mut self.inner.world, direction) {
             Ok(()) => {
                 let to = self.world.player_pos();
-                let mut events = vec![GameEvent::EntityMoved {
+                let mut events = Vec::new();
+                if let Some(event) = stagger_event {
+                    events.push(event);
+                }
+                events.push(GameEvent::EntityMoved {
                     entity: self.world.player_id(),
                     from,
                     to,
-                }];
-                let (trap_events, triggered_trap) =
-                    traps::trigger_player_trap_with_kind(&mut self.inner.world);
+                });
+                let (trap_events, triggered_trap) = {
+                    let state = &mut self.inner;
+                    traps::trigger_player_trap_with_kind(&mut state.world, &mut state.rng)
+                };
                 events.extend(trap_events);
                 let player_id = self.world.player_id();
                 let death_events = match death::collect_death_events_if_hp_depleted(
@@ -404,11 +454,39 @@ impl GameSession {
                     Err(error) => return self.abort_transaction(error),
                 };
                 events.extend(death_events);
+                if self.world.player_alive() {
+                    let (terrain_events, terrain_cause) = {
+                        let state = &mut self.inner;
+                        terrain::on_player_enter_tile(&mut state.world, &mut state.rng)
+                    };
+                    events.extend(terrain_events);
+                    if let Some(cause) = terrain_cause {
+                        let terrain_death = match death::collect_death_events_if_hp_depleted(
+                            &mut self.inner.world,
+                            player_id,
+                            cause,
+                        ) {
+                            Ok(events) => events,
+                            Err(error) => return self.abort_transaction(error),
+                        };
+                        events.extend(terrain_death);
+                    }
+                }
                 self.inner.state =
                     death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
-            Err(error) => self.reject(format!("{error}")),
+            Err(error) => {
+                if stagger_event.is_some()
+                    && self.world.carried_weight() <= self.world.carrying_capacity()
+                {
+                    return self.accept_turn(vec![GameEvent::Message {
+                        priority: MessagePriority::Info,
+                        text: "You bump into an obstacle in your confusion.".to_string(),
+                    }]);
+                }
+                self.reject(format!("{error}"))
+            }
         }
     }
 
@@ -434,6 +512,7 @@ impl GameSession {
                 target: attacker,
             });
         }
+        events.extend(engrave::erode_elbereth_on_attack(&mut self.inner.world));
         let death_events = match death::collect_death_events_after_attack(
             &mut self.inner.world,
             attacker,
@@ -487,15 +566,20 @@ impl GameSession {
     }
 
     fn submit_quaff(&mut self, item: EntityId) -> TurnOutcome {
+        let next_turn = self.turn.saturating_add(1);
         let state = &mut self.inner;
         match items::quaff(&mut state.world, &mut state.rng, item) {
-            Ok(events) => self.accept_turn(events),
+            Ok(events) => {
+                state.state = death::state_after_deaths_at(&state.world, next_turn);
+                self.accept_turn(events)
+            }
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_eat(&mut self, item: EntityId) -> TurnOutcome {
-        match items::eat(&mut self.inner.world, item) {
+        let state = &mut self.inner;
+        match items::eat(&mut state.world, &mut state.rng, item) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
@@ -522,7 +606,15 @@ impl GameSession {
     }
 
     fn submit_read(&mut self, item: EntityId) -> TurnOutcome {
-        match items::read(&mut self.inner.world, item) {
+        let state = &mut self.inner;
+        match items::read(&mut state.world, &mut state.rng, item) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_identify(&mut self, scroll: EntityId, target: EntityId) -> TurnOutcome {
+        match items::identify(&mut self.inner.world, scroll, target) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
@@ -539,12 +631,40 @@ impl GameSession {
         if self.world.prayer_cooldown > 0 {
             return self.reject("prayer is on cooldown".to_string());
         }
-        self.inner.world.state_mut().prayer_cooldown = 20;
+        let cooldown = self
+            .world
+            .campaign
+            .map(|c| c.attributes.wis_prayer_cooldown())
+            .unwrap_or(20);
+        self.inner.world.state_mut().prayer_cooldown = cooldown;
         self.inner.world.state_mut().luck = self.world.luck.saturating_add(1).min(3);
-        self.accept_turn(vec![GameEvent::PrayerOffered {
+        let mut events = vec![GameEvent::PrayerOffered {
             entity: self.world.player_id(),
             cooldown_after: self.world.prayer_cooldown,
-        }])
+        }];
+        if altar::is_on_altar(&self.world) {
+            events.extend(altar::pray_at_altar(&mut self.inner.world));
+        }
+        self.accept_turn(events)
+    }
+
+    fn submit_offer(&mut self, item: EntityId) -> TurnOutcome {
+        match altar::offer(&mut self.inner.world, item) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_cast(&mut self, spell: SpellKind, direction: Option<Direction>) -> TurnOutcome {
+        let state = &mut self.inner;
+        match spells::cast(&mut state.world, &mut state.rng, spell, direction) {
+            Ok(events) => {
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
+                self.accept_turn(events)
+            }
+            Err(error) => self.abort_transaction(error),
+        }
     }
 
     fn submit_open(&mut self, direction: Direction) -> TurnOutcome {
@@ -591,7 +711,16 @@ impl GameSession {
             }]);
         }
         match stairs::ascend(&mut self.inner.world) {
-            Ok(event) => self.accept_turn(vec![event]),
+            Ok(event) => {
+                let mut events = vec![event.clone()];
+                if let GameEvent::LevelChanged { to, .. } = event {
+                    match ascension::on_level_entered(&mut self.inner.world, to) {
+                        Ok(pursuit_events) => events.extend(pursuit_events),
+                        Err(error) => return self.abort_transaction(error),
+                    }
+                }
+                self.accept_turn(events)
+            }
             Err(error) => self.reject(error),
         }
     }
@@ -610,6 +739,13 @@ impl GameSession {
         }
     }
 
+    fn submit_take_off(&mut self, slot: aihack_core::domain::item::EquipmentSlot) -> TurnOutcome {
+        match items::take_off(&mut self.inner.world, slot) {
+            Ok(event) => self.accept_turn(vec![event]),
+            Err(error) => self.reject(error),
+        }
+    }
+
     fn submit_buy(&mut self, kind: aihack_core::domain::item::ItemKind) -> TurnOutcome {
         match crate::systems::shop::buy(&mut self.inner.world, kind) {
             Ok(events) => self.accept_turn(events),
@@ -620,6 +756,69 @@ impl GameSession {
     fn submit_sell(&mut self, item: EntityId) -> TurnOutcome {
         match crate::systems::shop::sell(&mut self.inner.world, item) {
             Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_apply(&mut self, item: EntityId, direction: Option<Direction>) -> TurnOutcome {
+        let state = &mut self.inner;
+        match tools::apply(&mut state.world, &mut state.rng, item, direction) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_container_put(&mut self, container: EntityId, item: EntityId) -> TurnOutcome {
+        let next_turn = self.turn.saturating_add(1);
+        let state = &mut self.inner;
+        match containers::container_put(&mut state.world, &mut state.rng, container, item) {
+            Ok(events) => {
+                state.state = death::state_after_deaths_at(&state.world, next_turn);
+                self.accept_turn(events)
+            }
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_container_take(&mut self, container: EntityId, item: EntityId) -> TurnOutcome {
+        let next_turn = self.turn.saturating_add(1);
+        let state = &mut self.inner;
+        match containers::container_take(&mut state.world, &mut state.rng, container, item) {
+            Ok(events) => {
+                state.state = death::state_after_deaths_at(&state.world, next_turn);
+                self.accept_turn(events)
+            }
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_dip(&mut self, item: EntityId, target: DipTarget) -> TurnOutcome {
+        let next_turn = self.turn.saturating_add(1);
+        let state = &mut self.inner;
+        match dip::dip(&mut state.world, &mut state.rng, item, target) {
+            Ok(events) => {
+                state.state = death::state_after_deaths_at(&state.world, next_turn);
+                self.accept_turn(events)
+            }
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_engrave(&mut self, method: EngravingMethod, text: EngravingText) -> TurnOutcome {
+        match engrave::engrave(&mut self.inner.world, method, text) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_drink(&mut self) -> TurnOutcome {
+        let next_turn = self.turn.saturating_add(1);
+        let state = &mut self.inner;
+        match terrain::drink_from_tile(&mut state.world, &mut state.rng) {
+            Ok(events) => {
+                state.state = death::state_after_deaths_at(&state.world, next_turn);
+                self.accept_turn(events)
+            }
             Err(error) => self.reject(error),
         }
     }
@@ -646,10 +845,216 @@ impl GameSession {
         let next_turn = self.turn.saturating_add(1);
         events.insert(0, GameEvent::TurnStarted { turn: next_turn });
         self.inner.turn = next_turn;
+        let prev_hunger = self.world.hunger_state();
         self.inner.world.state_mut().nutrition = self.world.nutrition.saturating_sub(1);
         self.inner.world.state_mut().prayer_cooldown = self.world.prayer_cooldown.saturating_sub(1);
+        if let Some(campaign) = self.world.campaign {
+            if !matches!(
+                self.state,
+                RunState::GameOver { .. } | RunState::Victory { .. }
+            ) {
+                if next_turn.is_multiple_of(5) && self.world.mp < self.world.max_mp {
+                    self.inner.world.state_mut().mp += 1;
+                }
+                if self.world.poison_turns == 0 && self.world.nutrition > 50 {
+                    let bonus_reduction = campaign.attributes.con_hp_per_level_bonus().max(0) as u8;
+                    let floor = if bonus_reduction > 0 { 4 } else { 5 };
+                    let regen_interval = u64::from(
+                        (15_u8
+                            .saturating_sub(campaign.level())
+                            .saturating_sub(bonus_reduction))
+                        .max(floor),
+                    );
+                    if next_turn.is_multiple_of(regen_interval) {
+                        let player_id = self.world.player_id();
+                        if let Some(stats) = self
+                            .inner
+                            .world
+                            .state_mut()
+                            .entities
+                            .actor_stats_mut(player_id)
+                        {
+                            if stats.hp > 0 && stats.hp < stats.max_hp {
+                                stats.hp += 1;
+                            }
+                        }
+                    }
+                }
+                let level = self.world.current_level();
+                if crate::campaign::has_amulet(&self.world)
+                    && level.branch == BranchId::Main
+                    && (1..=5).contains(&level.depth)
+                    && next_turn.is_multiple_of(15)
+                {
+                    self.inner.world.state_mut().nutrition = self.world.nutrition.saturating_sub(1);
+                }
+                {
+                    let state = self.inner.world.state_mut();
+                    let timers = &mut state.status_timers;
+                    let mut expiry_msgs = Vec::new();
+                    for (timer, msg) in [
+                        (&mut timers.blind, "You can see again."),
+                        (&mut timers.confused, "You feel less confused now."),
+                        (&mut timers.stunned, "You are no longer stunned."),
+                        (&mut timers.hallucinating, "Everything looks SO boring now."),
+                        (&mut timers.fast, "You feel yourself slowing down."),
+                        (&mut timers.levitation, "You float gently to the floor."),
+                        (&mut timers.invisible, "Your body returns to visibility."),
+                    ] {
+                        if *timer > 0 {
+                            *timer -= 1;
+                            if *timer == 0 {
+                                expiry_msgs.push(msg);
+                            }
+                        }
+                    }
+                    if timers.hallucinating == 0
+                        && expiry_msgs.contains(&"Everything looks SO boring now.")
+                    {
+                        state.hallucinating = false;
+                    }
+                    for text in expiry_msgs {
+                        events.push(GameEvent::Message {
+                            priority: MessagePriority::Info,
+                            text: text.to_string(),
+                        });
+                    }
+                }
+                events.extend(tools::tick_active_lamps(&mut self.inner.world));
+                {
+                    let state = &mut self.inner;
+                    engrave::tick_dust_engravings(&mut state.world, &mut state.rng);
+                }
+                let troll_template = crate::domain::monster::try_monster_template_from_registry(
+                    aihack_core::domain::monster::MonsterKind::Troll,
+                    self.world.content_registry(),
+                )
+                .ok();
+                {
+                    let current_level = self.world.current_level();
+                    let state = self.inner.world.state_mut();
+                    let corpses: Vec<_> = state
+                        .entities
+                        .entities()
+                        .iter()
+                        .filter_map(|e| {
+                            let (kind, _, loc, _, _) = e.item()?;
+                            if matches!(
+                                kind,
+                                aihack_core::domain::item::ItemKind::Corpse
+                                    | aihack_core::domain::item::ItemKind::CorpseJackal
+                            ) && loc != aihack_core::domain::entity::EntityLocation::Consumed
+                            {
+                                Some((
+                                    e.id,
+                                    e.item_corpse_monster(),
+                                    e.item_corpse_age().unwrap_or(0),
+                                    loc,
+                                ))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    let mut revivals = Vec::new();
+                    for (id, monster, age, loc) in corpses {
+                        let next_age = age.saturating_add(1);
+                        state.entities.set_item_corpse_age(id, next_age);
+                        if monster == Some(aihack_core::domain::monster::MonsterKind::Troll)
+                            && next_age >= 25
+                        {
+                            if let aihack_core::domain::entity::EntityLocation::OnMap {
+                                level,
+                                pos,
+                            } = loc
+                            {
+                                if state.entities.alive_actor_at(level, pos).is_none() {
+                                    revivals.push((id, level, pos));
+                                }
+                            }
+                        }
+                    }
+                    if let Some(template) = troll_template {
+                        for (corpse_id, level, pos) in revivals {
+                            state.entities.set_item_location(
+                                corpse_id,
+                                aihack_core::domain::entity::EntityLocation::Consumed,
+                            );
+                            if let Ok(troll_id) = state.entities.spawn_monster_with_template(
+                                aihack_core::domain::monster::MonsterKind::Troll,
+                                template,
+                                pos,
+                            ) {
+                                state.entities.set_actor_location(troll_id, level, pos);
+                                if level == current_level {
+                                    events.push(GameEvent::Message {
+                                        priority: MessagePriority::Warning,
+                                        text: "The troll corpse shudders and comes back to life!"
+                                            .to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if self.world.paralysis_turns > 0 {
             self.inner.world.state_mut().paralysis_turns -= 1;
+        }
+        if !matches!(
+            self.state,
+            RunState::GameOver { .. } | RunState::Victory { .. }
+        ) {
+            let curr_hunger = self.world.hunger_state();
+            if self.world.nutrition <= STARVATION_THRESHOLD {
+                let player_id = self.world.player_id();
+                if let Some(stats) = self
+                    .inner
+                    .world
+                    .state_mut()
+                    .entities
+                    .actor_stats_mut(player_id)
+                {
+                    stats.hp = 0;
+                }
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Danger,
+                    text: "You starve to death!".to_string(),
+                });
+                let death_events = match death::collect_death_events_if_hp_depleted(
+                    &mut self.inner.world,
+                    player_id,
+                    DeathCause::Starvation,
+                ) {
+                    Ok(death_events) => death_events,
+                    Err(error) => return self.abort_transaction(error),
+                };
+                events.extend(death_events);
+                self.inner.state = death::state_after_deaths_at(&self.world, next_turn);
+            } else if curr_hunger == HungerState::Fainting {
+                if prev_hunger != HungerState::Fainting || next_turn.is_multiple_of(10) {
+                    self.inner.world.state_mut().paralysis_turns =
+                        self.world.paralysis_turns.max(1);
+                    events.push(GameEvent::Message {
+                        priority: MessagePriority::Warning,
+                        text: "You faint from lack of food!".to_string(),
+                    });
+                }
+            } else if curr_hunger == HungerState::Weak && prev_hunger != HungerState::Weak {
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Warning,
+                    text: "You feel weak from hunger.".to_string(),
+                });
+            } else if curr_hunger == HungerState::Hungry
+                && prev_hunger != HungerState::Hungry
+                && matches!(prev_hunger, HungerState::NotHungry | HungerState::Satiated)
+            {
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: "You are beginning to feel hungry.".to_string(),
+                });
+            }
         }
         if !matches!(
             self.state,
@@ -701,6 +1106,7 @@ impl GameSession {
             };
             events.extend(monster_events);
         }
+        self.inner.world.mark_current_level_explored();
         self.inner.event_log.extend(events.clone());
 
         TurnOutcome {

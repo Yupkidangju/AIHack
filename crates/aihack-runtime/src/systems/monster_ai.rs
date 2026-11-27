@@ -1,6 +1,7 @@
 use aihack_core::{
     domain::{
-        monster::{MonsterAiKind, MonsterPassive},
+        entity::ActorKind,
+        monster::{MonsterAiKind, MonsterKind, MonsterPassive},
         tile::{DoorState, TileKind},
     },
     event::GameEvent,
@@ -11,7 +12,7 @@ use aihack_core::{
 };
 
 use crate::{
-    systems::{combat, death, movement, vision},
+    systems::{combat, death, items, movement, vision},
     world::GameWorld,
 };
 
@@ -32,10 +33,14 @@ pub enum MonsterIntent {
     },
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MonsterTurnPlan {
     pub intents: Vec<MonsterIntent>,
 }
+
+pub const ENERGY_THRESHOLD: i16 = 12;
+pub const MAX_MONSTER_ACTIONS_PER_TURN: usize = 4;
 
 pub fn run_monster_turn(
     world: &mut GameWorld,
@@ -43,12 +48,66 @@ pub fn run_monster_turn(
     state: &mut RunState,
     turn: u64,
 ) -> Result<Vec<GameEvent>, String> {
-    let plan = collect_monster_turn_at(world, rng, turn);
-    let events = apply_monster_turn(world, rng, &plan)?;
+    let mut events = Vec::new();
+    let monsters = world.current_level_hostile_monsters();
+    for actor in monsters {
+        if !world.player_alive() {
+            break;
+        }
+        let Some(entity) = world.entities.get(actor) else {
+            continue;
+        };
+        if !entity.is_alive_actor() {
+            continue;
+        }
+        let Some(stats) = world.entities.actor_stats(actor) else {
+            continue;
+        };
+        let speed = stats.speed;
+        let effective_gain = if world.status_timers.fast > 0 && speed > 0 {
+            (speed / 2).max(1)
+        } else {
+            speed
+        };
+        let next_energy = stats.energy.saturating_add(effective_gain).clamp(-36, 72);
+        if let Some(stats_mut) = world.state_mut().entities.actor_stats_mut(actor) {
+            stats_mut.energy = next_energy;
+        }
+        for _ in 0..MAX_MONSTER_ACTIONS_PER_TURN {
+            if !world.player_alive() {
+                break;
+            }
+            let Some(entity) = world.entities.get(actor) else {
+                break;
+            };
+            if !entity.is_alive_actor() {
+                break;
+            }
+            let current_energy = world
+                .entities
+                .actor_stats(actor)
+                .map(|s| s.energy)
+                .unwrap_or(0);
+            if current_energy < ENERGY_THRESHOLD {
+                break;
+            }
+            let spent = (current_energy - ENERGY_THRESHOLD).clamp(-36, 72);
+            if let Some(stats_mut) = world.state_mut().entities.actor_stats_mut(actor) {
+                stats_mut.energy = spent;
+            }
+            let intent = decide_monster_action(world, rng, actor);
+            if matches!(intent, MonsterIntent::Wait) {
+                break;
+            }
+            apply_monster_intent(world, rng, intent, &mut events)?;
+        }
+    }
+    regenerate_monsters(world, &mut events);
     *state = death::state_after_deaths_at(world, turn);
     Ok(events)
 }
 
+#[cfg(test)]
 pub fn collect_monster_turn_at(world: &GameWorld, rng: &mut GameRng, turn: u64) -> MonsterTurnPlan {
     MonsterTurnPlan {
         intents: world
@@ -59,110 +118,138 @@ pub fn collect_monster_turn_at(world: &GameWorld, rng: &mut GameRng, turn: u64) 
     }
 }
 
-pub fn apply_monster_turn(
+fn apply_monster_intent(
     world: &mut GameWorld,
     rng: &mut GameRng,
-    plan: &MonsterTurnPlan,
-) -> Result<Vec<GameEvent>, String> {
-    let mut events = Vec::new();
-    for intent in &plan.intents {
-        if !world.player_alive() {
-            break;
+    intent: MonsterIntent,
+    events: &mut Vec<GameEvent>,
+) -> Result<(), String> {
+    match intent {
+        MonsterIntent::Wait => {}
+        MonsterIntent::Move { entity, direction } => {
+            let Some((_, from)) = world.entities.actor_location(entity) else {
+                return Ok(());
+            };
+            if movement::move_actor(world, entity, direction).is_ok() {
+                let to = world
+                    .entities
+                    .actor_location(entity)
+                    .expect("monster move succeeded so location must exist")
+                    .1;
+                events.push(GameEvent::EntityMoved { entity, from, to });
+            }
         }
-        match *intent {
-            MonsterIntent::Wait => {}
-            MonsterIntent::Move { entity, direction } => {
-                let Some((_, from)) = world.entities.actor_location(entity) else {
-                    continue;
-                };
-                if movement::move_actor(world, entity, direction).is_ok() {
-                    let to = world
-                        .entities
-                        .actor_location(entity)
-                        .expect("monster move succeeded so location must exist")
-                        .1;
-                    events.push(GameEvent::EntityMoved { entity, from, to });
-                }
+        MonsterIntent::MeleeAttack { attacker, defender } => {
+            if !melee_intent_is_still_valid(world, attacker, defender) {
+                return Ok(());
             }
-            MonsterIntent::MeleeAttack { attacker, defender } => {
-                if !melee_intent_is_still_valid(world, attacker, defender) {
-                    continue;
-                }
-                let Some(resolution) = combat::resolve_attack(world, rng, attacker, defender)
-                else {
-                    continue;
-                };
-                let hit = resolution.hit;
-                events.push(combat::attack_event(&resolution));
-                if hit && defender == world.player_id {
-                    match world
-                        .entities
-                        .get(attacker)
-                        .and_then(|entity| entity.monster_passive())
-                    {
-                        Some(MonsterPassive::PoisonOnMelee) => {
-                            if crate::systems::items::has_poison_resistance(world) {
-                                events.push(GameEvent::Message {
-                                    priority: aihack_core::event::MessagePriority::Info,
-                                    text: "You resist the poison!".to_string(),
-                                });
-                            } else {
-                                let next_poison = world.poison_turns.max(3);
-                                world.state_mut().poison_turns = next_poison;
-                                events.push(GameEvent::PassiveAttackTriggered {
-                                    source: attacker,
-                                    target: defender,
-                                });
-                            }
+            let Some(resolution) = combat::resolve_attack(world, rng, attacker, defender) else {
+                return Ok(());
+            };
+            let hit = resolution.hit;
+            events.push(combat::attack_event(&resolution));
+            if hit && defender == world.player_id {
+                match world
+                    .entities
+                    .get(attacker)
+                    .and_then(|entity| entity.monster_passive())
+                {
+                    Some(MonsterPassive::PoisonOnMelee) => {
+                        if crate::systems::items::has_poison_resistance(world) {
+                            events.push(GameEvent::Message {
+                                priority: aihack_core::event::MessagePriority::Info,
+                                text: "You resist the poison!".to_string(),
+                            });
+                        } else {
+                            let next_poison = world.poison_turns.max(3);
+                            world.state_mut().poison_turns = next_poison;
+                            events.push(GameEvent::PassiveAttackTriggered {
+                                source: attacker,
+                                target: defender,
+                            });
                         }
-                        Some(MonsterPassive::FireOnMelee) => {
-                            if crate::systems::items::has_fire_resistance(world) {
-                                events.push(GameEvent::Message {
-                                    priority: aihack_core::event::MessagePriority::Info,
-                                    text: "You resist the fire!".to_string(),
-                                });
-                            } else {
-                                let fire_dmg = combat::roll_die(rng, 6);
-                                if let Some(stats) =
-                                    world.state_mut().entities.actor_stats_mut(defender)
-                                {
-                                    stats.hp = stats.hp.saturating_sub(fire_dmg);
-                                }
-                                events.push(GameEvent::PassiveAttackTriggered {
-                                    source: attacker,
-                                    target: defender,
-                                });
-                                events.push(GameEvent::Message {
-                                    priority: aihack_core::event::MessagePriority::Warning,
-                                    text: format!(
-                                        "The fire ant burns you for {fire_dmg} fire damage!"
-                                    ),
-                                });
-                            }
-                        }
-                        Some(MonsterPassive::ParalyzeOnMelee | MonsterPassive::Regenerate)
-                        | None => {}
                     }
+                    Some(MonsterPassive::FireOnMelee) => {
+                        if crate::systems::items::has_fire_resistance(world) {
+                            events.push(GameEvent::Message {
+                                priority: aihack_core::event::MessagePriority::Info,
+                                text: "You resist the fire!".to_string(),
+                            });
+                        } else {
+                            let fire_dmg = combat::roll_die(rng, 6);
+                            if let Some(stats) =
+                                world.state_mut().entities.actor_stats_mut(defender)
+                            {
+                                stats.hp = stats.hp.saturating_sub(fire_dmg);
+                            }
+                            events.push(GameEvent::PassiveAttackTriggered {
+                                source: attacker,
+                                target: defender,
+                            });
+                            events.push(GameEvent::Message {
+                                priority: aihack_core::event::MessagePriority::Warning,
+                                text: format!("The fire ant burns you for {fire_dmg} fire damage!"),
+                            });
+                        }
+                    }
+                    Some(
+                        MonsterPassive::ParalyzeOnMelee
+                        | MonsterPassive::Regenerate
+                        | MonsterPassive::FireBreath,
+                    )
+                    | None => {}
                 }
-                events.extend(death::collect_death_events_after_attack(
-                    world, attacker, defender,
-                )?);
             }
-            MonsterIntent::RangedAttack { attacker, defender } => {
-                if !ranged_intent_is_still_valid(world, attacker, defender) {
-                    continue;
+            events.extend(death::collect_death_events_after_attack(
+                world, attacker, defender,
+            )?);
+        }
+        MonsterIntent::RangedAttack { attacker, defender } => {
+            if !ranged_intent_is_still_valid(world, attacker, defender) {
+                return Ok(());
+            }
+            let passive = world
+                .entities
+                .get(attacker)
+                .and_then(|entity| entity.monster_passive());
+            if passive == Some(MonsterPassive::FireBreath) && defender == world.player_id {
+                if items::has_fire_resistance(world) {
+                    events.push(GameEvent::Message {
+                        priority: aihack_core::event::MessagePriority::Info,
+                        text: "You resist the dragon's fire breath!".to_string(),
+                    });
+                } else {
+                    let fire_dmg = combat::roll_die(rng, 6) + combat::roll_die(rng, 6);
+                    if let Some(stats) = world.state_mut().entities.actor_stats_mut(defender) {
+                        stats.hp = stats.hp.saturating_sub(fire_dmg);
+                    }
+                    events.push(GameEvent::PassiveAttackTriggered {
+                        source: attacker,
+                        target: defender,
+                    });
+                    events.push(GameEvent::Message {
+                        priority: aihack_core::event::MessagePriority::Warning,
+                        text: format!("The dragon breathes fire for {fire_dmg} damage!"),
+                    });
+                    events.extend(death::collect_death_events_after_attack(
+                        world, attacker, defender,
+                    )?);
                 }
-                let Some(resolution) = combat::resolve_attack(world, rng, attacker, defender)
-                else {
-                    continue;
-                };
-                events.push(combat::attack_event(&resolution));
-                events.extend(death::collect_death_events_after_attack(
-                    world, attacker, defender,
-                )?);
+                return Ok(());
             }
+            let Some(resolution) = combat::resolve_attack(world, rng, attacker, defender) else {
+                return Ok(());
+            };
+            events.push(combat::attack_event(&resolution));
+            events.extend(death::collect_death_events_after_attack(
+                world, attacker, defender,
+            )?);
         }
     }
+    Ok(())
+}
+
+fn regenerate_monsters(world: &mut GameWorld, events: &mut Vec<GameEvent>) {
     if world.player_alive() {
         for monster_id in world.current_level_hostile_monsters() {
             let Some(passive) = world
@@ -188,15 +275,27 @@ pub fn apply_monster_turn(
             }
         }
     }
-    Ok(events)
 }
 
+#[cfg(test)]
 fn decide_monster_intent(
     world: &GameWorld,
     rng: &mut GameRng,
     actor: EntityId,
     turn: u64,
 ) -> MonsterIntent {
+    let speed = world
+        .entities
+        .actor_stats(actor)
+        .map(|stats| stats.speed)
+        .unwrap_or_default();
+    if !acts_on_turn(speed, turn) {
+        return MonsterIntent::Wait;
+    }
+    decide_monster_action(world, rng, actor)
+}
+
+fn decide_monster_action(world: &GameWorld, rng: &mut GameRng, actor: EntityId) -> MonsterIntent {
     let Some(entity) = world.entities.get(actor) else {
         return MonsterIntent::Wait;
     };
@@ -206,19 +305,18 @@ fn decide_monster_intent(
     let Some((_, actor_pos)) = world.entities.actor_location(actor) else {
         return MonsterIntent::Wait;
     };
-    let speed = world
-        .entities
-        .actor_stats(actor)
-        .map(|stats| stats.speed)
-        .unwrap_or_default();
-    if !acts_on_turn(speed, turn) {
-        return MonsterIntent::Wait;
-    }
     if ai_kind == MonsterAiKind::Stationary {
         return MonsterIntent::Wait;
     }
     let player_id = world.player_id;
     let player_pos = world.player_pos();
+    if crate::systems::engrave::has_active_elbereth(world, player_pos)
+        && entity.actor_kind() != Some(ActorKind::Monster(MonsterKind::Minotaur))
+        && (actor_pos.chebyshev_distance(player_pos) <= 1
+            || vision::monster_has_line_of_sight_to_player(world, actor))
+    {
+        return choose_flee_intent(world, actor, actor_pos, player_pos);
+    }
     if actor_pos.chebyshev_distance(player_pos) <= 1 {
         return MonsterIntent::MeleeAttack {
             attacker: actor,
@@ -244,6 +342,7 @@ fn decide_monster_intent(
     }
 }
 
+#[cfg(test)]
 fn acts_on_turn(speed: i16, turn: u64) -> bool {
     if speed <= 0 || turn == 0 {
         return false;
@@ -296,6 +395,41 @@ fn choose_chase_intent(
         }
     }
     MonsterIntent::Wait
+}
+
+fn choose_flee_intent(
+    world: &GameWorld,
+    actor: EntityId,
+    actor_pos: Pos,
+    player_pos: Pos,
+) -> MonsterIntent {
+    let current = (
+        actor_pos.chebyshev_distance(player_pos),
+        manhattan_distance(actor_pos, player_pos),
+    );
+    let mut best_dir = None;
+    let mut best_score = current;
+    for direction in Direction::ALL {
+        if !movement::is_passable_for_actor(world, actor, direction) {
+            continue;
+        }
+        let to = actor_pos.offset(direction.delta());
+        let next = (
+            to.chebyshev_distance(player_pos),
+            manhattan_distance(to, player_pos),
+        );
+        if next > best_score {
+            best_score = next;
+            best_dir = Some(direction);
+        }
+    }
+    match best_dir {
+        Some(direction) => MonsterIntent::Move {
+            entity: actor,
+            direction,
+        },
+        None => MonsterIntent::Wait,
+    }
 }
 
 fn melee_intent_is_still_valid(world: &GameWorld, attacker: EntityId, defender: EntityId) -> bool {

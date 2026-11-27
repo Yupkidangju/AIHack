@@ -7,6 +7,16 @@ slot="melee"
 hit_bonus=1
 damage="1d4"
 base_price=4
+name="dagger"
+color="gray"
+material="iron"
+stackable=false
+damage_small="1d4"
+damage_large="1d3"
+tags=["weapon", "throwable", "blade"]
+spawn_depth_range=[1, 6]
+spawn_weight=25
+
 [[item]]
 id="item.food.ration"
 kind="food"
@@ -14,6 +24,14 @@ glyph="%"
 weight=20
 nutrition=800
 base_price=45
+name="food ration"
+color="brown"
+material="organic"
+stackable=true
+tags=["food", "ration"]
+spawn_depth_range=[1, 6]
+spawn_weight=30
+
 [[item]]
 id="item.potion.healing"
 kind="potion"
@@ -21,6 +39,15 @@ glyph="!"
 weight=20
 effect="heal_1d8_plus_4"
 base_price=50
+name="healing potion"
+color="bright_red"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "healing"]
+spawn_depth_range=[1, 6]
+spawn_weight=30
+
 [[item]]
 id="item.wand.magic_missile"
 kind="wand"
@@ -29,6 +56,14 @@ weight=7
 charges=3
 effect="magic_missile"
 base_price=175
+name="wand"
+color="cyan"
+material="wood"
+stackable=false
+tags=["wand", "attack"]
+spawn_depth_range=[1, 6]
+spawn_weight=12
+
 [[item]]
 id="item.scroll.identify"
 kind="scroll"
@@ -36,6 +71,15 @@ glyph="?"
 weight=5
 effect="identify"
 base_price=80
+name="identify scroll"
+color="white"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "utility"]
+spawn_depth_range=[1, 6]
+spawn_weight=22
+
 [[item]]
 id="item.scroll.reveal"
 kind="scroll"
@@ -43,6 +87,15 @@ glyph="?"
 weight=5
 effect="reveal"
 base_price=60
+name="reveal scroll"
+color="white"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "detection"]
+spawn_depth_range=[1, 6]
+spawn_weight=18
+
 [[item]]
 id="item.scroll.teleport"
 kind="scroll"
@@ -50,6 +103,15 @@ glyph="?"
 weight=5
 effect="teleport"
 base_price=100
+name="teleport scroll"
+color="white"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "escape"]
+spawn_depth_range=[1, 6]
+spawn_weight=14
+
 [[item]]
 id="item.armor.leather"
 kind="armor"
@@ -58,6 +120,14 @@ weight=15
 slot="body"
 ac_bonus=1
 base_price=8
+name="leather armor"
+color="brown"
+material="leather"
+stackable=false
+tags=["armor", "body"]
+spawn_depth_range=[1, 4]
+spawn_weight=20
+
 [[item]]
 id="item.weapon.rock"
 kind="weapon"
@@ -67,6 +137,16 @@ slot="melee"
 hit_bonus=0
 damage="1d3"
 base_price=1
+name="rock"
+color="gray"
+material="mineral"
+stackable=true
+damage_small="1d3"
+damage_large="1d3"
+tags=["weapon", "throwable", "ammo"]
+spawn_depth_range=[1, 6]
+spawn_weight=30
+
 [[item]]
 id="item.corpse.jackal"
 kind="corpse"
@@ -74,12 +154,25 @@ glyph="%"
 weight=12
 nutrition=50
 base_price=0
+name="jackal corpse"
+color="brown"
+material="organic"
+stackable=false
+tags=["corpse"]
+
 [[item]]
 id="item.quest.ascension"
 kind="quest"
 glyph='"'
 weight=1
 base_price=0
+name="Amulet of Ascension"
+color="bright_yellow"
+material="gold"
+stackable=false
+tags=["quest", "unique"]
+artifact_id="amulet_of_ascension"
+
 [[item]]
 id="item.weapon.short_sword"
 kind="weapon"
@@ -89,6 +182,16 @@ slot="melee"
 hit_bonus=1
 damage="1d6"
 base_price=10
+name="short sword"
+color="gray"
+material="iron"
+stackable=false
+damage_small="1d6"
+damage_large="1d8"
+tags=["weapon", "blade"]
+spawn_depth_range=[1, 6]
+spawn_weight=20
+
 [[item]]
 id="item.weapon.mace"
 kind="weapon"
@@ -98,6 +201,16 @@ slot="melee"
 hit_bonus=1
 damage="1d6"
 base_price=8
+name="mace"
+color="gray"
+material="iron"
+stackable=false
+damage_small="1d6"
+damage_large="1d6"
+tags=["weapon", "blunt"]
+spawn_depth_range=[1, 6]
+spawn_weight=18
+
 [[item]]
 id="item.armor.chain_mail"
 kind="armor"
@@ -106,6 +219,14 @@ weight=35
 slot="body"
 ac_bonus=3
 base_price=75
+name="chain mail"
+color="gray"
+material="iron"
+stackable=false
+tags=["armor", "body"]
+spawn_depth_range=[2, 6]
+spawn_weight=14
+
 [[item]]
 id="item.potion.extra_healing"
 kind="potion"
@@ -113,6 +234,15 @@ glyph="!"
 weight=20
 effect="heal_2d8_plus_8"
 base_price=100
+name="extra healing potion"
+color="red"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "healing"]
+spawn_depth_range=[2, 6]
+spawn_weight=18
+
 [[item]]
 id="item.scroll.charging"
 kind="scroll"
@@ -120,6 +250,15 @@ glyph="?"
 weight=5
 effect="charging"
 base_price=60
+name="charging scroll"
+color="white"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "utility"]
+spawn_depth_range=[2, 6]
+spawn_weight=14
+
 [[item]]
 id="item.scroll.enchant_weapon"
 kind="scroll"
@@ -127,6 +266,15 @@ glyph="?"
 weight=5
 effect="enchant_weapon"
 base_price=60
+name="enchant weapon scroll"
+color="white"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "enchant"]
+spawn_depth_range=[1, 6]
+spawn_weight=15
+
 [[item]]
 id="item.scroll.enchant_armor"
 kind="scroll"
@@ -134,6 +282,15 @@ glyph="?"
 weight=5
 effect="enchant_armor"
 base_price=80
+name="enchant armor scroll"
+color="white"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "enchant"]
+spawn_depth_range=[1, 6]
+spawn_weight=14
+
 [[item]]
 id="item.scroll.remove_curse"
 kind="scroll"
@@ -141,6 +298,15 @@ glyph="?"
 weight=5
 effect="remove_curse"
 base_price=80
+name="remove curse scroll"
+color="white"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "utility"]
+spawn_depth_range=[1, 6]
+spawn_weight=14
+
 [[item]]
 id="item.potion.cure"
 kind="potion"
@@ -148,6 +314,15 @@ glyph="!"
 weight=20
 effect="cure_status"
 base_price=90
+name="cure potion"
+color="green"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "cure"]
+spawn_depth_range=[1, 6]
+spawn_weight=18
+
 [[item]]
 id="item.wand.fire"
 kind="wand"
@@ -156,6 +331,14 @@ weight=7
 charges=4
 effect="fire"
 base_price=150
+name="wand of fire"
+color="red"
+material="wood"
+stackable=false
+tags=["wand", "fire", "attack"]
+spawn_depth_range=[2, 6]
+spawn_weight=10
+
 [[item]]
 id="item.ring.poison_resistance"
 kind="ring"
@@ -164,6 +347,16 @@ weight=3
 slot="ring"
 effect="poison_resistance"
 base_price=150
+name="ring of poison resistance"
+color="green"
+material="silver"
+unidentified_pool="ring"
+stackable=false
+effects=["poison"]
+tags=["ring", "resistance"]
+spawn_depth_range=[2, 6]
+spawn_weight=10
+
 [[item]]
 id="item.ring.fire_resistance"
 kind="ring"
@@ -172,6 +365,16 @@ weight=3
 slot="ring"
 effect="fire_resistance"
 base_price=150
+name="ring of fire resistance"
+color="red"
+material="gold"
+unidentified_pool="ring"
+stackable=false
+effects=["fire"]
+tags=["ring", "resistance"]
+spawn_depth_range=[2, 6]
+spawn_weight=10
+
 [[item]]
 id="item.ring.protection"
 kind="ring"
@@ -181,3 +384,418 @@ slot="ring"
 effect="protection"
 ac_bonus=1
 base_price=120
+name="ring of protection"
+color="blue"
+material="iron"
+unidentified_pool="ring"
+stackable=false
+effects=["protection"]
+tags=["ring", "defense"]
+spawn_depth_range=[1, 6]
+spawn_weight=12
+
+[[item]]
+id="item.armor.small_shield"
+kind="armor"
+glyph="["
+weight=25
+slot="shield"
+ac_bonus=1
+base_price=15
+name="small shield"
+color="gray"
+material="wood"
+stackable=false
+tags=["armor", "shield"]
+spawn_depth_range=[1, 6]
+spawn_weight=18
+
+[[item]]
+id="item.armor.iron_helm"
+kind="armor"
+glyph="["
+weight=20
+slot="helm"
+ac_bonus=1
+base_price=20
+name="iron helm"
+color="gray"
+material="iron"
+stackable=false
+tags=["armor", "helm"]
+spawn_depth_range=[1, 6]
+spawn_weight=16
+
+[[item]]
+id="item.armor.cloak_protection"
+kind="armor"
+glyph="["
+weight=10
+slot="cloak"
+ac_bonus=1
+base_price=50
+name="cloak of protection"
+color="blue"
+material="cloth"
+stackable=false
+tags=["armor", "cloak"]
+spawn_depth_range=[2, 6]
+spawn_weight=12
+
+[[item]]
+id="item.armor.leather_gloves"
+kind="armor"
+glyph="["
+weight=10
+slot="gloves"
+ac_bonus=1
+base_price=16
+name="leather gloves"
+color="brown"
+material="leather"
+stackable=false
+tags=["armor", "gloves"]
+spawn_depth_range=[1, 6]
+spawn_weight=16
+
+[[item]]
+id="item.armor.low_boots"
+kind="armor"
+glyph="["
+weight=10
+slot="boots"
+ac_bonus=1
+base_price=18
+name="low boots"
+color="brown"
+material="leather"
+stackable=false
+tags=["armor", "boots"]
+spawn_depth_range=[1, 6]
+spawn_weight=16
+
+[[item]]
+id="item.amulet.esp"
+kind="amulet"
+glyph='"'
+weight=10
+slot="amulet"
+ac_bonus=0
+base_price=150
+name="amulet of ESP"
+color="yellow"
+material="silver"
+unidentified_pool="amulet"
+stackable=false
+effects=["telepathy"]
+tags=["amulet", "telepathy"]
+spawn_depth_range=[2, 6]
+spawn_weight=8
+
+[[item]]
+id="item.potion.speed"
+kind="potion"
+glyph="!"
+weight=20
+effect="speed"
+base_price=100
+name="speed potion"
+color="cyan"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "buff"]
+spawn_depth_range=[2, 6]
+spawn_weight=12
+
+[[item]]
+id="item.potion.blindness"
+kind="potion"
+glyph="!"
+weight=20
+effect="blindness"
+base_price=60
+name="blindness potion"
+color="black"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "status"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.potion.confusion"
+kind="potion"
+glyph="!"
+weight=20
+effect="confusion"
+base_price=60
+name="confusion potion"
+color="orange"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "status"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.potion.hallucination"
+kind="potion"
+glyph="!"
+weight=20
+effect="hallucination"
+base_price=70
+name="hallucination potion"
+color="bright_magenta"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "status"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.potion.invisibility"
+kind="potion"
+glyph="!"
+weight=20
+effect="invisibility"
+base_price=120
+name="invisibility potion"
+color="white"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "buff"]
+spawn_depth_range=[2, 6]
+spawn_weight=10
+
+[[item]]
+id="item.potion.levitation"
+kind="potion"
+glyph="!"
+weight=20
+effect="levitation"
+base_price=110
+name="levitation potion"
+color="bright_blue"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "buff"]
+spawn_depth_range=[2, 6]
+spawn_weight=10
+
+[[item]]
+id="item.corpse.generic"
+kind="corpse"
+glyph="%"
+weight=20
+nutrition=100
+base_price=0
+name="corpse"
+color="red"
+material="organic"
+stackable=false
+tags=["corpse"]
+
+[[item]]
+id="item.tool.skeleton_key"
+kind="tool"
+glyph="("
+weight=3
+tool_action="unlock"
+base_price=10
+name="skeleton key"
+color="gray"
+material="iron"
+stackable=false
+tags=["tool", "unlock"]
+spawn_depth_range=[1, 6]
+spawn_weight=12
+
+[[item]]
+id="item.tool.lock_pick"
+kind="tool"
+glyph="("
+weight=4
+tool_action="unlock"
+base_price=20
+name="lock pick"
+color="gray"
+material="iron"
+stackable=false
+tags=["tool", "unlock"]
+spawn_depth_range=[2, 6]
+spawn_weight=10
+
+[[item]]
+id="item.tool.pick_axe"
+kind="tool"
+glyph="("
+weight=35
+tool_action="dig"
+base_price=50
+name="pick-axe"
+color="gray"
+material="iron"
+stackable=false
+tags=["tool", "dig"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.tool.dwarvish_mattock"
+kind="tool"
+glyph="("
+weight=30
+tool_action="dig"
+base_price=60
+name="dwarvish mattock"
+color="gray"
+material="steel"
+stackable=false
+tags=["tool", "dig"]
+spawn_depth_range=[3, 6]
+spawn_weight=8
+
+[[item]]
+id="item.tool.tin_whistle"
+kind="tool"
+glyph="("
+weight=3
+tool_action="music"
+base_price=10
+name="tin whistle"
+color="gray"
+material="iron"
+stackable=false
+tags=["tool", "music"]
+spawn_depth_range=[1, 5]
+spawn_weight=12
+
+[[item]]
+id="item.tool.oil_lamp"
+kind="tool"
+glyph="("
+weight=20
+tool_action="light"
+charges=150
+base_price=15
+name="oil lamp"
+color="yellow"
+material="iron"
+stackable=false
+tags=["tool", "light"]
+spawn_depth_range=[1, 6]
+spawn_weight=14
+
+[[item]]
+id="item.tool.blindfold"
+kind="tool"
+glyph="("
+weight=2
+tool_action="blindfold"
+base_price=20
+name="blindfold"
+color="white"
+material="cloth"
+stackable=false
+tags=["tool", "status"]
+spawn_depth_range=[2, 6]
+spawn_weight=10
+
+[[item]]
+id="item.tool.unicorn_horn"
+kind="tool"
+glyph="("
+weight=20
+tool_action="magic"
+base_price=100
+name="unicorn horn"
+color="white"
+material="organic"
+stackable=false
+tags=["tool", "cure"]
+spawn_depth_range=[3, 6]
+spawn_weight=8
+
+[[item]]
+id="item.tool.sack"
+kind="tool"
+glyph="("
+weight=15
+tool_action="container"
+container_capacity=200
+base_price=2
+name="sack"
+color="brown"
+material="cloth"
+stackable=false
+tags=["tool", "container"]
+spawn_depth_range=[1, 6]
+spawn_weight=16
+
+[[item]]
+id="item.tool.bag_of_holding"
+kind="tool"
+glyph="("
+weight=15
+tool_action="container"
+container_capacity=400
+base_price=100
+name="bag of holding"
+color="bright_blue"
+material="cloth"
+stackable=false
+tags=["tool", "container"]
+spawn_depth_range=[3, 6]
+spawn_weight=6
+
+[[item]]
+id="item.tool.chest"
+kind="tool"
+glyph="("
+weight=60
+tool_action="container"
+container_capacity=500
+base_price=16
+name="chest"
+color="brown"
+material="wood"
+stackable=false
+tags=["tool", "container"]
+spawn_depth_range=[2, 6]
+spawn_weight=8
+
+[[item]]
+id="item.potion.water"
+kind="potion"
+glyph="!"
+weight=20
+effect="water"
+base_price=5
+name="potion of water"
+color="cyan"
+material="glass"
+stackable=true
+tags=["potion", "water"]
+spawn_depth_range=[1, 6]
+spawn_weight=18
+
+[[item]]
+id="item.scroll.blank"
+kind="scroll"
+glyph="?"
+weight=5
+effect="blank"
+base_price=10
+name="blank paper scroll"
+color="white"
+material="paper"
+stackable=true
+tags=["scroll", "blank"]
+spawn_depth_range=[1, 6]
+spawn_weight=12

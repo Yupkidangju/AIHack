@@ -20,7 +20,7 @@ fn selected_role_bootstraps_real_campaign_and_v2_save() {
         assert_eq!(session.observation().player.max_hp, role.base_hp());
         assert_eq!(session.world().levels.len(), 8);
         let save = session.to_save_data();
-        assert_eq!(save.schema_version, 2);
+        assert_eq!(save.schema_version, 3);
         let restored = GameSession::from_save_data(save).unwrap();
         assert_eq!(
             session.snapshot().stable_hash(),
@@ -39,11 +39,8 @@ fn roles_and_level_thresholds_are_bounded_and_distinct() {
     assert_eq!(Role::Cleric.base_hit(), 3);
     assert_eq!(Role::Cleric.base_damage(), 1);
     for (xp, level) in [(0, 1), (19, 1), (20, 2), (179, 9), (180, 10)] {
-        let state = CampaignState {
-            role: Role::Knight,
-            xp,
-            amulet: EntityId(1),
-        };
+        let mut state = CampaignState::new(Role::Knight, EntityId(1));
+        state.xp = xp;
         assert_eq!(state.level(), level);
     }
 }
@@ -102,7 +99,7 @@ fn player_kills_produce_xp_and_growth_is_consumed_by_actor_stats() {
         .entities
         .actor_stats(session.world().player_id)
         .unwrap();
-    assert_eq!(stats.max_hp, 32);
+    assert_eq!(stats.max_hp, 33);
     assert_eq!(stats.hit_bonus, 5);
     assert_eq!(stats.damage_bonus, 3);
     GameSession::from_save_data(session.to_save_data()).unwrap();
@@ -138,6 +135,8 @@ fn player_kills_produce_xp_and_growth_is_consumed_by_actor_stats() {
     stats.hp = stats.hp.min(28);
     stats.hit_bonus = 4;
     stats.damage_bonus = 2;
+    low.world.max_mp = Role::Knight.base_mp();
+    low.world.mp = low.world.mp.min(low.world.max_mp);
     let mut high = GameSession::from_save_data(high).unwrap();
     let mut low = GameSession::from_save_data(low).unwrap();
     let attack_roll = |outcome: aihack_core::turn::TurnOutcome| {
@@ -219,6 +218,10 @@ fn route(
                     session.world().current_map().tile(next),
                     Ok(TileKind::Floor
                         | TileKind::Shop
+                        | TileKind::Altar
+                        | TileKind::Fountain
+                        | TileKind::DryFountain
+                        | TileKind::Sink
                         | TileKind::StairsUp
                         | TileKind::StairsDown
                         | TileKind::Door(_)
@@ -246,6 +249,7 @@ fn route(
 
 fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
     use aihack_core::{
+        campaign::SpellKind,
         domain::{
             entity::ActorKind,
             item::ItemKind,
@@ -254,10 +258,7 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
         },
         position::Direction,
     };
-    for _ in 0..1000 {
-        if session.world().player_pos() == target {
-            return;
-        }
+    for _ in 0..2000 {
         let observation = session.observation();
         assert!(
             session.world().player_alive(),
@@ -274,6 +275,19 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             assert!(session.submit(C::Wait).accepted);
             continue;
         }
+        if session.world().player_pos() == target {
+            return;
+        }
+        if observation.player.hunger < 180 {
+            if let Some(ration) = observation
+                .inventory
+                .iter()
+                .find(|i| i.kind == ItemKind::FoodRation)
+            {
+                assert!(session.submit(C::Eat { item: ration.item }).accepted);
+                continue;
+            }
+        }
         if observation.player.poison_turns > 0 {
             if let Some(cure) = observation
                 .inventory
@@ -282,6 +296,16 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             {
                 assert!(session.submit(C::Quaff { item: cure.item }).accepted);
                 continue;
+            }
+            if session.world().campaign.map(|c| c.role) == Some(Role::Cleric) {
+                let heal_cmd = C::Cast {
+                    spell: SpellKind::Heal,
+                    direction: None,
+                };
+                if observation.legal_actions.contains(&heal_cmd) {
+                    assert!(session.submit(heal_cmd).accepted);
+                    continue;
+                }
             }
         }
         let healing = observation.inventory.iter().find(|i| {
@@ -304,6 +328,14 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             continue;
         }
         if observation.player.hp * 3 < observation.player.max_hp * 2 {
+            let heal_cmd = C::Cast {
+                spell: SpellKind::Heal,
+                direction: None,
+            };
+            if observation.legal_actions.contains(&heal_cmd) {
+                assert!(session.submit(heal_cmd).accepted);
+                continue;
+            }
             if let Some(item) = healing {
                 assert!(session.submit(C::Quaff { item: item.item }).accepted);
                 continue;
@@ -324,6 +356,15 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             });
             if is_floating_eye || !observation.legal_actions.contains(&C::Move(dir)) {
                 continue;
+            }
+            let bolt_cmd = C::Cast {
+                spell: SpellKind::ForceBolt,
+                direction: Some(dir),
+            };
+            if observation.legal_actions.contains(&bolt_cmd) {
+                assert!(session.submit(bolt_cmd).accepted);
+                fought = true;
+                break;
             }
             if let Some(wand_cmd) = observation
                 .inventory
@@ -628,10 +669,15 @@ fn generator_is_repeatable_seed_sensitive_and_every_floor_is_connected() {
                 .entities
                 .set_actor_location(save.world.player_id, level.id, up);
             let probe = GameSession::from_save_data(save).unwrap();
-            for y in 0..20 {
-                for x in 0..40 {
+            for y in 0..level.map.height {
+                for x in 0..level.map.width {
                     let pos = aihack_core::position::Pos { x, y };
-                    if level.map.tile(pos).unwrap() != aihack_core::domain::tile::TileKind::Wall {
+                    if !matches!(
+                        level.map.tile(pos).unwrap(),
+                        aihack_core::domain::tile::TileKind::Wall
+                            | aihack_core::domain::tile::TileKind::Water
+                            | aihack_core::domain::tile::TileKind::Lava
+                    ) {
                         route(&probe, pos);
                     }
                 }
@@ -686,7 +732,8 @@ fn actual_ui_role_buttons_and_victory_restart_work_at_minimum_size() {
         click_ui(&mut app, label, 60, 24);
         assert_eq!(app.observation().campaign.unwrap().role, role);
         let lines = aihack_tui::tui::render_panels::status_lines(&app.observation());
-        assert!(lines.iter().any(|line| line.contains("/120")));
+        let expected_cap = format!("/{}", role.base_attributes().carrying_capacity());
+        assert!(lines.iter().any(|line| line.contains(&expected_cap)));
     }
     let victory = tour(42, Role::Knight);
     assert_eq!(
@@ -769,10 +816,7 @@ fn campaign_rejects_schema_topology_goal_and_growth_tampering_without_panics() {
 
 #[test]
 fn campaign_teleport_uses_generated_landing_and_remains_loadable() {
-    use aihack_core::{
-        domain::{entity::EntityLocation, item::ItemKind},
-        ids::LevelId,
-    };
+    use aihack_core::domain::{entity::EntityLocation, item::ItemKind};
     let mut save = start(42, Role::Knight).to_save_data();
     let item = save
         .world
@@ -791,15 +835,14 @@ fn campaign_teleport_uses_generated_landing_and_remains_loadable() {
         .unwrap();
     save.world.entities.set_item_letter(item, letter);
     let mut session = GameSession::from_save_data(save).unwrap();
+    let from = session.world().current_level();
     assert!(session.submit(C::Read { item }).accepted);
-    assert_eq!(session.world().current_level(), LevelId::main(2));
+    let landed = session.world().current_level();
+    assert_ne!(landed, from);
+    assert_eq!(landed.branch, from.branch);
     assert_eq!(
         session.world().player_pos(),
-        session
-            .world()
-            .levels
-            .stairs_up_pos(LevelId::main(2))
-            .unwrap()
+        session.world().levels.stairs_up_pos(landed).unwrap()
     );
     GameSession::from_save_data(session.to_save_data()).unwrap();
 }

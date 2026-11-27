@@ -57,7 +57,7 @@ fn player_factory_matches_phase3_spec() {
     let player = adventurer_template();
 
     assert_eq!(player.hp, 16);
-    assert_eq!(player.ac, 0);
+    assert_eq!(player.ac, 10);
     assert_eq!(player.hit_bonus, 2);
     assert_eq!(player.damage_bonus, 0);
     assert_eq!(player.attack_profile.hit_bonus, 1);
@@ -80,7 +80,7 @@ fn monster_factories_match_phase3_spec() {
             jackal.hit_bonus,
             jackal.attack_profile.damage
         ),
-        (4, 0, 0, DamageRoll { dice: 1, sides: 2 })
+        (4, 10, 0, DamageRoll { dice: 1, sides: 2 })
     );
     assert_eq!(
         (
@@ -89,7 +89,7 @@ fn monster_factories_match_phase3_spec() {
             goblin.hit_bonus,
             goblin.attack_profile.damage
         ),
-        (6, 1, 1, DamageRoll { dice: 1, sides: 4 })
+        (6, 9, 1, DamageRoll { dice: 1, sides: 4 })
     );
     assert_eq!(
         (
@@ -98,7 +98,7 @@ fn monster_factories_match_phase3_spec() {
             floating_eye.hit_bonus,
             floating_eye.attack_profile.damage
         ),
-        (8, 2, 0, DamageRoll { dice: 0, sides: 0 })
+        (8, 8, 0, DamageRoll { dice: 0, sides: 0 })
     );
 }
 
@@ -120,6 +120,8 @@ fn hit_formula_uses_d20_bonuses_and_defense() {
                 damage: DamageRoll { dice: 1, sides: 4 },
                 weapon_hit_bonus: 1,
                 speed: 12,
+                energy: 0,
+                resistances: aihack_core::domain::status::Resistances::NONE,
                 ai_kind: None,
                 passive: None,
                 difficulty: 0,
@@ -141,6 +143,8 @@ fn hit_formula_uses_d20_bonuses_and_defense() {
                 damage: DamageRoll { dice: 1, sides: 2 },
                 weapon_hit_bonus: 0,
                 speed: 12,
+                energy: 0,
+                resistances: aihack_core::domain::status::Resistances::NONE,
                 ai_kind: None,
                 passive: None,
                 difficulty: 0,

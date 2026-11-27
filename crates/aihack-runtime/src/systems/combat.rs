@@ -1,5 +1,5 @@
 use aihack_core::{
-    domain::{combat::AttackProfile, entity::Entity, item::BucStatus},
+    domain::{combat::AttackProfile, entity::Entity, item::BucStatus, status::HungerState},
     event::GameEvent,
     ids::EntityId,
     rng::GameRng,
@@ -20,16 +20,32 @@ pub fn resolve_attack(
     let mut extra_damage_bonus = 0_i16;
     if attacker_id == world.player_id {
         profile.hit_bonus = profile.hit_bonus.saturating_add(world.luck);
+        if let Some(campaign) = world.campaign {
+            profile.hit_bonus = profile
+                .hit_bonus
+                .saturating_add(campaign.attributes.dex_hit_bonus());
+            extra_damage_bonus =
+                extra_damage_bonus.saturating_add(campaign.attributes.melee_damage_bonus());
+        }
+        if matches!(
+            world.hunger_state(),
+            HungerState::Weak | HungerState::Fainting
+        ) {
+            profile.hit_bonus = profile.hit_bonus.saturating_sub(2);
+        }
         if let Some(weapon_id) = world.inventory.equipped_melee {
             if let Some(weapon) = world.entities.get(weapon_id) {
                 let enchant = i16::from(weapon.item_enchantment().unwrap_or(0));
+                let erosion = i16::from(weapon.item_erosion().unwrap_or(0));
                 let buc = weapon.item_buc().unwrap_or(BucStatus::Uncursed);
                 let bless_hit = if buc == BucStatus::Blessed { 1 } else { 0 };
                 profile.hit_bonus = profile
                     .hit_bonus
                     .saturating_add(enchant)
                     .saturating_add(bless_hit);
-                extra_damage_bonus = extra_damage_bonus.saturating_add(enchant);
+                extra_damage_bonus = extra_damage_bonus
+                    .saturating_add(enchant)
+                    .saturating_sub(erosion);
             }
         }
     }

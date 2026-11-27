@@ -1,8 +1,11 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use aihack_content::ContentRegistry;
 use aihack_core::{
     domain::{
         inventory::Inventory,
         level::{LevelRegistry, PHASE5_LEVEL1_ID},
+        status::{Resistances, StatusTimers},
     },
     error::ContentError,
     ids::EntityId,
@@ -94,6 +97,13 @@ pub(crate) fn campaign_world(
                         y: centers[2].y + 1,
                     },
                 ),
+                (
+                    MonsterKind::Dragon,
+                    Pos {
+                        x: centers[3].x - 1,
+                        y: centers[3].y,
+                    },
+                ),
             ],
             (aihack_core::ids::BranchId::Mines, 1) => vec![
                 (MonsterKind::Kobold, centers[2]),
@@ -111,6 +121,7 @@ pub(crate) fn campaign_world(
                         y: centers[3].y + 1,
                     },
                 ),
+                (MonsterKind::Bat, centers[4]),
             ],
             _ => vec![
                 (MonsterKind::Orc, centers[2]),
@@ -119,6 +130,13 @@ pub(crate) fn campaign_world(
                     Pos {
                         x: centers[2].x + 1,
                         y: centers[2].y + 1,
+                    },
+                ),
+                (
+                    MonsterKind::Minotaur,
+                    Pos {
+                        x: centers[3].x - 1,
+                        y: centers[3].y,
                     },
                 ),
             ],
@@ -147,15 +165,53 @@ pub(crate) fn campaign_world(
             ),
         ];
         match (id.branch, id.depth) {
-            (aihack_core::ids::BranchId::Main, 1) => floor_items.push((
-                ItemKind::ScrollEnchantWeapon,
-                Pos {
-                    x: centers[1].x,
-                    y: centers[1].y + 1,
-                },
-                BucStatus::Uncursed,
-                0,
-            )),
+            (aihack_core::ids::BranchId::Main, 1) => {
+                floor_items.push((
+                    ItemKind::ScrollEnchantWeapon,
+                    Pos {
+                        x: centers[1].x,
+                        y: centers[1].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::OilLamp,
+                    Pos {
+                        x: centers[4].x + 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::Sack,
+                    Pos {
+                        x: centers[4].x - 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::SkeletonKey,
+                    Pos {
+                        x: centers[5].x + 1,
+                        y: centers[5].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::PotionWater,
+                    Pos {
+                        x: centers[5].x - 1,
+                        y: centers[5].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+            }
             (aihack_core::ids::BranchId::Main, 2) => {
                 floor_items.push((
                     ItemKind::ScrollCharging,
@@ -171,6 +227,34 @@ pub(crate) fn campaign_world(
                     Pos {
                         x: centers[1].x + 1,
                         y: centers[1].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((ItemKind::ArmorShield, centers[4], BucStatus::Uncursed, 0));
+                floor_items.push((
+                    ItemKind::PickAxe,
+                    Pos {
+                        x: centers[4].x + 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::TinWhistle,
+                    Pos {
+                        x: centers[4].x - 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::ScrollBlank,
+                    Pos {
+                        x: centers[5].x + 1,
+                        y: centers[5].y,
                     },
                     BucStatus::Uncursed,
                     0,
@@ -191,6 +275,34 @@ pub(crate) fn campaign_world(
                     Pos {
                         x: centers[1].x + 1,
                         y: centers[1].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((ItemKind::ArmorGloves, centers[4], BucStatus::Uncursed, 0));
+                floor_items.push((
+                    ItemKind::PotionWater,
+                    Pos {
+                        x: centers[4].x + 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Blessed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::Blindfold,
+                    Pos {
+                        x: centers[4].x - 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::BagOfHolding,
+                    Pos {
+                        x: centers[5].x + 1,
+                        y: centers[5].y,
                     },
                     BucStatus::Uncursed,
                     0,
@@ -224,6 +336,25 @@ pub(crate) fn campaign_world(
                     BucStatus::Uncursed,
                     0,
                 ));
+                floor_items.push((ItemKind::PotionSpeed, centers[4], BucStatus::Uncursed, 0));
+                floor_items.push((
+                    ItemKind::UnicornHorn,
+                    Pos {
+                        x: centers[4].x + 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::DwarvishMattock,
+                    Pos {
+                        x: centers[4].x - 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
             (aihack_core::ids::BranchId::Main, 5) => {
                 floor_items.push((
@@ -244,16 +375,38 @@ pub(crate) fn campaign_world(
                     BucStatus::Uncursed,
                     0,
                 ));
+                floor_items.push((ItemKind::ArmorCloak, centers[5], BucStatus::Uncursed, 0));
+                floor_items.push((
+                    ItemKind::PotionWater,
+                    Pos {
+                        x: centers[4].x + 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Cursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::LockPick,
+                    Pos {
+                        x: centers[4].x - 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
-            (aihack_core::ids::BranchId::Main, 6) => floor_items.push((
-                ItemKind::PotionExtraHealing,
-                Pos {
-                    x: centers[1].x,
-                    y: centers[1].y + 1,
-                },
-                BucStatus::Uncursed,
-                0,
-            )),
+            (aihack_core::ids::BranchId::Main, 6) => {
+                floor_items.push((
+                    ItemKind::PotionExtraHealing,
+                    Pos {
+                        x: centers[1].x,
+                        y: centers[1].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((ItemKind::ArmorBoots, centers[5], BucStatus::Uncursed, 0));
+            }
             (aihack_core::ids::BranchId::Mines, 1) => {
                 floor_items.push((
                     ItemKind::ShortSword,
@@ -291,6 +444,34 @@ pub(crate) fn campaign_world(
                     BucStatus::Uncursed,
                     0,
                 ));
+                floor_items.push((ItemKind::ArmorHelm, centers[5], BucStatus::Uncursed, 0));
+                floor_items.push((
+                    ItemKind::PickAxe,
+                    Pos {
+                        x: centers[4].x + 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::OilLamp,
+                    Pos {
+                        x: centers[4].x - 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::Sack,
+                    Pos {
+                        x: centers[5].x + 1,
+                        y: centers[5].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
             (aihack_core::ids::BranchId::Mines, 2) => {
                 floor_items.push((
@@ -320,6 +501,16 @@ pub(crate) fn campaign_world(
                     BucStatus::Uncursed,
                     1,
                 ));
+                floor_items.push((ItemKind::AmuletEsp, centers[4], BucStatus::Uncursed, 0));
+                floor_items.push((
+                    ItemKind::UnicornHorn,
+                    Pos {
+                        x: centers[4].x + 1,
+                        y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
             _ => {}
         }
@@ -332,6 +523,50 @@ pub(crate) fn campaign_world(
             )?;
             state.entities.set_item_buc(item_id, buc);
             state.entities.set_item_enchantment(item_id, enchantment);
+        }
+        if matches!(
+            (id.branch, id.depth),
+            (aihack_core::ids::BranchId::Main, 2) | (aihack_core::ids::BranchId::Mines, 2)
+        ) {
+            let chest_pos = Pos {
+                x: centers[5].x - 1,
+                y: centers[5].y,
+            };
+            let chest_id = spawn_item(
+                &mut state.entities,
+                registry,
+                ItemKind::Chest,
+                EntityLocation::OnMap {
+                    level: id,
+                    pos: chest_pos,
+                },
+            )?;
+            state.entities.set_item_container_locked(chest_id, true);
+            state.entities.set_item_container_trapped(chest_id, true);
+            let contents: &[(ItemKind, BucStatus, i8)] = if id == LevelId::main(2) {
+                &[
+                    (ItemKind::PotionExtraHealing, BucStatus::Uncursed, 0),
+                    (ItemKind::LockPick, BucStatus::Uncursed, 0),
+                ]
+            } else {
+                &[
+                    (ItemKind::RingProtection, BucStatus::Blessed, 1),
+                    (ItemKind::PotionWater, BucStatus::Blessed, 0),
+                ]
+            };
+            for &(child_kind, child_buc, child_enchant) in contents {
+                let child_id = spawn_item(
+                    &mut state.entities,
+                    registry,
+                    child_kind,
+                    EntityLocation::InContainer {
+                        container: chest_id,
+                    },
+                )?;
+                state.entities.set_item_buc(child_id, child_buc);
+                state.entities.set_item_enchantment(child_id, child_enchant);
+                state.entities.push_contained_item(chest_id, child_id);
+            }
         }
         if id == LevelId::main(6) {
             amulet = Some(spawn_item(
@@ -382,12 +617,10 @@ pub(crate) fn campaign_world(
             .add_existing_with_next_letter(item)
             .expect("campaign starts with fewer than 52 items");
         state.entities.set_item_letter(item, letter);
+        state.entities.set_item_buc_known(item, true);
+        state.entities.set_item_enchant_known(item, true);
     }
-    let campaign = CampaignState {
-        role,
-        xp: 0,
-        amulet: amulet.expect("Main 6 was generated"),
-    };
+    let campaign = CampaignState::new(role, amulet.expect("Main 6 was generated"));
     let stats = state
         .entities
         .actor_stats_mut(state.player_id)
@@ -398,7 +631,21 @@ pub(crate) fn campaign_world(
     stats.damage_bonus = campaign.damage_bonus();
     state.campaign = Some(campaign);
     state.gold = 50;
+    state.max_mp = campaign.max_mp();
+    state.mp = campaign.max_mp();
+    state.ascension_pursuit_stage = 0;
+    mark_level_initial_explored(&mut state);
     Ok(state)
+}
+
+fn mark_level_initial_explored(state: &mut WorldState<EntityStore>) {
+    let Some((_, pos)) = state.entities.actor_location(state.player_id) else {
+        return;
+    };
+    if let Some(level) = state.levels.get_mut(state.current_level) {
+        let visible = aihack_core::vision::visible_positions(&level.map, pos);
+        level.mark_explored(&visible);
+    }
 }
 
 fn spawn_item(
@@ -488,7 +735,7 @@ pub fn initial_world(registry: &ContentRegistry) -> Result<WorldState<EntityStor
             },
         )?;
     }
-    Ok(WorldState {
+    let mut state = WorldState {
         campaign: None,
         levels: LevelRegistry::from_layouts(registry.levels())?,
         current_level: PHASE5_LEVEL1_ID,
@@ -504,6 +751,18 @@ pub fn initial_world(registry: &ContentRegistry) -> Result<WorldState<EntityStor
         kill_count: 0,
         gold: 0,
         identified_items: Vec::new(),
+        mp: 0,
+        max_mp: 0,
+        ascension_pursuit_stage: 0,
+        intrinsic_resistances: Resistances::NONE,
+        status_timers: StatusTimers::default(),
+        weapon_skills: BTreeMap::new(),
+        spell_skill: BTreeMap::new(),
+        learned_spells: Vec::new(),
+        generated_artifacts: BTreeSet::new(),
+        ascension_altars: Vec::new(),
         last_death_cause: None,
-    })
+    };
+    mark_level_initial_explored(&mut state);
+    Ok(state)
 }

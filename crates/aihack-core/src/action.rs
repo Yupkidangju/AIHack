@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{domain::item::ItemKind, ids::EntityId, position::Direction};
+use crate::{
+    campaign::SpellKind,
+    domain::item::{EquipmentSlot, ItemKind},
+    ids::EntityId,
+    position::Direction,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NarrativeTopic {
@@ -24,6 +29,38 @@ pub enum InventoryAction {
     Read,
     PutOn,
     Sell,
+    Offer,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DipTarget {
+    Item(EntityId),
+    Tile,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EngravingMethod {
+    Fingers,
+    Item(EntityId),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EngravingText {
+    Elbereth,
+    Warning,
+    Safe,
+    XMark,
+}
+
+impl EngravingText {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Elbereth => "Elbereth",
+            Self::Warning => "Beware!",
+            Self::Safe => "Safe",
+            Self::XMark => "X",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -58,6 +95,9 @@ pub enum CommandIntent {
         item: EntityId,
     },
     RemoveRing,
+    TakeOff {
+        slot: EquipmentSlot,
+    },
     Buy {
         kind: ItemKind,
     },
@@ -77,7 +117,39 @@ pub enum CommandIntent {
     Read {
         item: EntityId,
     },
+    Identify {
+        scroll: EntityId,
+        target: EntityId,
+    },
+    Offer {
+        item: EntityId,
+    },
+    Cast {
+        spell: SpellKind,
+        direction: Option<Direction>,
+    },
     Pray,
+    Apply {
+        item: EntityId,
+        direction: Option<Direction>,
+    },
+    ContainerPut {
+        container: EntityId,
+        item: EntityId,
+    },
+    ContainerTake {
+        container: EntityId,
+        item: EntityId,
+    },
+    Dip {
+        item: EntityId,
+        target: DipTarget,
+    },
+    Engrave {
+        method: EngravingMethod,
+        text: EngravingText,
+    },
+    Drink,
     Descend,
     Ascend,
     AcknowledgeMore,

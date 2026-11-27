@@ -741,34 +741,44 @@ impl TuiApp {
                 InventoryAction::Read => CommandIntent::Read { item: item.item },
                 InventoryAction::PutOn => CommandIntent::PutOn { item: item.item },
                 InventoryAction::Sell => CommandIntent::Sell { item: item.item },
+                InventoryAction::Offer => CommandIntent::Offer { item: item.item },
             },
-            _ => match item.kind {
-                ItemKind::Dagger | ItemKind::ShortSword | ItemKind::Mace => {
+            _ => match item
+                .item_class
+                .or_else(|| aihack_runtime::item_class(item.kind))
+            {
+                Some(aihack_ai_contract::ItemClass::Weapon) => {
                     CommandIntent::Wield { item: item.item }
                 }
-                ItemKind::ArmorLeather | ItemKind::ArmorChainMail => {
+                Some(aihack_ai_contract::ItemClass::Armor) => {
                     CommandIntent::Wear { item: item.item }
                 }
-                ItemKind::RingPoisonResistance
-                | ItemKind::RingFireResistance
-                | ItemKind::RingProtection => CommandIntent::PutOn { item: item.item },
-                ItemKind::PotionHealing | ItemKind::PotionExtraHealing | ItemKind::PotionCure => {
+                Some(
+                    aihack_ai_contract::ItemClass::Ring | aihack_ai_contract::ItemClass::Amulet,
+                ) => CommandIntent::PutOn { item: item.item },
+                Some(aihack_ai_contract::ItemClass::Potion) => {
                     CommandIntent::Quaff { item: item.item }
                 }
-                ItemKind::FoodRation | ItemKind::CorpseJackal => {
+                Some(aihack_ai_contract::ItemClass::Food) => CommandIntent::Eat { item: item.item },
+                Some(aihack_ai_contract::ItemClass::Corpse) => {
                     CommandIntent::Eat { item: item.item }
                 }
-                ItemKind::ScrollReveal
-                | ItemKind::ScrollIdentify
-                | ItemKind::ScrollLevelTeleport
-                | ItemKind::ScrollCharging
-                | ItemKind::ScrollEnchantWeapon
-                | ItemKind::ScrollEnchantArmor
-                | ItemKind::ScrollRemoveCurse => CommandIntent::Read { item: item.item },
-                ItemKind::WandMagicMissile
-                | ItemKind::WandFire
-                | ItemKind::Rock
-                | ItemKind::AmuletAscension => return None,
+                Some(aihack_ai_contract::ItemClass::Scroll) => {
+                    CommandIntent::Read { item: item.item }
+                }
+                Some(aihack_ai_contract::ItemClass::Tool) => CommandIntent::Apply {
+                    item: item.item,
+                    direction: None,
+                },
+                Some(
+                    aihack_ai_contract::ItemClass::Wand
+                    | aihack_ai_contract::ItemClass::Rock
+                    | aihack_ai_contract::ItemClass::Quest,
+                )
+                | None => {
+                    let _ = ItemKind::Dagger;
+                    return None;
+                }
             },
         };
         observation
@@ -825,6 +835,26 @@ impl TuiApp {
                 } else {
                     play_menu::action_menu(&self.observation(), action, Some(item))
                 });
+                Ok(false)
+            }
+            UiCommandCandidate::ChooseSpell(spell) => {
+                self.menu = Some(play_menu::spell_direction_menu(&self.observation(), spell));
+                Ok(false)
+            }
+            UiCommandCandidate::ChooseIdentifyTarget(scroll) => {
+                self.menu = Some(play_menu::identify_target_menu(&self.observation(), scroll));
+                Ok(false)
+            }
+            UiCommandCandidate::ChooseContainer(container) => {
+                self.menu = Some(play_menu::container_menu(&self.observation(), container));
+                Ok(false)
+            }
+            UiCommandCandidate::ChooseDipSource(item) => {
+                self.menu = Some(play_menu::dip_target_menu(&self.observation(), item));
+                Ok(false)
+            }
+            UiCommandCandidate::ChooseEngraveMethod(method) => {
+                self.menu = Some(play_menu::engrave_text_menu(&self.observation(), method));
                 Ok(false)
             }
             UiCommandCandidate::MenuPage(forward) => {
@@ -1501,6 +1531,7 @@ fn render_play_screen(frame: &mut ratatui::Frame, _size: Rect, app: &mut TuiApp)
                 crate::core::action::InventoryAction::Read => "read",
                 crate::core::action::InventoryAction::PutOn => "put on",
                 crate::core::action::InventoryAction::Sell => "sell",
+                crate::core::action::InventoryAction::Offer => "offer",
             };
             Some(render_panels::awaiting_inventory_lines(action_name))
         }
@@ -1656,6 +1687,10 @@ fn render_game_over_screen(
             format!("Killed by {:?}", trap)
         }
         crate::domain::combat::DeathCause::Poison => "Killed by poison".to_string(),
+        crate::domain::combat::DeathCause::Starvation => "Died of starvation".to_string(),
+        crate::domain::combat::DeathCause::Drowning => "Drowned in deep water".to_string(),
+        crate::domain::combat::DeathCause::Lava => "Incinerated in molten lava".to_string(),
+        crate::domain::combat::DeathCause::Explosion => "Killed by an explosion".to_string(),
     };
     let observation = app.observation();
     let lines = render_panels::game_over_lines(

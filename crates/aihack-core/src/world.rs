@@ -1,11 +1,29 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    domain::{combat::DeathCause, inventory::Inventory, item::ItemKind, level::LevelRegistry},
+    campaign::LearnedSpell,
+    domain::{
+        combat::DeathCause,
+        inventory::Inventory,
+        item::ItemKind,
+        level::LevelRegistry,
+        status::{Resistances, StatusTimers},
+    },
     ids::{EntityId, LevelId},
+    position::Pos,
 };
 
 pub fn is_zero_u8(value: &u8) -> bool {
+    *value == 0
+}
+
+pub fn is_zero_u16(value: &u16) -> bool {
+    *value == 0
+}
+
+pub fn is_zero_i16(value: &i16) -> bool {
     *value == 0
 }
 
@@ -29,6 +47,26 @@ pub struct WorldState<E> {
     pub kill_count: u32,
     pub gold: u32,
     pub identified_items: Vec<ItemKind>,
-    /// 현재 실행 중인 사망 처리만 위한 transient 값이며 v1 save에는 넣지 않는다.
+    #[serde(default, skip_serializing_if = "is_zero_i16")]
+    pub mp: i16,
+    #[serde(default, skip_serializing_if = "is_zero_i16")]
+    pub max_mp: i16,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub ascension_pursuit_stage: u8,
+    #[serde(default, skip_serializing_if = "Resistances::is_empty")]
+    pub intrinsic_resistances: Resistances,
+    #[serde(default, skip_serializing_if = "StatusTimers::is_empty")]
+    pub status_timers: StatusTimers,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub weapon_skills: BTreeMap<String, u8>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub spell_skill: BTreeMap<String, u8>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub learned_spells: Vec<LearnedSpell>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub generated_artifacts: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ascension_altars: Vec<(LevelId, Pos)>,
+    /// 현재 실행 중인 사망 처리만 위한 transient 값이며 save에는 넣지 않는다.
     pub last_death_cause: Option<DeathCause>,
 }

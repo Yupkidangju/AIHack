@@ -17,6 +17,7 @@ impl Widget for MapWidget<'_> {
         // 타일 렌더링
         for tile in &self.observation.visible_tiles {
             if let Some((cx, cy)) = self.viewport.world_to_terminal(tile.pos, area) {
+                use ratatui::style::Color;
                 let glyph = match tile.tile {
                     crate::domain::tile::TileKind::Wall => '#',
                     crate::domain::tile::TileKind::Floor => '.',
@@ -31,63 +32,54 @@ impl Widget for MapWidget<'_> {
                     crate::domain::tile::TileKind::HiddenDoor => '#',
                     crate::domain::tile::TileKind::HiddenTrap(_) => '.',
                     crate::domain::tile::TileKind::Shop => '$',
+                    crate::domain::tile::TileKind::Altar => '_',
+                    crate::domain::tile::TileKind::Fountain
+                    | crate::domain::tile::TileKind::DryFountain => '{',
+                    crate::domain::tile::TileKind::Sink => '}',
+                    crate::domain::tile::TileKind::Water | crate::domain::tile::TileKind::Lava => {
+                        '~'
+                    }
                 };
-                buf[(cx, cy)]
-                    .set_char(glyph)
-                    .set_style(Style::default().fg(self.theme.fg).bg(self.theme.bg));
+                let style = if tile.visible {
+                    let fg = match tile.tile {
+                        crate::domain::tile::TileKind::Fountain => Color::Cyan,
+                        crate::domain::tile::TileKind::DryFountain => self.theme.muted,
+                        crate::domain::tile::TileKind::Sink => Color::Gray,
+                        crate::domain::tile::TileKind::Water => Color::Blue,
+                        crate::domain::tile::TileKind::Lava => Color::LightRed,
+                        crate::domain::tile::TileKind::Floor if tile.engraving.is_some() => {
+                            self.theme.accent
+                        }
+                        _ => self.theme.fg,
+                    };
+                    Style::default().fg(fg).bg(self.theme.bg)
+                } else {
+                    Style::default().fg(self.theme.muted).bg(self.theme.bg)
+                };
+                buf[(cx, cy)].set_char(glyph).set_style(style);
             }
         }
         // 바닥 물건 위에 actor를 그리고 마지막에 player를 그려 겹친 셀의 우선순위를 보장한다.
         for actors in [false, true] {
             for entity in &self.observation.visible_entities {
-                use aihack_ai_contract::{EntityKind, ItemKind, MonsterKind};
+                use aihack_ai_contract::EntityKind;
                 if !entity.alive || matches!(entity.kind, EntityKind::Item(_)) == actors {
                     continue;
                 }
-                let glyph = match entity.kind {
+                let glyph = entity.glyph.unwrap_or_else(|| match entity.kind {
                     EntityKind::Player => '@',
-                    EntityKind::Monster(MonsterKind::Jackal) => 'd',
-                    EntityKind::Monster(MonsterKind::Goblin) => 'g',
-                    EntityKind::Monster(MonsterKind::FloatingEye) => 'e',
-                    EntityKind::Monster(MonsterKind::Kobold) => 'k',
-                    EntityKind::Monster(MonsterKind::Orc) => 'o',
-                    EntityKind::Monster(MonsterKind::Ogre) => 'O',
-                    EntityKind::Monster(MonsterKind::GiantSpider) => 's',
-                    EntityKind::Monster(MonsterKind::GnollArcher) => 'G',
-                    EntityKind::Monster(MonsterKind::Troll) => 'T',
-                    EntityKind::Monster(MonsterKind::FireAnt) => 'a',
-                    EntityKind::Item(kind) => match kind {
-                        ItemKind::Dagger | ItemKind::ShortSword | ItemKind::Mace => ')',
-                        ItemKind::ArmorLeather | ItemKind::ArmorChainMail => '[',
-                        ItemKind::RingPoisonResistance
-                        | ItemKind::RingFireResistance
-                        | ItemKind::RingProtection => '=',
-                        ItemKind::PotionHealing
-                        | ItemKind::PotionExtraHealing
-                        | ItemKind::PotionCure => '!',
-                        ItemKind::WandMagicMissile | ItemKind::WandFire => '/',
-                        ItemKind::Rock => '*',
-                        ItemKind::FoodRation | ItemKind::CorpseJackal => '%',
-                        ItemKind::AmuletAscension => '"',
-                        ItemKind::ScrollReveal
-                        | ItemKind::ScrollIdentify
-                        | ItemKind::ScrollLevelTeleport
-                        | ItemKind::ScrollCharging
-                        | ItemKind::ScrollEnchantWeapon
-                        | ItemKind::ScrollEnchantArmor
-                        | ItemKind::ScrollRemoveCurse => '?',
-                    },
-                };
+                    EntityKind::Monster(kind) => aihack_runtime::monster_glyph(kind),
+                    EntityKind::Item(kind) => aihack_runtime::item_glyph(kind),
+                });
+                let fg = entity_color(entity.color.as_deref()).unwrap_or(if actors {
+                    self.theme.danger
+                } else {
+                    self.theme.accent
+                });
                 if let Some((x, y)) = self.viewport.world_to_terminal(entity.pos, area) {
-                    buf[(x, y)].set_char(glyph).set_style(
-                        Style::default()
-                            .fg(if actors {
-                                self.theme.danger
-                            } else {
-                                self.theme.accent
-                            })
-                            .bg(self.theme.bg),
-                    );
+                    buf[(x, y)]
+                        .set_char(glyph)
+                        .set_style(Style::default().fg(fg).bg(self.theme.bg));
                 }
             }
         }
@@ -121,5 +113,23 @@ impl Widget for MapWidget<'_> {
                 }
             }
         }
+    }
+}
+
+fn entity_color(color: Option<&str>) -> Option<ratatui::style::Color> {
+    use ratatui::style::Color;
+    match color? {
+        "brown" | "yellow" => Some(Color::Yellow),
+        "gray" | "dark_gray" => Some(Color::Gray),
+        "bright_blue" => Some(Color::LightBlue),
+        "blue" => Some(Color::Blue),
+        "green" => Some(Color::Green),
+        "bright_green" => Some(Color::LightGreen),
+        "magenta" => Some(Color::Magenta),
+        "red" => Some(Color::Red),
+        "bright_red" => Some(Color::LightRed),
+        "cyan" => Some(Color::Cyan),
+        "white" => Some(Color::White),
+        _ => None,
     }
 }

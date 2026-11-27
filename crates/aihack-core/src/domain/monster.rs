@@ -16,6 +16,7 @@ pub enum MonsterPassive {
     PoisonOnMelee,
     Regenerate,
     FireOnMelee,
+    FireBreath,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -30,6 +31,9 @@ pub enum MonsterKind {
     GnollArcher,
     Troll,
     FireAnt,
+    Minotaur,
+    Dragon,
+    Bat,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,26 +53,29 @@ pub struct MonsterTemplate {
 impl MonsterKind {
     pub fn ai_kind(self) -> MonsterAiKind {
         match self {
-            Self::Jackal => MonsterAiKind::Wander,
+            Self::Jackal | Self::Bat => MonsterAiKind::Wander,
             Self::Goblin
             | Self::Kobold
             | Self::Orc
             | Self::Ogre
             | Self::GiantSpider
             | Self::Troll
-            | Self::FireAnt => MonsterAiKind::ChaseVisiblePlayer,
+            | Self::FireAnt
+            | Self::Minotaur => MonsterAiKind::ChaseVisiblePlayer,
             Self::FloatingEye => MonsterAiKind::Stationary,
-            Self::GnollArcher => MonsterAiKind::RangedOnSight,
+            Self::GnollArcher | Self::Dragon => MonsterAiKind::RangedOnSight,
         }
     }
     pub fn difficulty(self) -> u8 {
         match self {
             Self::Jackal => 1,
-            Self::Goblin | Self::Kobold => 2,
+            Self::Goblin | Self::Kobold | Self::Bat => 2,
             Self::Orc | Self::GiantSpider => 3,
             Self::GnollArcher => 4,
             Self::FloatingEye | Self::Ogre | Self::FireAnt => 5,
             Self::Troll => 6,
+            Self::Minotaur => 7,
+            Self::Dragon => 8,
         }
     }
 }

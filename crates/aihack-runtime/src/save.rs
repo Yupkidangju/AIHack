@@ -9,8 +9,9 @@ use aihack_core::{
     domain::{
         combat::DeathCause,
         entity::{ActorKind, EntityLocation, EntityPayload, MAX_ABSOLUTE_ACTOR_STAT},
-        item::{ItemClass, MAX_ITEM_ENCHANTMENT, MIN_ITEM_ENCHANTMENT},
+        item::{ItemClass, ItemKind, MAX_ITEM_ENCHANTMENT, MAX_ITEM_STACK, MIN_ITEM_ENCHANTMENT},
         player::adventurer_template,
+        tile::{TileKind, TrapKind},
     },
     error::{GameError, SaveValidationError},
     event::GameEvent,
@@ -31,7 +32,9 @@ use cap_tempfile::TempFile;
 
 use crate::{domain::entity::EntityStore, session::GameSession, world::GameWorld};
 
-pub use aihack_core::save::{ReplayLineV1, SAVE_SCHEMA_VERSION_V1};
+pub use aihack_core::save::{
+    ReplayLineV1, SAVE_SCHEMA_VERSION_V1, SAVE_SCHEMA_VERSION_V2, SAVE_SCHEMA_VERSION_V3,
+};
 pub type SavedWorldV1 = aihack_core::save::SavedWorldV1<EntityStore>;
 pub type SaveDataV1 = aihack_core::save::SaveDataV1<EntityStore>;
 
@@ -344,7 +347,7 @@ impl GameSession {
         let world = self.world();
         SaveDataV1 {
             schema_version: if world.campaign.is_some() {
-                2
+                SAVE_SCHEMA_VERSION_V3
             } else {
                 SAVE_SCHEMA_VERSION_V1
             },
@@ -366,7 +369,7 @@ impl GameSession {
         registry: &aihack_content::ContentRegistry,
     ) -> Result<Self, GameError> {
         let expected = if save.world.campaign.is_some() {
-            2
+            SAVE_SCHEMA_VERSION_V3
         } else {
             SAVE_SCHEMA_VERSION_V1
         };
@@ -424,7 +427,7 @@ pub(crate) fn validate_save_data_with_registry(
     validate_saved_world_for_run_state(&save.world, save.run_state, registry)?;
     if save.world.campaign.is_some() {
         for level in &save.world.levels.levels {
-            crate::campaign_map::validate_persisted_map(save.seed, level.id, &level.map)
+            crate::campaign_map::validate_persisted_map(save.seed, level)
                 .map_err(|reason| invalid_world_error(&reason))?;
         }
     }
@@ -459,14 +462,14 @@ fn validate_consumer_safe_arithmetic(save: &SaveDataV1) -> Result<(), GameError>
             .entries
             .iter()
             .try_fold(0_i128, |total, entry| {
-                let price = save
-                    .world
-                    .entities
-                    .item_data(entry.item)
-                    .map(|data| i128::from(data.base_price))
-                    .ok_or_else(|| invalid_world_error("inventory score item is missing"))?;
+                let stack_value = crate::systems::containers::recursive_item_value(
+                    &save.world.entities,
+                    entry.item,
+                    0,
+                )
+                .map_err(|()| invalid_world_error("inventory score overflows"))?;
                 total
-                    .checked_add(price)
+                    .checked_add(stack_value)
                     .ok_or_else(|| invalid_world_error("inventory score overflows"))
             })?;
     let score = i128::from(save.world.gold)
@@ -537,6 +540,36 @@ fn validate_saved_world_inner(
                 level.map.tile_count()
             ));
         }
+        if !level.explored.is_empty() && level.explored.len() != expected {
+            return invalid_world(format!(
+                "level {:?} explored tile count mismatch: expected {expected}, actual {}",
+                level.id,
+                level.explored.len()
+            ));
+        }
+        if !level.lit_tiles.is_empty() && level.lit_tiles.len() != expected {
+            return invalid_world(format!(
+                "level {:?} lit_tiles count mismatch: expected {expected}, actual {}",
+                level.id,
+                level.lit_tiles.len()
+            ));
+        }
+        if world.campaign.is_none() {
+            if !level.lit_tiles.is_empty()
+                || level.special_room.is_some()
+                || !level.engravings.is_empty()
+                || level.special_level_id.is_some()
+            {
+                return invalid_world(
+                    "legacy mode cannot contain campaign P8 level metadata".to_string(),
+                );
+            }
+            if level.map.tiles().iter().copied().any(is_p9_only_tile) {
+                return invalid_world(
+                    "legacy mode cannot contain campaign P9 tiles or traps".to_string(),
+                );
+            }
+        }
         total_tiles = total_tiles
             .checked_add(expected)
             .ok_or_else(|| invalid_world_error("total map tile count overflow"))?;
@@ -574,8 +607,14 @@ fn validate_saved_world_inner(
                 location,
                 stats,
                 alive,
+                monster_inventory,
                 ..
             } => {
+                if world.campaign.is_none() && !monster_inventory.is_empty() {
+                    return invalid_world(
+                        "legacy mode cannot contain monster inventories".to_string(),
+                    );
+                }
                 if *kind == ActorKind::Player {
                     player_count += 1;
                 }
@@ -586,12 +625,90 @@ fn validate_saved_world_inner(
                 kind,
                 data,
                 location,
+                assigned_letter,
                 charges,
                 enchantment,
+                quantity,
+                contained_items,
+                artifact_id,
+                tool_active,
+                container_locked,
+                container_trapped,
+                erosion,
                 ..
             } => {
+                if world.campaign.is_none()
+                    && (!contained_items.is_empty()
+                        || artifact_id.is_some()
+                        || *tool_active
+                        || *container_locked
+                        || *container_trapped
+                        || *erosion > 0
+                        || matches!(location, EntityLocation::InContainer { .. })
+                        || data.tool_action.is_some()
+                        || data.container_capacity.is_some()
+                        || data.class == ItemClass::Tool
+                        || is_p9_only_item_kind(*kind))
+                {
+                    return invalid_world(
+                        "legacy mode cannot contain extended item metadata".to_string(),
+                    );
+                }
                 if data.kind != *kind {
                     return invalid_world(format!("item {} kind/data mismatch", entity.id.0));
+                }
+                if *erosion > 3 {
+                    return invalid_world(format!(
+                        "item {} has out-of-range erosion {}",
+                        entity.id.0, erosion
+                    ));
+                }
+                if (*container_locked || *container_trapped || !contained_items.is_empty())
+                    && data.container_capacity.is_none()
+                {
+                    return invalid_world(format!(
+                        "non-container item {} has container metadata",
+                        entity.id.0
+                    ));
+                }
+                if *tool_active {
+                    let valid_active = (*kind == ItemKind::OilLamp
+                        && charges.unwrap_or(0) > 0
+                        && !matches!(
+                            location,
+                            EntityLocation::Consumed | EntityLocation::InContainer { .. }
+                        ))
+                        || (*kind == ItemKind::Blindfold
+                            && *location
+                                == EntityLocation::Inventory {
+                                    owner: world.player_id,
+                                });
+                    if !valid_active {
+                        return invalid_world(format!(
+                            "item {} has invalid tool_active state",
+                            entity.id.0
+                        ));
+                    }
+                }
+                if matches!(location, EntityLocation::InContainer { .. })
+                    && (*kind == ItemKind::AmuletAscension || assigned_letter.is_some())
+                {
+                    return invalid_world(format!(
+                        "item {} has invalid InContainer state",
+                        entity.id.0
+                    ));
+                }
+                if *quantity == 0 || *quantity > MAX_ITEM_STACK {
+                    return invalid_world(format!(
+                        "item {} has invalid stack quantity {}",
+                        entity.id.0, quantity
+                    ));
+                }
+                if *quantity > 1 && (!kind.is_stackable() || world.campaign.is_none()) {
+                    return invalid_world(format!(
+                        "item {} cannot stack with quantity {}",
+                        entity.id.0, quantity
+                    ));
                 }
                 if !(MIN_ITEM_ENCHANTMENT..=MAX_ITEM_ENCHANTMENT).contains(enchantment) {
                     return invalid_world(format!(
@@ -619,6 +736,7 @@ fn validate_saved_world_inner(
             }
         }
     }
+    validate_containers(world)?;
     let expected_next_id = max_id
         .checked_add(1)
         .ok_or_else(|| invalid_world_error("entity allocator has no successor ID"))?;
@@ -691,6 +809,150 @@ fn item_data_matches_registry(
         && persisted.max_charges == expected.max_charges
         && persisted.nutrition == expected.nutrition
         && persisted.ring_effect == expected.ring_effect
+        && persisted.armor_slot == expected.armor_slot
+        && persisted.tool_action == expected.tool_action
+        && persisted.container_capacity == expected.container_capacity
+}
+
+fn is_p9_only_tile(tile: TileKind) -> bool {
+    match tile {
+        TileKind::Fountain
+        | TileKind::DryFountain
+        | TileKind::Sink
+        | TileKind::Water
+        | TileKind::Lava => true,
+        TileKind::Trap(trap) | TileKind::HiddenTrap(trap) => matches!(
+            trap,
+            TrapKind::Hole
+                | TrapKind::Teleport
+                | TrapKind::SleepingGas
+                | TrapKind::Rust
+                | TrapKind::Polymorph
+                | TrapKind::AntiMagic
+                | TrapKind::FallingRock
+                | TrapKind::Magic
+                | TrapKind::Fire
+        ),
+        _ => false,
+    }
+}
+
+fn is_p9_only_item_kind(kind: ItemKind) -> bool {
+    matches!(
+        kind,
+        ItemKind::SkeletonKey
+            | ItemKind::LockPick
+            | ItemKind::PickAxe
+            | ItemKind::DwarvishMattock
+            | ItemKind::TinWhistle
+            | ItemKind::OilLamp
+            | ItemKind::Blindfold
+            | ItemKind::UnicornHorn
+            | ItemKind::Sack
+            | ItemKind::BagOfHolding
+            | ItemKind::Chest
+            | ItemKind::PotionWater
+            | ItemKind::ScrollBlank
+    )
+}
+
+fn validate_containers(world: &SavedWorldV1) -> Result<(), GameError> {
+    for entity in world.entities.entities() {
+        let Some((_, data, location, _, _)) = entity.item() else {
+            continue;
+        };
+        if let Some(children) = entity.item_contained_items() {
+            if !children.is_empty() {
+                let mut seen = HashSet::new();
+                for &child_id in children {
+                    if !seen.insert(child_id) {
+                        return invalid_world(format!(
+                            "container {} lists duplicate child {}",
+                            entity.id.0, child_id.0
+                        ));
+                    }
+                    let Some(child) = world.entities.get(child_id) else {
+                        return invalid_world(format!(
+                            "container {} references missing child {}",
+                            entity.id.0, child_id.0
+                        ));
+                    };
+                    if child.item().map(|(_, _, loc, _, _)| loc)
+                        != Some(EntityLocation::InContainer {
+                            container: entity.id,
+                        })
+                    {
+                        return invalid_world(format!(
+                            "container {}/{} bidirectional location mismatch",
+                            entity.id.0, child_id.0
+                        ));
+                    }
+                }
+                let raw =
+                    crate::systems::containers::raw_contained_weight(&world.entities, entity.id, 0);
+                let cap = data.container_capacity.unwrap_or(0);
+                if raw > cap {
+                    return invalid_world(format!(
+                        "container {} raw weight {} exceeds capacity {}",
+                        entity.id.0, raw, cap
+                    ));
+                }
+            }
+        }
+        if let EntityLocation::InContainer { mut container } = location {
+            let mut current = entity.id;
+            let mut visited = HashSet::from([entity.id]);
+            let mut depth = 0usize;
+            loop {
+                depth += 1;
+                if depth > crate::systems::containers::MAX_CONTAINER_DEPTH {
+                    return invalid_world(format!(
+                        "item {} exceeds max container nesting depth",
+                        entity.id.0
+                    ));
+                }
+                if !visited.insert(container) {
+                    return invalid_world(format!(
+                        "container cycle detected involving {}",
+                        container.0
+                    ));
+                }
+                let Some(parent) = world.entities.get(container) else {
+                    return invalid_world(format!(
+                        "item {} references missing container {}",
+                        entity.id.0, container.0
+                    ));
+                };
+                let Some((_, parent_data, parent_loc, _, _)) = parent.item() else {
+                    return invalid_world(format!("container {} is not an item", container.0));
+                };
+                if parent_data.container_capacity.is_none()
+                    || !parent
+                        .item_contained_items()
+                        .is_some_and(|list| list.contains(&current))
+                {
+                    return invalid_world(format!(
+                        "item {} missing from container {} contained_items",
+                        current.0, container.0
+                    ));
+                }
+                match parent_loc {
+                    EntityLocation::InContainer { container: next } => {
+                        current = container;
+                        container = next;
+                    }
+                    EntityLocation::Consumed => {
+                        return invalid_world(format!(
+                            "consumed container {} holds non-consumed item {}",
+                            container.0, entity.id.0
+                        ));
+                    }
+                    _ => break,
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_actor_stats(
@@ -708,9 +970,12 @@ fn validate_actor_stats(
         stats.damage_reduction,
         stats.weapon_hit_bonus,
         stats.speed,
+        stats.energy,
     ]
     .into_iter()
-    .all(|value| i32::from(value).abs() <= MAX_ABSOLUTE_ACTOR_STAT);
+    .all(|value| i32::from(value).abs() <= MAX_ABSOLUTE_ACTOR_STAT)
+        && (0..=36).contains(&stats.speed)
+        && (-36..=72).contains(&stats.energy);
     let dice_valid = (stats.damage.dice == 0 && stats.damage.sides == 0)
         || (stats.damage.dice > 0
             && stats.damage.sides > 0
@@ -748,7 +1013,11 @@ fn validate_map_location(
 }
 
 fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
-    if world.inventory.owner != world.player_id || world.inventory.next_letter_index > 26 {
+    if world.inventory.owner != world.player_id
+        || usize::from(world.inventory.next_letter_index)
+            > aihack_core::domain::inventory::MAX_INVENTORY_SLOTS
+        || world.inventory.entries.len() > aihack_core::domain::inventory::MAX_INVENTORY_SLOTS
+    {
         return invalid_world("inventory owner or next letter is invalid".to_string());
     }
     let mut items = HashSet::new();
@@ -756,7 +1025,7 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
     for entry in &world.inventory.entries {
         if !items.insert(entry.item)
             || !letters.insert(entry.letter)
-            || !entry.letter.0.is_ascii_lowercase()
+            || !entry.letter.0.is_ascii_alphabetic()
         {
             return invalid_world("inventory contains a duplicate or invalid entry".to_string());
         }
@@ -792,14 +1061,17 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
             }
         }
     }
-    validate_equipped_item(world, world.inventory.equipped_melee, ItemClass::Weapon)?;
-    validate_equipped_item(world, world.inventory.equipped_body, ItemClass::Armor)?;
-    validate_equipped_item(world, world.inventory.equipped_ring, ItemClass::Ring)?;
+    let mut seen_equipped = HashSet::new();
+    for (slot, item_opt) in world.inventory.equipped_slots() {
+        if let Some(item) = item_opt {
+            if !seen_equipped.insert(item) {
+                return invalid_world(format!("item {} is equipped in multiple slots", item.0));
+            }
+            validate_equipped_item_in_slot(world, item, slot)?;
+        }
+    }
     let mut bonus: i16 = 0;
-    for equipped in [world.inventory.equipped_body, world.inventory.equipped_ring]
-        .into_iter()
-        .flatten()
-    {
+    for equipped in world.inventory.all_defense_items() {
         let base = world
             .entities
             .item_data(equipped)
@@ -810,9 +1082,15 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
             .get(equipped)
             .and_then(|entity| entity.item_enchantment())
             .unwrap_or(0);
+        let erosion = world
+            .entities
+            .get(equipped)
+            .and_then(|entity| entity.item_erosion())
+            .unwrap_or(0);
         bonus = bonus
             .checked_add(base)
             .and_then(|acc| acc.checked_add(i16::from(enchant)))
+            .and_then(|acc| acc.checked_sub(i16::from(erosion)))
             .ok_or_else(|| invalid_world_error("equipped armor/ring AC overflows"))?;
     }
     let player_ac = world
@@ -830,21 +1108,33 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
     Ok(())
 }
 
-fn validate_equipped_item(
+fn validate_equipped_item_in_slot(
     world: &SavedWorldV1,
-    item: Option<aihack_core::ids::EntityId>,
-    expected_class: ItemClass,
+    item: aihack_core::ids::EntityId,
+    slot: aihack_core::domain::item::EquipmentSlot,
 ) -> Result<(), GameError> {
-    let Some(item) = item else {
-        return Ok(());
-    };
-    if !world.inventory.contains(item)
-        || world
-            .entities
-            .item_data(item)
-            .is_none_or(|data| data.class != expected_class)
-    {
+    use aihack_core::domain::item::EquipmentSlot;
+    if !world.inventory.contains(item) {
         return invalid_world(format!("equipped item {} is invalid", item.0));
+    }
+    let Some(data) = world.entities.item_data(item) else {
+        return invalid_world(format!("equipped item {} is invalid", item.0));
+    };
+    let valid = match slot {
+        EquipmentSlot::Melee => data.class == ItemClass::Weapon,
+        EquipmentSlot::LeftRing | EquipmentSlot::RightRing => data.class == ItemClass::Ring,
+        EquipmentSlot::Amulet => data.class == ItemClass::Amulet,
+        EquipmentSlot::Shield
+        | EquipmentSlot::Helm
+        | EquipmentSlot::Body
+        | EquipmentSlot::Cloak
+        | EquipmentSlot::Gloves
+        | EquipmentSlot::Boots => {
+            data.class == ItemClass::Armor && data.effective_armor_slot() == Some(slot)
+        }
+    };
+    if !valid {
+        return invalid_world(format!("equipped item {} is invalid for slot", item.0));
     }
     Ok(())
 }

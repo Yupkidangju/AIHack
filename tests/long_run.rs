@@ -16,9 +16,9 @@ const ITEMS_TOML: &str = include_str!("../crates/aihack-content/src/data/items.t
 const MONSTERS_TOML: &str = include_str!("../crates/aihack-content/src/data/monsters.toml");
 const LEVEL_1_TOML: &str = include_str!("../crates/aihack-content/src/data/levels/main_1.toml");
 const LEVEL_2_TOML: &str = include_str!("../crates/aihack-content/src/data/levels/main_2.toml");
-// Report 25의 alive/HP/max_hp 관계와 armor fixture를 함께 만족하는 정합 상태의 기준 hash다.
+// Report 25의 alive/HP/max_hp 관계, armor fixture, 및 Stage 1 (P7-Fix) 하강 AC·굶주림·탐험상태 기준 hash다.
 const EXPECTED_CAUSAL_HASHES: [&str; 3] =
-    ["e9737367c68c053d", "67074441a11c89da", "0c22555fc8344443"];
+    ["a6089b092a03e280", "28c1185c2fd6c8fb", "d6c245dd7cc7271a"];
 
 fn semantic_state(session: &GameSession) -> serde_json::Value {
     let mut value = serde_json::to_value(session.snapshot()).unwrap();

@@ -113,3 +113,88 @@ release/게시 승인, modification notice와 final-SHA bundle 갱신, 새 양 O
 - `tests/campaign.rs`(**12 PASS / 0 FAIL**, `Main 4` `RingFireResistance` 장착 포함 4역할 8층 완주), `tests/content_validation.rs`(**13 PASS / 0 FAIL**, 반지 3종 ID 포함), `crates/aihack-content/tests/registry.rs`(**1 PASS / 0 FAIL**, `aa720d339c7f0c77`), `tests/r8_documentation.rs`(**PASS**).
 - 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy --workspace --all-targets --locked -- -D warnings` PASS, `cargo test -j 4 --workspace --all-targets --locked --no-fail-fast` (**509 PASS / 0 FAIL / 0 ignored**, 93 test results), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS, `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix`/`tokio` warning 2건), `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
 - 커밋·푸시는 실행하지 않았으며 `feat/p5-gameplay-expansion` 브랜치도 삭제하지 않았다.
+
+## P7 확장 구현·검증 기록 (2026-11-26)
+
+### 구현
+
+- **P7a (제단 `Altar`·역할별 MP 풀·주문 3종)**:
+  - `aihack-core::domain::tile::TileKind::Altar`(이동/시야 통과 가능)를 추가하고 `campaign_map`이 `Main 3` `(centers[1].x, centers[1].y - 1)`와 `Mines 2` `(centers[1].x + 1, centers[1].y - 1)`에 배치하며 `validate_persisted_map`이 비인가 제단 변조를 거부하도록 연결했다.
+  - `systems/altar.rs`가 `Offer { item }` (`InventoryAction::Offer`, 아뮬렛·저주 장착 아이템 거부, 시체/식량 공물 시 `+1 luck`·`cooldown -10`·`+4 MP`·미저주 장착 무기 축복, 기타 아이템 공물 시 `ItemKind` 식별·`+2 MP`·`cooldown -5`)과 `Altar` 위 `Pray` bonus(소지 저주 해저주, `mp = max_mp`, HP `+6`)를 처리한다.
+  - `WorldState`/`SavedWorldV1`/`GameSnapshot`/`PlayerObservation`에 serde-omitted `mp`·`max_mp`를 추가하고, `Role`별 MP(`Mage` 14+3/lvl `[ForceBolt, Detect]`, `Cleric` 10+2/lvl `[Heal, Detect]`, `Scout` 6+1/lvl `[Detect]`, `Knight` 4+1/lvl `[Heal]`), 5턴당 `+1 MP` 자연 회복, `award_xp` 레벨업 MP 성장, `systems/spells.rs`의 `ForceBolt`(MP 4, 사거리 5 `trace_path_with_max_distance`, hit `+4`, `2d6 + level/2`), `Heal`(MP 5, `2d6 + 4 + level`, `Cleric` 중독 해제), `Detect`(MP 3, 숨겨진 문/함정 공개 및 몬스터 수 통지)를 구현했다. Legacy(`campaign.is_none()`)는 `mp == 0 && max_mp == 0`을 강제한다.
+- **P7b (시드 기반 미식별 외형·자동 식별·수량 스택)**:
+  - `crates/aihack-runtime/src/appearance.rs`가 전투 RNG와 독립된 SplitMix64 Fisher-Yates 셔플로 물약 6색상·두루마리 10라벨·반지 6재질의 `appearance_for_kind(seed, kind)`를 결정하고, 캠페인에서 미식별 상태일 때만 `ItemObservation`/`EntityObservation`의 `appearance`를 노출한다(식별 후 및 legacy에서는 `None` serde 생략). `Quaff`/`Read`/`PutOn`/제단 비식량 `Offer`/`ScrollIdentify`(미식별 우선) 시 즉시 식별된다.
+  - `EntityPayload::Item`/`EntitySnapshot`/`ItemObservation`에 `quantity: u16`(`MAX_ITEM_STACK = 99`, 기본 `1` serde 생략)을 추가해 캠페인 소모품/투사체(`Potion`/`Scroll`/`FoodRation`/`Rock`)의 `Pickup`/`Buy` 병합, `consume_one_from_inventory`(`Quaff`/`Read`/`Eat`/`Sell`/`Offer`), `Throw` 1단위 분리, `carried_weight()`/`inventory_value()`/`save.rs` 검증(legacy `> 1`·비중첩 `> 1`·`0`·`> 99` 거부)을 적용했다.
+- **P7c (심층 보스·귀환 추격·LLM/Content/Provenance 동기화)**:
+  - `monsters.toml`/`domain/monster.rs`/`bootstrap.rs`에 `Minotaur`(`H`, HP 26, diff 7, `Mines 2`) 및 `Dragon`(`D`, HP 30, diff 8, `MonsterPassive::FireBreath`, `Main 6`, 직교 거리 5 이내 `2d6` 화염 브레스·`RingFireResistance` 방어)을 추가하고, `docs/provenance/r7-content.sha256`(`6b32f63454368d64bb24a509072132f1e9aaaffee7a0616f10382cb4d76106e9`), `PROVENANCE.md`, `crates/aihack-content/tests/registry.rs` golden hash(`ed9c458bfb906125`)를 동기화했다.
+  - `ascension_pursuit_stage: u8`(`0..=3`, serde 생략)와 `systems/ascension.rs`로 `AmuletAscension` 소지 상승 시 `Main 4`(`FireAnt`)·`Main 2`(`Troll`)·`Main 1`(`Minotaur`) 각 1회 추격 스폰과 `Main 1..=5` 15턴당 허기 -1 부하를 연결했고, `crates/aihack-llm/src/decision.rs`에 `Offer`/`Cast` wire command를 추가했다.
+- **P7d (TUI·Headless `survival-v1`)**:
+  - `apps/aihack-tui`가 `_`/`"altar"`, `H`/`"minotaur"`, `D`/`"dragon"`, HUD `mp cur/max`, `<qty>x ` 스택 접두사, 미식별 외형 라벨, `'Z'`(주문 메뉴+방향 서브메뉴)와 `'O'`(공물 메뉴)를 렌더링·처리하고, `apps/aihack-headless` `survival-v1`은 부상 시 `Heal`·사거리 5 내 적에게 `ForceBolt`를 우선 시전한다.
+
+### 검증 증거
+
+- `tests/campaign_p7.rs`: 제단 배치/변조 거부/`Offer`/제단 `Pray`, 역할별 MP 성장/회복/`ForceBolt`·`Heal`·`Detect`/MP 저장 검증, 시드 기반 외형/독립성/자동 식별(`ScrollIdentify` 미식별 우선), 스택 병합·단위 소비·투척 분리·무게/점수·수량 검증, `Minotaur`/`Dragon` `FireBreath`·화염 저항·귀환 추격/부하·LLM wire, TUI·Headless·V1 JSON 기본 생략(**6 PASS / 0 FAIL**).
+- `tests/campaign.rs`(**12 PASS / 0 FAIL**, 4역할 8층 완주), `tests/campaign_p4.rs`(**6 PASS / 0 FAIL**, 스택 병합 ID 조회 정렬), `tests/campaign_p5.rs`(**4 PASS / 0 FAIL**), `tests/campaign_p6.rs`(**4 PASS / 0 FAIL**), `tests/content_validation.rs`(**13 PASS / 0 FAIL**), `crates/aihack-content/tests/registry.rs`(**1 PASS / 0 FAIL**, `ed9c458bfb906125`), `tests/r8_documentation.rs`(**11 PASS / 0 FAIL**).
+- 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy --workspace --all-targets --locked -- -D warnings` PASS, `cargo test -j 4 --workspace --all-targets --locked --no-fail-fast` (**515 PASS / 0 FAIL / 0 ignored**, 94 test results), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS, `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix`/`tokio` warning 2건), `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
+- 커밋·푸시는 실행하지 않았으며 `feat/p5-gameplay-expansion`·`feat/p6-shop-rings` 브랜치도 삭제하지 않았다.
+
+## Stage 1 (P7-Fix) 구현·검증 기록 (2026-11-27)
+
+### 구현 (`DEF-01` ~ `DEF-10`)
+
+- **DEF-01 (전면 하강 AC 통일)**: `adventurer_template().ac = 10`, `combat::attack_roll_value` 방어 공식 `defense = 20 - defender_ac`, `monsters.toml` 12종 몬스터 하강 AC(`10 - old_ac`) 전환, `PlayerObservation.ac`(optional V1 serde-omitted), TUI 상태 HUD `AC:<val>`·디버그 `player_ac`·생성 화면 `AC: 10`, `docs/provenance/r7-content.sha256`(`monsters.toml` LF SHA-256 `ff7f0cd1e98550038909f19a395434ecb8057700f5dfc60bef442e74ca949c71`), `PROVENANCE.md`, `crates/aihack-content/tests/registry.rs` golden hash(`bae2c53403902620`)를 동기화했다.
+- **DEF-02 (인벤토리 52슬롯 확장·재사용·만석 스택)**: `MAX_INVENTORY_SLOTS = 52`(`a..=z`, `A..=Z`), `next_letter()` 빈 슬롯 선형 재활용, `Pickup`/`Buy`의 52슬롯 만석 상태 stack 병합 선행 처리 및 `save::validate_inventory`(`<= 52`, `is_ascii_alphabetic()`) 정렬을 구현했다.
+- **DEF-03 (`ScrollLevelTeleport` 아뮬렛 차단 및 분기 텔레포트)**: 캠페인 모드에서 `has_amulet(world)` 시 스크롤 소비+경고 후 층·위치·추격 상태를 보존하고, 비소지 시 동일 분기 내 다른 유효 층으로 결정론 이동한다. Legacy 2층(`Main 1 <-> Main 2`) 토글은 유지했다.
+- **DEF-04 (허기 효과 및 Headless 섭취)**: `HungerState::Weak` 근접 `-2` 명중 페널티, `HungerState::Fainting` 주기적 마비, `STARVATION_THRESHOLD` (`nutrition <= -150`) 시 `DeathCause::Starvation` 및 TUI `"Died of starvation"`·`WEAK`/`FAINT` 배지, Headless `survival-v1`의 `hunger <= 150` 식량 우선 섭취를 연결했다.
+- **DEF-05 (캠페인 자연 HP 회복)**: 캠페인 전용 `poison_turns == 0 && nutrition > 50` 조건에서 `(15 - campaign.level()).max(5)` 턴 주기 `+1 HP` 회복을 추가했다(legacy 모드 비적용).
+- **DEF-06 (미식별 BUC/인챈트 은닉 및 상점 외형·가격 표시)**: `EntityPayload::Item`/`EntitySnapshot`/`ItemObservation` optional `buc_known`·`enchant_known`으로 캠페인 미감정 항목의 BUC/인챈트를 은닉(Cursed 장착·제단 공물/기도·강화/충전·감정 주문서로 공개)하고, 상점 `buy()`/`sell()` 로그의 미식별 randomized `ItemKind` 노출 차단 및 TUI 상점(`'$'`)의 `appearance_for_kind` + 구매 가격(`(<price>g)`) 표시를 적용했다.
+- **DEF-07 (Fog of War 탐험 기억)**: `GameLevel.explored`(optional serde) 및 `LevelSnapshot.explored` 영속화, `Observation.visible_tiles`의 `visible: false` 기억 타일 포함, TUI `render_map.rs` `theme.muted` 렌더링·몬스터/라벨 시야 제한, `LlmObservationView`의 `tile.visible` 필터(32 KiB 예산 보존) 및 Headless `visible_hostile_in_direction` 시야 검증을 구현했다.
+- **DEF-08 (`aihack-content` 단일 매핑 및 레벨 로더 보완)**: `monster_id`/`monster_kind_from_id`·`item_id`/`item_kind_from_id` 24종 통합 매핑 및 `level_spawns()` 24종·`level_tile_overrides()` `"locked"` 문·`"dart"`/`"bear"` 함정 파싱을 완성했다.
+- **DEF-09 (생성 화면 정리·환각 로그·보류 명세)**: `character_creation_lines()` 정적 `Strength: 10`/`Dexterity: 10` 제거 및 `AC: 10` 정합, TUI `log_lines()` `hallucinating` 시 `hallucination_message()` 적용, `spec.md` §10 P8/P9 보류 명시를 완료했다.
+- **DEF-10 (두루마리 BUC 분기·대상 지정 감정)**: `EnchantWeapon`/`EnchantArmor` BUC 3분기(Cursed `-1`+저주 / Uncursed `+1`+해저주 / Blessed `+1..=+2` 상한 `+5`), `RemoveCurse` 3분기(Blessed 전체 / Uncursed 장착 한정 / Cursed 무효), `CommandIntent::Identify { scroll, target }`(`legal_actions` 전 미감정 대상 노출·`ActionSpace` `.take(64)` 상한 유지), LLM `IDENTIFY` wire 직렬화 및 TUI `'r'` 식별된 감정 두루마리 대상 선택 메뉴(`Identify item`)를 구현했다.
+
+### 검증 증거 (`DEF-11`)
+
+- `tests/stage1_fixes.rs`: `def01`~`def10` 전수 검증 (**10 PASS / 0 FAIL**).
+- `tests/golden_phase8_rules.rs`(**20 PASS / 0 FAIL**, `p8_g03` 빈 슬롯 재사용 정렬), `tests/long_run.rs`(**7 PASS / 0 FAIL**, 새 Stage 1 기준 R9 causal 해시 `a6089b092a03e280`·`28c1185c2fd6c8fb`·`d6c245dd7cc7271a` 3회 안정 및 9종 witness·field-only AB 격리 통과), `apps/aihack-headless/tests/headless_contract.rs`(**7 PASS / 0 FAIL**, hash `3dd4fe7b6a4fd6fe`), `tests/combat.rs`, `tests/campaign.rs`(**12 PASS / 0 FAIL**), `tests/campaign_p4.rs`(**6 PASS / 0 FAIL**), `tests/campaign_p5.rs`(**4 PASS / 0 FAIL**), `tests/campaign_p6.rs`(**4 PASS / 0 FAIL**), `crates/aihack-content/tests/registry.rs`(**PASS**, `bae2c53403902620`), `apps/aihack-tui/tests/tui_contract.rs`(**20 PASS / 0 FAIL**), `conpty_contract.rs`(**4 PASS / 0 FAIL**).
+- 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy -j 4 --workspace --all-targets --locked -- -D warnings` PASS(0 warnings), `cargo test -j 4 --workspace --all-targets --locked --no-fail-fast` (**525 PASS / 0 FAIL / 0 ignored**, 95 test results, 0 compiler warnings), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS, `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix`/`tokio` warning 2건), Git Bash(`C:\Program Files\Git\bin\bash.exe`) `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
+- 커밋·푸시·태그·브랜치 삭제는 실행하지 않았다.
+
+## Stage 2 (P8) 구현·검증 기록 (2026-11-27)
+
+### 구현 (`P8-A`, `P8-B`, `P8-C` & `P9~P13` 훅)
+
+- **P8-A (콘텐츠 메타데이터 스키마·어댑터·TUI 데이터 주도 전환)**:
+  - `items.toml` (`503687fa5688c986f7669c3ff6fa71ed26dcc9b1455c9b9650e16ffdb18777e3`)과 `monsters.toml` (`1c73ddab91eeb8c1852885d6ad886357d341f64fb4aafc937160c79f6a9ee9b0`)에 표시 이름·색상·재질·unidentified pool·stackable·slot·extrinsic resistances·corpse spec·spawn depth/weight·speed(`0..=36`) 메타데이터를 보강하고, 방어구 5종(`ArmorShield`, `ArmorHelm`, `ArmorCloak`, `ArmorGloves`, `ArmorBoots`), 부적(`AmuletEsp`), 상태이상 물약 6종(`PotionSpeed`, `PotionBlindness`, `PotionConfusion`, `PotionHallucination`, `PotionInvisibility`, `PotionLevitation`), 일반화 시체(`ItemKind::Corpse`) 및 `MonsterKind::Bat`(`B`, speed `24`)를 추가했다.
+  - `docs/provenance/r7-content.sha256`(LF 정규화), `PROVENANCE.md`, `crates/aihack-content/tests/registry.rs` golden content hash(`cf2b7230608c64d2`)를 동기화하고, `aihack-runtime` 메타데이터 조회 함수(`item_display_name`, `monster_display_name`, `item_glyph`, `monster_glyph`, `item_class`) 및 `apps/aihack-tui` 데이터 주도 렌더링·동적 `character_creation_lines()`를 연결했다.
+- **P8-B (10장비 슬롯·에너지 스케줄러·6대 능력치·내성/상태이상·일반화 시체)**:
+  - `EquipmentSlot`/`Inventory`를 10슬롯(`Melee`, `Missile`, `BodyArmor`, `Shield`, `Helm`, `Cloak`, `Gloves`, `Boots`, `Amulet`, `RingLeft`, `RingRight` 중 10개 착용 상태 관리) 및 통합 9슬롯 하강 AC 공식으로 확장하고, `CommandIntent::TakeOff` 및 TUI `'x'` 장비 해제 메뉴(`'T' -> RemoveRing` 보존)를 구현했다.
+  - 에너지 버킷 턴 스케줄러(`speed` `0..=36`, `energy` `-36..=72`, `PotionSpeed`/`fast` 가속), 6대 능력치(`Str`, `Dex`, `Con`, `Int`, `Wis`, `Cha` — 근접/명중/HP·자연회복/주문 피해/기도 회복·쿨다운/상점 가격 및 범위 `3..=25` 저장 검증), 8플래그 `Resistances` 비트셋(`Telepathy` 원거리 몬스터 감지 포함)·7종 `StatusTimers`(`Blind`, `Confused`, `Stunned`, `Hallucinating`, `Fast`, `Levitation` 함정 회피 `"You float over the trap."`, `Invisible` 은신)·HUD 배지, 일반화 시체(`ItemKind::Corpse` 드롭 확률·부패 `corpse_age > 50` 독/내성 부여·트롤 `>= 25` 부활)를 구현했다.
+- **P8-C & `P9~P13` 확장 훅 (`SaveV3`)**:
+  - `campaign_map.rs`에 `80×21` Generator v3(`lit_tiles`, `SpecialRoomKind`, BFS 전 층 연결성), `BranchGraph::campaign_v3()`, 구조적 `validate_persisted_map`(내부 `Wall -> Floor` 채굴 허용·계단/상점/제단 보존)를 구현했다.
+  - 캠페인 저장을 `SAVE_SCHEMA_VERSION_V3 = 3`으로 전환하고 `P9~P13` optional 훅(`alignment`, `race`, `weapon_skills`, `spell_skill`, `learned_spells`, `generated_artifacts`, `ascension_altars`, `engravings`, `special_level_id`, `artifact_id`, `Faction`)을 roundtrip 검증과 함께 연결했으며, legacy(`campaign.is_none()`) `SAVE_SCHEMA_VERSION_V1 = 1`·2층 모드·`LlmObservationView < 32,768` bytes·`ActionSpace.commands <= 64`를 보존했다.
+
+### 검증 증거
+
+- `tests/stage2_p8.rs`: P8-A 콘텐츠 메타데이터·`speed 0..=36` 검증·TUI 데이터 주도 렌더링, P8-B 10슬롯/통합 AC/`TakeOff`/저주·중복 변조 거부, 에너지 버킷 스케줄러/`Fast`, 6대 능력치 전 효과·위조 거부, 8플래그 내성/`Telepathy`/7종 상태이상·혼란 비틀거림·부유·은신, 일반화 시체/부패/내성 부여/트롤 부활, P8-C `80×21` Generator v3·구조적 전이 검증·`BranchGraph`·`SaveV3` `P9~P13` roundtrip·legacy V1 거부·`LlmObservationView`/`ActionSpace` 예산·60×24 뷰포트 스크롤 (**7 PASS / 0 FAIL**).
+- 회귀·계약: `tests/campaign_p7.rs` (**6 PASS / 0 FAIL**), `tests/campaign.rs` (**12 PASS / 0 FAIL**), `tests/campaign_p6.rs` (**4 PASS / 0 FAIL**), `apps/aihack-headless/tests/headless_contract.rs` (**7 PASS / 0 FAIL**), `tests/ai_api_schema.rs` (**4 PASS / 0 FAIL**), `tests/long_run.rs` (**7 PASS / 0 FAIL**), `tests/stage1_fixes.rs` (**10 PASS / 0 FAIL**), `tests/r8_documentation.rs`, `tests/build_contract.rs`, `apps/aihack-tui/tests/tui_contract.rs` (**20 PASS / 0 FAIL**), `tests/ma2_play.rs` (**9 PASS / 0 FAIL**), `tests/conpty_contract.rs` (**4 PASS / 0 FAIL**).
+- 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy -j 4 --workspace --all-targets --locked -- -D warnings` PASS(0 warnings), `cargo test -j 2 --workspace --all-targets --locked --no-fail-fast` (**532 PASS / 0 FAIL / 0 ignored**, 96 test binaries), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS(`bans ok, licenses ok, sources ok`), `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix 1.1.4`/`tokio 1.52.4` warning 2건), Git Bash `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
+- 커밋·푸시·태그·브랜치 삭제는 실행하지 않았다.
+
+## Stage 3 (P9) 구현·검증 기록 (2026-11-27)
+
+### 구현 (`P9-1` ~ `P9-5`, `ADR-P9-01`)
+
+- **P9-1 (도구 시스템)**: `ItemClass::Tool`, `ToolAction::Blindfold`, `items.toml` P9 도구 8종(`SkeletonKey`, `LockPick`, `PickAxe`, `DwarvishMattock`, `TinWhistle`, `OilLamp`, `Blindfold`, `UnicornHorn`), `CommandIntent::Apply { item, direction }` 및 `systems/tools.rs`를 구현했다. 열쇠/자물쇠따개 잠금·해제 및 상자 함정 해체, 곡괭이/매톡 내부 벽 채굴(외곽 차단 및 SaveV3 영속), 오일 램프 어둠 시야 확대·연료 소모 소등, 눈가리개 시야 제한+텔레파시·저주 탈착 거부, 주석 호루라기 `Faction::Pet` 호출, 유니콘 뿔 상태이상/능력치 회복(저주 역효과)을 연결했다.
+- **P9-2 (컨테이너 & `InContainer`)**: `Sack`, `BagOfHolding`, `Chest`, `EntityLocation::InContainer { container }`, `ContainerPut`/`ContainerTake`, `ContainerItemObservation`, `systems/containers.rs`를 구현했다. `BagOfHolding` BUC 무게 배율(`Blessed /4`, `Uncursed /2`, `Cursed *2`)과 중첩 폭발(`DeathCause::Explosion`), 함정 상자 다트/독 트랩, 깊이 `<= 4`·용량 제한·순환 금지·`AmuletAscension` 수납 거부, `save.rs` 양방향 무결성·용량·`erosion` 검증을 구현했다.
+- **P9-3 (`#dip` · 성수/불성수 · 연금술 · 녹)**: `PotionWater`, `ScrollBlank`, `CommandIntent::Dip { item, target }`, `DipTarget`, `systems/dip.rs`를 구현했다. 제단 위 3 MP 성수 축복, 성수/불성수 BUC 변화, 맹물/분수/싱크 희석·세척·철제 무기/방어구 녹(`erosion 0..=3`, AC·명중/피해 연동), 물약 연금술 조합을 구현했다.
+- **P9-4 (`#engrave` · `Elbereth`)**: `CommandIntent::Engrave { method, text }`, `EngravingMethod`, `EngravingText`, `systems/engrave.rs`를 구현했다. 손가락(`Dust`)·무기/채굴 도구(`Engraved`)·화염 완드(`Burned`) 각인, 혼란/기절 시 문자열 왜곡, 적대 몬스터(`Minotaur` 제외) 근접 회피/도주, 플레이어 근접 공격 시 각인 마모 및 먼지 각인 자연 마모를 연결했다.
+- **P9-5 (지형 5종 · 함정 12종 · 어댑터)**: `TileKind::{Fountain, DryFountain, Sink, Water, Lava}`, 12종 `TrapKind`(+`Hole`, `Teleport`, `SleepingGas`, `Rust`, `Polymorph`, `AntiMagic`, `FallingRock`, `Magic`, `Fire`), `DeathCause::{Drowning, Lava, Explosion}`, `CommandIntent::Drink`, `systems/terrain.rs`를 구현했다. `campaign_map.rs` Room 4·5 모서리 배치 및 `validate_persisted_map`(`Fountain -> DryFountain` 포함)·`all_targets_reachable`(`Water | Lava` 비통과), `bootstrap.rs` P9 도구/상자 스폰, `aihack-tui`(`render_map`/`render_panels`/`input`/`play_menu`/`mod`, `'a'`/`'C'`/`'v'`/`'E'`/`'g'`), `aihack-headless`(`UnicornHorn` 치료, `Lava` 회피)를 통합하고 legacy V1·`observation_v1`·`LlmObservationView < 32,768` bytes·`ActionSpace <= 64`를 보존했다.
+
+### 검증 증거
+
+- `crates/aihack-content`: `items.toml` LF SHA-256 `b45ed709b09768670536e1d6a65e171c1787104ecd3078ee1e696e6470b340a3`, golden content hash `055379afe655af12` 동기화 (`tests/content_validation.rs` **13 PASS / 0 FAIL**, `registry.rs` **1 PASS**).
+- `tests/stage3_p9.rs`: `p9_1`~`p9_5` 도구/컨테이너/변조거부/`#dip`/연금술/녹/`#engrave` `Elbereth`/분수·싱크·물·용암/9종 신규 함정/TUI/Headless/LLM 예산 전수 검증 (**5 PASS / 0 FAIL**).
+- 회귀·계약: `tests/campaign.rs` (**12 PASS / 0 FAIL**), `tests/stage2_p8.rs` (**7 PASS / 0 FAIL**), `tests/campaign_p4.rs` (**6 PASS**), `tests/campaign_p5.rs` (**4 PASS**), `tests/campaign_p6.rs` (**4 PASS**), `tests/campaign_p7.rs` (**6 PASS**), `tests/long_run.rs` (**7 PASS / 0 FAIL**, legacy R9 해시 불변), `tests/ai_api_schema.rs` (**4 PASS**), `apps/aihack-tui/tests/tui_contract.rs` (**20 PASS**), `tests/ma2_play.rs` (**9 PASS**), `tests/conpty_contract.rs` (**4 PASS**).
+- 전체 게이트: `cargo fmt --all -- --check` PASS, `cargo clippy -j 4 --workspace --all-targets --locked -- -D warnings` PASS(0 warnings), `cargo test -j 2 --workspace --all-targets --locked --no-fail-fast` (**537 PASS / 0 FAIL / 0 ignored**, 97 test binaries), `cargo build -j 4 --workspace --all-targets --release --locked` PASS, `cargo deny check licenses bans sources` PASS(`bans ok, licenses ok, sources ok`), `cargo audit` PASS(0 vulnerabilities, 기존 허용 `rustix 1.1.4`/`tokio 1.52.4` warning 2건), Git Bash `scripts/r7_checkpoint.sh` PASS, `scripts/r8_checkpoint.sh` PASS.
+- 커밋·푸시·태그·브랜치 삭제는 실행하지 않았다.

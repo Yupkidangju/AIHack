@@ -7,16 +7,30 @@ use crate::{
         item::{BucStatus, ItemData, ItemKind},
         monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
         player::adventurer_template,
+        status::Resistances,
     },
     error::EntityAllocationError,
     ids::{EntityId, LevelId},
     position::Pos,
+    world::{is_zero_i16, is_zero_u16, is_zero_u8},
 };
 
 pub const MAX_ABSOLUTE_ACTOR_STAT: i32 = 10_000;
 
 fn is_zero_i8(value: &i8) -> bool {
     *value == 0
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn default_quantity_one() -> u16 {
+    1
+}
+
+fn is_one_u16(value: &u16) -> bool {
+    *value == 1
 }
 
 /// Actor payload 내부 종류다. Item은 별도 payload로 분리한다.
@@ -44,10 +58,13 @@ pub enum EntityKind {
     Item(ItemKind),
 }
 
-/// 전투 관계를 판정하기 위한 최소 faction이다.
+/// 전투 관계를 판정하기 위한 faction이다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Faction {
     Player,
+    Pet,
+    Peaceful,
+    Shopkeeper,
     Hostile,
     Neutral,
 }
@@ -65,6 +82,10 @@ pub struct ActorStats {
     pub weapon_hit_bonus: i16,
     #[serde(default = "default_actor_speed")]
     pub speed: i16,
+    #[serde(default, skip_serializing_if = "is_zero_i16")]
+    pub energy: i16,
+    #[serde(default, skip_serializing_if = "Resistances::is_empty")]
+    pub resistances: Resistances,
     #[serde(default)]
     pub ai_kind: Option<MonsterAiKind>,
     #[serde(default)]
@@ -82,6 +103,7 @@ fn default_actor_speed() -> i16 {
 pub enum EntityLocation {
     OnMap { level: LevelId, pos: Pos },
     Inventory { owner: EntityId },
+    InContainer { container: EntityId },
     Consumed,
 }
 
@@ -96,7 +118,7 @@ impl EntityLocation {
     pub fn map_position(self) -> Option<(LevelId, Pos)> {
         match self {
             Self::OnMap { level, pos } => Some((level, pos)),
-            Self::Inventory { .. } | Self::Consumed => None,
+            Self::Inventory { .. } | Self::InContainer { .. } | Self::Consumed => None,
         }
     }
 }
@@ -110,6 +132,8 @@ pub enum EntityPayload {
         location: EntityLocation,
         stats: ActorStats,
         alive: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        monster_inventory: Vec<EntityId>,
     },
     Item {
         kind: ItemKind,
@@ -121,6 +145,28 @@ pub enum EntityPayload {
         buc: BucStatus,
         #[serde(default, skip_serializing_if = "is_zero_i8")]
         enchantment: i8,
+        #[serde(default = "default_quantity_one", skip_serializing_if = "is_one_u16")]
+        quantity: u16,
+        #[serde(default, skip_serializing_if = "is_false")]
+        buc_known: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        enchant_known: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        corpse_monster: Option<MonsterKind>,
+        #[serde(default, skip_serializing_if = "is_zero_u16")]
+        corpse_age: u16,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        contained_items: Vec<EntityId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        artifact_id: Option<String>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        tool_active: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        container_locked: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        container_trapped: bool,
+        #[serde(default, skip_serializing_if = "is_zero_u8")]
+        erosion: u8,
     },
 }
 
@@ -165,6 +211,7 @@ impl Entity {
                 location,
                 stats,
                 alive,
+                ..
             } => {
                 let (level, pos) = location.map_position()?;
                 Some((*kind, *faction, level, pos, stats, *alive))
@@ -274,6 +321,98 @@ impl Entity {
         }
     }
 
+    pub fn item_quantity(&self) -> Option<u16> {
+        match &self.payload {
+            EntityPayload::Item { quantity, .. } => Some(*quantity),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_buc_known(&self) -> Option<bool> {
+        match &self.payload {
+            EntityPayload::Item { buc_known, .. } => Some(*buc_known),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_enchant_known(&self) -> Option<bool> {
+        match &self.payload {
+            EntityPayload::Item { enchant_known, .. } => Some(*enchant_known),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_corpse_monster(&self) -> Option<MonsterKind> {
+        match &self.payload {
+            EntityPayload::Item { corpse_monster, .. } => *corpse_monster,
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_corpse_age(&self) -> Option<u16> {
+        match &self.payload {
+            EntityPayload::Item { corpse_age, .. } => Some(*corpse_age),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_contained_items(&self) -> Option<&[EntityId]> {
+        match &self.payload {
+            EntityPayload::Item {
+                contained_items, ..
+            } => Some(contained_items),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_artifact_id(&self) -> Option<&str> {
+        match &self.payload {
+            EntityPayload::Item { artifact_id, .. } => artifact_id.as_deref(),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_tool_active(&self) -> Option<bool> {
+        match &self.payload {
+            EntityPayload::Item { tool_active, .. } => Some(*tool_active),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_container_locked(&self) -> Option<bool> {
+        match &self.payload {
+            EntityPayload::Item {
+                container_locked, ..
+            } => Some(*container_locked),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_container_trapped(&self) -> Option<bool> {
+        match &self.payload {
+            EntityPayload::Item {
+                container_trapped, ..
+            } => Some(*container_trapped),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_erosion(&self) -> Option<u8> {
+        match &self.payload {
+            EntityPayload::Item { erosion, .. } => Some(*erosion),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn actor_monster_inventory(&self) -> Option<&[EntityId]> {
+        match &self.payload {
+            EntityPayload::Actor {
+                monster_inventory, ..
+            } => Some(monster_inventory),
+            EntityPayload::Item { .. } => None,
+        }
+    }
+
     pub fn item_mut(&mut self) -> Option<ItemViewMut<'_>> {
         match &mut self.payload {
             EntityPayload::Item {
@@ -340,6 +479,21 @@ impl Entity {
                 ..
             } => Some(AttackProfile::natural("fire bite", stats.damage)),
             EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Minotaur),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("gore", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Dragon),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("bite", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Bat),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("bite", stats.damage)),
+            EntityPayload::Actor {
                 kind: ActorKind::Player,
                 ..
             } => None,
@@ -385,6 +539,8 @@ impl EntityStore {
                 damage: template.attack_profile.damage,
                 weapon_hit_bonus: template.attack_profile.hit_bonus,
                 speed: 12,
+                energy: 0,
+                resistances: Resistances::NONE,
                 ai_kind: None,
                 passive: None,
                 difficulty: 0,
@@ -412,6 +568,8 @@ impl EntityStore {
                 damage: template.attack_profile.damage,
                 weapon_hit_bonus: template.attack_profile.hit_bonus,
                 speed: template.speed,
+                energy: 0,
+                resistances: Resistances::NONE,
                 ai_kind: Some(template.ai_kind),
                 passive: template.passive,
                 difficulty: template.difficulty,
@@ -435,6 +593,7 @@ impl EntityStore {
                 location: EntityLocation::on_main_level(pos),
                 stats,
                 alive: true,
+                monster_inventory: Vec::new(),
             },
         });
         Ok(id)
@@ -457,6 +616,17 @@ impl EntityStore {
                 charges: data.max_charges,
                 buc: BucStatus::Uncursed,
                 enchantment: 0,
+                quantity: 1,
+                buc_known: false,
+                enchant_known: false,
+                corpse_monster: None,
+                corpse_age: 0,
+                contained_items: Vec::new(),
+                artifact_id: None,
+                tool_active: false,
+                container_locked: false,
+                container_trapped: false,
+                erosion: 0,
             },
         });
         Ok(id)
@@ -683,6 +853,197 @@ impl EntityStore {
             return false;
         };
         *enchantment = next;
+        true
+    }
+
+    pub fn set_item_quantity(&mut self, id: EntityId, next: u16) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { quantity, .. } = &mut entity.payload else {
+            return false;
+        };
+        *quantity = next;
+        true
+    }
+
+    pub fn set_item_buc_known(&mut self, id: EntityId, known: bool) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { buc_known, .. } = &mut entity.payload else {
+            return false;
+        };
+        *buc_known = known;
+        true
+    }
+
+    pub fn set_item_enchant_known(&mut self, id: EntityId, known: bool) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { enchant_known, .. } = &mut entity.payload else {
+            return false;
+        };
+        *enchant_known = known;
+        true
+    }
+
+    pub fn set_item_corpse_monster(&mut self, id: EntityId, monster: Option<MonsterKind>) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { corpse_monster, .. } = &mut entity.payload else {
+            return false;
+        };
+        *corpse_monster = monster;
+        true
+    }
+
+    pub fn set_item_corpse_age(&mut self, id: EntityId, age: u16) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { corpse_age, .. } = &mut entity.payload else {
+            return false;
+        };
+        *corpse_age = age;
+        true
+    }
+
+    pub fn set_item_artifact_id(&mut self, id: EntityId, artifact: Option<String>) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { artifact_id, .. } = &mut entity.payload else {
+            return false;
+        };
+        *artifact_id = artifact;
+        true
+    }
+
+    pub fn set_item_tool_active(&mut self, id: EntityId, active: bool) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { tool_active, .. } = &mut entity.payload else {
+            return false;
+        };
+        *tool_active = active;
+        true
+    }
+
+    pub fn set_item_container_locked(&mut self, id: EntityId, locked: bool) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item {
+            container_locked, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        *container_locked = locked;
+        true
+    }
+
+    pub fn set_item_container_trapped(&mut self, id: EntityId, trapped: bool) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item {
+            container_trapped, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        *container_trapped = trapped;
+        true
+    }
+
+    pub fn set_item_erosion(&mut self, id: EntityId, next: u8) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { erosion, .. } = &mut entity.payload else {
+            return false;
+        };
+        *erosion = next;
+        true
+    }
+
+    pub fn push_contained_item(&mut self, container: EntityId, item: EntityId) -> bool {
+        let Some(entity) = self.get_mut(container) else {
+            return false;
+        };
+        let EntityPayload::Item {
+            contained_items, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        if !contained_items.contains(&item) {
+            contained_items.push(item);
+        }
+        true
+    }
+
+    pub fn remove_contained_item(&mut self, container: EntityId, item: EntityId) -> bool {
+        let Some(entity) = self.get_mut(container) else {
+            return false;
+        };
+        let EntityPayload::Item {
+            contained_items, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        let before = contained_items.len();
+        contained_items.retain(|id| *id != item);
+        contained_items.len() != before
+    }
+
+    pub fn clear_contained_items(&mut self, container: EntityId) -> bool {
+        let Some(entity) = self.get_mut(container) else {
+            return false;
+        };
+        let EntityPayload::Item {
+            contained_items, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        contained_items.clear();
+        true
+    }
+
+    pub fn clear_item_letter(&mut self, id: EntityId) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let Some((_, _, assigned_letter, _)) = entity.item_mut() else {
+            return false;
+        };
+        *assigned_letter = None;
+        true
+    }
+
+    pub fn set_item_kind_and_data(&mut self, id: EntityId, kind: ItemKind, data: ItemData) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item {
+            kind: kind_ref,
+            data: data_ref,
+            charges,
+            ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        *kind_ref = kind;
+        *data_ref = data;
+        *charges = data.max_charges;
         true
     }
 

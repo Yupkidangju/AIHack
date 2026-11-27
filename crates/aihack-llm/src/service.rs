@@ -46,7 +46,12 @@ impl From<&Observation> for LlmObservationView {
             turn: observation.turn,
             run_state: observation.run_state,
             player: observation.player.clone(),
-            visible_tiles: observation.visible_tiles.clone(),
+            visible_tiles: observation
+                .visible_tiles
+                .iter()
+                .filter(|tile| tile.visible)
+                .cloned()
+                .collect(),
             visible_entities: observation.visible_entities.clone(),
             inventory: observation.inventory.clone(),
             last_events: observation.last_events.clone(),

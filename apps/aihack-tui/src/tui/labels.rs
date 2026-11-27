@@ -58,46 +58,27 @@ pub fn collect_auto_labels(observation: &Observation, current_time_ms: u64) -> V
         let is_adjacent = dx <= 1 && dy <= 1 && (dx + dy) > 0;
 
         if let crate::domain::entity::EntityKind::Monster(monster_kind) = entity.kind {
-            let is_hostile = matches!(
-                monster_kind,
-                crate::domain::monster::MonsterKind::Jackal
-                    | crate::domain::monster::MonsterKind::Goblin
-                    | crate::domain::monster::MonsterKind::Kobold
-                    | crate::domain::monster::MonsterKind::Orc
-                    | crate::domain::monster::MonsterKind::Ogre
-                    | crate::domain::monster::MonsterKind::GiantSpider
-                    | crate::domain::monster::MonsterKind::GnollArcher
-                    | crate::domain::monster::MonsterKind::Troll
-                    | crate::domain::monster::MonsterKind::FireAnt
-            );
-            if is_hostile && is_adjacent {
+            let is_passive = monster_kind == crate::domain::monster::MonsterKind::FloatingEye;
+            if !is_passive && is_adjacent {
+                let glyph = entity
+                    .glyph
+                    .unwrap_or_else(|| aihack_runtime::monster_glyph(monster_kind));
                 candidates.push(AutoLabel {
                     kind: LabelKind::HostileAdjacent,
                     pos: entity.pos,
-                    text: format!(
-                        "[{}]",
-                        match monster_kind {
-                            crate::domain::monster::MonsterKind::Jackal => "d",
-                            crate::domain::monster::MonsterKind::Goblin => "g",
-                            crate::domain::monster::MonsterKind::Kobold => "k",
-                            crate::domain::monster::MonsterKind::Orc => "o",
-                            crate::domain::monster::MonsterKind::Ogre => "O",
-                            crate::domain::monster::MonsterKind::GiantSpider => "s",
-                            crate::domain::monster::MonsterKind::GnollArcher => "G",
-                            crate::domain::monster::MonsterKind::Troll => "T",
-                            crate::domain::monster::MonsterKind::FireAnt => "a",
-                            _ => "?",
-                        }
-                    ),
+                    text: format!("[{glyph}]"),
                     created_at_ms: current_time_ms,
                     duration_ms: 1200,
                 });
-            } else if !is_hostile && is_adjacent {
-                // PassiveMonster
+            } else if is_passive && is_adjacent {
+                let name = entity
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| aihack_runtime::monster_display_name(monster_kind));
                 candidates.push(AutoLabel {
                     kind: LabelKind::PassiveMonster,
                     pos: entity.pos,
-                    text: "[floating eye]".to_string(),
+                    text: format!("[{name}]"),
                     created_at_ms: current_time_ms,
                     duration_ms: 1200,
                 });
@@ -124,7 +105,7 @@ pub fn collect_auto_labels(observation: &Observation, current_time_ms: u64) -> V
     // 계단 체크
     for tile in &observation.visible_tiles {
         use crate::domain::tile::TileKind;
-        if matches!(tile.tile, TileKind::StairsDown | TileKind::StairsUp) {
+        if tile.visible && matches!(tile.tile, TileKind::StairsDown | TileKind::StairsUp) {
             candidates.push(AutoLabel {
                 kind: LabelKind::Stairs,
                 pos: tile.pos,

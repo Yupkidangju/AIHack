@@ -67,7 +67,7 @@ fn headless_package_runs_through_the_game_client_contract() {
     let report = run_to_turn(&mut session, 1, HeadlessPolicy::wait_v1()).unwrap();
 
     assert_eq!(report.accepted_turns, 1);
-    assert_eq!(report.final_hash.0, "54e43384cefa2590");
+    assert_eq!(report.final_hash.0, "3dd4fe7b6a4fd6fe");
 }
 
 #[test]
@@ -303,7 +303,7 @@ fn headless_cli_cleric_role_creates_campaign_save_and_report() {
     );
     let save_bytes = fs::read(root.join("runtime/saves/cleric.json")).unwrap();
     let save: aihack_runtime::save::SaveDataV1 = serde_json::from_slice(&save_bytes).unwrap();
-    assert_eq!(save.schema_version, 2);
+    assert_eq!(save.schema_version, 3);
     assert_eq!(
         save.world.campaign.unwrap().role,
         aihack_ai_contract::Role::Cleric

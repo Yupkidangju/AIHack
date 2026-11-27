@@ -24,6 +24,18 @@ pub fn move_actor(
     let (level, from) = actor_origin(world, actor)?;
     let to = from.offset(direction.delta());
     aihack_core::movement::validate_actor_destination(world, actor, direction)?;
+    if actor != world.player_id {
+        if let Ok(tile) = world.map(level).tile(to) {
+            if !crate::systems::terrain::actor_kind_can_traverse(
+                world.entities.get(actor).and_then(|e| e.actor_kind()),
+                tile,
+            ) {
+                return Err(GameError::CommandRejected(
+                    "monster avoids hazardous terrain".to_string(),
+                ));
+            }
+        }
+    }
 
     if actor == world.player_id {
         world.set_player_location(level, to);
@@ -40,7 +52,23 @@ pub fn move_actor(
 }
 
 pub fn is_passable_for_actor(world: &GameWorld, actor: EntityId, direction: Direction) -> bool {
-    aihack_core::movement::is_passable_for_actor(world, actor, direction)
+    if !aihack_core::movement::is_passable_for_actor(world, actor, direction) {
+        return false;
+    }
+    if actor != world.player_id {
+        if let Some((level, from)) = world.entities.actor_location(actor) {
+            let to = from.offset(direction.delta());
+            if let Ok(tile) = world.map(level).tile(to) {
+                if !crate::systems::terrain::actor_kind_can_traverse(
+                    world.entities.get(actor).and_then(|e| e.actor_kind()),
+                    tile,
+                ) {
+                    return false;
+                }
+            }
+        }
+    }
+    true
 }
 
 pub fn is_passable_for_legal_action(world: &GameWorld, direction: Direction) -> bool {
@@ -88,6 +116,7 @@ fn is_walkable_or_attackable_destination(
             | TileKind::HiddenTrap(_)
             | TileKind::StairsDown
             | TileKind::StairsUp
-            | TileKind::Shop)
+            | TileKind::Shop
+            | TileKind::Altar)
     ) && aihack_core::movement::validate_path(world, actor, level, from, direction).is_ok()
 }

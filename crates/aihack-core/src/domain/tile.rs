@@ -12,6 +12,15 @@ pub enum TrapKind {
     Pit,
     Dart,
     Bear,
+    Teleport,
+    SleepingGas,
+    Rust,
+    Polymorph,
+    Hole,
+    AntiMagic,
+    FallingRock,
+    Magic,
+    Fire,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -25,6 +34,12 @@ pub enum TileKind {
     StairsDown,
     StairsUp,
     Shop,
+    Altar,
+    Fountain,
+    DryFountain,
+    Sink,
+    Water,
+    Lava,
 }
 
 impl TileKind {
@@ -38,6 +53,12 @@ impl TileKind {
                 | Self::StairsDown
                 | Self::StairsUp
                 | Self::Shop
+                | Self::Altar
+                | Self::Fountain
+                | Self::DryFountain
+                | Self::Sink
+                | Self::Water
+                | Self::Lava
         )
     }
     pub fn is_los_transparent(self) -> bool {

@@ -12,7 +12,7 @@ pub struct PlayerTemplate {
 pub fn adventurer_template() -> PlayerTemplate {
     PlayerTemplate {
         hp: 16,
-        ac: 0,
+        ac: 10,
         hit_bonus: 2,
         damage_bonus: 0,
         attack_profile: AttackProfile::dagger(),

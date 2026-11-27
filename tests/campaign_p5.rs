@@ -79,17 +79,87 @@ fn add_inventory_item(
     id
 }
 
-fn find_door_y(session: &GameSession, level: LevelId, x: i16) -> Option<(i16, TileKind)> {
+fn find_door_matching(
+    session: &GameSession,
+    level: LevelId,
+    pred: impl Fn(TileKind) -> bool,
+) -> Option<(Pos, TileKind)> {
     let map = session.world().levels.map(level)?;
-    for y in 0..map.height {
-        let pos = Pos { x, y };
-        if let Ok(tile) = map.tile(pos) {
-            if matches!(tile, TileKind::Door(_) | TileKind::HiddenDoor) {
-                return Some((y, tile));
+    for y in 1..map.height - 1 {
+        for x in 1..map.width - 1 {
+            let pos = Pos { x, y };
+            if let Ok(tile) = map.tile(pos) {
+                if pred(tile) {
+                    return Some((pos, tile));
+                }
             }
         }
     }
     None
+}
+
+fn adjacent_floor_toward(session: &GameSession, level: LevelId, target: Pos) -> (Pos, Direction) {
+    let map = session.world().levels.map(level).unwrap();
+    for dir in [
+        Direction::East,
+        Direction::West,
+        Direction::North,
+        Direction::South,
+        Direction::NorthEast,
+        Direction::NorthWest,
+        Direction::SouthEast,
+        Direction::SouthWest,
+    ] {
+        let d = dir.delta();
+        let candidate = Pos {
+            x: target.x - d.dx,
+            y: target.y - d.dy,
+        };
+        if matches!(
+            map.tile(candidate),
+            Ok(TileKind::Floor | TileKind::StairsUp | TileKind::StairsDown)
+        ) {
+            return (candidate, dir);
+        }
+    }
+    panic!("no adjacent floor around {target:?} on {level:?}");
+}
+
+fn visible_floor_neighbors(
+    session: &GameSession,
+    level: LevelId,
+    origin: Pos,
+    exclude: &[Pos],
+    needed: usize,
+) -> Vec<Pos> {
+    let map = session.world().levels.map(level).unwrap();
+    let mut found = Vec::new();
+    for dy in -2_i16..=2 {
+        for dx in -2_i16..=2 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let candidate = Pos {
+                x: origin.x + dx,
+                y: origin.y + dy,
+            };
+            if exclude.contains(&candidate) {
+                continue;
+            }
+            if map.tile(candidate).ok() == Some(TileKind::Floor)
+                && aihack_core::vision::has_line_of_sight(map, origin, candidate)
+            {
+                found.push(candidate);
+                if found.len() == needed {
+                    return found;
+                }
+            }
+        }
+    }
+    panic!(
+        "needed {needed} visible floor tiles near {origin:?} on {level:?}, found {}",
+        found.len()
+    );
 }
 
 #[test]
@@ -182,7 +252,7 @@ fn p5a_buc_enchantment_scrolls_potions_cursed_guards_and_validation() {
             .accepted
     );
     assert!(session.submit(C::Wear { item: cursed_armor }).accepted);
-    // ArmorLeather base AC bonus 1 + enchant 1 = 2 -> player AC 0 - 2 = -2
+    // ArmorLeather base AC bonus 1 + enchant 1 = 2 -> player AC 10 - 2 = 8
     assert_eq!(
         session
             .world()
@@ -190,7 +260,7 @@ fn p5a_buc_enchantment_scrolls_potions_cursed_guards_and_validation() {
             .actor_stats(session.world().player_id())
             .unwrap()
             .ac,
-        -2
+        8
     );
 
     // Cannot swap, drop, or throw cursed equipped weapon/armor
@@ -247,7 +317,7 @@ fn p5a_buc_enchantment_scrolls_potions_cursed_guards_and_validation() {
             .accepted
     );
 
-    // EnchantArmor uncurses equipped armor, increments +1 -> +2, updates AC to 0 - (1 + 2) = -3
+    // EnchantArmor uncurses equipped armor, increments +1 -> +2, updates AC to 10 - (1 + 2) = 7
     assert!(
         session
             .submit(C::Read {
@@ -280,7 +350,7 @@ fn p5a_buc_enchantment_scrolls_potions_cursed_guards_and_validation() {
             .actor_stats(session.world().player_id())
             .unwrap()
             .ac,
-        -3
+        7
     );
     let reloaded = GameSession::from_save_data(session.to_save_data()).unwrap();
     assert_eq!(
@@ -446,32 +516,33 @@ fn p5a_buc_enchantment_scrolls_potions_cursed_guards_and_validation() {
 fn p5a_locked_doors_spawn_kick_open_and_tamper_rejection() {
     let base = start(42, Role::Knight);
     let mines2 = mines_level(2);
-    let (y7, tile) = find_door_y(&base, mines2, 7).unwrap();
+    let (door_pos, tile) =
+        find_door_matching(&base, mines2, |t| t == TileKind::Door(DoorState::Locked)).unwrap();
     assert_eq!(tile, TileKind::Door(DoorState::Locked));
-    let door_pos = Pos { x: 7, y: y7 };
+    let (p_pos, kick_dir) = adjacent_floor_toward(&base, mines2, door_pos);
 
     let mut save = base.to_save_data();
     park_all_monsters_on(&mut save, mines2);
     save.world.current_level = mines2;
     save.world
         .entities
-        .set_actor_location(save.world.player_id, mines2, Pos { x: 6, y: y7 });
+        .set_actor_location(save.world.player_id, mines2, p_pos);
     let mut session = GameSession::from_save_data(save).unwrap();
 
     // Open and Move blocked on Locked door
     let hash_before = session.snapshot().stable_hash();
-    assert!(!session.submit(C::Open(Direction::East)).accepted);
-    assert!(!session.submit(C::Move(Direction::East)).accepted);
+    assert!(!session.submit(C::Open(kick_dir)).accepted);
+    assert!(!session.submit(C::Move(kick_dir)).accepted);
     assert_eq!(session.snapshot().stable_hash(), hash_before);
 
     // Kick unlocks into Open, and Close -> Open -> save/load valid on generated Locked site
-    let kicked = session.submit(C::Kick(Direction::East));
+    let kicked = session.submit(C::Kick(kick_dir));
     assert!(kicked.accepted);
     assert_eq!(
         session.world().current_map().tile(door_pos),
         Ok(TileKind::Door(DoorState::Open))
     );
-    assert!(session.submit(C::Close(Direction::East)).accepted);
+    assert!(session.submit(C::Close(kick_dir)).accepted);
     assert_eq!(
         session.world().current_map().tile(door_pos),
         Ok(TileKind::Door(DoorState::Closed))
@@ -479,7 +550,10 @@ fn p5a_locked_doors_spawn_kick_open_and_tamper_rejection() {
     assert!(GameSession::from_save_data(session.to_save_data()).is_ok());
 
     // Tampering: forging Locked on Main 1 Closed door or on Floor must be rejected
-    let (y_main1, main1_tile) = find_door_y(&base, LevelId::main(1), 7).unwrap();
+    let (main1_door_pos, main1_tile) = find_door_matching(&base, LevelId::main(1), |t| {
+        t == TileKind::Door(DoorState::Closed)
+    })
+    .unwrap();
     assert_eq!(main1_tile, TileKind::Door(DoorState::Closed));
     let mut forged_closed = base.to_save_data();
     forged_closed
@@ -487,7 +561,7 @@ fn p5a_locked_doors_spawn_kick_open_and_tamper_rejection() {
         .levels
         .map_mut(LevelId::main(1))
         .unwrap()
-        .set_tile(Pos { x: 7, y: y_main1 }, TileKind::Door(DoorState::Locked))
+        .set_tile(main1_door_pos, TileKind::Door(DoorState::Locked))
         .unwrap();
     assert!(GameSession::from_save_data(forged_closed).is_err());
 
@@ -826,8 +900,11 @@ fn p5c_tui_headless_and_legacy_v1_preservation() {
     // 2. TUI checks: POIS:<n>, locked door, BUC/enchant labels, monster labels/glyphs, DeathCause::Poison
     let base = start(42, Role::Knight);
     let mines2 = mines_level(2);
-    let (y7, _) = find_door_y(&base, mines2, 7).unwrap();
-    let locked_door_pos = Pos { x: 7, y: y7 };
+    let (locked_door_pos, _) =
+        find_door_matching(&base, mines2, |t| t == TileKind::Door(DoorState::Locked)).unwrap();
+    let (p_pos, kick_dir) = adjacent_floor_toward(&base, mines2, locked_door_pos);
+    let neighbors = visible_floor_neighbors(&base, mines2, p_pos, &[locked_door_pos], 3);
+    let (sp_pos, ar_pos, tr_pos) = (neighbors[0], neighbors[1], neighbors[2]);
 
     let spider_id = base
         .world()
@@ -858,10 +935,6 @@ fn p5c_tui_headless_and_legacy_v1_preservation() {
     park_all_monsters_on(&mut save, LevelId::main(6));
     save.world.poison_turns = 3;
     save.world.current_level = mines2;
-    let p_pos = Pos { x: 6, y: y7 };
-    let sp_pos = Pos { x: 5, y: y7 - 1 };
-    let ar_pos = Pos { x: 5, y: y7 };
-    let tr_pos = Pos { x: 5, y: y7 + 1 };
     save.world
         .entities
         .set_actor_location(save.world.player_id, mines2, p_pos);
@@ -874,8 +947,25 @@ fn p5c_tui_headless_and_legacy_v1_preservation() {
     save.world
         .entities
         .set_actor_location(troll_id, mines2, tr_pos);
-    add_inventory_item(&mut save, ItemKind::ShortSword, BucStatus::Blessed, 1);
-    add_inventory_item(&mut save, ItemKind::Dagger, BucStatus::Cursed, -1);
+    let blessed_sword = add_inventory_item(&mut save, ItemKind::ShortSword, BucStatus::Blessed, 1);
+    let cursed_dagger = add_inventory_item(&mut save, ItemKind::Dagger, BucStatus::Cursed, -1);
+    let mut revealed_save = save.clone();
+    revealed_save
+        .world
+        .entities
+        .set_item_buc_known(blessed_sword, true);
+    revealed_save
+        .world
+        .entities
+        .set_item_enchant_known(blessed_sword, true);
+    revealed_save
+        .world
+        .entities
+        .set_item_buc_known(cursed_dagger, true);
+    revealed_save
+        .world
+        .entities
+        .set_item_enchant_known(cursed_dagger, true);
 
     let ui_sess = GameSession::from_save_data(save).unwrap();
     let status = render_panels::status_lines(&ui_sess.observation());
@@ -896,7 +986,12 @@ fn p5c_tui_headless_and_legacy_v1_preservation() {
             render_panels::inspect_lines(&ui_sess.observation(), Some(pos), UiPanel::Inspect, &[]);
         assert!(lines.iter().any(|l| l.starts_with(expected)));
     }
-    let inv_ctas = input::inventory_panel_ctas(&ui_sess.observation());
+    let unrevealed_ctas = input::inventory_panel_ctas(&ui_sess.observation());
+    assert!(!unrevealed_ctas
+        .iter()
+        .any(|c| c.label.contains("blessed") || c.label.contains("cursed")));
+    let revealed_sess = GameSession::from_save_data(revealed_save).unwrap();
+    let inv_ctas = input::inventory_panel_ctas(&revealed_sess.observation());
     assert!(inv_ctas
         .iter()
         .any(|c| c.label.contains("+1 blessed short sword")));
@@ -964,7 +1059,7 @@ fn p5c_tui_headless_and_legacy_v1_preservation() {
     let t1 = hl_sess.turn();
     assert_eq!(
         HeadlessPolicy::survival_v1().candidates(&hl_sess),
-        vec![C::Kick(Direction::East)]
+        vec![C::Kick(kick_dir)]
     );
     aihack_headless::run_to_turn(&mut hl_sess, t1 + 1, HeadlessPolicy::survival_v1()).unwrap();
     assert_eq!(

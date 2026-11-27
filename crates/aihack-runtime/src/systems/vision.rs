@@ -1,5 +1,5 @@
 use aihack_core::{
-    domain::entity::ActorKind,
+    domain::{entity::ActorKind, status::Resistances},
     ids::{EntityId, LevelId},
     position::Pos,
 };
@@ -8,8 +8,29 @@ use crate::world::GameWorld;
 
 pub use aihack_core::vision::DEFAULT_VISION_RADIUS;
 
+pub const DARK_VISION_RADIUS: i16 = 2;
+
 pub fn visible_positions(world: &GameWorld) -> Vec<Pos> {
-    visible_positions_from(world, world.player_pos())
+    if world.status_timers.blind > 0 || crate::systems::tools::is_player_blindfolded(world) {
+        return vec![world.player_pos()];
+    }
+    let origin = world.player_pos();
+    let level = world.current_level();
+    let max_radius = if world.campaign.is_some()
+        && !crate::systems::tools::has_active_light_source(world)
+        && world
+            .levels
+            .get(level)
+            .is_some_and(|lvl| !lvl.is_lit(origin))
+    {
+        DARK_VISION_RADIUS
+    } else {
+        DEFAULT_VISION_RADIUS
+    };
+    visible_positions_on_level(world, level, origin)
+        .into_iter()
+        .filter(|pos| origin.chebyshev_distance(*pos) <= max_radius)
+        .collect()
 }
 
 pub fn visible_positions_from(world: &GameWorld, origin: Pos) -> Vec<Pos> {
@@ -32,7 +53,7 @@ pub fn monster_has_line_of_sight_to_player(world: &GameWorld, monster: EntityId)
     let Some(entity) = world.entities.get(monster) else {
         return false;
     };
-    let Some((ActorKind::Monster(_), _, monster_level, monster_pos, _, alive)) = entity.actor()
+    let Some((ActorKind::Monster(_), _, monster_level, monster_pos, stats, alive)) = entity.actor()
     else {
         return false;
     };
@@ -40,12 +61,24 @@ pub fn monster_has_line_of_sight_to_player(world: &GameWorld, monster: EntityId)
         return false;
     }
     let (player_level, player_pos) = world.player_location();
-    monster_level == player_level
-        && monster_pos.chebyshev_distance(player_pos) <= DEFAULT_VISION_RADIUS
+    if monster_level != player_level {
+        return false;
+    }
+    let dist = monster_pos.chebyshev_distance(player_pos);
+    if world.status_timers.invisible > 0
+        && !stats.resistances.contains(Resistances::SEE_INVISIBLE)
+        && dist > 1
+    {
+        return false;
+    }
+    dist <= DEFAULT_VISION_RADIUS
         && has_line_of_sight_on_level(world, monster_level, monster_pos, player_pos)
 }
 
 pub fn is_visible(world: &GameWorld, pos: Pos) -> bool {
+    if world.status_timers.blind > 0 || crate::systems::tools::is_player_blindfolded(world) {
+        return pos == world.player_pos();
+    }
     is_visible_from(world, world.player_pos(), pos)
 }
 

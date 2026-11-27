@@ -2,7 +2,7 @@ use aihack_core::{
     domain::{
         combat::{AttackProfile, DamageRoll},
         entity::EntityLocation,
-        item::{ItemKind, WandEffect},
+        item::{BucStatus, ItemKind, WandEffect},
         tile::{DoorState, TileKind},
     },
     event::GameEvent,
@@ -36,25 +36,69 @@ pub fn throw_item(
     if !world.inventory.contains(item) {
         return Err("item is not in player inventory".to_string());
     }
+    if !world
+        .entities
+        .get(item)
+        .and_then(|e| e.item_contained_items())
+        .is_none_or(<[EntityId]>::is_empty)
+    {
+        return Err("empty container before throwing".to_string());
+    }
     if data.attack_profile.is_none() {
         return Err("item cannot be thrown".to_string());
     }
 
     let from = world.player_pos();
     let outcome = trace_path(world, from, direction);
-    items::remove_inventory_item(world, item)?;
     let level = world.current_level();
-    world.state_mut().entities.set_item_location(
-        item,
-        EntityLocation::OnMap {
-            level,
-            pos: outcome.landing,
-        },
-    );
+    let (qty, buc, enchantment, buc_known, enchant_known) = world
+        .entities
+        .get(item)
+        .map(|entity| {
+            (
+                entity.item_quantity().unwrap_or(1),
+                entity.item_buc().unwrap_or(BucStatus::Uncursed),
+                entity.item_enchantment().unwrap_or(0),
+                entity.item_buc_known().unwrap_or(false),
+                entity.item_enchant_known().unwrap_or(false),
+            )
+        })
+        .unwrap_or((1, BucStatus::Uncursed, 0, false, false));
+    let thrown_id = if qty > 1 {
+        let spawned = world
+            .state_mut()
+            .entities
+            .spawn_item_with_data(
+                kind,
+                data,
+                EntityLocation::OnMap {
+                    level,
+                    pos: outcome.landing,
+                },
+            )
+            .map_err(|error| error.to_string())?;
+        let entities = &mut world.state_mut().entities;
+        entities.set_item_buc(spawned, buc);
+        entities.set_item_enchantment(spawned, enchantment);
+        entities.set_item_buc_known(spawned, buc_known);
+        entities.set_item_enchant_known(spawned, enchant_known);
+        entities.set_item_quantity(item, qty - 1);
+        spawned
+    } else {
+        items::remove_inventory_item(world, item)?;
+        world.state_mut().entities.set_item_location(
+            item,
+            EntityLocation::OnMap {
+                level,
+                pos: outcome.landing,
+            },
+        );
+        item
+    };
 
     let mut events = vec![GameEvent::ItemThrown {
         entity: world.player_id,
-        item,
+        item: thrown_id,
         from,
         to: outcome.landing,
     }];
@@ -147,8 +191,25 @@ fn projectile_profile(kind: ItemKind, base: Option<AttackProfile>) -> AttackProf
 }
 
 fn trace_path(world: &GameWorld, from: Pos, direction: Direction) -> ProjectileOutcome {
+    trace_path_with_max_distance(world, from, direction, i16::MAX)
+}
+
+pub(crate) fn trace_path_with_max_distance(
+    world: &GameWorld,
+    from: Pos,
+    direction: Direction,
+    max_distance: i16,
+) -> ProjectileOutcome {
     let mut current = from;
+    let mut steps = 0_i16;
     loop {
+        if steps >= max_distance {
+            return ProjectileOutcome {
+                landing: current,
+                hit_target: None,
+            };
+        }
+        steps += 1;
         let next = current.offset(direction.delta());
         if !world.current_map().contains(next) {
             return ProjectileOutcome {
@@ -224,14 +285,14 @@ mod tests {
         assert!(items::wear(&mut world, armor).unwrap().is_some());
         assert_eq!(
             world.entities.actor_stats(owner).unwrap().ac,
-            -armor_data.ac_bonus
+            10 - armor_data.ac_bonus
         );
 
         let mut rng = GameRng::new(42);
         throw_item(&mut world, &mut rng, armor, Direction::East).unwrap();
 
         assert_eq!(world.inventory.equipped_body, None);
-        assert_eq!(world.entities.actor_stats(owner).unwrap().ac, 0);
+        assert_eq!(world.entities.actor_stats(owner).unwrap().ac, 10);
         assert!(!world.inventory.contains(armor));
         assert_eq!(
             world.entities.item_location(armor),

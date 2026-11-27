@@ -143,6 +143,71 @@ impl EntityStore {
         self.0.set_item_enchantment(id, enchantment)
     }
 
+    pub fn set_item_buc_known(&mut self, id: EntityId, known: bool) -> bool {
+        self.0.set_item_buc_known(id, known)
+    }
+
+    pub fn set_item_enchant_known(&mut self, id: EntityId, known: bool) -> bool {
+        self.0.set_item_enchant_known(id, known)
+    }
+
+    pub fn set_item_quantity(&mut self, id: EntityId, quantity: u16) -> bool {
+        self.0.set_item_quantity(id, quantity)
+    }
+
+    pub fn set_item_corpse_monster(&mut self, id: EntityId, monster: Option<MonsterKind>) -> bool {
+        self.0.set_item_corpse_monster(id, monster)
+    }
+
+    pub fn set_item_corpse_age(&mut self, id: EntityId, age: u16) -> bool {
+        self.0.set_item_corpse_age(id, age)
+    }
+
+    pub fn set_item_artifact_id(&mut self, id: EntityId, artifact: Option<String>) -> bool {
+        self.0.set_item_artifact_id(id, artifact)
+    }
+
+    pub fn set_item_tool_active(&mut self, id: EntityId, active: bool) -> bool {
+        self.0.set_item_tool_active(id, active)
+    }
+
+    pub fn set_item_container_locked(&mut self, id: EntityId, locked: bool) -> bool {
+        self.0.set_item_container_locked(id, locked)
+    }
+
+    pub fn set_item_container_trapped(&mut self, id: EntityId, trapped: bool) -> bool {
+        self.0.set_item_container_trapped(id, trapped)
+    }
+
+    pub fn set_item_erosion(&mut self, id: EntityId, next: u8) -> bool {
+        self.0.set_item_erosion(id, next)
+    }
+
+    pub fn push_contained_item(&mut self, container: EntityId, item: EntityId) -> bool {
+        self.0.push_contained_item(container, item)
+    }
+
+    pub fn remove_contained_item(&mut self, container: EntityId, item: EntityId) -> bool {
+        self.0.remove_contained_item(container, item)
+    }
+
+    pub fn clear_contained_items(&mut self, container: EntityId) -> bool {
+        self.0.clear_contained_items(container)
+    }
+
+    pub fn clear_item_letter(&mut self, id: EntityId) -> bool {
+        self.0.clear_item_letter(id)
+    }
+
+    pub fn set_item_kind_and_data(
+        &mut self,
+        id: EntityId,
+        kind: aihack_core::domain::item::ItemKind,
+        data: aihack_core::domain::item::ItemData,
+    ) -> bool {
+        self.0.set_item_kind_and_data(id, kind, data)
+    }
+
     pub fn clear_monsters(&mut self) {
         self.0.clear_monsters();
     }

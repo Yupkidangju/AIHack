@@ -32,6 +32,7 @@ pub struct GameWorld {
     state: WorldState<EntityStore>,
     registry: ContentRegistry,
     corpse_jackal_data: aihack_core::domain::item::ItemData,
+    corpse_generic_data: aihack_core::domain::item::ItemData,
 }
 
 impl PartialEq for GameWorld {
@@ -39,6 +40,7 @@ impl PartialEq for GameWorld {
         self.state == other.state
             && self.registry.content_hash() == other.registry.content_hash()
             && self.corpse_jackal_data == other.corpse_jackal_data
+            && self.corpse_generic_data == other.corpse_generic_data
     }
 }
 
@@ -84,10 +86,14 @@ impl GameWorld {
         let state = crate::bootstrap::initial_world(registry)?;
         let corpse_jackal_data =
             crate::domain::item::try_item_data_from_registry(ItemKind::CorpseJackal, registry)?;
+        let corpse_generic_data =
+            crate::domain::item::try_item_data_from_registry(ItemKind::Corpse, registry)
+                .unwrap_or(corpse_jackal_data);
         Ok(Self {
             state,
             registry: registry.clone(),
             corpse_jackal_data,
+            corpse_generic_data,
         })
     }
 
@@ -179,6 +185,15 @@ impl GameWorld {
             "검증된 world는 player actor를 가진다"
         );
         self.state.current_level = level;
+        self.mark_current_level_explored();
+    }
+
+    pub(crate) fn mark_current_level_explored(&mut self) {
+        let level_id = self.state.current_level;
+        let visible = crate::systems::vision::visible_positions(self);
+        if let Some(level) = self.state.levels.get_mut(level_id) {
+            level.mark_explored(&visible);
+        }
     }
 
     pub fn player_pos(&self) -> Pos {
@@ -220,16 +235,36 @@ impl GameWorld {
         self.inventory
             .entries
             .iter()
-            .filter_map(|entry| self.entities.item_data(entry.item).map(|data| data.weight))
+            .map(|entry| {
+                crate::systems::containers::recursive_item_weight(&self.entities, entry.item, 0)
+            })
             .fold(0, i16::saturating_add)
     }
 
     pub fn carrying_capacity(&self) -> i16 {
-        if self.campaign.is_some() {
-            120
+        if let Some(campaign) = self.campaign {
+            campaign.attributes.carrying_capacity()
         } else {
             80
         }
+    }
+
+    pub fn effective_player_resistances(&self) -> aihack_core::domain::status::Resistances {
+        let mut total = self.intrinsic_resistances;
+        if let Some(stats) = self.entities.actor_stats(self.player_id) {
+            total.insert(stats.resistances);
+        }
+        for (_, item_opt) in self.inventory.equipped_slots() {
+            if let Some(item_id) = item_opt {
+                if let Some(data) = self.entities.item_data(item_id) {
+                    total.insert(aihack_content::item_extrinsic_resistances(
+                        data.kind,
+                        &self.registry,
+                    ));
+                }
+            }
+        }
+        total
     }
 
     pub fn status(&self) -> Status {
@@ -252,10 +287,14 @@ impl GameWorld {
     ) -> Result<Self, ContentError> {
         let corpse_jackal_data =
             crate::domain::item::try_item_data_from_registry(ItemKind::CorpseJackal, registry)?;
+        let corpse_generic_data =
+            crate::domain::item::try_item_data_from_registry(ItemKind::Corpse, registry)
+                .unwrap_or(corpse_jackal_data);
         Ok(Self {
             state: saved.into(),
             registry: registry.clone(),
             corpse_jackal_data,
+            corpse_generic_data,
         })
     }
 
@@ -265,6 +304,10 @@ impl GameWorld {
 
     pub(crate) fn corpse_jackal_data(&self) -> aihack_core::domain::item::ItemData {
         self.corpse_jackal_data
+    }
+
+    pub(crate) fn corpse_generic_data(&self) -> aihack_core::domain::item::ItemData {
+        self.corpse_generic_data
     }
 }
 
@@ -318,8 +361,11 @@ impl DeathScoreView for GameWorld {
         self.inventory
             .entries
             .iter()
-            .filter_map(|entry| self.entities.item_data(entry.item))
-            .map(|data| data.base_price)
+            .map(|entry| {
+                crate::systems::containers::recursive_item_value(&self.entities, entry.item, 0)
+                    .unwrap_or(0)
+                    .clamp(0, i128::from(u32::MAX)) as u32
+            })
             .fold(0, u32::saturating_add)
     }
 }

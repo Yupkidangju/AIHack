@@ -26,6 +26,9 @@ pub(crate) fn award_xp(world: &mut GameWorld, difficulty: u16) -> Vec<GameEvent>
     stats.max_hp = campaign.max_hp();
     stats.hit_bonus = campaign.hit_bonus();
     stats.damage_bonus = campaign.damage_bonus();
+    let mp_delta = campaign.role.mp_per_level() * i16::from(campaign.level() - before);
+    state.max_mp = campaign.max_mp();
+    state.mp = state.mp.saturating_add(mp_delta).min(state.max_mp);
     state.campaign = Some(campaign);
     vec![GameEvent::Message {
         priority: MessagePriority::Info,
@@ -45,14 +48,38 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
         })
         .collect();
     let Some(campaign) = world.campaign else {
-        return if quest_items.is_empty() {
-            Ok(())
-        } else {
-            Err("quest item requires campaign".into())
-        };
+        if !quest_items.is_empty() {
+            return Err("quest item requires campaign".into());
+        }
+        if world.mp != 0 || world.max_mp != 0 {
+            return Err("legacy mode does not use campaign MP".into());
+        }
+        if world.ascension_pursuit_stage != 0 {
+            return Err("legacy mode cannot have ascension pursuit state".into());
+        }
+        if !world.intrinsic_resistances.is_empty()
+            || !world.status_timers.is_empty()
+            || !world.weapon_skills.is_empty()
+            || !world.spell_skill.is_empty()
+            || !world.learned_spells.is_empty()
+            || !world.generated_artifacts.is_empty()
+            || !world.ascension_altars.is_empty()
+        {
+            return Err("legacy mode cannot have campaign P8/extended state".into());
+        }
+        return Ok(());
     };
+    if !campaign.attributes.is_valid() {
+        return Err("campaign attributes out of range".into());
+    }
     if campaign.xp > MAX_XP || campaign.xp % 10 != 0 {
         return Err("campaign XP out of range".into());
+    }
+    if world.max_mp != campaign.max_mp() || !(0..=world.max_mp).contains(&world.mp) {
+        return Err("campaign MP out of range".into());
+    }
+    if world.ascension_pursuit_stage > 3 {
+        return Err("campaign ascension pursuit stage out of range".into());
     }
     let stats = world
         .entities

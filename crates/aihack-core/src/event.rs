@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    campaign::SpellKind,
     domain::{
         combat::DeathCause,
         inventory::InventoryLetter,
@@ -98,6 +99,12 @@ pub enum GameEvent {
     PrayerOffered {
         entity: EntityId,
         cooldown_after: u16,
+    },
+    SpellCast {
+        entity: EntityId,
+        spell: SpellKind,
+        direction: Option<Direction>,
+        mp_after: i16,
     },
     AttackResolved {
         attacker: EntityId,

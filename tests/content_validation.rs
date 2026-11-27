@@ -145,7 +145,7 @@ fn causal_numeric_content_rejects_invalid_ranges() {
         ),
         Err(ContentError::Parse { .. })
     ));
-    let excessive_speed = MONSTERS.replace("speed = 12", "speed = 13");
+    let excessive_speed = MONSTERS.replace("speed = 12", "speed = 37");
     assert!(matches!(
         registry(
             ITEMS,
@@ -271,6 +271,19 @@ fn embedded_known_item_ids_keep_the_canonical_declared_kind_table() {
         ("item.ring.poison_resistance", "ring"),
         ("item.ring.fire_resistance", "ring"),
         ("item.ring.protection", "ring"),
+        ("item.tool.skeleton_key", "tool"),
+        ("item.tool.lock_pick", "tool"),
+        ("item.tool.pick_axe", "tool"),
+        ("item.tool.dwarvish_mattock", "tool"),
+        ("item.tool.tin_whistle", "tool"),
+        ("item.tool.oil_lamp", "tool"),
+        ("item.tool.blindfold", "tool"),
+        ("item.tool.unicorn_horn", "tool"),
+        ("item.tool.sack", "tool"),
+        ("item.tool.bag_of_holding", "tool"),
+        ("item.tool.chest", "tool"),
+        ("item.potion.water", "potion"),
+        ("item.scroll.blank", "scroll"),
     ] {
         assert_eq!(registry.item(id).unwrap().kind, expected_kind, "id={id}");
     }

@@ -1,5 +1,13 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use aihack_core::{
-    domain::{combat::DeathCause, entity::EntityStore, inventory::Inventory, level::LevelRegistry},
+    domain::{
+        combat::DeathCause,
+        entity::EntityStore,
+        inventory::Inventory,
+        level::LevelRegistry,
+        status::{Resistances, StatusTimers},
+    },
     ids::EntityId,
     save::SavedWorldV1,
     world::WorldState,
@@ -23,6 +31,16 @@ fn saved_world_roundtrip_preserves_persisted_state_and_resets_runtime_death_caus
         kill_count: 7,
         gold: 42,
         identified_items: Vec::new(),
+        mp: 0,
+        max_mp: 0,
+        ascension_pursuit_stage: 0,
+        intrinsic_resistances: Resistances::NONE,
+        status_timers: StatusTimers::default(),
+        weapon_skills: BTreeMap::new(),
+        spell_skill: BTreeMap::new(),
+        learned_spells: Vec::new(),
+        generated_artifacts: BTreeSet::new(),
+        ascension_altars: Vec::new(),
         last_death_cause: Some(DeathCause::Combat {
             attacker: EntityId(9),
         }),

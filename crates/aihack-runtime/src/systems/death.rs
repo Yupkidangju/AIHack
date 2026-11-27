@@ -45,16 +45,42 @@ pub fn collect_death_events_if_hp_depleted(
         .get(entity)
         .and_then(|entity| entity.monster_difficulty())
         .unwrap_or_default();
-    if let (Some((level, pos)), Some(EntityKind::Monster(MonsterKind::Jackal))) = (location, kind) {
-        world
-            .state_mut()
-            .entities
-            .spawn_item_with_data(
-                ItemKind::CorpseJackal,
-                corpse_jackal_data,
-                EntityLocation::OnMap { level, pos },
-            )
-            .map_err(|error| error.to_string())?;
+    if let (Some((level, pos)), Some(EntityKind::Monster(monster_kind))) = (location, kind) {
+        if world.campaign.is_none() {
+            if monster_kind == MonsterKind::Jackal {
+                world
+                    .state_mut()
+                    .entities
+                    .spawn_item_with_data(
+                        ItemKind::CorpseJackal,
+                        corpse_jackal_data,
+                        EntityLocation::OnMap { level, pos },
+                    )
+                    .map_err(|error| error.to_string())?;
+            }
+        } else {
+            let spec = aihack_content::monster_corpse_spec(monster_kind, world.content_registry());
+            let roll = deterministic_corpse_roll(entity, level, pos);
+            if roll < spec.chance {
+                let (drop_kind, drop_data) = if monster_kind == MonsterKind::Jackal {
+                    (ItemKind::CorpseJackal, corpse_jackal_data)
+                } else {
+                    (ItemKind::Corpse, world.corpse_generic_data())
+                };
+                let corpse_id = world
+                    .state_mut()
+                    .entities
+                    .spawn_item_with_data(
+                        drop_kind,
+                        drop_data,
+                        EntityLocation::OnMap { level, pos },
+                    )
+                    .map_err(|error| error.to_string())?;
+                let entities = &mut world.state_mut().entities;
+                entities.set_item_corpse_monster(corpse_id, Some(monster_kind));
+                entities.set_item_corpse_age(corpse_id, 0);
+            }
+        }
     }
     world.state_mut().entities.set_alive(entity, false);
     if entity == world.player_id {
@@ -94,4 +120,18 @@ pub fn state_after_deaths_at(world: &GameWorld, turn: u64) -> RunState {
             final_score: score::death_score(world, turn),
         }
     }
+}
+
+fn deterministic_corpse_roll(
+    entity: EntityId,
+    level: aihack_core::ids::LevelId,
+    pos: aihack_core::position::Pos,
+) -> u8 {
+    let mut z = u64::from(entity.0)
+        ^ ((u64::from(level.depth as u16) << 32)
+            | (u64::from(pos.x as u16) << 16)
+            | u64::from(pos.y as u16));
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    ((z ^ (z >> 31)) % 100) as u8
 }

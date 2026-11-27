@@ -183,6 +183,12 @@ fn p6a_ring_slot_ac_stacking_cursed_guards_and_save_validation() {
 
     let armor_id = add_inventory_item(&mut save, ItemKind::ArmorLeather, BucStatus::Uncursed, 0);
     let ring_prot = add_inventory_item(&mut save, ItemKind::RingProtection, BucStatus::Uncursed, 1);
+    let ring_poison = add_inventory_item(
+        &mut save,
+        ItemKind::RingPoisonResistance,
+        BucStatus::Uncursed,
+        0,
+    );
     let scroll_enc = add_inventory_item(
         &mut save,
         ItemKind::ScrollEnchantArmor,
@@ -218,7 +224,7 @@ fn p6a_ring_slot_ac_stacking_cursed_guards_and_save_validation() {
         .observation()
         .inventory
         .iter()
-        .any(|i| i.item == ring_prot && i.equipped_slot == Some(EquipmentSlot::Ring)));
+        .any(|i| i.item == ring_prot && i.equipped_slot == Some(EquipmentSlot::LeftRing)));
 
     assert!(sess.submit(C::Read { item: scroll_enc }).accepted);
     assert_eq!(
@@ -253,15 +259,24 @@ fn p6a_ring_slot_ac_stacking_cursed_guards_and_save_validation() {
         base_ac - 2
     );
 
-    // Cursed ring guards RemoveRing, PutOn swap, Drop, and Sell until ScrollRemoveCurse.
+    // Cursed ring guards RemoveRing, full-slot PutOn swap, Drop, and Sell until ScrollRemoveCurse.
     assert!(sess.submit(C::PutOn { item: cursed_fire }).accepted);
     assert!(sess.observation().player.fire_resistant);
     assert!(!sess.submit(C::RemoveRing).accepted);
-    assert!(!sess.submit(C::PutOn { item: ring_prot }).accepted);
+    assert!(
+        !sess
+            .submit(C::TakeOff {
+                slot: EquipmentSlot::LeftRing
+            })
+            .accepted
+    );
+    assert!(sess.submit(C::PutOn { item: ring_prot }).accepted);
+    assert!(!sess.submit(C::PutOn { item: ring_poison }).accepted);
     assert!(!sess.submit(C::Drop { item: cursed_fire }).accepted);
     assert!(!sess.submit(C::Sell { item: cursed_fire }).accepted);
 
     assert!(sess.submit(C::Read { item: scroll_rc }).accepted);
+    assert!(sess.submit(C::RemoveRing).accepted);
     assert!(sess.submit(C::RemoveRing).accepted);
     assert!(!sess.observation().player.fire_resistant);
     assert!(sess.submit(C::Sell { item: cursed_fire }).accepted);
@@ -699,14 +714,16 @@ fn p6b_shop_tile_economy_catalog_and_tamper_rejection() {
 
     let mut full_save = sess.to_save_data();
     full_save.world.gold = 500;
-    while full_save.world.inventory.next_letter_index < 26 {
+    while full_save.world.inventory.entries.len()
+        < aihack_core::domain::inventory::MAX_INVENTORY_SLOTS
+    {
         add_inventory_item(&mut full_save, ItemKind::Rock, BucStatus::Uncursed, 0);
     }
     let mut full_sess = GameSession::from_save_data(full_save).unwrap();
     assert!(
         !full_sess
             .submit(C::Buy {
-                kind: ItemKind::PotionHealing
+                kind: ItemKind::RingFireResistance
             })
             .accepted
     );
@@ -898,5 +915,5 @@ fn p6c_tui_headless_and_legacy_contract_compatibility() {
         .observation()
         .inventory
         .iter()
-        .any(|i| i.item == hl_ring && i.equipped_slot == Some(EquipmentSlot::Ring)));
+        .any(|i| i.item == hl_ring && i.equipped_slot == Some(EquipmentSlot::LeftRing)));
 }

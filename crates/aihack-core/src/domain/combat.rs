@@ -51,6 +51,10 @@ pub enum DeathCause {
     Combat { attacker: EntityId },
     Trap { trap: TrapKind },
     Poison,
+    Starvation,
+    Drowning,
+    Lava,
+    Explosion,
 }
 
 pub fn roll_die(rng: &mut GameRng, sides: i16) -> i16 {
@@ -83,7 +87,7 @@ pub fn attack_roll_value(
     let attack_roll = (i32::from(d20) + i32::from(attacker_hit_bonus) + i32::from(weapon_hit_bonus))
         .clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
     let defense =
-        (10_i32 + i32::from(defender_ac)).clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
+        (20_i32 - i32::from(defender_ac)).clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
     (attack_roll, defense, attack_roll >= defense)
 }
 

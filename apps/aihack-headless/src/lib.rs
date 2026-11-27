@@ -2,7 +2,8 @@ use serde::Serialize;
 use thiserror::Error;
 
 use aihack_ai_contract::{
-    CommandIntent, Direction, DoorState, EntityKind, ItemKind, RunState, SnapshotHash, TileKind,
+    CommandIntent, Direction, DoorState, EntityKind, ItemKind, Observation, Pos, RunState,
+    SnapshotHash, SpellKind, TileKind,
 };
 use aihack_runtime::{save::ReplayLineV1, GameClient};
 
@@ -321,6 +322,27 @@ impl HeadlessPolicy {
 fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent> {
     let observation = session.observation();
 
+    if observation.campaign.is_some()
+        && (observation.player.poison_turns > 0
+            || observation.player.blind_turns > 0
+            || observation.player.confused_turns > 0
+            || observation.player.stunned_turns > 0
+            || observation.player.hallucinating)
+    {
+        if let Some(horn) = observation.inventory.iter().find(|item| {
+            item.kind == ItemKind::UnicornHorn
+                && !(item.buc_known && item.buc == aihack_ai_contract::BucStatus::Cursed)
+        }) {
+            let command = CommandIntent::Apply {
+                item: horn.item,
+                direction: None,
+            };
+            if observation.legal_actions.contains(&command) {
+                return vec![command];
+            }
+        }
+    }
+
     if observation.player.poison_turns > 0 {
         if let Some(item) = observation
             .inventory
@@ -336,6 +358,13 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
     }
 
     if observation.player.hp.saturating_mul(2) <= observation.player.max_hp {
+        let heal_spell = CommandIntent::Cast {
+            spell: SpellKind::Heal,
+            direction: None,
+        };
+        if observation.legal_actions.contains(&heal_spell) {
+            return vec![heal_spell];
+        }
         if let Some(item) = observation
             .inventory
             .iter()
@@ -348,6 +377,37 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
             .map(|item| item.item)
         {
             let command = CommandIntent::Quaff { item };
+            if observation.legal_actions.contains(&command) {
+                return vec![command];
+            }
+        }
+    }
+
+    if observation.player.hunger <= 150 {
+        if let Some(item) = observation
+            .inventory
+            .iter()
+            .filter(|item| {
+                matches!(
+                    item.kind,
+                    ItemKind::FoodRation | ItemKind::CorpseJackal | ItemKind::Corpse
+                ) && observation
+                    .legal_actions
+                    .contains(&CommandIntent::Eat { item: item.item })
+            })
+            .min_by_key(|item| usize::from(item.kind != ItemKind::FoodRation))
+            .map(|item| item.item)
+        {
+            return vec![CommandIntent::Eat { item }];
+        }
+    }
+
+    for direction in priority_directions() {
+        if visible_hostile_in_direction(&observation, direction, 5) {
+            let command = CommandIntent::Cast {
+                spell: SpellKind::ForceBolt,
+                direction: Some(direction),
+            };
             if observation.legal_actions.contains(&command) {
                 return vec![command];
             }
@@ -367,11 +427,15 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         }
     }
 
-    if !observation
-        .inventory
-        .iter()
-        .any(|item| item.equipped_slot == Some(aihack_runtime::domain::item::EquipmentSlot::Ring))
-    {
+    if !observation.inventory.iter().any(|item| {
+        matches!(
+            item.equipped_slot,
+            Some(
+                aihack_runtime::domain::item::EquipmentSlot::LeftRing
+                    | aihack_runtime::domain::item::EquipmentSlot::RightRing
+            )
+        )
+    }) {
         if let Some(item) = observation.inventory.iter().find(|item| {
             matches!(
                 item.kind,
@@ -405,6 +469,20 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         }
     }
 
+    if observation.player.levitation_turns == 0 {
+        for direction in priority_directions() {
+            let target = observation.player_pos.offset(direction.delta());
+            let is_lava = observation
+                .visible_tiles
+                .iter()
+                .any(|tile| tile.pos == target && tile.tile == TileKind::Lava);
+            let command = CommandIntent::Move(direction);
+            if !is_lava && observation.legal_actions.contains(&command) {
+                return vec![command];
+            }
+        }
+    }
+
     for direction in priority_directions() {
         let command = CommandIntent::Move(direction);
         if observation.legal_actions.contains(&command) {
@@ -413,6 +491,39 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
     }
 
     vec![CommandIntent::Wait]
+}
+
+fn visible_hostile_in_direction(
+    observation: &Observation,
+    direction: Direction,
+    max_distance: i16,
+) -> bool {
+    let delta = direction.delta();
+    for step in 1..=max_distance {
+        let pos = Pos {
+            x: observation.player_pos.x + delta.dx * step,
+            y: observation.player_pos.y + delta.dy * step,
+        };
+        if observation.visible_entities.iter().any(|entity| {
+            entity.alive && matches!(entity.kind, EntityKind::Monster(_)) && entity.pos == pos
+        }) {
+            return true;
+        }
+        let passable = observation.visible_tiles.iter().any(|tile| {
+            tile.visible
+                && tile.pos == pos
+                && !matches!(
+                    tile.tile,
+                    TileKind::Wall
+                        | TileKind::Door(DoorState::Closed | DoorState::Locked)
+                        | TileKind::HiddenDoor
+                )
+        });
+        if !passable {
+            return false;
+        }
+    }
+    false
 }
 
 const fn priority_directions() -> [Direction; 8] {

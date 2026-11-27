@@ -55,15 +55,86 @@ fn park_all_monsters_on(save: &mut aihack_runtime::save::SaveDataV1, park_level:
     }
 }
 
-fn find_door_y(session: &GameSession, level: LevelId, x: i16) -> Option<(i16, TileKind)> {
+fn find_door_matching(
+    session: &GameSession,
+    level: LevelId,
+    pred: impl Fn(TileKind) -> bool,
+) -> Option<(Pos, TileKind)> {
     let map = session.world().levels.map(level)?;
-    for y in 0..map.height {
-        let tile = map.tile(Pos { x, y }).ok()?;
-        if matches!(tile, TileKind::Door(_) | TileKind::HiddenDoor) {
-            return Some((y, tile));
+    for y in 1..map.height - 1 {
+        for x in 1..map.width - 1 {
+            let pos = Pos { x, y };
+            let tile = map.tile(pos).ok()?;
+            if pred(tile) {
+                return Some((pos, tile));
+            }
         }
     }
     None
+}
+
+fn adjacent_floor_toward(session: &GameSession, level: LevelId, target: Pos) -> (Pos, Direction) {
+    let map = session.world().levels.map(level).unwrap();
+    for dir in [
+        Direction::East,
+        Direction::West,
+        Direction::North,
+        Direction::South,
+        Direction::NorthEast,
+        Direction::NorthWest,
+        Direction::SouthEast,
+        Direction::SouthWest,
+    ] {
+        let d = dir.delta();
+        let candidate = Pos {
+            x: target.x - d.dx,
+            y: target.y - d.dy,
+        };
+        if matches!(
+            map.tile(candidate),
+            Ok(TileKind::Floor | TileKind::StairsUp | TileKind::StairsDown)
+        ) {
+            return (candidate, dir);
+        }
+    }
+    panic!("no adjacent floor around {target:?} on {level:?}");
+}
+
+fn visible_floor_neighbors(
+    session: &GameSession,
+    level: LevelId,
+    origin: Pos,
+    exclude: &[Pos],
+    needed: usize,
+) -> Vec<Pos> {
+    let map = session.world().levels.map(level).unwrap();
+    let mut found = Vec::new();
+    for dy in -2_i16..=2 {
+        for dx in -2_i16..=2 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let candidate = Pos {
+                x: origin.x + dx,
+                y: origin.y + dy,
+            };
+            if exclude.contains(&candidate) {
+                continue;
+            }
+            if map.tile(candidate).ok() == Some(TileKind::Floor)
+                && aihack_core::vision::has_line_of_sight(map, origin, candidate)
+            {
+                found.push(candidate);
+                if found.len() == needed {
+                    return found;
+                }
+            }
+        }
+    }
+    panic!(
+        "needed {needed} visible floor tiles near {origin:?} on {level:?}, found {}",
+        found.len()
+    );
 }
 
 fn find_hidden_trap(session: &GameSession, level: LevelId, kind: TrapKind) -> Option<Pos> {
@@ -95,7 +166,9 @@ fn find_campaign_item(
             }
             match location {
                 EntityLocation::OnMap { level, pos } => Some((entity.id, level, pos)),
-                EntityLocation::Inventory { .. } | EntityLocation::Consumed => None,
+                EntityLocation::Inventory { .. }
+                | EntityLocation::InContainer { .. }
+                | EntityLocation::Consumed => None,
             }
         })
         .unwrap_or_else(|| panic!("missing campaign item {kind:?}"))
@@ -120,58 +193,38 @@ fn move_player_cleanly(
 fn campaign_doors_and_hidden_doors_work_across_depths_and_save_roundtrip() {
     let session = start(42, Role::Knight);
 
-    // 홀수 층 Main 1: x=7, x=17 모두 Door(Closed)
-    let (y7, tile7) = find_door_y(&session, LevelId::main(1), 7).unwrap();
-    let (_, tile17) = find_door_y(&session, LevelId::main(1), 17).unwrap();
-    assert_eq!(tile7, TileKind::Door(DoorState::Closed));
-    assert_eq!(tile17, TileKind::Door(DoorState::Closed));
-
-    // 짝수 층 Main 2: x=7 Door(Closed), x=17 HiddenDoor; Mines 2: x=7 Door(Locked), x=17 HiddenDoor
-    let (_, tile2_7) = find_door_y(&session, LevelId::main(2), 7).unwrap();
-    let (y2_17, tile2_17) = find_door_y(&session, LevelId::main(2), 17).unwrap();
-    let (_, mines2_7) = find_door_y(
-        &session,
-        LevelId {
-            branch: BranchId::Mines,
-            depth: 2,
-        },
-        7,
-    )
+    let (door_pos_1, tile1) = find_door_matching(&session, LevelId::main(1), |t| {
+        t == TileKind::Door(DoorState::Closed)
+    })
     .unwrap();
-    let (_, mines2_17) = find_door_y(
-        &session,
-        LevelId {
-            branch: BranchId::Mines,
-            depth: 2,
-        },
-        17,
-    )
-    .unwrap();
-    assert_eq!(tile2_7, TileKind::Door(DoorState::Closed));
-    assert_eq!(tile2_17, TileKind::HiddenDoor);
-    assert_eq!(mines2_7, TileKind::Door(DoorState::Locked));
-    assert_eq!(mines2_17, TileKind::HiddenDoor);
-    assert!(find_hidden_trap(
-        &session,
-        LevelId {
-            branch: BranchId::Mines,
-            depth: 2,
-        },
-        TrapKind::Bear,
-    )
-    .is_some());
+    assert_eq!(tile1, TileKind::Door(DoorState::Closed));
 
-    let door_pos_1 = Pos { x: 7, y: y7 };
-    let mut session = move_player_cleanly(
-        &session,
-        LevelId::main(1),
-        Pos { x: 6, y: y7 },
-        mines_level(2),
-    );
+    let (_, tile2_closed) = find_door_matching(&session, LevelId::main(2), |t| {
+        t == TileKind::Door(DoorState::Closed)
+    })
+    .unwrap();
+    let (hidden_pos_2, tile2_hidden) =
+        find_door_matching(&session, LevelId::main(2), |t| t == TileKind::HiddenDoor).unwrap();
+    let mines2 = LevelId {
+        branch: BranchId::Mines,
+        depth: 2,
+    };
+    let (_, mines2_locked) =
+        find_door_matching(&session, mines2, |t| t == TileKind::Door(DoorState::Locked)).unwrap();
+    let (_, mines2_hidden) =
+        find_door_matching(&session, mines2, |t| t == TileKind::HiddenDoor).unwrap();
+    assert_eq!(tile2_closed, TileKind::Door(DoorState::Closed));
+    assert_eq!(tile2_hidden, TileKind::HiddenDoor);
+    assert_eq!(mines2_locked, TileKind::Door(DoorState::Locked));
+    assert_eq!(mines2_hidden, TileKind::HiddenDoor);
+    assert!(find_hidden_trap(&session, mines2, TrapKind::Bear).is_some());
+
+    let (p1_pos, dir1) = adjacent_floor_toward(&session, LevelId::main(1), door_pos_1);
+    let mut session = move_player_cleanly(&session, LevelId::main(1), p1_pos, mines_level(2));
 
     // 닫힌 문은 바로 지나갈 수 없고 Open -> Close -> Kick이 모두 동작한다.
-    assert!(!session.submit(C::Move(Direction::East)).accepted);
-    let opened = session.submit(C::Open(Direction::East));
+    assert!(!session.submit(C::Move(dir1)).accepted);
+    let opened = session.submit(C::Open(dir1));
     assert!(opened.accepted);
     assert!(opened.events.iter().any(|event| matches!(
         event,
@@ -186,37 +239,32 @@ fn campaign_doors_and_hidden_doors_work_across_depths_and_save_roundtrip() {
         Ok(TileKind::Door(DoorState::Open))
     );
 
-    let closed = session.submit(C::Close(Direction::East));
+    let closed = session.submit(C::Close(dir1));
     assert!(closed.accepted);
     assert_eq!(
         session.world().current_map().tile(door_pos_1),
         Ok(TileKind::Door(DoorState::Closed))
     );
 
-    let kicked = session.submit(C::Kick(Direction::East));
+    let kicked = session.submit(C::Kick(dir1));
     assert!(kicked.accepted);
     assert_eq!(
         session.world().current_map().tile(door_pos_1),
         Ok(TileKind::Door(DoorState::Open))
     );
-    assert!(session.submit(C::Move(Direction::East)).accepted);
+    assert!(session.submit(C::Move(dir1)).accepted);
     assert_eq!(session.world().player_pos(), door_pos_1);
 
-    // Main 2 x=17 HiddenDoor는 관측상 벽으로 보이다가 Search 후 Open 가능하며 V2 저장/로드로 유지된다.
-    let hidden_pos_2 = Pos { x: 17, y: y2_17 };
-    let mut session = move_player_cleanly(
-        &session,
-        LevelId::main(2),
-        Pos { x: 16, y: y2_17 },
-        mines_level(2),
-    );
+    // Main 2 HiddenDoor는 관측상 벽으로 보이다가 Search 후 Open 가능하며 저장/로드로 유지된다.
+    let (p2_pos, dir2) = adjacent_floor_toward(&session, LevelId::main(2), hidden_pos_2);
+    let mut session = move_player_cleanly(&session, LevelId::main(2), p2_pos, mines_level(2));
     assert!(session
         .observation()
         .visible_tiles
         .iter()
         .any(|tile| tile.pos == hidden_pos_2 && tile.tile == TileKind::Wall));
-    assert!(!session.submit(C::Move(Direction::East)).accepted);
-    assert!(!session.submit(C::Open(Direction::East)).accepted);
+    assert!(!session.submit(C::Move(dir2)).accepted);
+    assert!(!session.submit(C::Open(dir2)).accepted);
 
     let searched = session.submit(C::Search);
     assert!(searched.accepted);
@@ -227,7 +275,7 @@ fn campaign_doors_and_hidden_doors_work_across_depths_and_save_roundtrip() {
             tile: TileKind::Door(DoorState::Closed),
         } if *pos == hidden_pos_2
     )));
-    assert!(session.submit(C::Open(Direction::East)).accepted);
+    assert!(session.submit(C::Open(dir2)).accepted);
     assert_eq!(
         session.world().current_map().tile(hidden_pos_2),
         Ok(TileKind::Door(DoorState::Open))
@@ -418,18 +466,28 @@ fn v2_campaign_map_validation_allows_transitions_and_rejects_tampering() {
     let session = start(42, Role::Knight);
     let original = session.to_save_data();
 
-    // 정당한 런타임 상태 전이: 문 열기/공개 및 숨겨진 함정 공개
+    // 정당한 런타임 상태 전이: 문 열기/공개, 숨겨진 함정 공개, 내부 벽 굴착(Wall->Floor)
     let mut valid_save = original.clone();
-    let y1_7 = find_door_y(&session, LevelId::main(1), 7).unwrap().0;
+    let (door1_pos, _) = find_door_matching(&session, LevelId::main(1), |t| {
+        t == TileKind::Door(DoorState::Closed)
+    })
+    .unwrap();
     let pit1 = find_hidden_trap(&session, LevelId::main(1), TrapKind::Pit).unwrap();
-    let y2_17 = find_door_y(&session, LevelId::main(2), 17).unwrap().0;
-    let y4_17 = find_door_y(&session, LevelId::main(4), 17).unwrap().0;
+    let (hidden2_pos, _) =
+        find_door_matching(&session, LevelId::main(2), |t| t == TileKind::HiddenDoor).unwrap();
+    let (hidden4_pos, _) =
+        find_door_matching(&session, LevelId::main(4), |t| t == TileKind::HiddenDoor).unwrap();
+    let map1 = original.world.levels.map(LevelId::main(1)).unwrap();
+    let interior_wall = (1..map1.height - 1)
+        .flat_map(|y| (1..map1.width - 1).map(move |x| Pos { x, y }))
+        .find(|&pos| map1.tile(pos).ok() == Some(TileKind::Wall))
+        .unwrap();
     valid_save
         .world
         .levels
         .map_mut(LevelId::main(1))
         .unwrap()
-        .set_tile(Pos { x: 7, y: y1_7 }, TileKind::Door(DoorState::Open))
+        .set_tile(door1_pos, TileKind::Door(DoorState::Open))
         .unwrap();
     valid_save
         .world
@@ -441,16 +499,23 @@ fn v2_campaign_map_validation_allows_transitions_and_rejects_tampering() {
     valid_save
         .world
         .levels
+        .map_mut(LevelId::main(1))
+        .unwrap()
+        .set_tile(interior_wall, TileKind::Floor)
+        .unwrap();
+    valid_save
+        .world
+        .levels
         .map_mut(LevelId::main(2))
         .unwrap()
-        .set_tile(Pos { x: 17, y: y2_17 }, TileKind::Door(DoorState::Closed))
+        .set_tile(hidden2_pos, TileKind::Door(DoorState::Closed))
         .unwrap();
     valid_save
         .world
         .levels
         .map_mut(LevelId::main(4))
         .unwrap()
-        .set_tile(Pos { x: 17, y: y4_17 }, TileKind::Door(DoorState::Open))
+        .set_tile(hidden4_pos, TileKind::Door(DoorState::Open))
         .unwrap();
     assert!(GameSession::from_save_data(valid_save).is_ok());
 
@@ -472,11 +537,6 @@ fn v2_campaign_map_validation_allows_transitions_and_rejects_tampering() {
             }),
         })
         .collect();
-    let map1 = original.world.levels.map(LevelId::main(1)).unwrap();
-    let interior_wall = (1..map1.height - 1)
-        .flat_map(|y| (1..map1.width - 1).map(move |x| Pos { x, y }))
-        .find(|&pos| map1.tile(pos).ok() == Some(TileKind::Wall))
-        .unwrap();
     let free_floor = (1..map1.height - 1)
         .flat_map(|y| (1..map1.width - 1).map(move |x| Pos { x, y }))
         .find(|&pos| map1.tile(pos).ok() == Some(TileKind::Floor) && !occupied.contains(&pos))
@@ -488,7 +548,7 @@ fn v2_campaign_map_validation_allows_transitions_and_rejects_tampering() {
         .unwrap();
 
     for (label, pos, bad_tile) in [
-        ("wall_to_floor", interior_wall, TileKind::Floor),
+        ("border_breach", Pos { x: 0, y: 5 }, TileKind::Floor),
         ("floor_to_wall", free_floor, TileKind::Wall),
         ("trap_removed", pit1, TileKind::Floor),
         ("trap_kind_swap", pit1, TileKind::Trap(TrapKind::Dart)),
@@ -673,7 +733,7 @@ fn p4_items_monsters_scroll_charging_and_bump_attack_on_trap() {
     let (short_sword_id, ss_lvl, ss_pos) = find_campaign_item(&cleric, ItemKind::ShortSword);
     let (_, mace_lvl, _) = find_campaign_item(&cleric, ItemKind::Mace);
     let (chain_mail_id, cm_lvl, cm_pos) = find_campaign_item(&cleric, ItemKind::ArmorChainMail);
-    let (extra_heal_id, eh_lvl, eh_pos) = find_campaign_item(&cleric, ItemKind::PotionExtraHealing);
+    let (_, eh_lvl, eh_pos) = find_campaign_item(&cleric, ItemKind::PotionExtraHealing);
     let (charging_id, ch_lvl, ch_pos) = find_campaign_item(&cleric, ItemKind::ScrollCharging);
     assert_ne!(ss_lvl, cm_lvl);
     assert_ne!(mace_lvl, eh_lvl);
@@ -798,7 +858,7 @@ fn p4_items_monsters_scroll_charging_and_bump_attack_on_trap() {
             .actor_stats(s_armor.world().player_id)
             .unwrap()
             .ac,
-        -3
+        7
     );
     let s_armor_reloaded = GameSession::from_save_data(s_armor.to_save_data()).unwrap();
     assert_eq!(
@@ -808,7 +868,7 @@ fn p4_items_monsters_scroll_charging_and_bump_attack_on_trap() {
             .actor_stats(s_armor_reloaded.world().player_id)
             .unwrap()
             .ac,
-        -3
+        7
     );
     let mut s_armor = s_armor_reloaded;
     assert!(
@@ -825,12 +885,19 @@ fn p4_items_monsters_scroll_charging_and_bump_attack_on_trap() {
             .actor_stats(s_armor.world().player_id)
             .unwrap()
             .ac,
-        0
+        10
     );
 
     // 5. PotionExtraHealing (2d8+8 = 10..=24) 회복 확인
     let mut s_heal = move_player_cleanly(&cleric, eh_lvl, eh_pos, mines_level(1));
     assert!(s_heal.submit(C::Pickup).accepted);
+    let extra_heal_id = s_heal
+        .observation()
+        .inventory
+        .iter()
+        .find(|i| i.kind == ItemKind::PotionExtraHealing)
+        .unwrap()
+        .item;
     let mut heal_save = s_heal.to_save_data();
     heal_save
         .world
@@ -995,8 +1062,13 @@ fn tui_renders_p4_doors_traps_items_monsters_and_cleric_cta() {
     assert!(creation_screen.contains("Esc - Back to Title"));
 
     // 2. 문 닫힘('+') vs 문 열림('-') 및 inspect_lines 타일/몬스터 라벨
-    let y7 = find_door_y(&base, LevelId::main(1), 7).unwrap().0;
-    let door_pos = Pos { x: 7, y: y7 };
+    let (door_pos, _) = find_door_matching(&base, LevelId::main(1), |t| {
+        t == TileKind::Door(DoorState::Closed)
+    })
+    .unwrap();
+    let (player_pos, open_dir) = adjacent_floor_toward(&base, LevelId::main(1), door_pos);
+    let neighbors = visible_floor_neighbors(&base, LevelId::main(1), player_pos, &[door_pos], 3);
+    let (kobold_pos, orc_pos, ogre_pos) = (neighbors[0], neighbors[1], neighbors[2]);
     let kobold_id = base
         .world()
         .entities()
@@ -1025,10 +1097,6 @@ fn tui_renders_p4_doors_traps_items_monsters_and_cleric_cta() {
     let mut save = base.to_save_data();
     park_all_monsters_on(&mut save, mines_level(2));
     save.world.current_level = LevelId::main(1);
-    let player_pos = Pos { x: 6, y: y7 };
-    let kobold_pos = Pos { x: 5, y: y7 - 1 };
-    let orc_pos = Pos { x: 5, y: y7 };
-    let ogre_pos = Pos { x: 5, y: y7 + 1 };
     save.world
         .entities
         .set_actor_location(save.world.player_id, LevelId::main(1), player_pos);
@@ -1078,7 +1146,7 @@ fn tui_renders_p4_doors_traps_items_monsters_and_cleric_cta() {
         assert_eq!(buf[(mx, my)].symbol(), sym);
     }
 
-    assert!(session.submit(C::Open(Direction::East)).accepted);
+    assert!(session.submit(C::Open(open_dir)).accepted);
     let open_inspect = render_panels::inspect_lines(
         &session.observation(),
         Some(door_pos),
@@ -1101,15 +1169,8 @@ fn tui_renders_p4_doors_traps_items_monsters_and_cleric_cta() {
         (LevelId::main(3), TrapKind::Bear, "tile bear trap"),
     ] {
         let trap_pos = find_hidden_trap(&base, level, kind).unwrap();
-        let mut s_trap = move_player_cleanly(
-            &base,
-            level,
-            Pos {
-                x: trap_pos.x - 1,
-                y: trap_pos.y,
-            },
-            mines_level(2),
-        );
+        let (adj, _) = adjacent_floor_toward(&base, level, trap_pos);
+        let mut s_trap = move_player_cleanly(&base, level, adj, mines_level(2));
         assert!(s_trap.submit(C::Search).accepted);
         let lines = render_panels::inspect_lines(
             &s_trap.observation(),

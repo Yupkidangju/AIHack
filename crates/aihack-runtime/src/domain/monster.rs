@@ -22,22 +22,7 @@ pub fn try_monster_template_from_registry(
 }
 
 pub fn monster_kind_from_id(id: &str) -> Result<MonsterKind, ContentError> {
-    match id {
-        "monster.jackal" => Ok(MonsterKind::Jackal),
-        "monster.goblin" => Ok(MonsterKind::Goblin),
-        "monster.floating_eye" => Ok(MonsterKind::FloatingEye),
-        "monster.kobold" => Ok(MonsterKind::Kobold),
-        "monster.orc" => Ok(MonsterKind::Orc),
-        "monster.ogre" => Ok(MonsterKind::Ogre),
-        "monster.giant_spider" => Ok(MonsterKind::GiantSpider),
-        "monster.gnoll_archer" => Ok(MonsterKind::GnollArcher),
-        "monster.troll" => Ok(MonsterKind::Troll),
-        "monster.fire_ant" => Ok(MonsterKind::FireAnt),
-        _ => Err(ContentError::UnknownReference {
-            owner: "monster kind".to_owned(),
-            target: id.to_owned(),
-        }),
-    }
+    aihack_content::monster_kind_from_id(id)
 }
 
 pub fn monster_ai_kind(kind: MonsterKind) -> MonsterAiKind {

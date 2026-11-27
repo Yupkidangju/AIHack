@@ -12,6 +12,60 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-P9-01: Stage 3 (P9) 도구·컨테이너·#dip/#engrave·지형/함정 생태계 및 SaveV3 확장 계약
+
+- **상태**: Accepted (2026-11-27)
+- **맥락**: Stage 2(`P8`)에서 `80×21` 절차적 생성기 v3, 구조적 `validate_persisted_map`, 10 슬롯 장비, `SAVE_SCHEMA_VERSION_V3 = 3` 및 P9 예약 훅(`contained_items`, `engravings`, `lit_tiles`, `tool_action`, `container_capacity`)을 구축했다. 이제 `docs/CODER_HANDOFF_P7_TO_P13.md` Stage 3(`P9`)의 도구(`(`), 컨테이너(가방/상자), `#dip`/성수 경제, `#engrave` `Elbereth`, 분수/싱크/물/용암 및 12종 함정 생태계를 연결해야 한다. 동시에 레거시 2층 모드(`campaign.is_none()`)의 V1 저장·R9 causal 해시(`tests/long_run.rs`)·`observation_v1.json`과 `CommandIntent: Copy`, `LlmObservationView < 32 KiB`, `ActionSpace <= 64` 불변조건은 반드시 유지해야 한다.
+- **결정**:
+  1. **Save Schema v3 유지 (`SAVE_SCHEMA_VERSION_V3 = 3`) 및 V1 격리**: 캠페인은 `SAVE_SCHEMA_VERSION_V3 = 3`을 유지하고 신규 P9 필드(`EntityPayload::Item`의 `tool_active`, `container_locked`, `container_trapped`, `erosion`, `EntityData`의 `tool_action`, `container_capacity`, `EntitySnapshot`/`Observation` P9 필드)에 모두 `#[serde(default, skip_serializing_if = ...)]`를 적용한다. `campaign.is_none()` 레거시 모드에서는 `EntityLocation::InContainer`, P9 타일/함정(`Fountain`, `DryFountain`, `Sink`, `Water`, `Lava`, 신규 9종 함정) 및 P9 아이템/메타데이터를 저장 검증에서 거부해 V1 직렬화와 해시를 불변으로 유지한다.
+  2. **`CommandIntent: Copy` 보존을 위한 고정 타입 액션 설계**: `ActionIntent`/`CommandIntent`가 `Copy`를 유지하도록 `#engrave`와 `#dip`은 임의 `String` 대신 `DipTarget { Item(EntityId), Tile }`, `EngravingMethod { Fingers, Item(EntityId) }`, `EngravingText { Elbereth, Warning, Safe, XMark }`(`as_str()`로 `"Elbereth"`, `"Beware!"`, `"Safe"`, `"X"` 산출)를 사용한다. ActionSpace `.take(64)` 상한 안에는 `Drink`/`Apply`/`Engrave` 등 핵심 명령을 `Drop`보다 앞에 배치해 LLM/Headless/TUI가 항상 접근할 수 있게 한다.
+  3. **컨테이너(`Sack`, `BagOfHolding`, `Chest`) 및 `BagOfHolding` 불변조건**: 컨테이너 내부 아이템은 `EntityLocation::InContainer { container }`와 컨테이너의 `contained_items: Vec<EntityId>`가 양방향 일치해야 하며 깊이 상한(4단계)·순환 금지·비음수 raw 무게 `<= container_capacity`를 `save.rs`에서 검증한다. `AmuletAscension`은 어떤 컨테이너에도 넣을 수 없어 목표 추적 및 승천 불변조건을 단순·안전하게 보존한다. `BagOfHolding`은 BUC별 내용물 무게 배율(`Blessed /4`, `Uncursed /2`, `Cursed *2`)을 적용하고, `BagOfHolding`끼리 중첩 삽입 시 2d8 폭발(`DeathCause::Explosion`)과 함께 내용물을 소멸시킨다.
+  4. **12종 함정·지형(`Fountain`, `DryFountain`, `Sink`, `Water`, `Lava`) 및 `validate_persisted_map` 수용**: 신규 지형/함정은 `campaign_map.rs`에서 주로 Room 4/5에 배치해 `rooms[0..3]` 주 경로와 기존 3종 함정 좌표를 보존하며, `all_targets_reachable`는 `Wall | Water | Lava`를 비통과로 판정한다. `validate_persisted_map`은 `Fountain -> DryFountain` 고갈과 12종 `HiddenTrap -> Trap` 공개를 허용하고 임의 지형/계단/상점/제단 변조를 차단한다.
+  5. **충돌 없는 TUI 조작 키 매핑**: 기존 키맵(`q`, `r`, `p`, `P`, `T`, `x`, `Z`, `O`, `$`, `f`, `s` 등)과 충돌하지 않도록 `'a'`(Apply tool), `'C'`(Container/Loot), `'v'`(Dip), `'E'`(Engrave), `'g'`(Drink, `'q'` 메뉴에도 병행)를 할당한다.
+- **대안 및 기각**: (a) `SAVE_SCHEMA_VERSION_V4`를 신설하면 불필요하게 기존 V3 캠페인 호환성을 깨므로 optional serde 훅을 갖춘 `V3`을 유지한다; (b) `CommandIntent::Engrave`에 `String`을 넣으면 `Copy`가 깨져 `ActionIntent`/`PlayMenu`/LLM 전 계층을 비-Copy로 고쳐야 하므로 `EngravingText` enum을 채택한다; (c) `AmuletAscension`을 컨테이너에 넣을 수 있게 허용하면 귀환 추격·승리·강제 변조 검사가 복잡해지므로 NetHack 3.6.7 스타일 반발 규칙과 함께 차단한다.
+- **결과**: 도구·컨테이너·성수/연금술·Elbereth·물/용암/분수/싱크·12종 함정이 `GameSession::submit` 단일 트랜잭션 경계 안에서 결정론적으로 동작하고 save/TUI/Headless/LLM 예산 불변조건을 모두 만족한다.
+
+## ADR-P8-01: Stage 2 (P8) 데이터 주도 콘텐츠·확장 RPG 코어·80x21 생성기 v3·SaveV3 및 P9~P13 스키마 훅
+
+- **상태**: Accepted (2026-11-27)
+- **맥락**: P7과 Stage 1(`P7-Fix`)까지는 40×20 고정 4방 생성기와 셀 단위 맵 일치 검증, 무기/몸통/반지 1개(총 3슬롯), 정수 나눗셈 턴 스케줄러(`speed` 0..=12), 역할별 고정 HP/hit/dmg, 화염/독 2종 저항, 잭칼 전용 시체만 지원했다. `P9`~`P13`의 대량 몬스터·아이템·특수 레벨·종교/아티팩트·마법/동료·승천 탑 확장을 수용하려면 엔진 코어와 세이브/콘텐츠 스키마를 먼저 구조적으로 업그레이드해야 한다. 동시에 레거시 2층 모드(`campaign.is_none()`)의 V1 세이브·`observation_v1.json`·R9 causal baseline 해시(`tests/long_run.rs`)는 100% 보존해야 한다.
+- **결정**:
+  1. **Save Schema v3 (`SAVE_SCHEMA_VERSION_V3 = 3`) 및 V1 격리**: 레거시 모드(`campaign.is_none()`)는 `schema_version = 1`과 V1 JSON 형태를 그대로 유지하며 모든 신규 P8 및 P9~P13 예약 필드에 `#[serde(default, skip_serializing_if = ...)]`를 적용해 레거시 직렬화와 R9 causal baseline을 불변으로 유지한다. 캠페인 모드(`campaign.is_some()`)는 `80×21` 맵 크기·6대 능력치·10 장비 슬롯 등 비호환 구조 확장에 맞춰 `schema_version = 3`으로 승격하며, V1/V2 캠페인 위조/구형 세이브는 로드 경계에서 명시적으로 거부한다.
+  2. **데이터 주도 콘텐츠 레지스트리 (`P8-A`)**: `CONTENT_SCHEMA_VERSION = 1` 하위 호환을 유지한 채 `items.toml`/`monsters.toml`에 `name`, `color`, `unidentified_pool`, `material`, `stackable`, `damage_small`/`damage_large`, `effects[]`, `tags[]`, `spawn_depth_range`, `spawn_weight`, `base_level`, `hp_dice`, `attacks[]`, `resistances[]`, `corpse_chance`, `corpse_nutrition`, `corpse_effects[]`, `ai_flags[]` 및 P9~P13 훅(`tool_action`, `container_capacity`, `artifact_id`)을 추가한다. `monster.speed` 검증 상한을 `0..=36`으로 확장하고, `armor` 슬롯(`body|shield|helm|cloak|gloves|boots`)과 `amulet` 슬롯·신규 P8 아이템 13종·`monster.bat`(`speed = 24`)을 추가한다. `ItemData.armor_slot`은 `Body` 방어구에 대해 `None`을 유지해 기존 V1 `ItemData` 직렬화를 보존하고, 정적 표시 메타데이터(`glyph`, `name`, `color`)는 `ContentRegistry` 및 캠페인 전용 optional `Observation` 필드로 조회해 TUI 하드코딩 `match`를 제거한다.
+  3. **확장 RPG 코어 (`P8-B`)**:
+     - **10 장비 슬롯**: `Melee`, `Shield`, `Helm`, `Body`, `Cloak`, `Gloves`, `Boots`, `LeftRing`(`#[serde(alias = "Ring")]` 호환), `RightRing`, `Amulet`을 `Inventory`에 저장하고 통합 하강 AC 공식(`10 - sum(ac_bonus + enchant)`)과 슬롯별 저주 가드·`CommandIntent::TakeOff { slot }`을 적용한다.
+     - **에너지 버킷 턴 스케줄러**: `ActorStats.energy` 누적기(`ENERGY_THRESHOLD = 12`, 턴당 최대 `4` 행동)로 `speed = 24`는 턴당 2행동, `speed = 6`은 2턴당 1행동, `Fast` 상태는 몬스터 에너지 획득을 절반으로 줄이며 `speed == 12` 레거시 케이던스와 해시를 보존한다.
+     - **6대 능력치 (`Str`, `Dex`, `Con`, `Int`, `Wis`, `Cha`, 3..=25)**: 역할별 시작 능력치(`Knight 16/11/15/9/10/12`, `Scout 12/16/12/11/10/12`, `Mage 9/12/10/17/14/11`, `Cleric 12/10/14/11/16/14`)를 `CampaignState`에 보관하고, `Str`(무게 한도 `60 + Str*5`, 근접 피해 `(Str-12)/3`), `Dex`(명중 `(Dex-12)/2`, `Dex>=15` 함정 피해 `-1`), `Con`(레벨당 `max_hp` 보정 `((Con-12)/3).max(0)`, 재생 주기 단축), `Int`/`Wis`(주문 위력·치유·기도 쿨다운 `20 - ((Wis-12).max(0))` 단축), `Cha`(상점 구매/판매 배율: `<=8` 120%/80%, `9..=14` 100%, `>=15` 85%/115%)를 런타임 전체에 연결한다.
+     - **저항 비트셋과 상태이상**: 8종 `Resistances`(`Fire`, `Cold`, `Shock`, `Poison`, `Sleep`, `Disintegration`, `Telepathy`, `SeeInvisible`)의 내재(`intrinsic_resistances`)+장비 외재 합성 및 7종 `StatusTimers`(`Blind`, `Confused`, `Stunned`, `Hallucinating`, `Fast`, `Levitation`, `Invisible`) 매 턴 감산/효과(시야 0+텔레파시, 결정론적 혼란 이동, 공중부양 함정 회피, 투명화 탐지 차단, 가속)를 구현한다.
+     - **일반화된 몬스터 시체**: 캠페인 처치는 레지스트리의 `corpse_chance`·`corpse_nutrition`·`corpse_effects`로 임의 몬스터 시체(`corpse_monster`, `corpse_age`)를 드롭하며(레거시 잭칼 전용 드롭 유지), `corpse_age > 50` 부패 식중독, 시체 섭취 시 확률적 내재 저항 획득, `Troll` 시체 `corpse_age >= 25` 부활을 지원한다.
+  4. **Generator v3 (`80×21`)·분기 그래프·구조 검증기 (`P8-C`)**: `campaign_map`을 `80×21` 가변 방·복도·루프·어둠/조명(`lit_tiles`)·특수방(`Shop`, `Temple`, `Barracks`, `Vault`)과 BFS 연결 보장 구조로 교체하고 `BranchGraph`(`Main 1..=6`, `Mines 1..=2`, 예약 `Sokoban`/`Quest`/`Gehennom`)로 계단/분기 전환을 일반화한다. `validate_persisted_map`은 `80×21` 크기·외곽 `Wall` 테두리·계단 수/좌표·`Shop`/`Altar` 위조/삭제 차단·BFS 도달성·`lit_tiles`/`engravings` 불변조건을 검증하되 내부 `Wall -> Floor` 전이(P9 곡괭이 굴착 대비)는 허용한다.
+  5. **P9~P13 스키마 훅 선반영**: `contained_items`, `artifact_id`, `engravings`, `special_level_id`, `alignment`, `race`, `god_anger`, `prayer_timeout`, `weapon_skills`, `spell_skill`, `learned_spells`, `generated_artifacts`, `ascension_altars`, `Faction::{Pet, Peaceful, Shopkeeper}`, `monster_inventory`를 optional serde 생략 필드로 선반영한다(단 `CampaignState: Copy` 관례를 보존하기 위해 컬렉션 훅은 `WorldState`/`SavedWorldV1`에 배치).
+- **대안 및 기각**: (a) 40×20 셀 단위 맵 동일성 검증과 V2 save를 그대로 유지하면 절차적 다중 방과 P9 굴착이 막히므로 `SaveV3` + 구조적 검증으로 전환한다; (b) `ItemData`에 `String` 메타데이터를 직접 복사하면 `Copy` 및 V1 `ItemData` 직렬화가 깨지므로 `ContentRegistry` 조회와 `Observation` optional 필드를 사용한다.
+- **결과**: `P9`~`P13` 콘텐츠와 특수 레벨을 세이브/엔진 대수술 없이 추가할 수 있는 기반이 확립되며, `80×21` 맵에서도 `LlmObservationView`(시야 타일 필터)는 `32,768B` 이하를 유지하고 TUI `60×24` 뷰포트는 플레이어 중심 카메라 스크롤로 동작한다.
+
+## ADR-P7-02: Stage 1 (P7-Fix) 하강 AC 통일·52슬롯·안개·미식별 은닉·허기/회복·두루마리 BUC 및 호환성
+
+- **상태**: Accepted (2026-11-27)
+- **맥락**: P7 확장 워킹트리에서 방어구·반지 AC 부호 역전(`DEF-01`), 인벤토리 `a-z` 단조 소진(`DEF-02`), `ScrollLevelTeleport` 아뮬렛 추격 우회(`DEF-03`), 허기/자연회복 미연결(`DEF-04`~`05`), 미식별 BUC·상점 외형 누출(`DEF-06`), Fog of War 미구현(`DEF-07`), `aihack-content` 레벨 로더 누락(`DEF-08`), 생성 화면 정적 스탯/미연결 상태(`DEF-09`), 두루마리 BUC 분기·대상 지정 감정 부재(`DEF-10`)가 확인됐다. 동시에 V1 저장·`observation_v1.json` 호환·`Entity::item()` 5-튜플·`LlmObservationView` 32 KiB 예산·64개 `action_space` 상한을 유지해야 한다.
+- **결정**:
+  1. **전면 하강 AC 통일(`DEF-01`)**: `adventurer_template().ac = 10`, `combat::attack_roll_value` `defense = 20 - defender.ac`, `monsters.toml` 12종 AC(`10 - old_ac`), `PlayerObservation.ac`(`default = 10`, `skip_serializing_if = "is_default_player_ac"`), TUI `AC:<val>` HUD로 통일한다.
+  2. **52슬롯 인벤토리 재사용(`DEF-02`)**: `Inventory`는 `a..=z`, `A..=Z` 중 `entries`에 없는 가장 앞 슬롯을 재할당하고 `next_letter_index` 불변조건(`<= 52`, `>= entries.len()`)을 유지하며, `Pickup`/`Buy` 스택 병합은 슬롯 한도 전에 먼저 검사한다.
+  3. **감정 은닉·안개·예산 격리(`DEF-06`, `DEF-07`)**: `EntityPayload::Item`과 `ItemObservation`에 optional serde `buc_known`/`enchant_known`을 두고 캠페인 `Observation`에서 미감정 항목의 `buc`/`enchantment` 값을 마스킹한다. `GameLevel.explored`를 optional serde로 저장하고 `Observation.visible_tiles`에 `visible: false` 타일을 포함하되, `LlmObservationView::from(observation)`은 `tile.visible == true`만 투영해 32,768B 제한을 보존한다.
+  4. **허기·자연 회복·아뮬렛 순간이동·두루마리 BUC(`DEF-03`~`05`, `DEF-10`)**: `DeathCause::Starvation`·`Weak`/`Fainting`/아사 효과 및 `survival-v1` 식량 섭취(`hunger <= 150`)를 연결하고, 캠페인 전용 자연 HP 회복(`(15 - level).max(5)`턴, `poison_turns == 0 && nutrition > 50`)과 `has_amulet` 레벨 텔레포트 차단을 적용한다. `CommandIntent::Identify { scroll, target }`는 식별된 `ScrollIdentify`에 대해 `legal_actions`와 TUI 메뉴가 미감정/미확인 대상 전부를 노출하고(혼잡 인벤토리에서도 대상 선택이 굶지 않음), LLM 전송용 `Observation.action_space.commands`는 64개 상한(`.take(64)`)을 유지한다.
+- **대안 및 기각**: (a) legacy 모드에만 상승 AC를 남기면 동일 엔진 내 방어 공식 이원화와 향후 콘텐츠 충돌이 남으므로 전면 하강 AC 통일을 택했다; (b) `LlmObservationView`에 전체 `explored` 타일(최대 800개, ~56 KB)을 그대로 실으면 `REQUEST_BODY_LIMIT`(32,768B) 초과로 LLM 요청이 실패하므로 LLM 뷰는 현재 시야 타일만 유지했다.
+- **결과**: 모든 전투/장비/상점/탐험/생존 규칙이 단일 일관 계약을 따르며, `DEF-01`·`DEF-04`·`DEF-07` 반영 후 `tests/long_run.rs` R9 causal baseline(9개 witness 및 3회 결정론)을 새 기준 해시로 재검증·고정한다.
+
+## ADR-P7-01: P7 제단·마나/주문·시드 외형 식별·아이템 중첩·최종 보스/승천 추격 및 V1 호환성
+
+- **상태**: Accepted (2026-11-26)
+- **맥락**: P6(반지 슬롯·저항·상점/골드 경제) 이후 핵심 로그라이크 루프를 완성하기 위해 제단 봉헌/기도 보상, 직업별 MP 풀과 주문 시전, 시드 결정론적 외형 미식별/자동 식별, 소모품/투척물 중첩(stacking), 후반 보스(`Minotaur`, `Dragon`) 및 승천 추격 메커니즘이 필요하다. 동시에 기존 레거시(`campaign.is_none()`) 시뮬레이션 결정론 해시(`tests/long_run.rs`), `observation_v1` JSON 호환성, V1 세이브 호환, `Entity::item()` 시그니처가 유지되어야 한다.
+- **결정**:
+  1. **직업 MP와 상태 저장 분리**: `CampaignState` 구조체 필드(`role`, `xp`, `amulet`)를 유지하고 `mp`, `max_mp`, `ascension_pursuit_stage`는 `WorldState` 및 `SavedWorldV1`에 `#[serde(default, skip_serializing_if = "...")]`로 추가한다. 레거시 모드는 `mp == 0 && max_mp == 0`과 `ascension_pursuit_stage == 0`을 강제하며 캠페인 검증기에서 불변조건(`max_mp == campaign.max_mp()`, `0 <= mp <= max_mp`)을 검증한다.
+  2. **외형 미식별 및 중첩 게이트**: `appearance_for_kind(seed, kind)`는 전투 RNG와 분리된 SplitMix64 기반 Fisher-Yates 셔플로 포션(6색)·스크롤(10라벨)·반지(6재질)를 매핑한다. `ItemObservation.appearance`와 바닥 `EntityObservation.appearance`는 캠페인에서 미식별일 때만 채우고(`None`이면 직렬화 생략), `quantity`는 캠페인 소모품(`Potion`/`Scroll`/`Food`/`Rock`, 최대 `MAX_ITEM_STACK = 99`)에만 `> 1`을 허용하며 레거시는 항상 `1`(`1`일 때 직렬화 생략)으로 고정한다.
+  3. **제단·주문·보스/승천 추격**: `TileKind::Altar`(이동·시야 통과 가능)는 `Main 3`과 `Mines 2`의 고정 결정론 좌표에 배치하고 맵 검증기에서 강제한다. `SpellKind::{ForceBolt, Heal, Detect}`는 `CommandIntent::Cast`로 실행하며 `Offer`와 함께 LLM/TUI/헤드리스 계약에 포함한다. `Minotaur`(`Mines 2`), `Dragon`(`Main 6`, `FireBreath`는 `RingFireResistance`로 방어) 및 `AmuletAscension` 보유 상승 시 단계별 추격 스폰과 허기 부담을 적용한다.
+- **대안 및 기각**: `CampaignState`에 MP 필드를 직접 추가하거나 `Entity::item()` 5-튜플 시그니처를 변경하면 기존 테스트와 스냅샷 직렬화 호환성이 광범위하게 깨지므로 기각했다.
+- **결과**: 레거시 결정론(`long_run`)과 기존 V1 세이브·스냅샷 계약을 훼손하지 않으면서 P7 캠페인 확장을 안전하게 계층적으로 구현할 수 있다.
+
 ## ADR-P6-01: P6 반지 슬롯·저항·화염 개미·상점/골드 경제 및 V1/스냅샷 호환성
 
 Status: Accepted (2026-11-26); 구현 시작. 기준 계약: `docs/campaign_spec.md` P6.

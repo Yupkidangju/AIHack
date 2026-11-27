@@ -6,15 +6,196 @@ use crate::{
         tile::TileKind,
     },
     error::ContentError,
-    ids::LevelId,
+    ids::{BranchId, LevelId},
     position::Pos,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SpecialRoomKind {
+    Shop,
+    Temple,
+    Vault,
+    Barracks,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EngravingKind {
+    Dust,
+    Burned,
+    Engraved,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Engraving {
+    pub pos: Pos,
+    pub text: String,
+    pub kind: EngravingKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BranchEntryKind {
+    StairsUp,
+    StairsDown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BranchDef {
+    pub id: BranchId,
+    pub max_depth: i16,
+    pub parent: Option<(LevelId, BranchEntryKind)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BranchGraph {
+    pub branches: &'static [BranchDef],
+}
+
+impl BranchGraph {
+    pub const fn campaign_v3() -> Self {
+        const BRANCHES: &[BranchDef] = &[
+            BranchDef {
+                id: BranchId::Main,
+                max_depth: 6,
+                parent: None,
+            },
+            BranchDef {
+                id: BranchId::Mines,
+                max_depth: 2,
+                parent: Some((LevelId::main(3), BranchEntryKind::StairsUp)),
+            },
+            // P10~P13 분기 그래프 예약 훅 (초기 캠페인에서는 level_ids로 활성화하지 않음)
+            BranchDef {
+                id: BranchId::Sokoban,
+                max_depth: 0,
+                parent: Some((LevelId::main(4), BranchEntryKind::StairsDown)),
+            },
+            BranchDef {
+                id: BranchId::Quest,
+                max_depth: 0,
+                parent: Some((LevelId::main(5), BranchEntryKind::StairsDown)),
+            },
+            BranchDef {
+                id: BranchId::Gehennom,
+                max_depth: 0,
+                parent: Some((LevelId::main(6), BranchEntryKind::StairsDown)),
+            },
+        ];
+        Self { branches: BRANCHES }
+    }
+
+    pub fn branch_def(self, id: BranchId) -> Option<BranchDef> {
+        self.branches.iter().copied().find(|b| b.id == id)
+    }
+
+    pub fn active_level_ids(self) -> Vec<LevelId> {
+        let mut out = Vec::new();
+        for branch in self.branches {
+            for depth in 1..=branch.max_depth {
+                out.push(LevelId::new(branch.id, depth));
+            }
+        }
+        out
+    }
+
+    pub fn branch_entry_from(self, from: LevelId, tile: TileKind) -> Option<LevelId> {
+        self.branches.iter().find_map(|branch| {
+            if branch.max_depth <= 0 {
+                return None;
+            }
+            let (parent_level, entry_kind) = branch.parent?;
+            let matches_tile = matches!(
+                (entry_kind, tile),
+                (BranchEntryKind::StairsUp, TileKind::StairsUp)
+                    | (BranchEntryKind::StairsDown, TileKind::StairsDown)
+            );
+            (parent_level == from && matches_tile).then(|| LevelId::new(branch.id, 1))
+        })
+    }
+
+    pub fn descend_target(self, from: LevelId) -> Option<LevelId> {
+        let branch = self.branch_def(from.branch)?;
+        (from.depth < branch.max_depth).then(|| LevelId::new(from.branch, from.depth + 1))
+    }
+
+    pub fn ascend_target(self, from: LevelId) -> Option<LevelId> {
+        let branch = self.branch_def(from.branch)?;
+        if from.depth > 1 {
+            Some(LevelId::new(from.branch, from.depth - 1))
+        } else {
+            branch.parent.map(|(parent_level, _)| parent_level)
+        }
+    }
+}
 
 /// level map과 식별자를 함께 보관한다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameLevel {
     pub id: LevelId,
     pub map: GameMap,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub explored: Vec<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lit_tiles: Vec<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_room: Option<SpecialRoomKind>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub engravings: Vec<Engraving>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_level_id: Option<String>,
+}
+
+impl GameLevel {
+    pub fn is_lit(&self, pos: Pos) -> bool {
+        if !self.map.contains(pos) {
+            return false;
+        }
+        if self.lit_tiles.len() != self.map.tile_count() {
+            return true;
+        }
+        let idx = (pos.y as usize * self.map.width as usize) + pos.x as usize;
+        self.lit_tiles.get(idx).copied().unwrap_or(true)
+    }
+
+    pub fn is_explored(&self, pos: Pos) -> bool {
+        if !self.map.contains(pos) || self.explored.is_empty() {
+            return false;
+        }
+        let idx = (pos.y as usize * self.map.width as usize) + pos.x as usize;
+        self.explored.get(idx).copied().unwrap_or(false)
+    }
+
+    pub fn mark_explored(&mut self, positions: &[Pos]) {
+        if positions.is_empty() {
+            return;
+        }
+        let expected = self.map.tile_count();
+        if self.explored.len() != expected {
+            self.explored.resize(expected, false);
+        }
+        for &pos in positions {
+            if self.map.contains(pos) {
+                let idx = (pos.y as usize * self.map.width as usize) + pos.x as usize;
+                self.explored[idx] = true;
+            }
+        }
+    }
+
+    pub fn explored_positions(&self) -> Vec<Pos> {
+        let expected = self.map.tile_count();
+        if self.explored.len() != expected {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        for y in 0..self.map.height {
+            for x in 0..self.map.width {
+                let idx = (y as usize * self.map.width as usize) + x as usize;
+                if self.explored[idx] {
+                    out.push(Pos { x, y });
+                }
+            }
+        }
+        out
+    }
 }
 
 /// level을 deterministic 순서로 보관한다.
@@ -30,10 +211,20 @@ impl LevelRegistry {
                 GameLevel {
                     id: PHASE5_LEVEL1_ID,
                     map: GameMap::fixture_phase2(),
+                    explored: Vec::new(),
+                    lit_tiles: Vec::new(),
+                    special_room: None,
+                    engravings: Vec::new(),
+                    special_level_id: None,
                 },
                 GameLevel {
                     id: PHASE5_LEVEL2_ID,
                     map: GameMap::fixture_phase5_level2(),
+                    explored: Vec::new(),
+                    lit_tiles: Vec::new(),
+                    special_room: None,
+                    engravings: Vec::new(),
+                    special_level_id: None,
                 },
             ],
         }
@@ -47,6 +238,11 @@ impl LevelRegistry {
                 Ok(GameLevel {
                     id: LevelId::main(definition.depth()),
                     map: GameMap::from_level_data(definition)?,
+                    explored: Vec::new(),
+                    lit_tiles: Vec::new(),
+                    special_room: None,
+                    engravings: Vec::new(),
+                    special_level_id: None,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;

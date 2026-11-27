@@ -16,6 +16,26 @@ Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c0
 
 ## 1. 문서 운영 규칙
 
+### Stage 3 (P9) 도구·컨테이너·#dip/#engrave·지형/함정 생태계 (2026-11-27)
+
+`docs/CODER_HANDOFF_P7_TO_P13.md`의 Stage 3(`P9`, `ADR-P9-01`)에 따라 아래 시스템을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## Stage 3 (P9)`, 의사결정은 `ADR-P9-01`, 실행 계획은 `tasks/plan.md`를 따른다:
+- **도구 클래스(`(`, `ItemClass::Tool`) & `#apply` (`CommandIntent::Apply`)**: `SkeletonKey`, `LockPick`, `PickAxe`, `DwarvishMattock`, `TinWhistle`, `OilLamp`, `Blindfold`, `UnicornHorn` 8종 도구 및 암흑방 시야(`OilLamp`), 눈가리개+텔레파시(`Blindfold`), 벽 굴착(`PickAxe`/`DwarvishMattock`), 상태/능력치 복구(`UnicornHorn`), 잠금/함정 해제(`SkeletonKey`/`LockPick`), 펫 호출(`TinWhistle`)을 지원한다.
+- **컨테이너 & `#loot` (`CommandIntent::ContainerPut`, `ContainerTake`)**: `Sack`, `BagOfHolding`(BUC별 내용물 무게 배율 및 중첩 폭발 `DeathCause::Explosion`), `Chest`(잠금/함정 지원)와 양방향 저장 무결성(`EntityLocation::InContainer` ↔ `contained_items`), `AmuletAscension` 수납 차단을 구현한다.
+- **`#dip` (`CommandIntent::Dip`) & 성수/연금술**: 제단 물 축복(`Blessed PotionWater`, 성수) 및 BUC 정화/저주, 분수·싱크·물 희석/세척·철강 장비 녹(`erosion: 0..=3`)·등불 소등, 물약 간 조합 연금술을 구현한다.
+- **`#engrave` (`CommandIntent::Engrave`) & `Elbereth`**: 손가락(Dust)·무기/곡괭이(Engraved)·화염 지팡이(Burned) 바닥 각인과 혼란 시 오탈자, 공격/턴 경과 마모, `Minotaur` 제외 비이성 몬스터 회피(후퇴) AI를 연결한다.
+- **지형 & 12종 함정 생태계**: `Fountain`, `DryFountain`, `Sink`, `Water`(부유/수영/익사 `DeathCause::Drowning`), `Lava`(부유/화염 저항/`DeathCause::Lava`), `#drink`(`CommandIntent::Drink`), 9종 신규 함정(`Teleport`, `SleepingGas`, `Rust`, `Polymorph`, `Hole`, `AntiMagic`, `FallingRock`, `Magic`, `Fire`), TUI(`a`/`C`/`v`/`E`/`g`)·Headless(`UnicornHorn` 활용)·LLM 직렬화 및 `SaveV3` 검증을 완성한다(레거시 V1/R9 해시 및 `LlmObservationView < 32 KiB`/`ActionSpace <= 64` 보존).
+
+### Stage 2 (P8) 엔진 기반 업그레이드 (2026-11-27)
+
+`docs/CODER_HANDOFF_P7_TO_P13.md`의 Stage 2(`P8`, `ADR-P8-01`)에 따라 대량 콘텐츠·규칙 확장을 수용할 수 있는 엔진 기반을 구축한다:
+- **P8-A**: `items.toml`/`monsters.toml` 메타데이터 확장(`name`, `color`, `material`, `stackable`, `resistances`, `corpse_*`, `ai_flags`, `spawn_*`), `speed` 0..=36 확장, 다슬롯 방어구/아뮬렛/상태 물약/`Bat` 추가, TUI의 데이터 주도 메타데이터 소비 전환.
+- **P8-B**: 10 장비 슬롯(`Melee`, `Shield`, `Helm`, `Body`, `Cloak`, `Gloves`, `Boots`, `LeftRing`, `RightRing`, `Amulet`) 및 통합 하강 AC, 에너지 버킷(`energy`, 임계값 12) 턴 스케줄러, 6대 능력치(`Str`/`Dex`/`Con`/`Int`/`Wis`/`Cha`), 8종 `Resistances` 비트셋(내재+외재) 및 7종 `StatusTimers`(`Blind`/`Confused`/`Stunned`/`Hallucinating`/`Fast`/`Levitation`/`Invisible`), 일반화된 몬스터 시체(드롭·부패·저항 획득·트롤 부활).
+- **P8-C & Hooks**: `80×21` 가변 방·복도·루프·어둠/조명·특수방(`Shop`, `Temple`, `Vault`, `Barracks`) 절차 생성기 v3, 데이터 주도 `BranchGraph`(`Main`, `Mines`, 예약 분기), 구조적 `validate_persisted_map`, 캠페인 세이브 `SaveV3`(`schema_version = 3`, 레거시 V1/R9 해시 및 `observation_v1.json` 호환 보존), P9~P13 스키마 훅(`engravings`, `contained_items`, `artifact_id`, `alignment`, `race`, `god_anger`, `prayer_timeout`, `weapon_skills`, `spell_skill`, `learned_spells`, `generated_artifacts`, `ascension_altars`, `Faction::{Pet, Peaceful, Shopkeeper}`, `monster_inventory`).
+
+### P7 캠페인 확장 (2026-11-26)
+
+P1–P6 캠페인 위에 제단(`TileKind::Altar`, `Offer`/제단 기도)·역할별 마나(`mp`/`max_mp`) 및 주문(`ForceBolt`/`Heal`/`Detect`), 시드별 미식별 외형 및 자동 식별, 소모품/투사체 수량 스택(`1..=99`), 심층 보스(`Minotaur`/`Dragon` `FireBreath`) 및 아뮬렛 귀환 추격(`ascension_pursuit_stage`)을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## P7`, 의사결정은 `ADR-P7-01`, 실행 계획은 `tasks/plan.md`를 따른다.
+
 ### P6 캠페인 확장 (2026-11-26)
 
 P1–P5 캠페인 위에 반지 슬롯(`ItemClass::Ring`, `EquipmentSlot::Ring`, `Inventory::equipped_ring`), 신규 반지 3종(`RingPoisonResistance`, `RingFireResistance`, `RingProtection`), 화염 개미(`FireAnt`, `FireOnMelee`), 상점 타일(`TileKind::Shop`) 및 `Buy`/`Sell` 골드 경제를 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## P6`, 의사결정은 `ADR-P6-01`, 실행 계획은 `tasks/plan.md`를 따른다.
@@ -401,7 +421,7 @@ pub enum LlmInputCode {
 
 `RequestId`는 worker가 생성하는 opaque UUID 문자열이며 caller가 임의 문자열을 만들 수 없다. input과 output type을 분리하고 모든 external response는 worker boundary에서 validate한다.
 
-`LlmObservationView`는 `Observation`에서 만든 read-only projection이다. visible tiles 최대 800개, visible entities 128개, inventory 52개, last events 20개, action space 64개로 제한한다. canonical request JSON이 32,768 bytes를 넘으면 `PayloadTooLarge`다. soft-adjudication user text는 trim 후 1..=240자이며 control/ANSI escape를 거부한다.
+`LlmObservationView`는 `Observation`에서 만든 read-only projection이다. visible tiles 최대 800개(Stage 1 `DEF-07` 이후 `tile.visible == true`인 현재 시야 타일만 투영해 explored 타일 누적으로 인한 32 KiB 초과를 방지), visible entities 128개, inventory 52개, last events 20개, action space 64개로 제한한다. canonical request JSON이 32,768 bytes를 넘으면 `PayloadTooLarge`다. soft-adjudication user text는 trim 후 1..=240자이며 control/ANSI escape를 거부한다.
 
 기본값:
 
@@ -557,11 +577,11 @@ TUI 입력은 key code 열거가 아니라 candidate의 repeat 안전성과 한 
 
 ## 10. 동결된 게임 공식
 
-v0.3.0 리팩터링은 아래 공식을 변경하지 않는다.
+`ADR-P7-02`(`Stage 1 / P7-Fix`, `DEF-01` · `DEF-04`)로 하강 AC 전면 통일과 허기 런타임 효과를 반영한 현재 공식이다.
 
 ```text
-attack_roll = d20 + attacker.hit_bonus + weapon.hit_bonus
-defense = 10 + defender.ac
+attack_roll = d20 + attacker.hit_bonus + weapon.hit_bonus (+ weak_hunger_penalty)
+defense = 20 - defender.ac
 hit = attack_roll >= defense
 
 damage = max(1, damage_roll + attacker.damage_bonus - defender.damage_reduction)
@@ -571,13 +591,15 @@ death_score = gold + kill_count * 10 + depth * 100 + carried_item_base_price - t
 vision_radius = 8
 low_hp = hp * 100 <= max_hp * 30
 trap_pit_damage = 3
+weak_hit_penalty = -2 (nutrition in 1..=50 or Fainting <= 0)
+starvation_threshold = nutrition <= -150 -> DeathCause::Starvation
 ```
 
-공식 변경은 별도 feature spec과 golden scenario ID가 필요하다.
+- `hallucinating`의 자연 유발원(포션/몬스터 등)과 `damage_reduction`의 방어구 피해 경감 확장은 `Stage 2 (P8) / Stage 3 (P9)` 범위로 보류한다(`hallucinating == true`일 때 TUI 로그는 `hallucination_message`를 적용한다).
 
 ## 11. 실데이터 기준
 
-아래 Phase fixture 데이터와 Adventurer 기본값은 legacy 호환 경로의 기준이다. P1–P3 역할별 시작·생성 던전·승천은 `docs/campaign_spec.md`의 campaign 계약을 적용한다.
+아래 Phase fixture 데이터와 Adventurer 기본값은 legacy 호환 경로의 기준이다. P1–P7 역할별 시작·생성 던전·승천은 `docs/campaign_spec.md`의 campaign 계약을 적용한다.
 
 ### 11.1 플레이어
 
@@ -587,9 +609,8 @@ id = "player.adventurer"
 hp = 16
 max_hp = 16
 energy = 6
-strength = 10
-dexterity = 10
-ac = 0
+# strength / dexterity 6능력치는 Stage 2 (P8-B)에서 도입 예정
+ac = 10
 hit_bonus = 2
 damage_bonus = 0
 vision_radius = 8
@@ -603,7 +624,7 @@ start_items = ["item.weapon.dagger", "item.food.ration"]
 id = "monster.jackal"
 glyph = "d"
 hp = 4
-ac = 0
+ac = 10
 hit_bonus = 0
 damage = "1d2"
 ai = "wander"
@@ -716,12 +737,14 @@ pub enum HeadlessRunError {
 
 `survival-v1` 규칙:
 
-1. HP가 max HP의 50% 이하이고 healing potion legal이면 quaff
-2. adjacent hostile에 대한 bump attack legal이면 공격
-3. 현재 tile에서 pickup legal이면 pickup
-4. 통과 가능한 방향을 North, East, South, West, NorthEast, SouthEast, SouthWest, NorthWest 순으로 선택
-5. 이동이 모두 불법이면 Wait
-6. GameOver가 되면 같은 seed의 새 session을 만들지 않고 report를 실패 처리
+1. 중독(`poison_turns > 0`) 시 해독 물약(`PotionCure`) legal이면 quaff
+2. HP가 max HP의 50% 이하이고 `Heal` 주문 또는 healing potion legal이면 회복
+3. 허기(`hunger <= 150`, `Hungry`/`Weak`/`Fainting`) 시 소지 식량(`FoodRation`, `CorpseJackal`) `Eat` legal이면 섭취
+4. 사거리 5 이내 적에게 `ForceBolt` 주문 legal이면 시전; 또는 adjacent hostile에 대한 bump attack legal이면 공격
+5. 미착용 상태의 반지 착용(`PutOn`) 및 현재 tile pickup legal이면 pickup, 잠긴 문 `Kick`
+6. 통과 가능한 방향을 North, East, South, West, NorthEast, SouthEast, SouthWest, NorthWest 순으로 선택
+7. 이동이 모두 불법이면 Wait
+8. GameOver가 되면 같은 seed의 새 session을 만들지 않고 report를 실패 처리
 
 `--turns 1000` 성공은 `accepted_turns == 1000`일 때만 인정한다.
 
