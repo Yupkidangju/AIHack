@@ -42,6 +42,12 @@ impl Widget for MapWidget<'_> {
                 };
                 let style = if tile.visible {
                     let fg = match tile.tile {
+                        crate::domain::tile::TileKind::Altar => match tile.altar_alignment {
+                            Some(aihack_ai_contract::Alignment::Lawful) => Color::White,
+                            Some(aihack_ai_contract::Alignment::Neutral) => Color::Yellow,
+                            Some(aihack_ai_contract::Alignment::Chaotic) => Color::LightRed,
+                            None => self.theme.fg,
+                        },
                         crate::domain::tile::TileKind::Fountain => Color::Cyan,
                         crate::domain::tile::TileKind::DryFountain => self.theme.muted,
                         crate::domain::tile::TileKind::Sink => Color::Gray,
@@ -71,11 +77,18 @@ impl Widget for MapWidget<'_> {
                     EntityKind::Monster(kind) => aihack_runtime::monster_glyph(kind),
                     EntityKind::Item(kind) => aihack_runtime::item_glyph(kind),
                 });
-                let fg = entity_color(entity.color.as_deref()).unwrap_or(if actors {
-                    self.theme.danger
-                } else {
-                    self.theme.accent
-                });
+                let fg = match entity.faction {
+                    Some(aihack_ai_contract::Faction::Pet) => ratatui::style::Color::LightGreen,
+                    Some(aihack_ai_contract::Faction::Shopkeeper) => ratatui::style::Color::White,
+                    Some(aihack_ai_contract::Faction::Peaceful) => {
+                        entity_color(entity.color.as_deref()).unwrap_or(ratatui::style::Color::Cyan)
+                    }
+                    _ => entity_color(entity.color.as_deref()).unwrap_or(if actors {
+                        self.theme.danger
+                    } else {
+                        self.theme.accent
+                    }),
+                };
                 if let Some((x, y)) = self.viewport.world_to_terminal(entity.pos, area) {
                     buf[(x, y)]
                         .set_char(glyph)
@@ -119,16 +132,20 @@ impl Widget for MapWidget<'_> {
 fn entity_color(color: Option<&str>) -> Option<ratatui::style::Color> {
     use ratatui::style::Color;
     match color? {
-        "brown" | "yellow" => Some(Color::Yellow),
+        "brown" | "yellow" | "orange" => Some(Color::Yellow),
+        "bright_yellow" => Some(Color::LightYellow),
         "gray" | "dark_gray" => Some(Color::Gray),
+        "black" => Some(Color::DarkGray),
         "bright_blue" => Some(Color::LightBlue),
         "blue" => Some(Color::Blue),
         "green" => Some(Color::Green),
         "bright_green" => Some(Color::LightGreen),
         "magenta" => Some(Color::Magenta),
+        "bright_magenta" => Some(Color::LightMagenta),
         "red" => Some(Color::Red),
         "bright_red" => Some(Color::LightRed),
         "cyan" => Some(Color::Cyan),
+        "bright_cyan" => Some(Color::LightCyan),
         "white" => Some(Color::White),
         _ => None,
     }

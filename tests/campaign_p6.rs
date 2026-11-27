@@ -904,6 +904,10 @@ fn p6c_tui_headless_and_legacy_contract_compatibility() {
         BucStatus::Uncursed,
         1,
     );
+    hl_save
+        .world
+        .identified_items
+        .push(ItemKind::RingProtection);
     let mut hl_sess = GameSession::from_save_data(hl_save).unwrap();
     assert_eq!(
         HeadlessPolicy::survival_v1().candidates(&hl_sess),

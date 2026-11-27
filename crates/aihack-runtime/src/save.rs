@@ -558,6 +558,7 @@ fn validate_saved_world_inner(
             if !level.lit_tiles.is_empty()
                 || level.special_room.is_some()
                 || !level.engravings.is_empty()
+                || !level.altar_alignments.is_empty()
                 || level.special_level_id.is_some()
             {
                 return invalid_world(
@@ -568,6 +569,22 @@ fn validate_saved_world_inner(
                 return invalid_world(
                     "legacy mode cannot contain campaign P9 tiles or traps".to_string(),
                 );
+            }
+        } else {
+            let mut seen_altars = HashSet::new();
+            for (pos, _) in &level.altar_alignments {
+                if !seen_altars.insert(*pos) {
+                    return invalid_world(format!(
+                        "level {:?} has duplicate altar alignment entry at ({}, {})",
+                        level.id, pos.x, pos.y
+                    ));
+                }
+                if level.map.tile(*pos).ok() != Some(TileKind::Altar) {
+                    return invalid_world(format!(
+                        "level {:?} altar_alignments points to non-altar tile at ({}, {})",
+                        level.id, pos.x, pos.y
+                    ));
+                }
             }
         }
         total_tiles = total_tiles
@@ -594,6 +611,7 @@ fn validate_saved_world_inner(
 
     let entities = world.entities.entities();
     let mut entity_ids = HashSet::new();
+    let mut seen_artifacts = HashSet::new();
     let mut max_id = 0u32;
     let mut player_count = 0usize;
     for entity in entities {
@@ -604,16 +622,62 @@ fn validate_saved_world_inner(
         match &entity.payload {
             EntityPayload::Actor {
                 kind,
+                faction,
                 location,
                 stats,
                 alive,
                 monster_inventory,
-                ..
+                tameness,
+                pet_xp,
+                pet_hunger,
             } => {
-                if world.campaign.is_none() && !monster_inventory.is_empty() {
-                    return invalid_world(
-                        "legacy mode cannot contain monster inventories".to_string(),
-                    );
+                if world.campaign.is_none() {
+                    if !monster_inventory.is_empty()
+                        || *tameness > 0
+                        || *pet_xp > 0
+                        || *pet_hunger != 0
+                    {
+                        return invalid_world(
+                            "legacy mode cannot contain monster inventories or pet state"
+                                .to_string(),
+                        );
+                    }
+                    if let ActorKind::Monster(mk) = *kind {
+                        if mk.is_p11_only()
+                            || *faction != aihack_core::domain::entity::Faction::Hostile
+                        {
+                            return invalid_world(
+                                "legacy mode cannot contain campaign P11 monsters or non-hostile factions"
+                                    .to_string(),
+                            );
+                        }
+                    }
+                } else {
+                    if *tameness > aihack_core::domain::entity::MAX_PET_TAMENESS
+                        || *pet_xp > aihack_core::domain::entity::MAX_PET_XP
+                        || !(0..=aihack_core::domain::entity::MAX_PET_HUNGER).contains(pet_hunger)
+                    {
+                        return invalid_world(format!(
+                            "actor {} has out-of-range pet state",
+                            entity.id.0
+                        ));
+                    }
+                    if *kind == ActorKind::Player {
+                        if *faction != aihack_core::domain::entity::Faction::Player
+                            || *tameness > 0
+                            || *pet_xp > 0
+                            || *pet_hunger != 0
+                        {
+                            return invalid_world(
+                                "player actor has invalid faction or pet metadata".to_string(),
+                            );
+                        }
+                    } else if *faction == aihack_core::domain::entity::Faction::Player {
+                        return invalid_world(format!(
+                            "non-player actor {} cannot use Player faction",
+                            entity.id.0
+                        ));
+                    }
                 }
                 if *kind == ActorKind::Player {
                     player_count += 1;
@@ -629,12 +693,14 @@ fn validate_saved_world_inner(
                 charges,
                 enchantment,
                 quantity,
+                corpse_monster,
                 contained_items,
                 artifact_id,
                 tool_active,
                 container_locked,
                 container_trapped,
                 erosion,
+                unpaid,
                 ..
             } => {
                 if world.campaign.is_none()
@@ -644,6 +710,7 @@ fn validate_saved_world_inner(
                         || *container_locked
                         || *container_trapped
                         || *erosion > 0
+                        || *unpaid
                         || matches!(location, EntityLocation::InContainer { .. })
                         || data.tool_action.is_some()
                         || data.container_capacity.is_some()
@@ -653,6 +720,56 @@ fn validate_saved_world_inner(
                     return invalid_world(
                         "legacy mode cannot contain extended item metadata".to_string(),
                     );
+                }
+                if *unpaid
+                    && (*kind == ItemKind::AmuletAscension
+                        || matches!(
+                            location,
+                            EntityLocation::Consumed | EntityLocation::InContainer { .. }
+                        ))
+                {
+                    return invalid_world(format!(
+                        "item {} has invalid unpaid location or kind",
+                        entity.id.0
+                    ));
+                }
+                if !matches!(*kind, ItemKind::Corpse | ItemKind::CorpseJackal)
+                    && corpse_monster.is_some()
+                {
+                    return invalid_world(format!(
+                        "non-corpse item {} has corpse_monster metadata",
+                        entity.id.0
+                    ));
+                }
+                if let Some(art_id) = artifact_id {
+                    if *erosion > 0 {
+                        return invalid_world(format!(
+                            "artifact item {} ({art_id}) cannot have erosion {}",
+                            entity.id.0, erosion
+                        ));
+                    }
+                    let Some(def) = aihack_core::campaign::artifact_def(art_id) else {
+                        return invalid_world(format!(
+                            "item {} has unknown artifact_id {}",
+                            entity.id.0, art_id
+                        ));
+                    };
+                    if *kind != def.base_kind {
+                        return invalid_world(format!(
+                            "artifact item {} ({art_id}) base kind mismatch",
+                            entity.id.0
+                        ));
+                    }
+                    if !seen_artifacts.insert(art_id.clone()) {
+                        return invalid_world(format!(
+                            "duplicate unique artifact {art_id} in world"
+                        ));
+                    }
+                    if !world.generated_artifacts.contains(art_id) {
+                        return invalid_world(format!(
+                            "artifact {art_id} is missing from generated_artifacts"
+                        ));
+                    }
                 }
                 if data.kind != *kind {
                     return invalid_world(format!("item {} kind/data mismatch", entity.id.0));
@@ -737,6 +854,7 @@ fn validate_saved_world_inner(
         }
     }
     validate_containers(world)?;
+    validate_monster_inventories(world)?;
     let expected_next_id = max_id
         .checked_add(1)
         .ok_or_else(|| invalid_world_error("entity allocator has no successor ID"))?;
@@ -853,6 +971,11 @@ fn is_p9_only_item_kind(kind: ItemKind) -> bool {
             | ItemKind::Chest
             | ItemKind::PotionWater
             | ItemKind::ScrollBlank
+            | ItemKind::LongSword
+            | ItemKind::Katana
+            | ItemKind::BattleAxe
+            | ItemKind::Quarterstaff
+            | ItemKind::BroadSword
     )
 }
 
@@ -955,6 +1078,65 @@ fn validate_containers(world: &SavedWorldV1) -> Result<(), GameError> {
     Ok(())
 }
 
+fn validate_monster_inventories(world: &SavedWorldV1) -> Result<(), GameError> {
+    let mut seen_monster_items = HashSet::new();
+    for entity in world.entities.entities() {
+        let EntityPayload::Actor {
+            kind,
+            monster_inventory,
+            ..
+        } = &entity.payload
+        else {
+            continue;
+        };
+        if *kind == ActorKind::Player {
+            if !monster_inventory.is_empty() {
+                return invalid_world("player actor cannot carry monster_inventory".to_string());
+            }
+            continue;
+        }
+        for &item_id in monster_inventory {
+            if !seen_monster_items.insert(item_id) {
+                return invalid_world(format!(
+                    "duplicate or shared monster_inventory item {}",
+                    item_id.0
+                ));
+            }
+            let Some(item_entity) = world.entities.get(item_id) else {
+                return invalid_world(format!(
+                    "monster {} references missing inventory item {}",
+                    entity.id.0, item_id.0
+                ));
+            };
+            let Some((item_kind, _, loc, _, _)) = item_entity.item() else {
+                return invalid_world(format!(
+                    "monster {} inventory entry {} is not an item",
+                    entity.id.0, item_id.0
+                ));
+            };
+            if item_kind == ItemKind::AmuletAscension {
+                return invalid_world(format!(
+                    "monster {} inventory cannot hold Amulet of Ascension",
+                    entity.id.0
+                ));
+            }
+            if world.inventory.contains(item_id) {
+                return invalid_world(format!(
+                    "monster {} inventory overlaps player inventory item {}",
+                    entity.id.0, item_id.0
+                ));
+            }
+            if loc != (EntityLocation::Inventory { owner: entity.id }) {
+                return invalid_world(format!(
+                    "monster {} item {} location mismatch",
+                    entity.id.0, item_id.0
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_actor_stats(
     entity_id: u32,
     stats: &aihack_core::domain::entity::ActorStats,
@@ -1051,10 +1233,20 @@ fn validate_inventory(world: &SavedWorldV1) -> Result<(), GameError> {
     for entity in world.entities.entities() {
         if let Some((_, _, EntityLocation::Inventory { owner }, _, _)) = entity.item() {
             if owner != world.player_id {
-                return invalid_world(format!(
-                    "inventory item {} has unsupported owner {}",
-                    entity.id.0, owner.0
-                ));
+                let valid_monster_owner = world.campaign.is_some()
+                    && world.entities.get(owner).is_some_and(|actor| {
+                        actor.actor_kind().is_some_and(|k| k != ActorKind::Player)
+                            && actor
+                                .actor_monster_inventory()
+                                .is_some_and(|inv| inv.contains(&entity.id))
+                    });
+                if !valid_monster_owner {
+                    return invalid_world(format!(
+                        "inventory item {} has unsupported owner {}",
+                        entity.id.0, owner.0
+                    ));
+                }
+                continue;
             }
             if !items.contains(&entity.id) {
                 return invalid_world(format!("inventory item {} is not indexed", entity.id.0));

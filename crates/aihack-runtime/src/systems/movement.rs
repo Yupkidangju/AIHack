@@ -1,5 +1,5 @@
 use aihack_core::{
-    domain::tile::{DoorState, TileKind},
+    domain::tile::TileKind,
     error::GameError,
     ids::{EntityId, LevelId},
     position::{Direction, Pos},
@@ -93,6 +93,56 @@ pub fn is_bump_attack_for_legal_action(world: &GameWorld, direction: Direction) 
         )
 }
 
+pub fn is_friendly_swap_for_legal_action(world: &GameWorld, direction: Direction) -> bool {
+    if world.campaign.is_none() || world.carried_weight() > world.carrying_capacity() {
+        return false;
+    }
+    let from = world.player_pos();
+    let to = from.offset(direction.delta());
+    world
+        .entities
+        .alive_friendly_at(world.current_level(), to)
+        .is_some()
+        && is_walkable_or_attackable_destination(
+            world,
+            world.player_id,
+            world.current_level(),
+            from,
+            to,
+            direction,
+        )
+}
+
+pub fn swap_player_with_friendly(
+    world: &mut GameWorld,
+    friendly_id: EntityId,
+    direction: Direction,
+) -> Result<(Pos, Pos), GameError> {
+    if world.carried_weight() > world.carrying_capacity() {
+        return Err(GameError::CommandRejected(
+            "movement blocked by encumbrance".to_string(),
+        ));
+    }
+    let (level, from) = actor_origin(world, world.player_id)?;
+    let to = from.offset(direction.delta());
+    if !is_walkable_or_attackable_destination(world, world.player_id, level, from, to, direction) {
+        return Err(GameError::CommandRejected(
+            "cannot swap into blocked destination".to_string(),
+        ));
+    }
+    if world.entities.alive_friendly_at(level, to) != Some(friendly_id) {
+        return Err(GameError::CommandRejected(
+            "friendly actor is not at destination".to_string(),
+        ));
+    }
+    world.set_player_location(level, to);
+    world
+        .state_mut()
+        .entities
+        .set_actor_location(friendly_id, level, from);
+    Ok((from, to))
+}
+
 fn actor_origin(world: &GameWorld, actor: EntityId) -> Result<(LevelId, Pos), GameError> {
     world
         .entities
@@ -108,15 +158,9 @@ fn is_walkable_or_attackable_destination(
     to: Pos,
     direction: Direction,
 ) -> bool {
-    matches!(
-        world.map(level).tile(to),
-        Ok(TileKind::Floor
-            | TileKind::Door(DoorState::Open)
-            | TileKind::Trap(_)
-            | TileKind::HiddenTrap(_)
-            | TileKind::StairsDown
-            | TileKind::StairsUp
-            | TileKind::Shop
-            | TileKind::Altar)
-    ) && aihack_core::movement::validate_path(world, actor, level, from, direction).is_ok()
+    world
+        .map(level)
+        .tile(to)
+        .is_ok_and(TileKind::is_movement_passable)
+        && aihack_core::movement::validate_path(world, actor, level, from, direction).is_ok()
 }

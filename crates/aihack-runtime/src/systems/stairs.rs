@@ -6,7 +6,7 @@ use aihack_core::{
 
 use crate::world::GameWorld;
 
-pub fn enter_branch(world: &mut GameWorld) -> Result<GameEvent, String> {
+pub fn enter_branch(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
     if world.campaign.is_none() {
         return Err("branch navigation is only available in campaign mode".into());
     }
@@ -24,24 +24,30 @@ pub fn enter_branch(world: &mut GameWorld) -> Result<GameEvent, String> {
     transfer(world, to, true)
 }
 
-fn transfer(world: &mut GameWorld, to: LevelId, up: bool) -> Result<GameEvent, String> {
+fn transfer(world: &mut GameWorld, to: LevelId, up: bool) -> Result<Vec<GameEvent>, String> {
     let from = world.current_level();
+    let from_pos = world.player_pos();
     let landing = if up {
         world.levels.stairs_up_pos(to)
     } else {
         world.levels.stairs_down_pos(to)
     }
     .ok_or("target landing is missing")?;
+    let mut events = crate::systems::npc::check_shop_theft_on_move_or_stairs(world, true);
     world.set_player_location(to, landing);
-    Ok(GameEvent::LevelChanged {
+    events.push(GameEvent::LevelChanged {
         entity: world.player_id,
         from,
         to,
-    })
+    });
+    events.extend(crate::systems::pets::follow_player_on_level_change(
+        world, from, from_pos, to, landing,
+    ));
+    Ok(events)
 }
 
 /// 현재 위치의 아래층 계단을 통해 고정된 대상 레벨로 이동한다.
-pub fn descend(world: &mut GameWorld) -> Result<GameEvent, String> {
+pub fn descend(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
     let from = world.current_level();
     let player_pos = world.player_pos();
     match world.current_map().tile(player_pos) {
@@ -71,16 +77,21 @@ pub fn descend(world: &mut GameWorld) -> Result<GameEvent, String> {
         .levels
         .stairs_up_pos(to)
         .ok_or_else(|| "target level has no stairs up landing".to_string())?;
+    let mut events = crate::systems::npc::check_shop_theft_on_move_or_stairs(world, true);
     world.set_player_location(to, landing);
-    Ok(GameEvent::LevelChanged {
+    events.push(GameEvent::LevelChanged {
         entity: world.player_id,
         from,
         to,
-    })
+    });
+    events.extend(crate::systems::pets::follow_player_on_level_change(
+        world, from, player_pos, to, landing,
+    ));
+    Ok(events)
 }
 
 /// 현재 위치의 위층 계단을 통해 고정된 이전 레벨로 이동한다.
-pub fn ascend(world: &mut GameWorld) -> Result<GameEvent, String> {
+pub fn ascend(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
     let from = world.current_level();
     let player_pos = world.player_pos();
     match world.current_map().tile(player_pos) {

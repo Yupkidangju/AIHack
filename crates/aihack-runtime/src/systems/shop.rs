@@ -2,14 +2,14 @@ use aihack_content::ContentRegistry;
 use aihack_core::{
     domain::{
         entity::EntityLocation,
-        item::{BucStatus, ItemClass, ItemData, ItemKind, MAX_ITEM_STACK},
+        item::{BucStatus, ItemData, ItemKind, MAX_ITEM_STACK},
         tile::TileKind,
     },
     event::{GameEvent, MessagePriority},
     ids::EntityId,
 };
 
-use crate::{systems::items, world::GameWorld};
+use crate::{appearance, systems::items, world::GameWorld};
 
 pub const SHOP_CATALOG: [ItemKind; 9] = [
     ItemKind::FoodRation,
@@ -26,6 +26,7 @@ pub const SHOP_CATALOG: [ItemKind; 9] = [
 pub fn is_on_shop(world: &GameWorld) -> bool {
     world.campaign.is_some()
         && world.current_map().tile(world.player_pos()).ok() == Some(TileKind::Shop)
+        && !crate::systems::npc::has_hostile_shopkeeper_on_level(world)
 }
 
 pub fn buy_price(kind: ItemKind, registry: &ContentRegistry) -> Result<u32, String> {
@@ -91,23 +92,11 @@ fn find_buy_stack(
     })
 }
 
-fn shop_item_log_name(world: &GameWorld, kind: ItemKind, class: ItemClass) -> String {
-    if world.campaign.is_some()
-        && !world.is_item_identified(kind)
-        && kind.has_randomized_appearance()
-    {
-        match class {
-            ItemClass::Potion => "unidentified potion".to_string(),
-            ItemClass::Scroll => "unidentified scroll".to_string(),
-            ItemClass::Ring => "unidentified ring".to_string(),
-            _ => "unidentified item".to_string(),
-        }
-    } else {
-        format!("{kind:?}")
-    }
+fn shop_item_log_name(seed: u64, world: &GameWorld, kind: ItemKind) -> String {
+    appearance::display_name_for_kind(seed, world, kind)
 }
 
-pub fn buy(world: &mut GameWorld, kind: ItemKind) -> Result<Vec<GameEvent>, String> {
+pub fn buy(seed: u64, world: &mut GameWorld, kind: ItemKind) -> Result<Vec<GameEvent>, String> {
     if !is_on_shop(world) {
         return Err("must be standing in a shop to buy".to_string());
     }
@@ -117,7 +106,7 @@ pub fn buy(world: &mut GameWorld, kind: ItemKind) -> Result<Vec<GameEvent>, Stri
     }
     let data = crate::domain::item::try_item_data_from_registry(kind, world.content_registry())
         .map_err(|error| error.to_string())?;
-    let log_name = shop_item_log_name(world, kind, data.class);
+    let log_name = shop_item_log_name(seed, world, kind);
     if let Some((item_id, letter, next_qty)) = find_buy_stack(world, kind) {
         let player_id = world.player_id;
         let entities = &mut world.state_mut().entities;
@@ -171,7 +160,7 @@ pub fn buy(world: &mut GameWorld, kind: ItemKind) -> Result<Vec<GameEvent>, Stri
     ])
 }
 
-pub fn sell(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, String> {
+pub fn sell(seed: u64, world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, String> {
     if !is_on_shop(world) {
         return Err("must be standing in a shop to sell".to_string());
     }
@@ -185,6 +174,9 @@ pub fn sell(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
     if data.kind == ItemKind::AmuletAscension {
         return Err("cannot sell the Amulet of Ascension".to_string());
     }
+    if world.entities.get(item).and_then(|e| e.item_unpaid()) == Some(true) {
+        return Err("cannot sell unpaid shop merchandise".to_string());
+    }
     if let Some((non_empty, active, buc)) = world.entities.get(item).map(|entity| {
         (
             !entity.item_contained_items().unwrap_or_default().is_empty(),
@@ -197,7 +189,6 @@ pub fn sell(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
         }
         if data.kind == ItemKind::Blindfold && active {
             if buc == Some(BucStatus::Cursed) {
-                world.state_mut().entities.set_item_buc_known(item, true);
                 return Err("The blindfold is cursed and stuck to your face!".to_string());
             }
             world.state_mut().entities.set_item_tool_active(item, false);
@@ -207,7 +198,7 @@ pub fn sell(world: &mut GameWorld, item: EntityId) -> Result<Vec<GameEvent>, Str
         }
     }
     let price = sell_price_for_world(world, &data);
-    let log_name = shop_item_log_name(world, data.kind, data.class);
+    let log_name = shop_item_log_name(seed, world, data.kind);
     items::consume_one_from_inventory(world, item)?;
     world.state_mut().gold = world.gold.saturating_add(price);
     Ok(vec![GameEvent::Message {

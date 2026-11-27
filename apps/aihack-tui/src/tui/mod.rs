@@ -253,6 +253,9 @@ pub struct TuiApp {
     /// 턴이 진행될 때만 새 라벨을 수집한다.
     pub last_label_update_turn: u64,
     transition_gesture: TransitionGestureGate,
+    creation_role: Option<aihack_ai_contract::Role>,
+    creation_race: aihack_ai_contract::Race,
+    creation_alignment: aihack_ai_contract::Alignment,
 }
 
 impl TuiApp {
@@ -328,6 +331,9 @@ impl TuiApp {
             active_labels: Vec::new(),
             last_label_update_turn: 0,
             transition_gesture: TransitionGestureGate::default(),
+            creation_role: None,
+            creation_race: aihack_ai_contract::Race::Human,
+            creation_alignment: aihack_ai_contract::Alignment::Lawful,
         }
     }
 
@@ -682,6 +688,9 @@ impl TuiApp {
         self.debug_observation_visible = false;
         self.active_labels.clear();
         self.last_label_update_turn = 0;
+        self.creation_role = None;
+        self.creation_race = aihack_ai_contract::Race::Human;
+        self.creation_alignment = aihack_ai_contract::Alignment::Lawful;
         self.llm_status = if self.llm_enabled {
             LlmUiStatus::Ready
         } else {
@@ -881,7 +890,7 @@ impl TuiApp {
                     .enumerate()
                     .map(|(i, event)| play_menu::Entry {
                         key: char::from(b'0' + i as u8),
-                        label: format!("{event:?}"),
+                        label: render_panels::event_line(event),
                         candidate: UiCommandCandidate::CloseOverlay,
                     })
                     .collect();
@@ -990,6 +999,60 @@ impl TuiApp {
                     };
                 } else {
                     self.reset_transients();
+                }
+                Ok(false)
+            }
+            UiCommandCandidate::CreationCycleRole(forward) => {
+                use aihack_ai_contract::Role;
+                let len = Role::ALL.len();
+                let next = match self.creation_role {
+                    None => {
+                        if forward {
+                            Role::ALL[0]
+                        } else {
+                            Role::ALL[len - 1]
+                        }
+                    }
+                    Some(curr) => {
+                        let idx = Role::ALL.iter().position(|r| *r == curr).unwrap_or(0);
+                        let next_idx = if forward {
+                            (idx + 1) % len
+                        } else {
+                            (idx + len - 1) % len
+                        };
+                        Role::ALL[next_idx]
+                    }
+                };
+                self.creation_role = Some(next);
+                if !next.allowed_races().contains(&self.creation_race) {
+                    self.creation_race = next.default_race();
+                }
+                if !next.allowed_alignments().contains(&self.creation_alignment) {
+                    self.creation_alignment = next.default_alignment();
+                }
+                Ok(false)
+            }
+            UiCommandCandidate::CreationCycleRace => {
+                use aihack_ai_contract::{Race, Role};
+                let idx = Race::ALL
+                    .iter()
+                    .position(|r| *r == self.creation_race)
+                    .unwrap_or(0);
+                self.creation_race = Race::ALL[(idx + 1) % Race::ALL.len()];
+                if self.creation_role.is_none() {
+                    self.creation_role = Some(Role::Knight);
+                }
+                Ok(false)
+            }
+            UiCommandCandidate::CreationCycleAlignment => {
+                use aihack_ai_contract::{Alignment, Role};
+                let idx = Alignment::ALL
+                    .iter()
+                    .position(|a| *a == self.creation_alignment)
+                    .unwrap_or(0);
+                self.creation_alignment = Alignment::ALL[(idx + 1) % Alignment::ALL.len()];
+                if self.creation_role.is_none() {
+                    self.creation_role = Some(Role::Knight);
                 }
                 Ok(false)
             }
@@ -1454,7 +1517,7 @@ pub fn render_frame(frame: &mut ratatui::Frame, app: &mut TuiApp) {
     match app.run_state() {
         crate::core::session::RunState::Title => render_title_screen(frame, size, app.theme()),
         crate::core::session::RunState::CharacterCreation => {
-            render_character_creation_screen(frame, size, app.theme())
+            render_character_creation_screen(frame, size, app)
         }
         crate::core::session::RunState::Playing
         | crate::core::session::RunState::AwaitingDirection { .. }
@@ -1488,12 +1551,16 @@ fn render_title_screen(frame: &mut ratatui::Frame, size: Rect, theme: UiTheme) {
     );
 }
 
-fn render_character_creation_screen(frame: &mut ratatui::Frame, size: Rect, theme: UiTheme) {
+fn render_character_creation_screen(frame: &mut ratatui::Frame, size: Rect, app: &TuiApp) {
     frame.render_widget(
         render_panels::ThemedTextPanel {
             title: "Character Creation",
-            lines: render_panels::character_creation_lines(),
-            theme,
+            lines: render_panels::character_creation_lines_with_selection(
+                app.creation_role,
+                app.creation_race,
+                app.creation_alignment,
+            ),
+            theme: app.theme(),
         },
         size,
     );
@@ -1691,6 +1758,8 @@ fn render_game_over_screen(
         crate::domain::combat::DeathCause::Drowning => "Drowned in deep water".to_string(),
         crate::domain::combat::DeathCause::Lava => "Incinerated in molten lava".to_string(),
         crate::domain::combat::DeathCause::Explosion => "Killed by an explosion".to_string(),
+        crate::domain::combat::DeathCause::DivineWrath => "Smitten by divine wrath".to_string(),
+        crate::domain::combat::DeathCause::ArtifactBlast => "Blasted by an artifact".to_string(),
     };
     let observation = app.observation();
     let lines = render_panels::game_over_lines(
@@ -1728,16 +1797,13 @@ fn key_to_candidate_for_state(
             _ => None,
         },
         RunState::CharacterCreation => match ch {
-            '1' | '2' | '3' | '4' => Some(UiCommandCandidate::Command(
-                aihack_ai_contract::CommandIntent::StartCampaign {
-                    role: match ch {
-                        '1' => aihack_ai_contract::Role::Knight,
-                        '2' => aihack_ai_contract::Role::Scout,
-                        '3' => aihack_ai_contract::Role::Mage,
-                        _ => aihack_ai_contract::Role::Cleric,
-                    },
-                },
-            )),
+            c if input::creation_role_for_key(c).is_some() => {
+                input::creation_role_for_key(c).map(|role| {
+                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
+                        role,
+                    })
+                })
+            }
             '\n' | '\r' => Some(UiCommandCandidate::Command(
                 crate::core::action::CommandIntent::Wait,
             )),
@@ -1861,40 +1927,65 @@ fn modal_mouse_candidate(
                 ("Q - Quit", UiCommandCandidate::Quit),
             ],
         ),
-        RunState::CharacterCreation => (
-            render_panels::character_creation_lines(),
-            vec![
-                (
-                    "[1] Knight",
-                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
-                        role: aihack_ai_contract::Role::Knight,
-                    }),
+        RunState::CharacterCreation => {
+            use aihack_ai_contract::{CommandIntent, Role};
+            let role_candidate = |role: Role| {
+                if app.creation_role.is_some() {
+                    let race = if role.allowed_races().contains(&app.creation_race) {
+                        app.creation_race
+                    } else {
+                        role.default_race()
+                    };
+                    let alignment = if role.allowed_alignments().contains(&app.creation_alignment) {
+                        app.creation_alignment
+                    } else {
+                        role.default_alignment()
+                    };
+                    UiCommandCandidate::Command(CommandIntent::StartCampaignWithBuild {
+                        role,
+                        race,
+                        alignment,
+                    })
+                } else {
+                    UiCommandCandidate::Command(CommandIntent::StartCampaign { role })
+                }
+            };
+            let confirm_candidate = match app.creation_role {
+                Some(role) => UiCommandCandidate::Command(CommandIntent::StartCampaignWithBuild {
+                    role,
+                    race: app.creation_race,
+                    alignment: app.creation_alignment,
+                }),
+                None => UiCommandCandidate::Command(CommandIntent::Wait),
+            };
+            (
+                render_panels::character_creation_lines_with_selection(
+                    app.creation_role,
+                    app.creation_race,
+                    app.creation_alignment,
                 ),
-                (
-                    "[2] Scout",
-                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
-                        role: aihack_ai_contract::Role::Scout,
-                    }),
-                ),
-                (
-                    "[3] Mage",
-                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
-                        role: aihack_ai_contract::Role::Mage,
-                    }),
-                ),
-                (
-                    "[4] Cleric",
-                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::StartCampaign {
-                        role: aihack_ai_contract::Role::Cleric,
-                    }),
-                ),
-                (
-                    "Press Enter to confirm",
-                    UiCommandCandidate::Command(aihack_ai_contract::CommandIntent::Wait),
-                ),
-                ("Esc - Back to Title", UiCommandCandidate::BackToTitle),
-            ],
-        ),
+                vec![
+                    ("[1] Knight", role_candidate(Role::Knight)),
+                    ("[2] Scout", role_candidate(Role::Scout)),
+                    ("[3] Mage", role_candidate(Role::Mage)),
+                    ("[4] Cleric", role_candidate(Role::Cleric)),
+                    ("[5] Valkyrie", role_candidate(Role::Valkyrie)),
+                    ("[6] Wizard", role_candidate(Role::Wizard)),
+                    ("[7] Rogue", role_candidate(Role::Rogue)),
+                    ("[8] Priest", role_candidate(Role::Priest)),
+                    ("[9] Samurai", role_candidate(Role::Samurai)),
+                    ("[b] Barbarian", role_candidate(Role::Barbarian)),
+                    ("[g] Ranger", role_candidate(Role::Ranger)),
+                    ("[m] Monk", role_candidate(Role::Monk)),
+                    ("[k] Archeologist", role_candidate(Role::Archeologist)),
+                    ("[R] Race:", UiCommandCandidate::CreationCycleRace),
+                    ("[A] Align:", UiCommandCandidate::CreationCycleAlignment),
+                    ("[Tab] Next", UiCommandCandidate::CreationCycleRole(true)),
+                    ("Press Enter to confirm", confirm_candidate),
+                    ("Esc - Back to Title", UiCommandCandidate::BackToTitle),
+                ],
+            )
+        }
         RunState::GameOver {
             cause: _,
             final_score: _,
@@ -2067,6 +2158,55 @@ pub fn runtime_event_to_candidate(
                 | RunState::Victory { .. }
         ) {
             runtime_key_to_candidate(key.code, &state, &app.observation())
+        } else if state == RunState::CharacterCreation {
+            use aihack_ai_contract::CommandIntent;
+            match key.code {
+                KeyCode::Tab => Some(UiCommandCandidate::CreationCycleRole(true)),
+                KeyCode::BackTab => Some(UiCommandCandidate::CreationCycleRole(false)),
+                KeyCode::Char('r' | 'R') => Some(UiCommandCandidate::CreationCycleRace),
+                KeyCode::Char('a' | 'A') => Some(UiCommandCandidate::CreationCycleAlignment),
+                KeyCode::Enter if app.creation_role.is_some() => {
+                    let role = app.creation_role.expect("checked is_some");
+                    Some(UiCommandCandidate::Command(
+                        CommandIntent::StartCampaignWithBuild {
+                            role,
+                            race: app.creation_race,
+                            alignment: app.creation_alignment,
+                        },
+                    ))
+                }
+                KeyCode::Char(c) if input::creation_role_for_key(c).is_some() => {
+                    let role = input::creation_role_for_key(c).expect("checked is_some");
+                    if app.creation_role.is_some() {
+                        let race = if role.allowed_races().contains(&app.creation_race) {
+                            app.creation_race
+                        } else {
+                            role.default_race()
+                        };
+                        let alignment =
+                            if role.allowed_alignments().contains(&app.creation_alignment) {
+                                app.creation_alignment
+                            } else {
+                                role.default_alignment()
+                            };
+                        app.creation_role = Some(role);
+                        app.creation_race = race;
+                        app.creation_alignment = alignment;
+                        Some(UiCommandCandidate::Command(
+                            CommandIntent::StartCampaignWithBuild {
+                                role,
+                                race,
+                                alignment,
+                            },
+                        ))
+                    } else {
+                        Some(UiCommandCandidate::Command(CommandIntent::StartCampaign {
+                            role,
+                        }))
+                    }
+                }
+                key_code => runtime_key_to_candidate(key_code, &state, &app.observation()),
+            }
         } else {
             match key.code {
                 KeyCode::F(9) => Some(UiCommandCandidate::ToggleDebug),

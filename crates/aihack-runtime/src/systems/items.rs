@@ -33,35 +33,39 @@ pub fn pickup(world: &mut GameWorld) -> Result<GameEvent, String> {
         let Some(floor_entity) = world.entities.get(item) else {
             return Err("entity is not an item".to_string());
         };
-        if let Some((kind, _, _, _, _)) = floor_entity.item() {
-            if kind.is_stackable() {
-                let floor_buc = floor_entity.item_buc().unwrap_or(BucStatus::Uncursed);
-                let floor_enchant = floor_entity.item_enchantment().unwrap_or(0);
-                let floor_qty = floor_entity.item_quantity().unwrap_or(1);
-                let target = world.inventory.entries.iter().find_map(|entry| {
-                    let existing = world.entities.get(entry.item)?;
-                    let (existing_kind, _, _, _, _) = existing.item()?;
-                    let existing_qty = existing.item_quantity().unwrap_or(1);
-                    if existing_kind == kind
-                        && existing.item_buc().unwrap_or(BucStatus::Uncursed) == floor_buc
-                        && existing.item_enchantment().unwrap_or(0) == floor_enchant
-                        && existing_qty.saturating_add(floor_qty) <= MAX_ITEM_STACK
-                    {
-                        Some((entry.item, entry.letter, existing_qty + floor_qty))
-                    } else {
-                        None
-                    }
-                });
-                if let Some((existing_id, existing_letter, next_qty)) = target {
-                    let entities = &mut world.state_mut().entities;
-                    entities.set_item_quantity(existing_id, next_qty);
-                    entities.set_item_location(item, EntityLocation::Consumed);
-                    entities.set_item_quantity(item, 1);
-                    return Ok(GameEvent::ItemPickedUp {
-                        entity: player_id,
-                        item: existing_id,
-                        letter: existing_letter,
+        let is_unpaid = floor_entity.item_unpaid() == Some(true);
+        if !is_unpaid {
+            if let Some((kind, _, _, _, _)) = floor_entity.item() {
+                if kind.is_stackable() {
+                    let floor_buc = floor_entity.item_buc().unwrap_or(BucStatus::Uncursed);
+                    let floor_enchant = floor_entity.item_enchantment().unwrap_or(0);
+                    let floor_qty = floor_entity.item_quantity().unwrap_or(1);
+                    let target = world.inventory.entries.iter().find_map(|entry| {
+                        let existing = world.entities.get(entry.item)?;
+                        let (existing_kind, _, _, _, _) = existing.item()?;
+                        let existing_qty = existing.item_quantity().unwrap_or(1);
+                        if existing_kind == kind
+                            && existing.item_unpaid() != Some(true)
+                            && existing.item_buc().unwrap_or(BucStatus::Uncursed) == floor_buc
+                            && existing.item_enchantment().unwrap_or(0) == floor_enchant
+                            && existing_qty.saturating_add(floor_qty) <= MAX_ITEM_STACK
+                        {
+                            Some((entry.item, entry.letter, existing_qty + floor_qty))
+                        } else {
+                            None
+                        }
                     });
+                    if let Some((existing_id, existing_letter, next_qty)) = target {
+                        let entities = &mut world.state_mut().entities;
+                        entities.set_item_quantity(existing_id, next_qty);
+                        entities.set_item_location(item, EntityLocation::Consumed);
+                        entities.set_item_quantity(item, 1);
+                        return Ok(GameEvent::ItemPickedUp {
+                            entity: player_id,
+                            item: existing_id,
+                            letter: existing_letter,
+                        });
+                    }
                 }
             }
         }
@@ -76,6 +80,25 @@ pub fn pickup(world: &mut GameWorld) -> Result<GameEvent, String> {
         .entities
         .set_item_location(item, EntityLocation::Inventory { owner: player_id });
     world.state_mut().entities.set_item_letter(item, letter);
+    if world.campaign.is_some()
+        && world.entities.get(item).and_then(|e| e.item_unpaid()) == Some(true)
+        && crate::systems::npc::has_peaceful_shopkeeper_on_level(world)
+    {
+        let price = crate::systems::npc::unpaid_item_price(world, item);
+        let qty = u32::from(
+            world
+                .entities
+                .get(item)
+                .and_then(|e| e.item_quantity())
+                .unwrap_or(1),
+        );
+        let charge = price.saturating_mul(qty);
+        let next = world
+            .shop_debt
+            .saturating_add(charge)
+            .min(crate::systems::npc::MAX_SHOP_DEBT);
+        world.state_mut().shop_debt = next;
+    }
 
     Ok(GameEvent::ItemPickedUp {
         entity: world.player_id,
@@ -186,7 +209,6 @@ pub fn drop(world: &mut GameWorld, item: EntityId) -> Result<GameEvent, String> 
             && entity.item_tool_active() == Some(true)
         {
             if entity.item_buc() == Some(BucStatus::Cursed) {
-                world.state_mut().entities.set_item_buc_known(item, true);
                 return Err("The blindfold is cursed and stuck to your face!".to_string());
             }
             world.state_mut().entities.set_item_tool_active(item, false);
@@ -196,6 +218,23 @@ pub fn drop(world: &mut GameWorld, item: EntityId) -> Result<GameEvent, String> 
     remove_inventory_item(world, item)?;
     let level = world.current_level();
     let pos = world.player_pos();
+    let was_unpaid = world.entities.get(item).and_then(|e| e.item_unpaid()) == Some(true);
+    if world.campaign.is_some()
+        && was_unpaid
+        && crate::systems::npc::has_peaceful_shopkeeper_on_level(world)
+        && crate::systems::npc::is_in_shop_zone(world, pos)
+    {
+        let price = crate::systems::npc::unpaid_item_price(world, item);
+        let qty = u32::from(
+            world
+                .entities
+                .get(item)
+                .and_then(|e| e.item_quantity())
+                .unwrap_or(1),
+        );
+        let credit = price.saturating_mul(qty);
+        world.state_mut().shop_debt = world.shop_debt.saturating_sub(credit);
+    }
     world
         .state_mut()
         .entities
@@ -604,15 +643,12 @@ pub fn read(
         .entities
         .item_data(item)
         .ok_or_else(|| "entity is not an item".to_string())?;
+    if data.class != ItemClass::Scroll {
+        return Err("item is not a scroll".to_string());
+    }
     let Some(effect) = data.consumable_effect else {
         return Err("item is not a scroll".to_string());
     };
-    if matches!(
-        effect,
-        ConsumableEffect::Heal { .. } | ConsumableEffect::CureStatus
-    ) {
-        return Err("item is not a scroll".to_string());
-    }
     let scroll_buc = world
         .entities
         .get(item)

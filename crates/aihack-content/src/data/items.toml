@@ -171,7 +171,6 @@ color="bright_yellow"
 material="gold"
 stackable=false
 tags=["quest", "unique"]
-artifact_id="amulet_of_ascension"
 
 [[item]]
 id="item.weapon.short_sword"
@@ -799,3 +798,99 @@ stackable=true
 tags=["scroll", "blank"]
 spawn_depth_range=[1, 6]
 spawn_weight=12
+
+[[item]]
+id="item.weapon.long_sword"
+kind="weapon"
+glyph=")"
+weight=40
+slot="melee"
+hit_bonus=1
+damage="1d8"
+damage_small="1d8"
+damage_large="1d12"
+base_price=15
+name="long sword"
+color="gray"
+material="iron"
+stackable=false
+tags=["weapon", "blade"]
+spawn_depth_range=[1, 6]
+spawn_weight=14
+
+[[item]]
+id="item.weapon.katana"
+kind="weapon"
+glyph=")"
+weight=40
+slot="melee"
+hit_bonus=2
+damage="1d10"
+damage_small="1d10"
+damage_large="1d12"
+base_price=80
+name="katana"
+color="bright_cyan"
+material="iron"
+stackable=false
+tags=["weapon", "blade"]
+spawn_depth_range=[2, 6]
+spawn_weight=6
+
+[[item]]
+id="item.weapon.battle_axe"
+kind="weapon"
+glyph=")"
+weight=120
+slot="melee"
+hit_bonus=0
+damage="1d8"
+damage_small="1d8"
+damage_large="2d6"
+base_price=40
+name="battle-axe"
+color="gray"
+material="iron"
+stackable=false
+tags=["weapon", "axe"]
+spawn_depth_range=[2, 6]
+spawn_weight=8
+
+[[item]]
+id="item.weapon.quarterstaff"
+kind="weapon"
+glyph=")"
+weight=40
+slot="melee"
+hit_bonus=1
+damage="1d6"
+damage_small="1d6"
+damage_large="1d6"
+base_price=5
+name="quarterstaff"
+color="brown"
+material="wood"
+stackable=false
+tags=["weapon", "staff"]
+spawn_depth_range=[1, 6]
+spawn_weight=16
+
+[[item]]
+id="item.weapon.broad_sword"
+kind="weapon"
+glyph=")"
+weight=70
+slot="melee"
+hit_bonus=1
+damage="2d4"
+damage_small="2d4"
+damage_large="1d6"
+base_price=10
+name="broadsword"
+color="gray"
+material="iron"
+stackable=false
+tags=["weapon", "blade"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+

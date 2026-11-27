@@ -140,11 +140,27 @@ pub struct GameLevel {
     pub special_room: Option<SpecialRoomKind>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub engravings: Vec<Engraving>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub altar_alignments: Vec<(Pos, crate::campaign::Alignment)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub special_level_id: Option<String>,
 }
 
 impl GameLevel {
+    pub fn altar_alignment(&self, pos: Pos) -> Option<crate::campaign::Alignment> {
+        self.altar_alignments
+            .iter()
+            .find_map(|(at, alignment)| (*at == pos).then_some(*alignment))
+    }
+
+    pub fn set_altar_alignment(&mut self, pos: Pos, alignment: crate::campaign::Alignment) {
+        if let Some((_, existing)) = self.altar_alignments.iter_mut().find(|(at, _)| *at == pos) {
+            *existing = alignment;
+        } else {
+            self.altar_alignments.push((pos, alignment));
+        }
+    }
+
     pub fn is_lit(&self, pos: Pos) -> bool {
         if !self.map.contains(pos) {
             return false;
@@ -215,6 +231,7 @@ impl LevelRegistry {
                     lit_tiles: Vec::new(),
                     special_room: None,
                     engravings: Vec::new(),
+                    altar_alignments: Vec::new(),
                     special_level_id: None,
                 },
                 GameLevel {
@@ -224,6 +241,7 @@ impl LevelRegistry {
                     lit_tiles: Vec::new(),
                     special_room: None,
                     engravings: Vec::new(),
+                    altar_alignments: Vec::new(),
                     special_level_id: None,
                 },
             ],
@@ -242,6 +260,7 @@ impl LevelRegistry {
                     lit_tiles: Vec::new(),
                     special_room: None,
                     engravings: Vec::new(),
+                    altar_alignments: Vec::new(),
                     special_level_id: None,
                 })
             })

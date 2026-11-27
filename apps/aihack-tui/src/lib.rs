@@ -6,7 +6,7 @@ pub const ADAPTER_NAME: &str = "aihack";
 
 mod core {
     pub use aihack_ai_contract::{
-        ActionIntent, CommandIntent, Direction, EntityObservation, GameEvent, Observation, Pos,
+        CommandIntent, Direction, EntityObservation, GameEvent, Observation, Pos,
     };
     pub mod action {
         pub use aihack_ai_contract::{CommandIntent, DirectionalAction, InventoryAction};

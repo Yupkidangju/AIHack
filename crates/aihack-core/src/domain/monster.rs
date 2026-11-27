@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::combat::AttackProfile;
+use crate::domain::{combat::AttackProfile, status::Resistances};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MonsterAiKind {
@@ -17,6 +17,12 @@ pub enum MonsterPassive {
     Regenerate,
     FireOnMelee,
     FireBreath,
+    StealGold,
+    StealItem,
+    RustMetal,
+    SplitOnHit,
+    GazeParalyze,
+    SummonAllies,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -34,6 +40,23 @@ pub enum MonsterKind {
     Minotaur,
     Dragon,
     Bat,
+    Kitten,
+    Housecat,
+    LittleDog,
+    Dog,
+    Pony,
+    Warhorse,
+    Shopkeeper,
+    TemplePriest,
+    Oracle,
+    Watchman,
+    Leprechaun,
+    Nymph,
+    RustMonster,
+    BlackPudding,
+    Dwarf,
+    Medusa,
+    OrcCaptain,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +71,7 @@ pub struct MonsterTemplate {
     pub speed: i16,
     pub passive: Option<MonsterPassive>,
     pub difficulty: u16,
+    pub resistances: Resistances,
 }
 
 impl MonsterKind {
@@ -61,21 +85,91 @@ impl MonsterKind {
             | Self::GiantSpider
             | Self::Troll
             | Self::FireAnt
-            | Self::Minotaur => MonsterAiKind::ChaseVisiblePlayer,
-            Self::FloatingEye => MonsterAiKind::Stationary,
-            Self::GnollArcher | Self::Dragon => MonsterAiKind::RangedOnSight,
+            | Self::Minotaur
+            | Self::Kitten
+            | Self::Housecat
+            | Self::LittleDog
+            | Self::Dog
+            | Self::Pony
+            | Self::Warhorse
+            | Self::Shopkeeper
+            | Self::TemplePriest
+            | Self::Watchman
+            | Self::Leprechaun
+            | Self::Nymph
+            | Self::RustMonster
+            | Self::BlackPudding
+            | Self::Dwarf
+            | Self::OrcCaptain => MonsterAiKind::ChaseVisiblePlayer,
+            Self::FloatingEye | Self::Oracle => MonsterAiKind::Stationary,
+            Self::GnollArcher | Self::Dragon | Self::Medusa => MonsterAiKind::RangedOnSight,
         }
     }
     pub fn difficulty(self) -> u8 {
         match self {
             Self::Jackal => 1,
-            Self::Goblin | Self::Kobold | Self::Bat => 2,
-            Self::Orc | Self::GiantSpider => 3,
-            Self::GnollArcher => 4,
-            Self::FloatingEye | Self::Ogre | Self::FireAnt => 5,
-            Self::Troll => 6,
+            Self::Goblin | Self::Kobold | Self::Bat | Self::Kitten | Self::LittleDog => 2,
+            Self::Orc | Self::GiantSpider | Self::Pony => 3,
+            Self::GnollArcher | Self::Housecat | Self::Dog | Self::Leprechaun | Self::Dwarf => 4,
+            Self::FloatingEye
+            | Self::Ogre
+            | Self::FireAnt
+            | Self::Nymph
+            | Self::RustMonster
+            | Self::OrcCaptain => 5,
+            Self::Troll | Self::Warhorse | Self::Oracle | Self::Watchman | Self::BlackPudding => 6,
             Self::Minotaur => 7,
-            Self::Dragon => 8,
+            Self::Dragon | Self::TemplePriest | Self::Medusa => 8,
+            Self::Shopkeeper => 10,
+        }
+    }
+
+    pub const fn is_p11_only(self) -> bool {
+        matches!(
+            self,
+            Self::Kitten
+                | Self::Housecat
+                | Self::LittleDog
+                | Self::Dog
+                | Self::Pony
+                | Self::Warhorse
+                | Self::Shopkeeper
+                | Self::TemplePriest
+                | Self::Oracle
+                | Self::Watchman
+                | Self::Leprechaun
+                | Self::Nymph
+                | Self::RustMonster
+                | Self::BlackPudding
+                | Self::Dwarf
+                | Self::Medusa
+                | Self::OrcCaptain
+        )
+    }
+
+    pub const fn is_pet_capable(self) -> bool {
+        matches!(
+            self,
+            Self::Kitten
+                | Self::Housecat
+                | Self::LittleDog
+                | Self::Dog
+                | Self::Pony
+                | Self::Warhorse
+                | Self::Jackal
+        )
+    }
+
+    pub const fn is_herbivore_pet(self) -> bool {
+        matches!(self, Self::Pony | Self::Warhorse)
+    }
+
+    pub const fn evolved_form(self) -> Option<Self> {
+        match self {
+            Self::Kitten => Some(Self::Housecat),
+            Self::LittleDog => Some(Self::Dog),
+            Self::Pony => Some(Self::Warhorse),
+            _ => None,
         }
     }
 }

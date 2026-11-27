@@ -69,7 +69,14 @@ fn find_pursuit_spawn_pos(world: &GameWorld, level: LevelId) -> Option<Pos> {
             let Ok(tile) = map.tile(pos) else {
                 continue;
             };
-            if !tile.is_movement_passable() || world.entities.alive_actor_at(level, pos).is_some() {
+            if !tile.is_movement_passable()
+                || matches!(
+                    tile,
+                    aihack_core::domain::tile::TileKind::Water
+                        | aihack_core::domain::tile::TileKind::Lava
+                )
+                || world.entities.alive_actor_at(level, pos).is_some()
+            {
                 continue;
             }
             let too_close = pos.chebyshev_distance(player_pos) < 2;

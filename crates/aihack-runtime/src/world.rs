@@ -251,6 +251,9 @@ impl GameWorld {
 
     pub fn effective_player_resistances(&self) -> aihack_core::domain::status::Resistances {
         let mut total = self.intrinsic_resistances;
+        if let Some(campaign) = self.campaign {
+            total.insert(campaign.race.intrinsic_resistances());
+        }
         if let Some(stats) = self.entities.actor_stats(self.player_id) {
             total.insert(stats.resistances);
         }
@@ -264,6 +267,9 @@ impl GameWorld {
                 }
             }
         }
+        total.insert(crate::systems::artifacts::inventory_artifact_resistances(
+            self,
+        ));
         total
     }
 

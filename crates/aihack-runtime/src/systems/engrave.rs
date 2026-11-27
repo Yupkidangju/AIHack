@@ -31,12 +31,17 @@ pub fn engrave(
         return Err("you cannot engrave on water or lava".to_string());
     }
 
-    let kind = match method {
-        EngravingMethod::Fingers => EngravingKind::Dust,
-        EngravingMethod::Item(id) => {
-            if !world.inventory.contains(id) {
-                return Err("engraving tool is not in player inventory".to_string());
-            }
+    let level_id = world.current_level();
+    let charge_cost_for = {
+        let level = world
+            .levels
+            .get(level_id)
+            .ok_or_else(|| "current level missing".to_string())?;
+        let existing = level.engravings.iter().any(|e| e.pos == pos);
+        if !existing && level.engravings.len() >= MAX_ENGRAVINGS_PER_LEVEL {
+            return Err("too many engravings on this level".to_string());
+        }
+        if let EngravingMethod::Item(id) = method {
             let entity = world
                 .entities
                 .get(id)
@@ -49,10 +54,35 @@ pub fn engrave(
                 if current_charges == 0 {
                     return Err("the wand of fire has no charges left".to_string());
                 }
-                world
-                    .state_mut()
-                    .entities
-                    .set_item_charges(id, Some(current_charges - 1));
+                Some((id, current_charges - 1))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    let kind = match method {
+        EngravingMethod::Fingers => EngravingKind::Dust,
+        EngravingMethod::Item(id) => {
+            if !world.inventory.contains(id) {
+                return Err("engraving tool is not in player inventory".to_string());
+            }
+            let entity = world
+                .entities
+                .get(id)
+                .ok_or_else(|| "entity is not an item".to_string())?;
+            let (_, data, _, _, _) = entity
+                .item()
+                .ok_or_else(|| "entity is not an item".to_string())?;
+            if data.wand_effect == Some(WandEffect::Fire) {
+                if let Some((wand_id, next_charges)) = charge_cost_for {
+                    world
+                        .state_mut()
+                        .entities
+                        .set_item_charges(wand_id, Some(next_charges));
+                }
                 EngravingKind::Burned
             } else if data.class == ItemClass::Weapon || data.tool_action == Some(ToolAction::Dig) {
                 EngravingKind::Engraved
@@ -72,7 +102,6 @@ pub fn engrave(
         text.as_str().to_string()
     };
 
-    let level_id = world.current_level();
     {
         let level = world
             .state_mut()
@@ -83,9 +112,6 @@ pub fn engrave(
             existing.text = final_text.clone();
             existing.kind = kind;
         } else {
-            if level.engravings.len() >= MAX_ENGRAVINGS_PER_LEVEL {
-                return Err("too many engravings on this level".to_string());
-            }
             level.engravings.push(Engraving {
                 pos,
                 text: final_text.clone(),

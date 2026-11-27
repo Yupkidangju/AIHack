@@ -39,6 +39,7 @@ pub fn collect_death_events_if_hp_depleted(
 
     let location = world.entities.actor_location(entity);
     let kind = world.entities.get(entity).map(|entity| entity.kind());
+    let faction = world.entities.get(entity).and_then(|e| e.faction());
     let corpse_jackal_data = world.corpse_jackal_data();
     let difficulty = world
         .entities
@@ -59,6 +60,13 @@ pub fn collect_death_events_if_hp_depleted(
                     .map_err(|error| error.to_string())?;
             }
         } else {
+            let dropped = world.state_mut().entities.clear_monster_inventory(entity);
+            for item_id in dropped {
+                world
+                    .state_mut()
+                    .entities
+                    .set_item_location(item_id, EntityLocation::OnMap { level, pos });
+            }
             let spec = aihack_content::monster_corpse_spec(monster_kind, world.content_registry());
             let roll = deterministic_corpse_roll(entity, level, pos);
             if roll < spec.chance {
@@ -83,9 +91,14 @@ pub fn collect_death_events_if_hp_depleted(
         }
     }
     world.state_mut().entities.set_alive(entity, false);
+    if world.campaign.is_some() && kind == Some(EntityKind::Monster(MonsterKind::Shopkeeper)) {
+        if let Some((level, _)) = location {
+            crate::systems::npc::on_shopkeeper_died(world, level);
+        }
+    }
     if entity == world.player_id {
         world.state_mut().last_death_cause = Some(cause);
-    } else {
+    } else if faction != Some(aihack_core::domain::entity::Faction::Pet) {
         let gold_gain = if world.campaign.is_some() {
             u32::from(difficulty).saturating_mul(25)
         } else {

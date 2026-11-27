@@ -68,6 +68,11 @@ pub enum CommandIntent {
     StartCampaign {
         role: crate::campaign::Role,
     },
+    StartCampaignWithBuild {
+        role: crate::campaign::Role,
+        race: crate::campaign::Race,
+        alignment: crate::campaign::Alignment,
+    },
     EnterBranch,
     Wait,
     Quit,
@@ -150,6 +155,14 @@ pub enum CommandIntent {
         text: EngravingText,
     },
     Drink,
+    Invoke {
+        item: EntityId,
+    },
+    Enhance {
+        skill: crate::campaign::SkillCategory,
+    },
+    Chat(Direction),
+    Pay,
     Descend,
     Ascend,
     AcknowledgeMore,

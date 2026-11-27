@@ -16,6 +16,21 @@ Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c0
 
 ## 1. 문서 운영 규칙
 
+### Stage 4 (P10) 감사 보고서 35 시정 기준 (`P10-Audit-Fix`, 2026-11-27)
+
+`docs/audit/audit_report_35.md` 및 `ADR-P10-02`에 따라 Stage 4.5 시정 계약을 적용한다. 세부 계약은 `docs/campaign_spec.md` `## Stage 4.5 (P10-Audit-Fix)`, 의사결정은 `DESIGN_DECISIONS.md` `ADR-P10-02`, 실행 계획은 `tasks/plan.md`를 따른다:
+- **트랜잭션 & ActionSpace (`CRIT-01`~`03`)**: `!outcome.accepted` 시 전수 롤백(선검증 후변이), `playing_actions` 공간/생존 명령 우선순위 배치 + TUI `legal_actions` 전환(LLM 64개 상한 분리 유지), `TileKind::is_movement_passable()` 기반 근접 공격과 `Water`/`Lava` 추격 스폰 제외.
+- **미식별 은닉 · `60x24` 생성 UI · 종족/행운/무결성 (`MAJ-01`~`06`)**: 미식별 외형 기반 색상(`color_for_appearance`), 컨테이너/Dip/상점 로그 은닉, `LlmObservationView` 미식별 `kind` 마스킹, Headless `SurvivalV1` 미식별 약물/반지 사용 억제(레거시 유지); `60x24` 비클리핑 13역할 UI·키 충돌 해소·동적 스탯; 유니콘 뿔 종족 보정, 행운 상한 `MAX_LUCK(13)` 통일, `monster_resistances`/`con_regen_reduction`/`spawn_weight` 연결 및 `P12` `build.rs`+데이터 디스패치 ADR 확정; `SaveV3` P10 필드 검증·치명 `Hole` 즉시 사망·대기 에너지 클램프·물/용암 정지/추락 피해.
+- **이월 및 소결함 (`MIN-01`~`07`, `GAP-01`)**: `PutOn` 아뮬렛 포함, TUI 색상·`Apply`/아이템 `'V'` 메뉴, `Stormbringer` 시야선 및 상자 아티팩트 반발, 투척 보너스, `FloatingEye` 난이도 `5` 통일, Mines 1/2 스폰 좌표 분리, 8층 깊이(`P11`/`P13` 확장)·`MAX_XP=180`(`P12` 확장)·`SaveV2` 비호환 유지.
+
+### Stage 4 (P10) 성향·종족·신앙·고유 아티팩트·13역할·숙련도(#enhance) (2026-11-27)
+
+`docs/CODER_HANDOFF_P7_TO_P13.md`의 Stage 4(`P10`, `ADR-P10-01`)에 따라 아래 시스템을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## Stage 4 (P10)`, 의사결정은 `ADR-P10-01`, 실행 계획은 `tasks/plan.md`를 따른다:
+- **3 성향 · 5 종족 · 13 역할**: `Alignment`(`Lawful`/`Neutral`/`Chaotic`), `Race`(`Human`/`Elf`/`Dwarf`/`Gnome`/`Orc` 능력치·HP/MP·내재 저항·암시), 13종 `Role`(`Knight`, `Scout`, `Mage`, `Cleric`, `Valkyrie`, `Wizard`, `Rogue`, `Priest`, `Samurai`, `Barbarian`, `Ranger`, `Monk`, `Archeologist`) 및 `role × race × alignment` 조합 검증을 구현한다.
+- **신앙·제단 심화**: 제단별 성향(`GameLevel::altar_alignments`, `Main 3` 동정렬 / `Mines 2` 비정렬), `god_anger`/`prayer_timeout`, 비정렬 기도 신벌(`DeathCause::DivineWrath`), 비정렬 `#offer` 개종, 동정렬 헌납 분노 해소 및 아티팩트 하사, 비정렬 `#dip` 저주를 구현한다.
+- **무기 5종 · 고유 아티팩트 6종 · `#invoke`**: `LongSword`, `Katana`, `BattleAxe`, `Quarterstaff`, `BroadSword` 추가 및 6종 고유 아티팩트(`excalibur`, `sunsword`, `magicbane`, `cleaver`, `stormbringer`, `sting`), 전역 1회 생성, `Lawful` 레벨 5+ 분수 `#dip` `Excalibur` 획득, 비정렬 아티팩트 반발(`DeathCause::ArtifactBlast`), `erosion_proof`, `CommandIntent::Invoke { item }` (`'V'`, 25턴 쿨다운)을 구현한다.
+- **숙련도 & `#enhance`**: 8종 `SkillCategory` × 6단계 `SkillRank`(`0..=5`), 전투/시전 숙련도(`skill_practice`) 누적, 명중/피해/주문 스케일링, `CommandIntent::Enhance { skill }` (`'X'`) 및 TUI·Headless·LLM·SaveV3 통합 검증을 완성한다(레거시 V1/R9 해시 및 `LlmObservationView < 32 KiB`/`ActionSpace <= 64` 보존).
+
 ### Stage 3 (P9) 도구·컨테이너·#dip/#engrave·지형/함정 생태계 (2026-11-27)
 
 `docs/CODER_HANDOFF_P7_TO_P13.md`의 Stage 3(`P9`, `ADR-P9-01`)에 따라 아래 시스템을 확장한다. 세부 계약은 [campaign_spec.md](docs/campaign_spec.md) `## Stage 3 (P9)`, 의사결정은 `ADR-P9-01`, 실행 계획은 `tasks/plan.md`를 따른다:
@@ -899,3 +914,9 @@ release `output/` directory 전체가 게시 bundle이다. build는 workspace �
 ### 19.5 구현 순서
 
 R9-1은 semantic delta/witness 테스트 기반, R9-2는 음식·영양·시체, R9-3은 content behavior projection, R9-4는 경제·점수, R9-5는 상태 orphan 폐쇄, R9-6은 3 seed 장기 회귀와 전체 감사다. 각 단계는 RED 테스트를 먼저 만들고 해당 단계의 workspace build/test가 통과한 뒤 다음 단계로 진행한다.
+
+## 20. 캠페인 확장 기준 (`Stage 1` ~ `Stage 5 / P11`)
+
+- 캠페인 모드(`campaign.is_some()`, `SAVE_SCHEMA_VERSION_V3 = 3`)의 세부 계약은 `docs/campaign_spec.md`와 `DESIGN_DECISIONS.md` (`ADR-P7-01` ~ `ADR-P11-01`)을 따른다.
+- `Stage 5 (P11, ADR-P11-01)`은 캠페인 전용 반려동물(펫) 동반·길들이기·성장·진화·저주 회피·상점 절도·층간 동반, 실제 NPC(`Shopkeeper`, `TemplePriest`, `Oracle`, `Watchman`)·바닥 진열 상품·`shop_debt` 채무 정산(`Chat`/`Pay`)·도둑질 적대화, 고급 몬스터 AI(문 열기·아이템 줍기/장착/사용/사망 드롭·금화/아이템 훔치기+텔레포트·금속 부식·분열·소환·실명 방어 시선 공격·파벌전)를 추가한다.
+- 레거시 2층 모드(`campaign.is_none()`, `SAVE_SCHEMA_VERSION_V1 = 1`), `CommandIntent: Copy`, `LlmObservationView < 32,768B`, `ActionSpace <= 64`, `tests/long_run.rs` R9 causal 해시 불변조건은 모든 캠페인 확장에서도 유지한다.

@@ -181,9 +181,42 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
                 (false, false) => String::new(),
             }
         };
+        let ready_skills = campaign.skills.iter().filter(|s| s.ready).count();
+        let align_code = campaign.alignment.map(|a| a.short_label()).unwrap_or("?");
+        let race_name = campaign.race.map(|r| r.as_str()).unwrap_or("Human");
+        let anger_badge = if campaign.god_anger > 0 {
+            format!(" ANG:{}", campaign.god_anger)
+        } else {
+            String::new()
+        };
+        let invoke_badge = if campaign.artifact_invoke_cooldown > 0 {
+            format!(" INV:{}", campaign.artifact_invoke_cooldown)
+        } else {
+            String::new()
+        };
+        let enhance_badge = if ready_skills > 0 {
+            format!(" ENH:{ready_skills}")
+        } else {
+            String::new()
+        };
+        let debt_badge = if observation.player.shop_debt > 0 {
+            format!(" DEBT:{}", observation.player.shop_debt)
+        } else {
+            String::new()
+        };
         lines.push(format!(
-            "{:?} L{} X{} G{}{}",
-            campaign.role, campaign.level, campaign.xp, observation.player.gold, res
+            "[{}] {} {} L{} X{} G{}{}{}{}{}{}",
+            align_code,
+            race_name,
+            campaign.role.display_name(),
+            campaign.level,
+            campaign.xp,
+            observation.player.gold,
+            res,
+            anger_badge,
+            invoke_badge,
+            enhance_badge,
+            debt_badge
         ));
         if let Some(attrs) = campaign.attributes {
             lines.push(format!(
@@ -350,6 +383,9 @@ fn hovered_inspect_lines(observation: &Observation, pos: Pos) -> Vec<String> {
         format!("tile {}", tile),
         entity,
     ];
+    if let Some(align) = tile_obs.and_then(|t| t.altar_alignment) {
+        lines.push(format!("altar alignment: {}", align.as_str()));
+    }
     if let Some(engraving) = tile_obs.and_then(|t| t.engraving.as_deref()) {
         lines.push(format!("engraving \"{engraving}\""));
     } else {
@@ -402,33 +438,72 @@ fn recent_priority_messages(observation: &Observation) -> Vec<String> {
     lines
 }
 
-fn event_line(event: &GameEvent) -> String {
+pub(super) fn event_line(event: &GameEvent) -> String {
+    use aihack_ai_contract::MessagePriority;
     match event {
+        GameEvent::TurnStarted { turn } => format!(". turn {turn}"),
+        GameEvent::Waited { turn } => format!(". wait (turn {turn})"),
+        GameEvent::EntityMoved { to, .. } => format!("> moved ({},{})", to.x, to.y),
+        GameEvent::LevelChanged { to, .. } => format!("> level {:?}:{}", to.branch, to.depth),
+        GameEvent::DoorChanged { to, .. } => format!("> door {to:?}"),
+        GameEvent::TileRevealed { pos, tile } => {
+            format!("? revealed {tile:?} ({},{})", pos.x, pos.y)
+        }
+        GameEvent::ItemPickedUp { letter, .. } => format!("+ pickup {}", letter.0),
+        GameEvent::ItemDropped { pos, .. } => format!("- drop ({},{})", pos.x, pos.y),
+        GameEvent::ItemEquipped { slot, .. } => format!("= equip {slot:?}"),
+        GameEvent::ItemConsumed { .. } => "- consumed item".to_string(),
+        GameEvent::EntityHealed {
+            amount, hp_after, ..
+        } => format!("+ healed {amount} (hp {hp_after})"),
+        GameEvent::TrapTriggered { damage, .. } => format!("! trap {damage}"),
+        GameEvent::ItemThrown { to, .. } => format!("/ threw ({},{})", to.x, to.y),
+        GameEvent::WandZapped {
+            direction,
+            charges_after,
+            ..
+        } => format!("/ zap {direction:?} ({charges_after})"),
+        GameEvent::ScrollRead { .. } => "* read scroll".to_string(),
+        GameEvent::ItemIdentified { .. } => "* identified item".to_string(),
+        GameEvent::DoorKicked { pos } => format!("! kick ({},{})", pos.x, pos.y),
+        GameEvent::PassiveAttackTriggered { .. } => "! passive strike".to_string(),
+        GameEvent::PrayerOffered { cooldown_after, .. } => {
+            format!("* prayed (cd {cooldown_after})")
+        }
+        GameEvent::SpellCast {
+            spell, mp_after, ..
+        } => format!("* cast {spell:?} (mp {mp_after})"),
         GameEvent::AttackResolved {
             hit: true, damage, ..
         } => format!("! hit for {damage}"),
         GameEvent::AttackResolved { hit: false, .. } => "~ miss".to_string(),
-        GameEvent::ItemPickedUp { letter, .. } => format!("+ pickup {}", letter.0),
-        GameEvent::DoorChanged { to, .. } => format!("> door {to:?}"),
+        GameEvent::EntityDied { cause, .. } => format!("! died ({cause:?})"),
         GameEvent::CommandRejected { reason } => format!("x {reason}"),
-        GameEvent::TrapTriggered { damage, .. } => format!("! trap {damage}"),
-        GameEvent::SpellCast {
-            spell, mp_after, ..
-        } => format!("* cast {spell:?} (mp {mp_after})"),
-        _ => format!("{event:?}"),
+        GameEvent::Message { priority, text } => match priority {
+            MessagePriority::Danger | MessagePriority::Warning => format!("! {text}"),
+            MessagePriority::Info | MessagePriority::Low => text.clone(),
+        },
     }
 }
 
 fn entity_line(entity: &EntityObservation) -> String {
+    let unpaid_suffix = if entity.unpaid { " (unpaid)" } else { "" };
     if let Some(appearance) = &entity.appearance {
-        return format!("entity {appearance}");
+        return format!("entity {appearance}{unpaid_suffix}");
     }
     let label = entity
         .name
         .clone()
         .unwrap_or_else(|| entity_kind_label(entity.kind));
+    let faction_tag = match entity.faction {
+        Some(aihack_ai_contract::Faction::Pet) => " [pet]",
+        Some(aihack_ai_contract::Faction::Peaceful) => " [peaceful]",
+        Some(aihack_ai_contract::Faction::Shopkeeper) => " [shopkeeper]",
+        Some(aihack_ai_contract::Faction::Hostile) => " [hostile]",
+        _ => "",
+    };
     let hp = entity.hp.map(|hp| format!(" hp {hp}")).unwrap_or_default();
-    format!("entity {label}{hp}")
+    format!("entity {label}{faction_tag}{hp}{unpaid_suffix}")
 }
 
 fn entity_kind_label(kind: EntityKind) -> String {
@@ -491,48 +566,105 @@ pub fn title_lines() -> Vec<String> {
 
 /// Character Creation 화면 텍스트 라인 생성
 pub fn character_creation_lines() -> Vec<String> {
-    let k = aihack_ai_contract::Role::Knight.base_attributes();
-    let s = aihack_ai_contract::Role::Scout.base_attributes();
-    let m = aihack_ai_contract::Role::Mage.base_attributes();
-    let c = aihack_ai_contract::Role::Cleric.base_attributes();
+    use aihack_ai_contract::Role;
+    character_creation_lines_with_selection(
+        None,
+        Role::Knight.default_race(),
+        Role::Knight.default_alignment(),
+    )
+}
+
+pub fn character_creation_lines_with_selection(
+    selected_role: Option<aihack_ai_contract::Role>,
+    race: aihack_ai_contract::Race,
+    alignment: aihack_ai_contract::Alignment,
+) -> Vec<String> {
+    use aihack_ai_contract::Role;
+    let k = Role::Knight.base_attributes();
+    let s = Role::Scout.base_attributes();
+    let m = Role::Mage.base_attributes();
+    let c = Role::Cleric.base_attributes();
+    let (class_line, combo_status, hp_line, ac_line, detail_line) = match selected_role {
+        None => (
+            "  Class: Adventurer (Enter = legacy 2-floor run)".to_string(),
+            "  Pick role: [1]-[9],[b],[g],[m],[k] or [Tab]".to_string(),
+            "  HP: 16/16".to_string(),
+            "  AC: 10".to_string(),
+            "  Campaign: Main 6 + Mines 2; Main 3 up: B->Mines".to_string(),
+        ),
+        Some(role) => {
+            let attrs = role.base_attributes().with_race_deltas(race);
+            let hp = (role.base_hp() + race.starting_hp_bonus()).max(1);
+            let mp = (role.base_mp() + race.starting_mp_bonus()).max(0);
+            let tag = if role.is_valid_combo(race, alignment) {
+                "Valid"
+            } else {
+                "INVALID"
+            };
+            (
+                format!(
+                    "  Class: {} {} {}",
+                    alignment.as_str(),
+                    race.as_str(),
+                    role.display_name()
+                ),
+                format!(
+                    "  Selected: {} {} {} ({tag})",
+                    alignment.as_str(),
+                    race.as_str(),
+                    role.display_name()
+                ),
+                format!("  HP: {hp}/{hp}   MP: {mp}/{mp}"),
+                "  AC: 10".to_string(),
+                format!(
+                    "  St:{} Dx:{} Co:{} In:{} Wi:{} Ch:{}",
+                    attrs.str_, attrs.dex, attrs.con, attrs.int, attrs.wis, attrs.cha
+                ),
+            )
+        }
+    };
     vec![
-        "".to_string(),
-        "".to_string(),
-        "         Character Creation".to_string(),
-        "".to_string(),
-        "         Class: Adventurer".to_string(),
+        "  Character Creation".to_string(),
+        class_line,
         format!(
-            "         [1] Knight - HP{}, melee (St{} Co{})",
-            aihack_ai_contract::Role::Knight.base_hp(),
+            "  [1] Knight - HP{}, melee (St{} Co{})",
+            Role::Knight.base_hp(),
             k.str_,
             k.con
         ),
         format!(
-            "         [2] Scout - HP{}, accuracy (Dx{} St{})",
-            aihack_ai_contract::Role::Scout.base_hp(),
+            "  [2] Scout - HP{}, accuracy (Dx{} St{})",
+            Role::Scout.base_hp(),
             s.dex,
             s.str_
         ),
         format!(
-            "         [3] Mage - HP{}, wands (In{} Wi{})",
-            aihack_ai_contract::Role::Mage.base_hp(),
+            "  [3] Mage - HP{}, wands (In{} Wi{})",
+            Role::Mage.base_hp(),
             m.int,
             m.wis
         ),
         format!(
-            "         [4] Cleric - HP{}, mace/heal (Wi{} Co{})",
-            aihack_ai_contract::Role::Cleric.base_hp(),
+            "  [4] Cleric - HP{}, mace/heal (Wi{} Co{})",
+            Role::Cleric.base_hp(),
             c.wis,
             c.con
         ),
-        "         Campaign: Main 6 + Mines 2; return the Amulet".to_string(),
-        "         Main 3 up stairs: B enters the Mines".to_string(),
-        "         Enter: legacy two-floor Adventurer".to_string(),
-        "         HP: 16/16".to_string(),
-        "         AC: 10".to_string(),
-        "".to_string(),
-        "         Press Enter to confirm".to_string(),
-        "         Esc - Back to Title".to_string(),
+        "  [5] Valkyrie     [6] Wizard      [7] Rogue".to_string(),
+        "  [8] Priest       [9] Samurai     [b] Barbarian".to_string(),
+        "  [g] Ranger       [m] Monk        [k] Archeologist".to_string(),
+        String::new(),
+        format!(
+            "  [R] Race: {:<5}  [A] Align: {:<7} [Tab] Next",
+            race.as_str(),
+            alignment.as_str()
+        ),
+        combo_status,
+        hp_line,
+        ac_line,
+        detail_line,
+        String::new(),
+        "  Press Enter to confirm   Esc - Back to Title".to_string(),
     ]
 }
 

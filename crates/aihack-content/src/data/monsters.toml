@@ -32,7 +32,7 @@ color="gray"
 base_level=1
 corpse_chance=60
 corpse_nutrition=60
-ai_flags=["humanoid"]
+ai_flags=["humanoid", "opens_doors", "picks_up", "uses_items"]
 spawn_depth_range=[1, 4]
 spawn_weight=30
 
@@ -46,7 +46,7 @@ damage="0"
 ai="stationary"
 passive="paralyze_on_melee"
 speed=0
-difficulty=3
+difficulty=5
 name="floating eye"
 color="bright_blue"
 base_level=2
@@ -73,7 +73,7 @@ base_level=1
 corpse_chance=65
 corpse_nutrition=55
 corpse_effects=["poisonous", "grant_poison_resistance"]
-ai_flags=["humanoid", "infravision"]
+ai_flags=["humanoid", "infravision", "opens_doors", "picks_up", "uses_items"]
 spawn_depth_range=[1, 4]
 spawn_weight=28
 
@@ -92,7 +92,7 @@ color="green"
 base_level=2
 corpse_chance=65
 corpse_nutrition=80
-ai_flags=["humanoid", "greedy"]
+ai_flags=["humanoid", "greedy", "opens_doors", "picks_up", "uses_items", "orc", "hates_dwarves"]
 spawn_depth_range=[2, 6]
 spawn_weight=24
 
@@ -111,7 +111,7 @@ color="brown"
 base_level=4
 corpse_chance=70
 corpse_nutrition=140
-ai_flags=["giant"]
+ai_flags=["giant", "opens_doors", "picks_up"]
 spawn_depth_range=[4, 6]
 spawn_weight=16
 
@@ -152,7 +152,7 @@ color="yellow"
 base_level=3
 corpse_chance=65
 corpse_nutrition=85
-ai_flags=["humanoid", "ranged"]
+ai_flags=["humanoid", "ranged", "opens_doors", "picks_up", "uses_items"]
 spawn_depth_range=[3, 6]
 spawn_weight=18
 
@@ -258,3 +258,325 @@ corpse_nutrition=40
 ai_flags=["animal", "fast", "erratic"]
 spawn_depth_range=[1, 6]
 spawn_weight=28
+
+[[monster]]
+id="monster.kitten"
+glyph="f"
+hp=5
+ac=6
+hit_bonus=2
+damage="1d3"
+ai="chase_on_sight"
+speed=18
+difficulty=2
+name="kitten"
+color="white"
+base_level=2
+corpse_chance=60
+corpse_nutrition=50
+ai_flags=["animal", "pet_capable", "domestic"]
+spawn_weight=0
+
+[[monster]]
+id="monster.housecat"
+glyph="f"
+hp=12
+ac=5
+hit_bonus=3
+damage="1d6"
+ai="chase_on_sight"
+speed=18
+difficulty=4
+name="housecat"
+color="bright_yellow"
+base_level=4
+corpse_chance=70
+corpse_nutrition=90
+ai_flags=["animal", "pet_capable", "domestic"]
+spawn_weight=0
+
+[[monster]]
+id="monster.little_dog"
+glyph="d"
+hp=6
+ac=6
+hit_bonus=2
+damage="1d4"
+ai="chase_on_sight"
+speed=18
+difficulty=2
+name="little dog"
+color="brown"
+base_level=2
+corpse_chance=65
+corpse_nutrition=60
+ai_flags=["animal", "pet_capable", "domestic"]
+spawn_weight=0
+
+[[monster]]
+id="monster.dog"
+glyph="d"
+hp=14
+ac=5
+hit_bonus=3
+damage="1d6"
+ai="chase_on_sight"
+speed=16
+difficulty=4
+name="dog"
+color="yellow"
+base_level=4
+corpse_chance=75
+corpse_nutrition=110
+ai_flags=["animal", "pet_capable", "domestic"]
+spawn_weight=0
+
+[[monster]]
+id="monster.pony"
+glyph="u"
+hp=16
+ac=6
+hit_bonus=2
+damage="1d6"
+ai="chase_on_sight"
+speed=16
+difficulty=3
+name="pony"
+color="brown"
+base_level=3
+corpse_chance=75
+corpse_nutrition=150
+ai_flags=["animal", "pet_capable", "herbivore"]
+spawn_weight=0
+
+[[monster]]
+id="monster.warhorse"
+glyph="u"
+hp=28
+ac=4
+hit_bonus=4
+damage="1d10"
+ai="chase_on_sight"
+speed=18
+difficulty=6
+name="warhorse"
+color="bright_yellow"
+base_level=7
+corpse_chance=80
+corpse_nutrition=220
+ai_flags=["animal", "pet_capable", "herbivore"]
+spawn_weight=0
+
+[[monster]]
+id="monster.shopkeeper"
+glyph="@"
+hp=40
+ac=0
+hit_bonus=6
+damage="2d6"
+ai="chase_on_sight"
+speed=18
+difficulty=10
+name="shopkeeper"
+color="white"
+base_level=12
+corpse_chance=40
+corpse_nutrition=120
+ai_flags=["humanoid", "opens_doors", "shopkeeper", "peaceful_default"]
+spawn_weight=0
+
+[[monster]]
+id="monster.temple_priest"
+glyph="@"
+hp=32
+ac=2
+hit_bonus=5
+damage="1d8"
+ai="chase_on_sight"
+speed=12
+difficulty=8
+name="temple priest"
+color="bright_cyan"
+base_level=10
+corpse_chance=40
+corpse_nutrition=120
+ai_flags=["humanoid", "opens_doors", "priest", "peaceful_default"]
+spawn_weight=0
+
+[[monster]]
+id="monster.oracle"
+glyph="@"
+hp=24
+ac=4
+hit_bonus=3
+damage="1d4"
+ai="stationary"
+speed=0
+difficulty=6
+name="oracle"
+color="bright_magenta"
+base_level=8
+corpse_chance=30
+corpse_nutrition=100
+ai_flags=["humanoid", "oracle", "peaceful_default"]
+spawn_weight=0
+
+[[monster]]
+id="monster.watchman"
+glyph="@"
+hp=24
+ac=4
+hit_bonus=4
+damage="1d8"
+ai="chase_on_sight"
+speed=12
+difficulty=6
+name="watchman"
+color="blue"
+base_level=6
+corpse_chance=50
+corpse_nutrition=120
+ai_flags=["humanoid", "opens_doors", "picks_up", "uses_items", "watch", "peaceful_default"]
+spawn_weight=0
+
+[[monster]]
+id="monster.leprechaun"
+glyph="l"
+hp=9
+ac=7
+hit_bonus=2
+damage="1d2"
+ai="chase_on_sight"
+passive="steal_gold"
+speed=15
+difficulty=4
+name="leprechaun"
+color="green"
+base_level=3
+corpse_chance=50
+corpse_nutrition=60
+ai_flags=["humanoid", "greedy", "steals_gold", "teleports"]
+spawn_depth_range=[2, 5]
+spawn_weight=14
+
+[[monster]]
+id="monster.nymph"
+glyph="n"
+hp=12
+ac=7
+hit_bonus=2
+damage="0"
+ai="chase_on_sight"
+passive="steal_item"
+speed=12
+difficulty=5
+name="wood nymph"
+color="bright_magenta"
+base_level=3
+corpse_chance=50
+corpse_nutrition=70
+ai_flags=["humanoid", "steals_item", "teleports"]
+spawn_depth_range=[3, 6]
+spawn_weight=12
+
+[[monster]]
+id="monster.rust_monster"
+glyph="R"
+hp=16
+ac=4
+hit_bonus=3
+damage="1d2"
+ai="chase_on_sight"
+passive="rust_metal"
+speed=18
+difficulty=5
+name="rust monster"
+color="red"
+base_level=5
+corpse_chance=75
+corpse_nutrition=120
+ai_flags=["animal", "rusts_metal"]
+spawn_depth_range=[3, 6]
+spawn_weight=14
+
+[[monster]]
+id="monster.black_pudding"
+glyph="P"
+hp=22
+ac=6
+hit_bonus=3
+damage="2d4"
+ai="chase_on_sight"
+passive="split_on_hit"
+speed=6
+difficulty=6
+name="black pudding"
+color="black"
+base_level=6
+resistances=["poison", "cold", "shock"]
+corpse_chance=80
+corpse_nutrition=140
+corpse_effects=["grant_cold_resistance", "grant_shock_resistance"]
+ai_flags=["ooze", "splits"]
+spawn_depth_range=[4, 6]
+spawn_weight=10
+
+[[monster]]
+id="monster.dwarf"
+glyph="h"
+hp=12
+ac=6
+hit_bonus=2
+damage="1d8"
+ai="chase_on_sight"
+speed=12
+difficulty=4
+name="dwarf"
+color="red"
+base_level=3
+corpse_chance=70
+corpse_nutrition=110
+ai_flags=["humanoid", "infravision", "opens_doors", "picks_up", "uses_items", "dwarf", "hates_orcs"]
+spawn_depth_range=[2, 5]
+spawn_weight=16
+
+[[monster]]
+id="monster.medusa"
+glyph="@"
+hp=26
+ac=4
+hit_bonus=4
+damage="1d8"
+ai="ranged_on_sight"
+passive="gaze_paralyze"
+speed=12
+difficulty=8
+name="Medusa"
+color="bright_green"
+base_level=10
+resistances=["poison"]
+corpse_chance=85
+corpse_nutrition=160
+ai_flags=["humanoid", "opens_doors", "gaze_attack"]
+spawn_depth_range=[6, 6]
+spawn_weight=6
+
+[[monster]]
+id="monster.orc_captain"
+glyph="o"
+hp=16
+ac=6
+hit_bonus=3
+damage="1d8"
+ai="chase_on_sight"
+passive="summon_allies"
+speed=12
+difficulty=5
+name="orc captain"
+color="bright_green"
+base_level=5
+corpse_chance=70
+corpse_nutrition=100
+ai_flags=["humanoid", "opens_doors", "picks_up", "uses_items", "orc", "hates_dwarves", "summoner"]
+spawn_depth_range=[4, 6]
+spawn_weight=10

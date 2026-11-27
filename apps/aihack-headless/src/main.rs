@@ -11,8 +11,40 @@ use serde::Serialize;
 /// AIHack 결정론적 headless runner의 실행 인자다.
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(long, value_parser = ["knight", "scout", "mage", "cleric"], conflicts_with = "load")]
+    #[arg(
+        long,
+        value_parser = [
+            "knight",
+            "scout",
+            "mage",
+            "cleric",
+            "valkyrie",
+            "wizard",
+            "rogue",
+            "priest",
+            "samurai",
+            "barbarian",
+            "ranger",
+            "monk",
+            "archeologist",
+        ],
+        conflicts_with = "load"
+    )]
     role: Option<String>,
+    #[arg(
+        long,
+        value_parser = ["human", "elf", "dwarf", "gnome", "orc"],
+        conflicts_with = "load",
+        requires = "role"
+    )]
+    race: Option<String>,
+    #[arg(
+        long,
+        value_parser = ["lawful", "neutral", "chaotic"],
+        conflicts_with = "load",
+        requires = "role"
+    )]
+    alignment: Option<String>,
     #[arg(long)]
     seed: Option<u64>,
     #[arg(
@@ -95,19 +127,46 @@ fn main() {
         }
     };
     if let Some(role) = args.role.as_deref() {
-        use aihack_ai_contract::{CommandIntent, Role};
+        use aihack_ai_contract::{Alignment, CommandIntent, Race, Role};
         let role = match role {
             "knight" => Role::Knight,
             "scout" => Role::Scout,
             "cleric" => Role::Cleric,
+            "valkyrie" => Role::Valkyrie,
+            "wizard" => Role::Wizard,
+            "rogue" => Role::Rogue,
+            "priest" => Role::Priest,
+            "samurai" => Role::Samurai,
+            "barbarian" => Role::Barbarian,
+            "ranger" => Role::Ranger,
+            "monk" => Role::Monk,
+            "archeologist" => Role::Archeologist,
             _ => Role::Mage,
         };
-        if !session.submit(CommandIntent::Wait).accepted
-            || !session
-                .submit(CommandIntent::StartCampaign { role })
-                .accepted
-        {
-            eprintln!("campaign initialization was rejected");
+        let intent = if args.race.is_some() || args.alignment.is_some() {
+            let race = match args.race.as_deref() {
+                Some("elf") => Race::Elf,
+                Some("dwarf") => Race::Dwarf,
+                Some("gnome") => Race::Gnome,
+                Some("orc") => Race::Orc,
+                _ => role.default_race(),
+            };
+            let alignment = match args.alignment.as_deref() {
+                Some("lawful") => Alignment::Lawful,
+                Some("neutral") => Alignment::Neutral,
+                Some("chaotic") => Alignment::Chaotic,
+                _ => role.default_alignment(),
+            };
+            CommandIntent::StartCampaignWithBuild {
+                role,
+                race,
+                alignment,
+            }
+        } else {
+            CommandIntent::StartCampaign { role }
+        };
+        if !session.submit(CommandIntent::Wait).accepted || !session.submit(intent).accepted {
+            eprintln!("campaign initialization was rejected (check role/race/alignment combo)");
             std::process::exit(2);
         }
     }

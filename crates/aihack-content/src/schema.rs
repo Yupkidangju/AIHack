@@ -393,6 +393,11 @@ fn canonical_item_kind(id: &str) -> Option<&'static str> {
     match id {
         "item.weapon.dagger"
         | "item.weapon.short_sword"
+        | "item.weapon.long_sword"
+        | "item.weapon.katana"
+        | "item.weapon.battle_axe"
+        | "item.weapon.quarterstaff"
+        | "item.weapon.broad_sword"
         | "item.weapon.mace"
         | "item.weapon.rock" => Some("weapon"),
         "item.food.ration" => Some("food"),

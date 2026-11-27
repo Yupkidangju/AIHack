@@ -15,11 +15,12 @@ use crate::{systems::movement, world::GameWorld};
 pub fn has_active_light_source(world: &GameWorld) -> bool {
     let level = world.current_level();
     let pos = world.player_pos();
-    world
-        .inventory
-        .entries
-        .iter()
-        .any(|entry| is_lit_lamp(world, entry.item))
+    crate::systems::artifacts::is_light_emitting_artifact_held(world)
+        || world
+            .inventory
+            .entries
+            .iter()
+            .any(|entry| is_lit_lamp(world, entry.item))
         || world
             .entities
             .items_at(level, pos)
@@ -375,7 +376,6 @@ fn apply_blindfold(
 ) -> Result<Vec<GameEvent>, String> {
     if active {
         if buc == BucStatus::Cursed {
-            world.state_mut().entities.set_item_buc_known(item, true);
             return Err("The blindfold is cursed and stuck to your face!".to_string());
         }
         world.state_mut().entities.set_item_tool_active(item, false);
@@ -420,7 +420,10 @@ fn apply_unicorn_horn(
     state.status_timers.stunned = 0;
     state.status_timers.hallucinating = 0;
     if let Some(mut campaign) = state.campaign {
-        let base = campaign.role.base_attributes();
+        let base = campaign
+            .role
+            .base_attributes()
+            .with_race_deltas(campaign.race);
         campaign.attributes.str_ = campaign.attributes.str_.max(base.str_);
         campaign.attributes.dex = campaign.attributes.dex.max(base.dex);
         campaign.attributes.con = campaign.attributes.con.max(base.con);

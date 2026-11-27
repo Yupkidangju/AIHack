@@ -1,4 +1,7 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use aihack_core::{
+    campaign::Alignment,
     domain::{
         entity::{EntityKind, EntityLocation},
         inventory::{InventoryEntry, InventoryLetter},
@@ -13,7 +16,7 @@ use aihack_core::{
     ids::{EntityId, LevelId},
     position::Pos,
     run_state::RunState,
-    world::{is_zero_i16, is_zero_u16, is_zero_u8},
+    world::{is_zero_i16, is_zero_u16, is_zero_u32, is_zero_u8},
 };
 use serde::{Deserialize, Serialize};
 
@@ -75,6 +78,20 @@ pub struct EntitySnapshot {
     pub container_trapped: bool,
     #[serde(default, skip_serializing_if = "is_zero_u8")]
     pub erosion: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faction: Option<aihack_core::domain::entity::Faction>,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub tameness: u8,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub pet_xp: u32,
+    #[serde(default, skip_serializing_if = "is_zero_i16")]
+    pub pet_hunger: i16,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub monster_inventory: Vec<EntityId>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub unpaid: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,6 +108,8 @@ pub struct LevelSnapshot {
     pub special_room: Option<SpecialRoomKind>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub engravings: Vec<Engraving>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub altar_alignments: Vec<(Pos, Alignment)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +171,16 @@ pub struct GameSnapshot {
     pub intrinsic_resistances: Resistances,
     #[serde(default, skip_serializing_if = "StatusTimers::is_empty")]
     pub status_timers: StatusTimers,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub weapon_skills: BTreeMap<String, u8>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub spell_skill: BTreeMap<String, u8>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub skill_practice: BTreeMap<String, u16>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub generated_artifacts: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub shop_debt: u32,
 }
 
 impl GameSnapshot {
@@ -167,7 +196,7 @@ impl GameSnapshot {
             .entities()
             .iter()
             .map(|entity| {
-                if let Some((_, _, level, pos, stats, alive)) = entity.actor() {
+                if let Some((_, faction, level, pos, stats, alive)) = entity.actor() {
                     EntitySnapshot {
                         id: entity.id,
                         kind: entity.kind(),
@@ -191,6 +220,16 @@ impl GameSnapshot {
                         container_locked: false,
                         container_trapped: false,
                         erosion: 0,
+                        artifact_id: None,
+                        faction: world.campaign.is_some().then_some(faction),
+                        tameness: entity.actor_tameness().unwrap_or(0),
+                        pet_xp: entity.actor_pet_xp().unwrap_or(0),
+                        pet_hunger: entity.actor_pet_hunger().unwrap_or(0),
+                        monster_inventory: entity
+                            .actor_monster_inventory()
+                            .unwrap_or_default()
+                            .to_vec(),
+                        unpaid: false,
                     }
                 } else {
                     let (kind, _, location, assigned_letter, charges) =
@@ -218,6 +257,13 @@ impl GameSnapshot {
                         container_locked: entity.item_container_locked().unwrap_or(false),
                         container_trapped: entity.item_container_trapped().unwrap_or(false),
                         erosion: entity.item_erosion().unwrap_or(0),
+                        artifact_id: entity.item_artifact_id().map(str::to_owned),
+                        faction: None,
+                        tameness: 0,
+                        pet_xp: 0,
+                        pet_hunger: 0,
+                        monster_inventory: Vec::new(),
+                        unpaid: entity.item_unpaid().unwrap_or(false),
                     }
                 }
             })
@@ -237,6 +283,7 @@ impl GameSnapshot {
                 lit_tiles: level.lit_tiles.clone(),
                 special_room: level.special_room,
                 engravings: level.engravings.clone(),
+                altar_alignments: level.altar_alignments.clone(),
             })
             .collect::<Vec<_>>();
         levels.sort_by_key(|level| level.id);
@@ -281,6 +328,11 @@ impl GameSnapshot {
             ascension_pursuit_stage: world.ascension_pursuit_stage,
             intrinsic_resistances: world.intrinsic_resistances,
             status_timers: world.status_timers,
+            weapon_skills: world.weapon_skills.clone(),
+            spell_skill: world.spell_skill.clone(),
+            skill_practice: world.skill_practice.clone(),
+            generated_artifacts: world.generated_artifacts.clone(),
+            shop_debt: world.shop_debt,
         }
     }
 

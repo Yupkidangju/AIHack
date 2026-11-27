@@ -18,7 +18,7 @@ use crate::{
     rng::RngStateV1,
     run_state::RunState,
     turn::TurnOutcome,
-    world::{is_zero_i16, is_zero_u8, WorldState},
+    world::{is_zero_i16, is_zero_u32, is_zero_u8, WorldState},
 };
 
 pub const SAVE_SCHEMA_VERSION_V1: u16 = 1;
@@ -59,12 +59,16 @@ pub struct SavedWorldV1<E> {
     pub weapon_skills: BTreeMap<String, u8>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub spell_skill: BTreeMap<String, u8>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub skill_practice: BTreeMap<String, u16>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub learned_spells: Vec<LearnedSpell>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub generated_artifacts: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ascension_altars: Vec<(LevelId, Pos)>,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub shop_debt: u32,
 }
 
 impl<E: Clone> From<&WorldState<E>> for SavedWorldV1<E> {
@@ -92,9 +96,11 @@ impl<E: Clone> From<&WorldState<E>> for SavedWorldV1<E> {
             status_timers: world.status_timers,
             weapon_skills: world.weapon_skills.clone(),
             spell_skill: world.spell_skill.clone(),
+            skill_practice: world.skill_practice.clone(),
             learned_spells: world.learned_spells.clone(),
             generated_artifacts: world.generated_artifacts.clone(),
             ascension_altars: world.ascension_altars.clone(),
+            shop_debt: world.shop_debt,
         }
     }
 }
@@ -124,9 +130,11 @@ impl<E> From<SavedWorldV1<E>> for WorldState<E> {
             status_timers: saved.status_timers,
             weapon_skills: saved.weapon_skills,
             spell_skill: saved.spell_skill,
+            skill_practice: saved.skill_practice,
             learned_spells: saved.learned_spells,
             generated_artifacts: saved.generated_artifacts,
             ascension_altars: saved.ascension_altars,
+            shop_debt: saved.shop_debt,
             last_death_cause: None,
         }
     }

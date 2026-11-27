@@ -226,6 +226,16 @@ fn wire_action_value(action: ActionIntent) -> Value {
 fn wire_command_value(command: CommandIntent) -> Value {
     match command {
         CommandIntent::StartCampaign { role } => json!({ "type": "START_CAMPAIGN", "role": role }),
+        CommandIntent::StartCampaignWithBuild {
+            role,
+            race,
+            alignment,
+        } => json!({
+            "type": "START_CAMPAIGN_WITH_BUILD",
+            "role": role,
+            "race": race,
+            "alignment": alignment,
+        }),
         CommandIntent::EnterBranch => json!({ "type": "ENTER_BRANCH" }),
         CommandIntent::Wait => json!({ "type": "WAIT" }),
         CommandIntent::Quit => json!({ "type": "QUIT" }),
@@ -301,6 +311,10 @@ fn wire_command_value(command: CommandIntent) -> Value {
             "text": text.as_str(),
         }),
         CommandIntent::Drink => json!({ "type": "DRINK" }),
+        CommandIntent::Invoke { item } => item_action("INVOKE", item.0),
+        CommandIntent::Enhance { skill } => json!({ "type": "ENHANCE", "skill": skill }),
+        CommandIntent::Chat(direction) => direction_action("CHAT", direction),
+        CommandIntent::Pay => json!({ "type": "PAY" }),
         CommandIntent::Descend => json!({ "type": "DESCEND" }),
         CommandIntent::Ascend => json!({ "type": "ASCEND" }),
         CommandIntent::AcknowledgeMore => json!({ "type": "ACKNOWLEDGE_MORE" }),

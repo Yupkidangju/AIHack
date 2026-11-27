@@ -12,11 +12,13 @@ use aihack_core::{
 };
 
 use crate::{
-    systems::{combat::roll_die, death, items},
+    appearance,
+    systems::{altar, artifacts, combat::roll_die, death, items},
     world::GameWorld,
 };
 
 pub fn dip(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     item: EntityId,
@@ -29,12 +31,13 @@ pub fn dip(
         return Err("item is not in player inventory".to_string());
     }
     match target {
-        DipTarget::Tile => dip_into_tile(world, rng, item),
-        DipTarget::Item(potion_id) => dip_into_potion(world, rng, item, potion_id),
+        DipTarget::Tile => dip_into_tile(seed, world, rng, item),
+        DipTarget::Item(potion_id) => dip_into_potion(seed, world, rng, item, potion_id),
     }
 }
 
 fn dip_into_tile(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     item: EntityId,
@@ -57,11 +60,71 @@ fn dip_into_tile(
 
     match tile {
         TileKind::Altar => {
+            let cross_aligned = world.campaign.is_some_and(|c| {
+                altar::altar_alignment(world).is_some_and(|align| align != c.alignment)
+            });
+            if cross_aligned {
+                let enchant = entity.item_enchantment().unwrap_or(0);
+                if !can_place_result_single(
+                    world,
+                    item,
+                    qty,
+                    kind,
+                    BucStatus::Cursed,
+                    enchant,
+                    false,
+                ) {
+                    return Err("inventory letter capacity exceeded".to_string());
+                }
+                let target = if qty > 1 && kind.is_stackable() {
+                    spawn_or_replace_single(
+                        world,
+                        item,
+                        qty,
+                        kind,
+                        BucStatus::Cursed,
+                        enchant,
+                        true,
+                    )?
+                } else {
+                    let entities = &mut world.state_mut().entities;
+                    entities.set_item_buc(item, BucStatus::Cursed);
+                    entities.set_item_buc_known(item, true);
+                    item
+                };
+                let _ = target;
+                let state = world.state_mut();
+                state.luck = (state.luck - 1).clamp(
+                    aihack_core::campaign::MIN_LUCK,
+                    aihack_core::campaign::MAX_LUCK,
+                );
+                if let Some(mut c) = state.campaign {
+                    c.god_anger =
+                        (c.god_anger.saturating_add(1)).min(aihack_core::campaign::MAX_GOD_ANGER);
+                    state.campaign = Some(c);
+                }
+                return Ok(vec![GameEvent::Message {
+                    priority: MessagePriority::Warning,
+                    text: "An unholy chill curses the item you dipped on the alien altar!"
+                        .to_string(),
+                }]);
+            }
             if kind != ItemKind::PotionWater || buc != BucStatus::Uncursed {
                 return Err("only uncursed water can be blessed on an altar".to_string());
             }
             if world.mp < 3 {
                 return Err("not enough MP (requires 3) to bless water".to_string());
+            }
+            if !can_place_result_single(
+                world,
+                item,
+                qty,
+                ItemKind::PotionWater,
+                BucStatus::Blessed,
+                0,
+                false,
+            ) {
+                return Err("inventory letter capacity exceeded".to_string());
             }
             world.state_mut().mp -= 3;
             world.identify_item_kind(ItemKind::PotionWater);
@@ -81,7 +144,12 @@ fn dip_into_tile(
             }])
         }
         TileKind::Fountain | TileKind::Sink | TileKind::Water => {
-            let mut events = apply_plain_water_effect(world, item, kind, data.class, qty)?;
+            if tile == TileKind::Fountain {
+                if let Some(excal_events) = artifacts::try_fountain_excalibur(world, item)? {
+                    return Ok(excal_events);
+                }
+            }
+            let mut events = apply_plain_water_effect(seed, world, item, kind, data.class, qty)?;
             if tile == TileKind::Fountain && rng.next_u64().is_multiple_of(5) {
                 let _ = world.current_map_mut().set_tile(pos, TileKind::DryFountain);
                 events.push(GameEvent::Message {
@@ -96,6 +164,7 @@ fn dip_into_tile(
 }
 
 fn dip_into_potion(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     item: EntityId,
@@ -118,6 +187,7 @@ fn dip_into_potion(
         return Err("can only dip into a potion".to_string());
     }
     let target_buc = target_entity.item_buc().unwrap_or(BucStatus::Uncursed);
+    let target_qty = target_entity.item_quantity().unwrap_or(1);
 
     let item_entity = world
         .entities
@@ -129,6 +199,8 @@ fn dip_into_potion(
     let item_class = item_data.class;
     let item_buc = item_entity.item_buc().unwrap_or(BucStatus::Uncursed);
     let item_qty = item_entity.item_quantity().unwrap_or(1);
+    let item_enchant = item_entity.item_enchantment().unwrap_or(0);
+    let freed_target_slot = target_qty <= 1;
 
     if target_kind == ItemKind::PotionWater {
         if item_kind == ItemKind::PotionWater && target_buc == BucStatus::Uncursed {
@@ -136,6 +208,24 @@ fn dip_into_potion(
         }
         match target_buc {
             BucStatus::Blessed => {
+                let next_buc = match item_buc {
+                    BucStatus::Cursed => BucStatus::Uncursed,
+                    BucStatus::Uncursed | BucStatus::Blessed => BucStatus::Blessed,
+                };
+                if item_qty > 1
+                    && item_kind.is_stackable()
+                    && !can_place_result_single(
+                        world,
+                        item,
+                        item_qty,
+                        item_kind,
+                        next_buc,
+                        item_enchant,
+                        freed_target_slot,
+                    )
+                {
+                    return Err("inventory letter capacity exceeded".to_string());
+                }
                 items::consume_one_from_inventory(world, potion_id)?;
                 world.identify_item_kind(ItemKind::PotionWater);
                 if world.inventory.contains(potion_id) {
@@ -144,10 +234,6 @@ fn dip_into_potion(
                         .entities
                         .set_item_buc_known(potion_id, true);
                 }
-                let next_buc = match item_buc {
-                    BucStatus::Cursed => BucStatus::Uncursed,
-                    BucStatus::Uncursed | BucStatus::Blessed => BucStatus::Blessed,
-                };
                 if item_qty > 1 && item_kind.is_stackable() {
                     let _ = spawn_or_replace_single(
                         world,
@@ -155,7 +241,7 @@ fn dip_into_potion(
                         item_qty,
                         item_kind,
                         next_buc,
-                        item_entity_enchant(world, item),
+                        item_enchant,
                         true,
                     )?;
                 } else {
@@ -170,6 +256,24 @@ fn dip_into_potion(
                 }]);
             }
             BucStatus::Cursed => {
+                let next_buc = match item_buc {
+                    BucStatus::Blessed => BucStatus::Uncursed,
+                    BucStatus::Uncursed | BucStatus::Cursed => BucStatus::Cursed,
+                };
+                if item_qty > 1
+                    && item_kind.is_stackable()
+                    && !can_place_result_single(
+                        world,
+                        item,
+                        item_qty,
+                        item_kind,
+                        next_buc,
+                        item_enchant,
+                        freed_target_slot,
+                    )
+                {
+                    return Err("inventory letter capacity exceeded".to_string());
+                }
                 items::consume_one_from_inventory(world, potion_id)?;
                 world.identify_item_kind(ItemKind::PotionWater);
                 if world.inventory.contains(potion_id) {
@@ -178,10 +282,6 @@ fn dip_into_potion(
                         .entities
                         .set_item_buc_known(potion_id, true);
                 }
-                let next_buc = match item_buc {
-                    BucStatus::Blessed => BucStatus::Uncursed,
-                    BucStatus::Uncursed | BucStatus::Cursed => BucStatus::Cursed,
-                };
                 if item_qty > 1 && item_kind.is_stackable() {
                     let _ = spawn_or_replace_single(
                         world,
@@ -189,7 +289,7 @@ fn dip_into_potion(
                         item_qty,
                         item_kind,
                         next_buc,
-                        item_entity_enchant(world, item),
+                        item_enchant,
                         true,
                     )?;
                 } else {
@@ -204,8 +304,20 @@ fn dip_into_potion(
                 }]);
             }
             BucStatus::Uncursed => {
+                if !can_plain_water_place(
+                    world,
+                    item,
+                    item_kind,
+                    item_class,
+                    item_qty,
+                    freed_target_slot,
+                ) {
+                    return Err("inventory letter capacity exceeded".to_string());
+                }
                 items::consume_one_from_inventory(world, potion_id)?;
-                return apply_plain_water_effect(world, item, item_kind, item_class, item_qty);
+                return apply_plain_water_effect(
+                    seed, world, item, item_kind, item_class, item_qty,
+                );
             }
         }
     }
@@ -230,6 +342,17 @@ fn dip_into_potion(
         } else {
             BucStatus::Uncursed
         };
+        if !can_place_result_single(
+            world,
+            item,
+            item_qty,
+            result_kind,
+            result_buc,
+            0,
+            freed_target_slot,
+        ) {
+            return Err("inventory letter capacity exceeded".to_string());
+        }
         items::consume_one_from_inventory(world, potion_id)?;
         let _ = spawn_or_replace_single(world, item, item_qty, result_kind, result_buc, 0, true)?;
         let mut events = Vec::new();
@@ -251,7 +374,7 @@ fn dip_into_potion(
                 DeathCause::Explosion,
             )?);
         } else {
-            let name = aihack_content::item_display_name(result_kind, world.content_registry());
+            let name = appearance::display_name_for_kind(seed, world, result_kind);
             events.push(GameEvent::Message {
                 priority: MessagePriority::Info,
                 text: format!("The potions bubble and mix into {name}!"),
@@ -263,15 +386,74 @@ fn dip_into_potion(
     Err("dipping into that potion has no special effect".to_string())
 }
 
-fn item_entity_enchant(world: &GameWorld, item: EntityId) -> i8 {
-    world
-        .entities
-        .get(item)
-        .and_then(|e| e.item_enchantment())
-        .unwrap_or(0)
+fn can_plain_water_place(
+    world: &GameWorld,
+    item: EntityId,
+    kind: ItemKind,
+    class: ItemClass,
+    qty: u16,
+    extra_freed_slot: bool,
+) -> bool {
+    if class == ItemClass::Potion && kind != ItemKind::PotionWater {
+        return can_place_result_single(
+            world,
+            item,
+            qty,
+            ItemKind::PotionWater,
+            BucStatus::Uncursed,
+            0,
+            extra_freed_slot,
+        );
+    }
+    if class == ItemClass::Scroll && kind != ItemKind::ScrollBlank {
+        return can_place_result_single(
+            world,
+            item,
+            qty,
+            ItemKind::ScrollBlank,
+            BucStatus::Uncursed,
+            0,
+            extra_freed_slot,
+        );
+    }
+    true
+}
+
+fn can_place_result_single(
+    world: &GameWorld,
+    source_item: EntityId,
+    source_qty: u16,
+    new_kind: ItemKind,
+    new_buc: BucStatus,
+    new_enchant: i8,
+    extra_freed_slot: bool,
+) -> bool {
+    if source_qty <= 1 {
+        return true;
+    }
+    if world.inventory.has_free_slot() || extra_freed_slot {
+        return true;
+    }
+    new_kind.is_stackable()
+        && world.inventory.entries.iter().any(|entry| {
+            let Some(e) = world.entities.get(entry.item) else {
+                return false;
+            };
+            let Some((k, _, _, _, _)) = e.item() else {
+                return false;
+            };
+            let q = e.item_quantity().unwrap_or(1);
+            entry.item != source_item
+                && k == new_kind
+                && e.item_buc().unwrap_or(BucStatus::Uncursed) == new_buc
+                && e.item_enchantment().unwrap_or(0) == new_enchant
+                && e.item_erosion().unwrap_or(0) == 0
+                && q < aihack_core::domain::item::MAX_ITEM_STACK
+        })
 }
 
 fn apply_plain_water_effect(
+    seed: u64,
     world: &mut GameWorld,
     item: EntityId,
     kind: ItemKind,
@@ -320,7 +502,12 @@ fn apply_plain_water_effect(
         .content_registry()
         .item(aihack_content::item_id(kind))
         .and_then(|d| d.material.as_deref());
-    if matches!(material, Some("iron" | "steel")) {
+    let is_artifact = world
+        .entities
+        .get(item)
+        .and_then(|e| e.item_artifact_id())
+        .is_some();
+    if !is_artifact && matches!(material, Some("iron" | "steel")) {
         let erosion = world
             .entities
             .get(item)
@@ -329,7 +516,7 @@ fn apply_plain_water_effect(
         let next = (erosion + 1).min(3);
         world.state_mut().entities.set_item_erosion(item, next);
         items::recompute_player_ac(world)?;
-        let item_name = aihack_content::item_display_name(kind, world.content_registry());
+        let item_name = appearance::display_name_for_world_item(seed, world, item, kind);
         return Ok(vec![GameEvent::Message {
             priority: MessagePriority::Warning,
             text: format!("Your {item_name} looks rusty!"),

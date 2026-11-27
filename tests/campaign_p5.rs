@@ -1047,6 +1047,7 @@ fn p5c_tui_headless_and_legacy_v1_preservation() {
         .entities
         .set_actor_location(hl_save.world.player_id, mines2, p_pos);
     add_inventory_item(&mut hl_save, ItemKind::PotionCure, BucStatus::Uncursed, 0);
+    hl_save.world.identified_items.push(ItemKind::PotionCure);
     let mut hl_sess = GameSession::from_save_data(hl_save).unwrap();
     assert!(matches!(
         HeadlessPolicy::survival_v1().candidates(&hl_sess).first(),

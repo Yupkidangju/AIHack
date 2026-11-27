@@ -1,4 +1,5 @@
 use aihack_core::{
+    campaign::SkillCategory,
     domain::{
         combat::{AttackProfile, DamageRoll},
         entity::EntityLocation,
@@ -12,7 +13,7 @@ use aihack_core::{
 };
 
 use crate::{
-    systems::{combat, death, items},
+    systems::{combat, death, items, skills},
     world::GameWorld,
 };
 
@@ -44,7 +45,13 @@ pub fn throw_item(
     {
         return Err("empty container before throwing".to_string());
     }
-    if data.attack_profile.is_none() {
+    let is_campaign_food_throw = world.campaign.is_some()
+        && matches!(
+            data.class,
+            aihack_core::domain::item::ItemClass::Food
+                | aihack_core::domain::item::ItemClass::Corpse
+        );
+    if data.attack_profile.is_none() && !is_campaign_food_throw {
         return Err("item cannot be thrown".to_string());
     }
 
@@ -103,16 +110,81 @@ pub fn throw_item(
         to: outcome.landing,
     }];
     if let Some(target) = outcome.hit_target {
-        let profile = projectile_profile(kind, data.attack_profile);
-        if let Some(resolution) =
-            combat::resolve_attack_with_profile(world, rng, world.player_id, target, profile)
+        if let Some(feed_events) =
+            crate::systems::pets::try_feed_or_tame_by_throw(world, target, thrown_id)
         {
+            events.extend(feed_events);
+            return Ok(events);
+        }
+        events.extend(crate::systems::npc::provoke_actor(world, target));
+        let mut profile = projectile_profile(kind, data.attack_profile);
+        let mut extra_bonus = 0_i16;
+        if world.campaign.is_some() {
+            profile.hit_bonus = profile.hit_bonus.saturating_add(world.luck);
+            if let Some(campaign) = world.campaign {
+                profile.hit_bonus = profile
+                    .hit_bonus
+                    .saturating_add(campaign.attributes.dex_hit_bonus());
+            }
+            if let Some(thrown_entity) = world.entities.get(thrown_id) {
+                let enchant = i16::from(thrown_entity.item_enchantment().unwrap_or(0));
+                let erosion = i16::from(thrown_entity.item_erosion().unwrap_or(0));
+                let bless_hit = if thrown_entity.item_buc()
+                    == Some(aihack_core::domain::item::BucStatus::Blessed)
+                {
+                    1
+                } else {
+                    0
+                };
+                profile.hit_bonus = profile
+                    .hit_bonus
+                    .saturating_add(enchant)
+                    .saturating_add(bless_hit);
+                extra_bonus = extra_bonus.saturating_add(enchant).saturating_sub(erosion);
+            }
+            if let Some(def) = crate::systems::artifacts::artifact_def_for_item(world, thrown_id) {
+                profile.hit_bonus = profile.hit_bonus.saturating_add(def.hit_bonus);
+                extra_bonus = extra_bonus.saturating_add(def.damage_bonus);
+                if def.id == "sting"
+                    && matches!(
+                        world.entities.get(target).and_then(|e| e.actor_kind()),
+                        Some(aihack_core::domain::entity::ActorKind::Monster(
+                            aihack_core::domain::monster::MonsterKind::Orc
+                                | aihack_core::domain::monster::MonsterKind::Kobold
+                                | aihack_core::domain::monster::MonsterKind::Ogre
+                        ))
+                    )
+                {
+                    extra_bonus = extra_bonus.saturating_add(3);
+                }
+            }
+        }
+        if let Some(cat) = SkillCategory::for_weapon_kind(kind) {
+            if world.campaign.is_some() {
+                let rank = skills::current_rank(world, cat);
+                profile.hit_bonus = profile.hit_bonus.saturating_add(rank.hit_bonus());
+                extra_bonus = extra_bonus.saturating_add(rank.damage_bonus());
+                skills::record_practice(world, cat, 4);
+            }
+        }
+        if let Some(resolution) = combat::resolve_attack_with_profile_and_bonus(
+            world,
+            rng,
+            world.player_id,
+            target,
+            profile,
+            extra_bonus,
+        ) {
             events.push(combat::attack_event(&resolution));
             events.extend(death::collect_death_events_after_attack(
                 world,
                 world.player_id,
                 target,
             )?);
+        }
+    } else if world.campaign.is_some() {
+        if let Some(cat) = SkillCategory::for_weapon_kind(kind) {
+            skills::record_practice(world, cat, 2);
         }
     }
     Ok(events)
@@ -154,6 +226,20 @@ pub fn zap_wand(
         charges_after,
     }];
     if let Some(target) = outcome.hit_target {
+        events.extend(crate::systems::npc::provoke_actor(world, target));
+        if wand_effect == WandEffect::Fire
+            && world.entities.actor_stats(target).is_some_and(|stats| {
+                stats
+                    .resistances
+                    .contains(aihack_core::domain::status::Resistances::FIRE)
+            })
+        {
+            events.push(aihack_core::event::GameEvent::Message {
+                priority: aihack_core::event::MessagePriority::Info,
+                text: "The fire bolt has no effect on the fire-resistant creature!".to_string(),
+            });
+            return Ok(events);
+        }
         let (profile, extra_damage_bonus) = match wand_effect {
             WandEffect::MagicMissile => (
                 AttackProfile::natural("magic missile", DamageRoll::new(1, 6)),

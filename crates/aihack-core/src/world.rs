@@ -27,6 +27,10 @@ pub fn is_zero_i16(value: &i16) -> bool {
     *value == 0
 }
 
+pub fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
+}
+
 /// UI, content bootstrap, 파일 I/O와 분리된 게임 world의 저장 가능 상태다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorldState<E> {
@@ -61,12 +65,16 @@ pub struct WorldState<E> {
     pub weapon_skills: BTreeMap<String, u8>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub spell_skill: BTreeMap<String, u8>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub skill_practice: BTreeMap<String, u16>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub learned_spells: Vec<LearnedSpell>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub generated_artifacts: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ascension_altars: Vec<(LevelId, Pos)>,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub shop_debt: u32,
     /// 현재 실행 중인 사망 처리만 위한 transient 값이며 save에는 넣지 않는다.
     pub last_death_cause: Option<DeathCause>,
 }

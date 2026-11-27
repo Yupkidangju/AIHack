@@ -9,8 +9,9 @@ use std::{
 };
 
 use aihack_ai_contract::{
-    ActionSpace, ClientRevision, EntityObservation, GameEvent, ItemObservation, Observation,
-    PlayerObservation, RunStateSummary, TileObservation,
+    ActionSpace, BucStatus, ClientRevision, EntityId, EntityKind, EntityObservation, EquipmentSlot,
+    Faction, GameEvent, InventoryLetter, ItemClass, ItemKind, ItemObservation, Observation,
+    PlayerObservation, Pos, RunStateSummary, TileObservation,
 };
 use serde::Serialize;
 
@@ -25,9 +26,140 @@ pub use aihack_ai_contract::llm::LlmPayload;
 pub const LLM_SCHEMA_VERSION: u16 = 1;
 pub type SessionRevision = ClientRevision;
 pub type VisibleTile = TileObservation;
-pub type VisibleEntity = EntityObservation;
-pub type InventoryObservation = ItemObservation;
+pub type VisibleEntity = LlmVisibleEntity;
+pub type InventoryObservation = LlmInventoryItem;
 pub type GameEventSummary = GameEvent;
+
+fn is_zero_u16(value: &u16) -> bool {
+    *value == 0
+}
+fn is_zero_u8(value: &u8) -> bool {
+    *value == 0
+}
+fn is_zero_i8(value: &i8) -> bool {
+    *value == 0
+}
+fn is_one_u16(value: &u16) -> bool {
+    *value == 1
+}
+fn is_true(value: &bool) -> bool {
+    *value
+}
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LlmVisibleEntity {
+    pub entity: EntityId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<EntityKind>,
+    pub pos: Pos,
+    pub hp: Option<i16>,
+    pub alive: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub appearance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glyph: Option<char>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faction: Option<Faction>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub unpaid: bool,
+}
+
+impl LlmVisibleEntity {
+    fn from_obs(entity: &EntityObservation, in_campaign: bool) -> Self {
+        let hide_kind = in_campaign && entity.appearance.is_some();
+        Self {
+            entity: entity.entity,
+            kind: (!hide_kind).then_some(entity.kind),
+            pos: entity.pos,
+            hp: entity.hp,
+            alive: entity.alive,
+            appearance: entity.appearance.clone(),
+            glyph: entity.glyph,
+            name: entity.name.clone(),
+            color: entity.color.clone(),
+            faction: entity.faction,
+            unpaid: entity.unpaid,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LlmInventoryItem {
+    pub item: EntityId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<ItemKind>,
+    pub letter: InventoryLetter,
+    pub equipped_slot: Option<EquipmentSlot>,
+    pub identified: bool,
+    #[serde(skip_serializing_if = "is_true")]
+    pub buc_known: bool,
+    #[serde(skip_serializing_if = "is_true")]
+    pub enchant_known: bool,
+    #[serde(skip_serializing_if = "BucStatus::is_uncursed")]
+    pub buc: BucStatus,
+    #[serde(skip_serializing_if = "is_zero_i8")]
+    pub enchantment: i8,
+    #[serde(skip_serializing_if = "is_one_u16")]
+    pub quantity: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub appearance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glyph: Option<char>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_class: Option<ItemClass>,
+    #[serde(skip_serializing_if = "is_zero_u16")]
+    pub contained_count: u16,
+    #[serde(skip_serializing_if = "is_false")]
+    pub tool_active: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub container_locked: bool,
+    #[serde(skip_serializing_if = "is_zero_u8")]
+    pub erosion: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub unpaid: bool,
+}
+
+impl LlmInventoryItem {
+    fn from_obs(item: &ItemObservation, in_campaign: bool) -> Self {
+        let hide_kind = in_campaign && !item.identified && item.appearance.is_some();
+        Self {
+            item: item.item,
+            kind: (!hide_kind).then_some(item.kind),
+            letter: item.letter,
+            equipped_slot: item.equipped_slot,
+            identified: item.identified,
+            buc_known: item.buc_known,
+            enchant_known: item.enchant_known,
+            buc: item.buc,
+            enchantment: item.enchantment,
+            quantity: item.quantity,
+            appearance: item.appearance.clone(),
+            glyph: item.glyph,
+            name: item.name.clone(),
+            color: item.color.clone(),
+            item_class: item.item_class,
+            contained_count: item.contained_count,
+            tool_active: item.tool_active,
+            container_locked: item.container_locked,
+            erosion: item.erosion,
+            artifact_id: item.artifact_id.clone(),
+            unpaid: item.unpaid,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LlmObservationView {
@@ -42,6 +174,7 @@ pub struct LlmObservationView {
 
 impl From<&Observation> for LlmObservationView {
     fn from(observation: &Observation) -> Self {
+        let in_campaign = observation.campaign.is_some();
         Self {
             turn: observation.turn,
             run_state: observation.run_state,
@@ -52,8 +185,16 @@ impl From<&Observation> for LlmObservationView {
                 .filter(|tile| tile.visible)
                 .cloned()
                 .collect(),
-            visible_entities: observation.visible_entities.clone(),
-            inventory: observation.inventory.clone(),
+            visible_entities: observation
+                .visible_entities
+                .iter()
+                .map(|entity| LlmVisibleEntity::from_obs(entity, in_campaign))
+                .collect(),
+            inventory: observation
+                .inventory
+                .iter()
+                .map(|item| LlmInventoryItem::from_obs(item, in_campaign))
+                .collect(),
             last_events: observation.last_events.clone(),
         }
     }

@@ -85,6 +85,17 @@ impl EntityStore {
         self.0.spawn_monster_with_template(kind, template, pos)
     }
 
+    pub fn spawn_monster_with_faction(
+        &mut self,
+        kind: MonsterKind,
+        template: MonsterTemplate,
+        faction: Faction,
+        pos: Pos,
+    ) -> Result<EntityId, EntityAllocationError> {
+        self.0
+            .spawn_monster_with_faction(kind, template, faction, pos)
+    }
+
     pub(crate) fn spawn_item_with_data(
         &mut self,
         kind: ItemKind,
@@ -193,6 +204,42 @@ impl EntityStore {
 
     pub fn clear_contained_items(&mut self, container: EntityId) -> bool {
         self.0.clear_contained_items(container)
+    }
+
+    pub fn set_item_unpaid(&mut self, id: EntityId, unpaid: bool) -> bool {
+        self.0.set_item_unpaid(id, unpaid)
+    }
+
+    pub fn set_actor_faction(&mut self, id: EntityId, next: Faction) -> bool {
+        self.0.set_actor_faction(id, next)
+    }
+
+    pub fn set_actor_kind(&mut self, id: EntityId, next: ActorKind) -> bool {
+        self.0.set_actor_kind(id, next)
+    }
+
+    pub fn set_actor_tameness(&mut self, id: EntityId, next: u8) -> bool {
+        self.0.set_actor_tameness(id, next)
+    }
+
+    pub fn set_actor_pet_xp(&mut self, id: EntityId, next: u32) -> bool {
+        self.0.set_actor_pet_xp(id, next)
+    }
+
+    pub fn set_actor_pet_hunger(&mut self, id: EntityId, next: i16) -> bool {
+        self.0.set_actor_pet_hunger(id, next)
+    }
+
+    pub fn push_monster_inventory(&mut self, actor: EntityId, item: EntityId) -> bool {
+        self.0.push_monster_inventory(actor, item)
+    }
+
+    pub fn remove_monster_inventory(&mut self, actor: EntityId, item: EntityId) -> bool {
+        self.0.remove_monster_inventory(actor, item)
+    }
+
+    pub fn clear_monster_inventory(&mut self, actor: EntityId) -> Vec<EntityId> {
+        self.0.clear_monster_inventory(actor)
     }
 
     pub fn clear_item_letter(&mut self, id: EntityId) -> bool {

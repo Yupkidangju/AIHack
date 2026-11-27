@@ -55,6 +55,8 @@ pub enum DeathCause {
     Drowning,
     Lava,
     Explosion,
+    DivineWrath,
+    ArtifactBlast,
 }
 
 pub fn roll_die(rng: &mut GameRng, sides: i16) -> i16 {

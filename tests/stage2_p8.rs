@@ -1230,21 +1230,30 @@ fn p8c_generator_v3_map_validation_branch_graph_save_v3_llm_and_tui_viewport() {
     assert!(GameSession::from_save_data(forged_altar_save).is_err());
 
     // P9~P13 SaveV3 roundtrip + legacy V1 rejection of P8/extended state
-    let mut save_v3 = sess_a1.to_save_data();
+    let mut sess_v3 = GameSession::try_new(42).unwrap();
+    assert!(sess_v3.submit(C::Wait).accepted);
+    assert!(
+        sess_v3
+            .submit(C::StartCampaignWithBuild {
+                role: Role::Mage,
+                race: Race::Elf,
+                alignment: Alignment::Chaotic,
+            })
+            .accepted
+    );
+    let mut save_v3 = sess_v3.to_save_data();
     assert_eq!(save_v3.schema_version, SAVE_SCHEMA_VERSION_V3);
-    save_v3.world.campaign.as_mut().unwrap().alignment = Alignment::Chaotic;
-    save_v3.world.campaign.as_mut().unwrap().race = Race::Elf;
     save_v3
         .world
         .intrinsic_resistances
         .insert(Resistances::COLD.union(Resistances::SHOCK));
-    save_v3.world.weapon_skills.insert("short_blade".into(), 2);
-    save_v3.world.spell_skill.insert("attack".into(), 1);
+    save_v3.world.weapon_skills.insert("dagger".into(), 2);
+    save_v3.world.spell_skill.insert("spellcasting".into(), 1);
     save_v3.world.learned_spells.push(LearnedSpell {
         spell: SpellKind::ForceBolt,
         learned_at_turn: 3,
     });
-    save_v3.world.generated_artifacts.insert("Excalibur".into());
+    save_v3.world.generated_artifacts.insert("sting".into());
     save_v3
         .world
         .ascension_altars
@@ -1259,7 +1268,7 @@ fn p8c_generator_v3_map_validation_branch_graph_save_v3_llm_and_tui_viewport() {
     save_v3
         .world
         .entities
-        .set_item_artifact_id(art_id, Some("Excalibur".into()));
+        .set_item_artifact_id(art_id, Some("sting".into()));
 
     let json = serde_json::to_string(&save_v3).unwrap();
     let decoded: aihack_runtime::save::SaveDataV1 = serde_json::from_str(&json).unwrap();
@@ -1270,14 +1279,14 @@ fn p8c_generator_v3_map_validation_branch_graph_save_v3_llm_and_tui_viewport() {
     assert!(rw
         .intrinsic_resistances
         .contains(Resistances::COLD.union(Resistances::SHOCK)));
-    assert_eq!(rw.weapon_skills.get("short_blade"), Some(&2));
-    assert_eq!(rw.spell_skill.get("attack"), Some(&1));
+    assert_eq!(rw.weapon_skills.get("dagger"), Some(&2));
+    assert_eq!(rw.spell_skill.get("spellcasting"), Some(&1));
     assert_eq!(rw.learned_spells.len(), 1);
-    assert!(rw.generated_artifacts.contains("Excalibur"));
+    assert!(rw.generated_artifacts.contains("sting"));
     assert_eq!(rw.levels.levels[0].engravings[0].text, "Elbereth");
     assert_eq!(
         rw.entities().get(art_id).unwrap().item_artifact_id(),
-        Some("Excalibur")
+        Some("sting")
     );
 
     // Legacy V1 saves omit extended keys and reject tampered P8/P9~P13 payloads

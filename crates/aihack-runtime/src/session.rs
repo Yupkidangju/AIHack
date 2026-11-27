@@ -143,7 +143,17 @@ impl GameSession {
     pub fn submit(&mut self, intent: CommandIntent) -> TurnOutcome {
         let mut transaction = crate::transaction::TurnTransaction::prepare(self);
         let outcome = transaction.apply(intent);
-        if transaction.was_aborted() {
+        if transaction.was_aborted() || !outcome.accepted {
+            if !transaction.was_aborted()
+                && matches!(
+                    self.state,
+                    RunState::AwaitingDirection { .. }
+                        | RunState::AwaitingInventorySelection { .. }
+                )
+                && outcome.next_state == RunState::Playing
+            {
+                self.inner.state = RunState::Playing;
+            }
             let reason = outcome
                 .events
                 .iter()
@@ -222,6 +232,49 @@ impl GameSession {
                     ),
                 }])
             }
+            CommandIntent::StartCampaignWithBuild {
+                role,
+                race,
+                alignment,
+            } => {
+                if self.turn != 0 || self.world.campaign.is_some() {
+                    return self.reject("campaign requires a fresh creation state".into());
+                }
+                if !role.is_valid_combo(race, alignment) {
+                    return self.reject(format!(
+                        "invalid build: {} cannot be {} {}",
+                        role.display_name(),
+                        alignment.as_str(),
+                        race.as_str()
+                    ));
+                }
+                let registry = self.world.content_registry().clone();
+                let state = match crate::bootstrap::campaign_world_with_build(
+                    &registry,
+                    self.seed(),
+                    role,
+                    race,
+                    alignment,
+                ) {
+                    Ok(state) => state,
+                    Err(error) => return self.abort_transaction(error.to_string()),
+                };
+                self.inner.world =
+                    match GameWorld::from_saved_world_with_registry((&state).into(), &registry) {
+                        Ok(world) => world,
+                        Err(error) => return self.abort_transaction(error.to_string()),
+                    };
+                self.inner.state = RunState::Playing;
+                self.accept_without_turn(vec![GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: format!(
+                        "{} {} {}: recover the Amulet on Main 6 and return to the surface.",
+                        alignment.as_str(),
+                        race.as_str(),
+                        role.display_name()
+                    ),
+                }])
+            }
             CommandIntent::Wait => {
                 self.inner.state = RunState::Playing;
                 self.accept_without_turn(vec![GameEvent::Message {
@@ -241,11 +294,11 @@ impl GameSession {
             return self.reject("player is paralyzed".to_string());
         }
         match intent {
-            CommandIntent::StartCampaign { .. } => {
+            CommandIntent::StartCampaign { .. } | CommandIntent::StartCampaignWithBuild { .. } => {
                 self.reject("role is chosen only during creation".into())
             }
             CommandIntent::EnterBranch => match stairs::enter_branch(&mut self.inner.world) {
-                Ok(event) => self.accept_turn(vec![event]),
+                Ok(events) => self.accept_turn(events),
                 Err(error) => self.reject(error),
             },
             CommandIntent::Wait => self.submit_wait(),
@@ -286,6 +339,10 @@ impl GameSession {
             CommandIntent::Dip { item, target } => self.submit_dip(item, target),
             CommandIntent::Engrave { method, text } => self.submit_engrave(method, text),
             CommandIntent::Drink => self.submit_drink(),
+            CommandIntent::Invoke { item } => self.submit_invoke(item),
+            CommandIntent::Enhance { skill } => self.submit_enhance(skill),
+            CommandIntent::Chat(direction) => self.submit_chat(direction),
+            CommandIntent::Pay => self.submit_pay(),
             CommandIntent::AcknowledgeMore => {
                 self.reject("no more prompt to acknowledge".to_string())
             }
@@ -425,6 +482,61 @@ impl GameSession {
                 return self.submit_bump_attack(defender);
             }
         }
+        if self.world.campaign.is_some() {
+            if let Some(friendly) = self
+                .world
+                .entities
+                .alive_friendly_at(self.world.current_level(), to)
+            {
+                return match movement::swap_player_with_friendly(
+                    &mut self.inner.world,
+                    friendly,
+                    direction,
+                ) {
+                    Ok((old_pos, new_pos)) => {
+                        let friendly_name = self
+                            .world
+                            .entities
+                            .get(friendly)
+                            .and_then(|e| e.actor_kind())
+                            .and_then(|k| k.monster_kind())
+                            .map(|mk| {
+                                aihack_content::monster_display_name(
+                                    mk,
+                                    self.world.content_registry(),
+                                )
+                            })
+                            .unwrap_or_else(|| "companion".to_string());
+                        let mut events = Vec::new();
+                        if let Some(event) = stagger_event {
+                            events.push(event);
+                        }
+                        events.push(GameEvent::EntityMoved {
+                            entity: self.world.player_id(),
+                            from: old_pos,
+                            to: new_pos,
+                        });
+                        events.push(GameEvent::EntityMoved {
+                            entity: friendly,
+                            from: new_pos,
+                            to: old_pos,
+                        });
+                        events.push(GameEvent::Message {
+                            priority: MessagePriority::Info,
+                            text: format!("You swap places with the {friendly_name}."),
+                        });
+                        events.extend(crate::systems::npc::check_shop_theft_on_move_or_stairs(
+                            &mut self.inner.world,
+                            false,
+                        ));
+                        self.inner.state =
+                            death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
+                        self.accept_turn(events)
+                    }
+                    Err(error) => self.reject(format!("{error}")),
+                };
+            }
+        }
         match movement::move_player(&mut self.inner.world, direction) {
             Ok(()) => {
                 let to = self.world.player_pos();
@@ -437,9 +549,16 @@ impl GameSession {
                     from,
                     to,
                 });
+                events.extend(crate::systems::npc::check_shop_theft_on_move_or_stairs(
+                    &mut self.inner.world,
+                    false,
+                ));
                 let (trap_events, triggered_trap) = {
                     let state = &mut self.inner;
-                    traps::trigger_player_trap_with_kind(&mut state.world, &mut state.rng)
+                    match traps::trigger_player_trap_with_kind(&mut state.world, &mut state.rng) {
+                        Ok(result) => result,
+                        Err(error) => return self.abort_transaction(error),
+                    }
                 };
                 events.extend(trap_events);
                 let player_id = self.world.player_id();
@@ -455,9 +574,10 @@ impl GameSession {
                 };
                 events.extend(death_events);
                 if self.world.player_alive() {
+                    let seed = self.meta.seed;
                     let (terrain_events, terrain_cause) = {
                         let state = &mut self.inner;
-                        terrain::on_player_enter_tile(&mut state.world, &mut state.rng)
+                        terrain::on_player_enter_tile(seed, &mut state.world, &mut state.rng)
                     };
                     events.extend(terrain_events);
                     if let Some(cause) = terrain_cause {
@@ -506,11 +626,36 @@ impl GameSession {
                 .and_then(|entity| entity.monster_passive()),
             Some(MonsterPassive::ParalyzeOnMelee)
         ) {
-            self.inner.world.state_mut().paralysis_turns = self.world.paralysis_turns.max(2);
-            events.push(GameEvent::PassiveAttackTriggered {
-                source: defender,
-                target: attacker,
-            });
+            let gaze_blocked = self.world.campaign.is_some()
+                && (self.world.status_timers.blind > 0
+                    || crate::systems::tools::is_player_blindfolded(&self.world));
+            if gaze_blocked {
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: "Your blindness shields you from the floating eye's gaze!".to_string(),
+                });
+            } else {
+                self.inner.world.state_mut().paralysis_turns = self.world.paralysis_turns.max(2);
+                events.push(GameEvent::PassiveAttackTriggered {
+                    source: defender,
+                    target: attacker,
+                });
+            }
+        }
+        if resolution.hit
+            && self.world.campaign.is_some()
+            && matches!(
+                self.world
+                    .entities
+                    .get(defender)
+                    .and_then(|entity| entity.monster_passive()),
+                Some(MonsterPassive::SplitOnHit)
+            )
+        {
+            match crate::systems::monster_ai::try_split_on_hit(&mut self.inner.world, defender) {
+                Ok(split_events) => events.extend(split_events),
+                Err(error) => return self.abort_transaction(error),
+            }
         }
         events.extend(engrave::erode_elbereth_on_attack(&mut self.inner.world));
         let death_events = match death::collect_death_events_after_attack(
@@ -527,8 +672,72 @@ impl GameSession {
     }
 
     fn submit_pickup(&mut self) -> TurnOutcome {
+        let floor_item = self
+            .world
+            .entities
+            .item_at(self.world.current_level(), self.world.player_pos());
         match items::pickup(&mut self.inner.world) {
-            Ok(event) => self.accept_turn(vec![event]),
+            Ok(event) => {
+                let mut events = vec![event];
+                if let Some(item) = floor_item {
+                    if self.world.campaign.is_some()
+                        && self.world.entities.get(item).and_then(|e| e.item_unpaid()) == Some(true)
+                        && crate::systems::npc::has_peaceful_shopkeeper_on_level(&self.world)
+                    {
+                        let price = crate::systems::npc::unpaid_item_price(&self.world, item);
+                        let item_name = self
+                            .world
+                            .entities
+                            .item_data(item)
+                            .map(|d| {
+                                crate::appearance::display_name_for_world_item(
+                                    self.meta.seed,
+                                    &self.world,
+                                    item,
+                                    d.kind,
+                                )
+                            })
+                            .unwrap_or_else(|| "item".to_string());
+                        events.push(GameEvent::Message {
+                            priority: MessagePriority::Info,
+                            text: format!(
+                                "You pick up {item_name} (unpaid, {price} gold). Shop debt: {} gold.",
+                                self.world.shop_debt
+                            ),
+                        });
+                    }
+                }
+                if let (Some(item), Some(campaign)) = (floor_item, self.world.campaign) {
+                    if let Some(def) =
+                        crate::systems::artifacts::artifact_def_for_item(&self.world, item)
+                    {
+                        if crate::systems::artifacts::is_artifact_hostile_to(
+                            def,
+                            campaign.alignment,
+                        ) {
+                            let state = &mut self.inner;
+                            match crate::systems::artifacts::apply_artifact_blast(
+                                &mut state.world,
+                                &mut state.rng,
+                                def,
+                                2,
+                                6,
+                                "pick up",
+                            ) {
+                                Ok(blast) => {
+                                    events.extend(blast);
+                                    self.inner.state = death::state_after_deaths_at(
+                                        &self.world,
+                                        self.turn.saturating_add(1),
+                                    );
+                                }
+                                Err(error) => return self.abort_transaction(error),
+                            }
+                        }
+                    }
+                }
+                self.accept_turn(events)
+            }
             Err(error) => self.reject(error),
         }
     }
@@ -558,6 +767,34 @@ impl GameSession {
     }
 
     fn submit_wield(&mut self, item: EntityId) -> TurnOutcome {
+        if let Some(campaign) = self.world.campaign {
+            if self.world.inventory.contains(item) {
+                if let Some(def) =
+                    crate::systems::artifacts::artifact_def_for_item(&self.world, item)
+                {
+                    if crate::systems::artifacts::is_artifact_hostile_to(def, campaign.alignment) {
+                        let state = &mut self.inner;
+                        return match crate::systems::artifacts::apply_artifact_blast(
+                            &mut state.world,
+                            &mut state.rng,
+                            def,
+                            4,
+                            4,
+                            "wield",
+                        ) {
+                            Ok(events) => {
+                                self.inner.state = death::state_after_deaths_at(
+                                    &self.world,
+                                    self.turn.saturating_add(1),
+                                );
+                                self.accept_turn(events)
+                            }
+                            Err(error) => self.abort_transaction(error),
+                        };
+                    }
+                }
+            }
+        }
         match items::wield(&mut self.inner.world, item) {
             Ok(Some(event)) => self.accept_turn(vec![event]),
             Ok(None) => self.accept_without_turn(Vec::new()),
@@ -628,28 +865,67 @@ impl GameSession {
     }
 
     fn submit_pray(&mut self) -> TurnOutcome {
+        if self.world.campaign.is_some() {
+            let state = &mut self.inner;
+            return match altar::resolve_campaign_pray(&mut state.world, &mut state.rng) {
+                Ok(events) => {
+                    self.inner.state =
+                        death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
+                    self.accept_turn(events)
+                }
+                Err(error) => self.reject(error),
+            };
+        }
         if self.world.prayer_cooldown > 0 {
             return self.reject("prayer is on cooldown".to_string());
         }
-        let cooldown = self
-            .world
-            .campaign
-            .map(|c| c.attributes.wis_prayer_cooldown())
-            .unwrap_or(20);
-        self.inner.world.state_mut().prayer_cooldown = cooldown;
+        self.inner.world.state_mut().prayer_cooldown = 20;
         self.inner.world.state_mut().luck = self.world.luck.saturating_add(1).min(3);
-        let mut events = vec![GameEvent::PrayerOffered {
+        let events = vec![GameEvent::PrayerOffered {
             entity: self.world.player_id(),
             cooldown_after: self.world.prayer_cooldown,
         }];
-        if altar::is_on_altar(&self.world) {
-            events.extend(altar::pray_at_altar(&mut self.inner.world));
-        }
         self.accept_turn(events)
     }
 
     fn submit_offer(&mut self, item: EntityId) -> TurnOutcome {
-        match altar::offer(&mut self.inner.world, item) {
+        let state = &mut self.inner;
+        match altar::offer(&mut state.world, &mut state.rng, item) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_invoke(&mut self, item: EntityId) -> TurnOutcome {
+        let state = &mut self.inner;
+        match crate::systems::artifacts::invoke(&mut state.world, &mut state.rng, item) {
+            Ok(events) => {
+                self.inner.state =
+                    death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
+                self.accept_turn(events)
+            }
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_enhance(&mut self, skill: aihack_core::campaign::SkillCategory) -> TurnOutcome {
+        match crate::systems::skills::enhance(&mut self.inner.world, skill) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_chat(&mut self, direction: Direction) -> TurnOutcome {
+        match crate::systems::npc::chat(self.meta.seed, self.turn, &self.inner.world, direction) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_pay(&mut self) -> TurnOutcome {
+        let seed = self.meta.seed;
+        let state = &mut self.inner;
+        match crate::systems::npc::pay(seed, &mut state.world, &mut state.rng) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
@@ -685,7 +961,7 @@ impl GameSession {
 
     fn submit_descend(&mut self) -> TurnOutcome {
         match stairs::descend(&mut self.inner.world) {
-            Ok(event) => self.accept_turn(vec![event]),
+            Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
     }
@@ -711,9 +987,16 @@ impl GameSession {
             }]);
         }
         match stairs::ascend(&mut self.inner.world) {
-            Ok(event) => {
-                let mut events = vec![event.clone()];
-                if let GameEvent::LevelChanged { to, .. } = event {
+            Ok(mut events) => {
+                let entered_to = events.iter().find_map(|event| match event {
+                    GameEvent::LevelChanged { entity, to, .. }
+                        if *entity == self.world.player_id =>
+                    {
+                        Some(*to)
+                    }
+                    _ => None,
+                });
+                if let Some(to) = entered_to {
                     match ascension::on_level_entered(&mut self.inner.world, to) {
                         Ok(pursuit_events) => events.extend(pursuit_events),
                         Err(error) => return self.abort_transaction(error),
@@ -747,14 +1030,16 @@ impl GameSession {
     }
 
     fn submit_buy(&mut self, kind: aihack_core::domain::item::ItemKind) -> TurnOutcome {
-        match crate::systems::shop::buy(&mut self.inner.world, kind) {
+        let seed = self.meta.seed;
+        match crate::systems::shop::buy(seed, &mut self.inner.world, kind) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
     }
 
     fn submit_sell(&mut self, item: EntityId) -> TurnOutcome {
-        match crate::systems::shop::sell(&mut self.inner.world, item) {
+        let seed = self.meta.seed;
+        match crate::systems::shop::sell(seed, &mut self.inner.world, item) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
@@ -770,8 +1055,9 @@ impl GameSession {
 
     fn submit_container_put(&mut self, container: EntityId, item: EntityId) -> TurnOutcome {
         let next_turn = self.turn.saturating_add(1);
+        let seed = self.meta.seed;
         let state = &mut self.inner;
-        match containers::container_put(&mut state.world, &mut state.rng, container, item) {
+        match containers::container_put(seed, &mut state.world, &mut state.rng, container, item) {
             Ok(events) => {
                 state.state = death::state_after_deaths_at(&state.world, next_turn);
                 self.accept_turn(events)
@@ -782,8 +1068,9 @@ impl GameSession {
 
     fn submit_container_take(&mut self, container: EntityId, item: EntityId) -> TurnOutcome {
         let next_turn = self.turn.saturating_add(1);
+        let seed = self.meta.seed;
         let state = &mut self.inner;
-        match containers::container_take(&mut state.world, &mut state.rng, container, item) {
+        match containers::container_take(seed, &mut state.world, &mut state.rng, container, item) {
             Ok(events) => {
                 state.state = death::state_after_deaths_at(&state.world, next_turn);
                 self.accept_turn(events)
@@ -794,8 +1081,9 @@ impl GameSession {
 
     fn submit_dip(&mut self, item: EntityId, target: DipTarget) -> TurnOutcome {
         let next_turn = self.turn.saturating_add(1);
+        let seed = self.meta.seed;
         let state = &mut self.inner;
-        match dip::dip(&mut state.world, &mut state.rng, item, target) {
+        match dip::dip(seed, &mut state.world, &mut state.rng, item, target) {
             Ok(events) => {
                 state.state = death::state_after_deaths_at(&state.world, next_turn);
                 self.accept_turn(events)
@@ -848,6 +1136,11 @@ impl GameSession {
         let prev_hunger = self.world.hunger_state();
         self.inner.world.state_mut().nutrition = self.world.nutrition.saturating_sub(1);
         self.inner.world.state_mut().prayer_cooldown = self.world.prayer_cooldown.saturating_sub(1);
+        if let Some(mut c) = self.inner.world.campaign {
+            c.prayer_timeout = c.prayer_timeout.saturating_sub(1);
+            c.artifact_invoke_cooldown = c.artifact_invoke_cooldown.saturating_sub(1);
+            self.inner.world.state_mut().campaign = Some(c);
+        }
         if let Some(campaign) = self.world.campaign {
             if !matches!(
                 self.state,
@@ -857,7 +1150,7 @@ impl GameSession {
                     self.inner.world.state_mut().mp += 1;
                 }
                 if self.world.poison_turns == 0 && self.world.nutrition > 50 {
-                    let bonus_reduction = campaign.attributes.con_hp_per_level_bonus().max(0) as u8;
+                    let bonus_reduction = campaign.attributes.con_regen_reduction();
                     let floor = if bonus_reduction > 0 { 4 } else { 5 };
                     let regen_interval = u64::from(
                         (15_u8
@@ -888,6 +1181,10 @@ impl GameSession {
                 {
                     self.inner.world.state_mut().nutrition = self.world.nutrition.saturating_sub(1);
                 }
+                let moved_this_turn = events.iter().any(|e| {
+                    matches!(e, GameEvent::EntityMoved { entity, .. } if *entity == self.world.player_id)
+                });
+                let mut levitation_expired = false;
                 {
                     let state = self.inner.world.state_mut();
                     let timers = &mut state.status_timers;
@@ -904,6 +1201,9 @@ impl GameSession {
                         if *timer > 0 {
                             *timer -= 1;
                             if *timer == 0 {
+                                if msg == "You float gently to the floor." {
+                                    levitation_expired = true;
+                                }
                                 expiry_msgs.push(msg);
                             }
                         }
@@ -920,7 +1220,43 @@ impl GameSession {
                         });
                     }
                 }
+                let player_id = self.world.player_id;
+                let current_tile = self.world.current_map().tile(self.world.player_pos()).ok();
+                if self.world.player_alive()
+                    && matches!(
+                        current_tile,
+                        Some(
+                            aihack_core::domain::tile::TileKind::Water
+                                | aihack_core::domain::tile::TileKind::Lava
+                        )
+                    )
+                    && (levitation_expired
+                        || (!moved_this_turn && self.world.status_timers.levitation == 0))
+                {
+                    let seed = self.meta.seed;
+                    let (terrain_events, terrain_cause) = {
+                        let state = &mut self.inner;
+                        terrain::on_player_enter_tile(seed, &mut state.world, &mut state.rng)
+                    };
+                    events.extend(terrain_events);
+                    if let Some(cause) = terrain_cause {
+                        let terrain_death = match death::collect_death_events_if_hp_depleted(
+                            &mut self.inner.world,
+                            player_id,
+                            cause,
+                        ) {
+                            Ok(events) => events,
+                            Err(error) => return self.abort_transaction(error),
+                        };
+                        events.extend(terrain_death);
+                    }
+                    self.inner.state = death::state_after_deaths_at(&self.world, next_turn);
+                }
                 events.extend(tools::tick_active_lamps(&mut self.inner.world));
+                events.extend(crate::systems::pets::tick_pets_hunger(
+                    &mut self.inner.world,
+                    next_turn,
+                ));
                 {
                     let state = &mut self.inner;
                     engrave::tick_dust_engravings(&mut state.world, &mut state.rng);

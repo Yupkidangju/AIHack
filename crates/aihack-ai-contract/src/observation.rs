@@ -1,8 +1,8 @@
 use aihack_core::{
     action::{ActionIntent, CommandIntent},
-    campaign::{Alignment, Attributes, Race},
+    campaign::{Alignment, Attributes, Race, SkillCategory, SkillRank},
     domain::{
-        entity::EntityKind,
+        entity::{EntityKind, Faction},
         inventory::InventoryLetter,
         item::{BucStatus, EquipmentSlot, ItemClass, ItemKind},
         tile::TileKind,
@@ -120,6 +120,8 @@ pub struct PlayerObservation {
     pub invisible_turns: u8,
     #[serde(default, skip_serializing_if = "is_false")]
     pub blindfolded: bool,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub shop_debt: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +139,10 @@ pub struct EntityObservation {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faction: Option<Faction>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub unpaid: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -161,6 +167,8 @@ pub struct ContainerItemObservation {
     pub enchantment: i8,
     #[serde(default, skip_serializing_if = "is_zero_u8")]
     pub erosion: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,6 +193,16 @@ pub struct Observation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillObservation {
+    pub category: SkillCategory,
+    pub rank: SkillRank,
+    pub cap: SkillRank,
+    pub practice: u16,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CampaignObservation {
     pub carried_weight: i16,
     pub carrying_capacity: i16,
@@ -200,6 +218,14 @@ pub struct CampaignObservation {
     pub alignment: Option<Alignment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub race: Option<Race>,
+    #[serde(default, skip_serializing_if = "is_zero_i16")]
+    pub god_anger: i16,
+    #[serde(default, skip_serializing_if = "is_zero_u16")]
+    pub prayer_timeout: u16,
+    #[serde(default, skip_serializing_if = "is_zero_u16")]
+    pub artifact_invoke_cooldown: u16,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<SkillObservation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -237,6 +263,10 @@ pub struct ItemObservation {
     pub container_locked: bool,
     #[serde(default, skip_serializing_if = "is_zero_u8")]
     pub erosion: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub unpaid: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -247,4 +277,6 @@ pub struct TileObservation {
     pub visible: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engraving: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub altar_alignment: Option<Alignment>,
 }

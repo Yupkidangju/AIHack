@@ -1,5 +1,17 @@
 # AIHack Provenance and License Gate
 
+## Stage 5 (P11) 콘텐츠 확장 기록 (2026-11-27)
+
+`ADR-P11-01` 및 `docs/campaign_spec.md` `## Stage 5 (P11)`에 따라 `crates/aihack-content/src/data/monsters.toml`에 신규 P11 몬스터·동료·NPC 17종(`monster.kitten`, `monster.housecat`, `monster.little_dog`, `monster.dog`, `monster.pony`, `monster.warhorse`, `monster.shopkeeper`, `monster.temple_priest`, `monster.oracle`, `monster.watchman`, `monster.leprechaun`, `monster.nymph`, `monster.rust_monster`, `monster.black_pudding`, `monster.dwarf`, `monster.medusa`, `monster.orc_captain`)을 추가하고 기존 인간형 몬스터 5종(`goblin`/`kobold`/`orc`/`ogre`/`gnoll_archer`)의 `ai_flags`를 확장했다. 기존 아이템 55종과 `main_1.toml`·`main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `monsters.toml` SHA256은 `e454e6629f17e85afe6f6124d3965fbfd2baccb3c36df22cefe326219a5dac38`에서 `704e48b35aeb3f3661fdab8f054a31447dd5771713c60b790330581d674c165c`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
+## Stage 4.5 (P10-Audit-Fix) 콘텐츠 동기화 기록 (2026-11-27)
+
+`ADR-P10-02` 및 `docs/campaign_spec.md` `## Stage 4.5 (P10-Audit-Fix)`에 따라 `crates/aihack-content/src/data/items.toml`의 `item.quest.ascension`에서 미사용 `artifact_id="amulet_of_ascension"` 필드를 제거하고(`MIN-07`), `crates/aihack-content/src/data/monsters.toml`의 `monster.floating_eye` `difficulty`를 `3`에서 `5`로 동기화했다(`MIN-06`). 기존 아이템·몬스터 종류와 `main_1.toml`·`main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `eba715745046d08ef6fba30e5bdd93c6f848c42d6733acbba3b7e65afe591a27`에서 `2f4e9b632ff68117571f1368a99fb6dbafdc5a058e73f8b6d9d8b3de6780cc56`로, LF `monsters.toml` SHA256은 `1c73ddab91eeb8c1852885d6ad886357d341f64fb4aafc937160c79f6a9ee9b0`에서 `e454e6629f17e85afe6f6124d3965fbfd2baccb3c36df22cefe326219a5dac38`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
+## Stage 4 (P10) 콘텐츠 확장 기록 (2026-11-27)
+
+`ADR-P10-01` 및 `docs/campaign_spec.md` `## Stage 4 (P10)`에 따라 `crates/aihack-content/src/data/items.toml`에 신규 무기 5종(`item.weapon.long_sword`, `item.weapon.katana`, `item.weapon.battle_axe`, `item.weapon.quarterstaff`, `item.weapon.broad_sword`)을 추가했다. 기존 50개 item, 13종 monster, `main_1.toml`, `main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `b45ed709b09768670536e1d6a65e171c1787104ecd3078ee1e696e6470b340a3`에서 `eba715745046d08ef6fba30e5bdd93c6f848c42d6733acbba3b7e65afe591a27`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
 ## Stage 3 (P9) 콘텐츠 확장 기록 (2026-11-27)
 
 `ADR-P9-01` 및 `docs/campaign_spec.md` `## Stage 3 (P9)`에 따라 `crates/aihack-content/src/data/items.toml`에 신규 13종 아이템(도구 8종 `SkeletonKey`/`LockPick`/`PickAxe`/`DwarvishMattock`/`TinWhistle`/`OilLamp`/`Blindfold`/`UnicornHorn`, 컨테이너 3종 `Sack`/`BagOfHolding`/`Chest`, 물약/두루마리 2종 `PotionWater`/`ScrollBlank`)을 추가했다. 기존 37개 item, 13종 monster, `main_1.toml`, `main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `503687fa5688c986f7669c3ff6fa71ed26dcc9b1455c9b9650e16ffdb18777e3`에서 `b45ed709b09768670536e1d6a65e171c1787104ecd3078ee1e696e6470b340a3`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.

@@ -26,16 +26,67 @@ fn allocation_content_error(error: aihack_core::error::EntityAllocationError) ->
     }
 }
 
+fn resolve_safe_floor_pos(map: &aihack_core::domain::map::GameMap, preferred: Pos) -> Pos {
+    use aihack_core::domain::tile::TileKind;
+    if map.tile(preferred).ok() == Some(TileKind::Floor) {
+        return preferred;
+    }
+    for radius in 1..=3_i16 {
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if dx.abs().max(dy.abs()) != radius {
+                    continue;
+                }
+                let candidate = Pos {
+                    x: preferred.x.saturating_add(dx),
+                    y: preferred.y.saturating_add(dy),
+                };
+                if map.contains(candidate) && map.tile(candidate).ok() == Some(TileKind::Floor) {
+                    return candidate;
+                }
+            }
+        }
+    }
+    preferred
+}
+
 pub(crate) fn campaign_world(
     registry: &ContentRegistry,
     seed: u64,
     role: aihack_core::campaign::Role,
 ) -> Result<WorldState<EntityStore>, ContentError> {
+    campaign_world_with_build(
+        registry,
+        seed,
+        role,
+        role.default_race(),
+        role.default_alignment(),
+    )
+}
+
+pub(crate) fn campaign_world_with_build(
+    registry: &ContentRegistry,
+    seed: u64,
+    role: aihack_core::campaign::Role,
+    race: aihack_core::campaign::Race,
+    alignment: aihack_core::campaign::Alignment,
+) -> Result<WorldState<EntityStore>, ContentError> {
     use aihack_core::{
         campaign::{CampaignState, Role},
         domain::{item::BucStatus, monster::MonsterKind},
-        ids::LevelId,
+        ids::{BranchId, LevelId},
     };
+    if !role.is_valid_combo(race, alignment) {
+        return Err(ContentError::Parse {
+            file: "campaign build".to_owned(),
+            message: format!(
+                "invalid build: {} cannot be {} {}",
+                role.display_name(),
+                alignment.as_str(),
+                race.as_str()
+            ),
+        });
+    }
     let mut state = initial_world(registry)?;
     state.entities = EntityStore::new();
     state.levels.levels.clear();
@@ -47,7 +98,34 @@ pub(crate) fn campaign_world(
     state.inventory = Inventory::new(state.player_id);
     let mut amulet = None;
     for id in crate::campaign_map::level_ids() {
-        let (level, centers) = crate::campaign_map::generate(seed, id)?;
+        let (mut level, centers) = crate::campaign_map::generate(seed, id)?;
+        if id == LevelId::main(3) {
+            let positions: Vec<Pos> = (0..level.map.height)
+                .flat_map(|y| (0..level.map.width).map(move |x| Pos { x, y }))
+                .filter(|&p| {
+                    level.map.tile(p).ok() == Some(aihack_core::domain::tile::TileKind::Altar)
+                })
+                .collect();
+            for pos in positions {
+                level.set_altar_alignment(pos, alignment);
+            }
+        } else if id
+            == (LevelId {
+                branch: BranchId::Mines,
+                depth: 2,
+            })
+        {
+            let cross = alignment.cross_alignment();
+            let positions: Vec<Pos> = (0..level.map.height)
+                .flat_map(|y| (0..level.map.width).map(move |x| Pos { x, y }))
+                .filter(|&p| {
+                    level.map.tile(p).ok() == Some(aihack_core::domain::tile::TileKind::Altar)
+                })
+                .collect();
+            for pos in positions {
+                level.set_altar_alignment(pos, cross);
+            }
+        }
         state.levels.levels.push(level);
         let mut monster_spawns = match (id.branch, id.depth) {
             (aihack_core::ids::BranchId::Main, 1 | 2) => {
@@ -141,6 +219,57 @@ pub(crate) fn campaign_world(
                 ),
             ],
         };
+        if id.branch == aihack_core::ids::BranchId::Main && (2..=5).contains(&id.depth) {
+            let weighted = aihack_content::weighted_monster_kinds_for_depth(id.depth, registry);
+            let total: u32 = weighted.iter().map(|(_, w)| *w).sum();
+            if total > 0 {
+                let mut roll = (seed
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add((id.depth as u64).wrapping_mul(1442695040888963407))
+                    % u64::from(total)) as u32;
+                let mut picked = weighted[0].0;
+                for (kind, weight) in weighted {
+                    if roll < weight {
+                        picked = kind;
+                        break;
+                    }
+                    roll -= weight;
+                }
+                if let Some(level_ref) = state.levels.levels.last() {
+                    let mut chosen = None;
+                    for radius in 0..=2_i16 {
+                        for dy in -radius..=radius {
+                            for dx in -radius..=radius {
+                                if radius > 0 && dx.abs().max(dy.abs()) != radius {
+                                    continue;
+                                }
+                                let pos = Pos {
+                                    x: centers[5].x.saturating_add(dx),
+                                    y: centers[5].y.saturating_add(dy),
+                                };
+                                if level_ref.map.tile(pos).ok()
+                                    == Some(aihack_core::domain::tile::TileKind::Floor)
+                                    && pos != centers[0]
+                                    && !monster_spawns.iter().any(|(_, p)| *p == pos)
+                                {
+                                    chosen = Some(pos);
+                                    break;
+                                }
+                            }
+                            if chosen.is_some() {
+                                break;
+                            }
+                        }
+                        if chosen.is_some() {
+                            break;
+                        }
+                    }
+                    if let Some(pos) = chosen {
+                        monster_spawns.push((picked, pos));
+                    }
+                }
+            }
+        }
         for (kind, pos) in monster_spawns.drain(..) {
             let monster = state
                 .entities
@@ -429,8 +558,8 @@ pub(crate) fn campaign_world(
                 floor_items.push((
                     ItemKind::Dagger,
                     Pos {
-                        x: centers[1].x,
-                        y: centers[1].y - 1,
+                        x: centers[1].x - 1,
+                        y: centers[1].y,
                     },
                     BucStatus::Cursed,
                     -1,
@@ -495,8 +624,8 @@ pub(crate) fn campaign_world(
                 floor_items.push((
                     ItemKind::RingProtection,
                     Pos {
-                        x: centers[1].x,
-                        y: centers[1].y - 1,
+                        x: centers[1].x - 1,
+                        y: centers[1].y,
                     },
                     BucStatus::Uncursed,
                     1,
@@ -514,7 +643,13 @@ pub(crate) fn campaign_world(
             }
             _ => {}
         }
-        for (kind, pos, buc, enchantment) in floor_items {
+        for (kind, raw_pos, buc, enchantment) in floor_items {
+            let pos = state
+                .levels
+                .levels
+                .last()
+                .map(|lvl| resolve_safe_floor_pos(&lvl.map, raw_pos))
+                .unwrap_or(raw_pos);
             let item_id = spawn_item(
                 &mut state.entities,
                 registry,
@@ -593,6 +728,47 @@ pub(crate) fn campaign_world(
             ItemKind::PotionExtraHealing,
             ItemKind::ScrollIdentify,
         ],
+        Role::Valkyrie => vec![
+            ItemKind::LongSword,
+            ItemKind::ArmorShield,
+            ItemKind::PotionHealing,
+        ],
+        Role::Wizard => vec![
+            ItemKind::Quarterstaff,
+            ItemKind::WandMagicMissile,
+            ItemKind::PotionHealing,
+        ],
+        Role::Rogue => vec![
+            ItemKind::ShortSword,
+            ItemKind::LockPick,
+            ItemKind::PotionInvisibility,
+        ],
+        Role::Priest => vec![
+            ItemKind::Mace,
+            ItemKind::PotionWater,
+            ItemKind::PotionExtraHealing,
+        ],
+        Role::Samurai => vec![
+            ItemKind::Katana,
+            ItemKind::ArmorLeather,
+            ItemKind::PotionSpeed,
+        ],
+        Role::Barbarian => vec![
+            ItemKind::BattleAxe,
+            ItemKind::FoodRation,
+            ItemKind::PotionHealing,
+        ],
+        Role::Ranger => vec![ItemKind::Rock, ItemKind::Rock, ItemKind::ArmorCloak],
+        Role::Monk => vec![
+            ItemKind::FoodRation,
+            ItemKind::PotionHealing,
+            ItemKind::PotionSpeed,
+        ],
+        Role::Archeologist => vec![
+            ItemKind::PickAxe,
+            ItemKind::ArmorLeather,
+            ItemKind::ScrollIdentify,
+        ],
     };
     for kind in [
         ItemKind::Dagger,
@@ -620,7 +796,12 @@ pub(crate) fn campaign_world(
         state.entities.set_item_buc_known(item, true);
         state.entities.set_item_enchant_known(item, true);
     }
-    let campaign = CampaignState::new(role, amulet.expect("Main 6 was generated"));
+    let campaign =
+        CampaignState::new_custom(role, race, alignment, amulet.expect("Main 6 was generated"))
+            .map_err(|message| ContentError::Parse {
+                file: "campaign build".to_owned(),
+                message,
+            })?;
     let stats = state
         .entities
         .actor_stats_mut(state.player_id)
@@ -630,12 +811,246 @@ pub(crate) fn campaign_world(
     stats.hit_bonus = campaign.hit_bonus();
     stats.damage_bonus = campaign.damage_bonus();
     state.campaign = Some(campaign);
+    state.intrinsic_resistances = race.intrinsic_resistances();
+    crate::systems::skills::init_role_skills(&mut state, role);
     state.gold = 50;
     state.max_mp = campaign.max_mp();
     state.mp = campaign.max_mp();
     state.ascension_pursuit_stage = 0;
+    state.shop_debt = 0;
+    spawn_campaign_companions_and_npcs(&mut state, registry, role, race)?;
     mark_level_initial_explored(&mut state);
     Ok(state)
+}
+
+fn find_open_actor_tile(
+    state: &WorldState<EntityStore>,
+    level_id: aihack_core::ids::LevelId,
+    center: Pos,
+    avoid_pos: Option<Pos>,
+) -> Option<Pos> {
+    let map = state.levels.map(level_id)?;
+    for radius in 1..=3_i16 {
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if dx.abs().max(dy.abs()) != radius {
+                    continue;
+                }
+                let candidate = Pos {
+                    x: center.x.saturating_add(dx),
+                    y: center.y.saturating_add(dy),
+                };
+                if avoid_pos == Some(candidate) || !map.contains(candidate) {
+                    continue;
+                }
+                if map.tile(candidate).ok() == Some(aihack_core::domain::tile::TileKind::Floor)
+                    && state.entities.alive_actor_at(level_id, candidate).is_none()
+                {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_tile_on_level(
+    state: &WorldState<EntityStore>,
+    level_id: aihack_core::ids::LevelId,
+    target: aihack_core::domain::tile::TileKind,
+) -> Option<Pos> {
+    let map = state.levels.map(level_id)?;
+    for y in 0..map.height {
+        for x in 0..map.width {
+            let pos = Pos { x, y };
+            if map.tile(pos).ok() == Some(target) {
+                return Some(pos);
+            }
+        }
+    }
+    None
+}
+
+fn spawn_campaign_companions_and_npcs(
+    state: &mut WorldState<EntityStore>,
+    registry: &ContentRegistry,
+    role: aihack_core::campaign::Role,
+    race: aihack_core::campaign::Race,
+) -> Result<(), ContentError> {
+    use aihack_core::{
+        domain::{entity::Faction, monster::MonsterKind, tile::TileKind},
+        ids::{BranchId, LevelId},
+    };
+    // 1. Starting pet adjacent to player on Main 1
+    let main1 = LevelId::main(1);
+    if let Some((_, player_pos)) = state.entities.actor_location(state.player_id) {
+        if let Some(pet_pos) = find_open_actor_tile(state, main1, player_pos, Some(player_pos)) {
+            let pet_kind = crate::systems::pets::starting_pet_kind(role, race);
+            let pet_id = state
+                .entities
+                .spawn_monster_with_faction(
+                    pet_kind,
+                    try_monster_template_from_registry(pet_kind, registry)?,
+                    Faction::Pet,
+                    pet_pos,
+                )
+                .map_err(allocation_content_error)?;
+            state.entities.set_actor_location(pet_id, main1, pet_pos);
+            crate::systems::pets::init_pet_state(&mut state.entities, pet_id, 5);
+        }
+    }
+
+    // 2. Shopkeepers + displayed unpaid wares on Main 2 and Mines 1
+    let shop_configs: [(LevelId, [ItemKind; 3]); 2] = [
+        (
+            LevelId::main(2),
+            [
+                ItemKind::ScrollIdentify,
+                ItemKind::ArmorCloak,
+                ItemKind::RingProtection,
+            ],
+        ),
+        (
+            LevelId {
+                branch: BranchId::Mines,
+                depth: 1,
+            },
+            [
+                ItemKind::ScrollEnchantArmor,
+                ItemKind::ArmorGloves,
+                ItemKind::LockPick,
+            ],
+        ),
+    ];
+    for (shop_level, wares) in shop_configs {
+        if let Some(shop_pos) = find_tile_on_level(state, shop_level, TileKind::Shop) {
+            if let Some(sk_pos) = find_open_actor_tile(state, shop_level, shop_pos, Some(shop_pos))
+            {
+                let sk_id = state
+                    .entities
+                    .spawn_monster_with_faction(
+                        MonsterKind::Shopkeeper,
+                        try_monster_template_from_registry(MonsterKind::Shopkeeper, registry)?,
+                        Faction::Shopkeeper,
+                        sk_pos,
+                    )
+                    .map_err(allocation_content_error)?;
+                state.entities.set_actor_location(sk_id, shop_level, sk_pos);
+            }
+            let offsets = [(-1_i16, 0_i16), (1, 0), (-1, 1), (1, 1), (0, 2), (-2, 1)];
+            let mut placed = 0usize;
+            for (dx, dy) in offsets {
+                if placed >= wares.len() {
+                    break;
+                }
+                let candidate = Pos {
+                    x: shop_pos.x.saturating_add(dx),
+                    y: shop_pos.y.saturating_add(dy),
+                };
+                let is_open_floor = state.levels.map(shop_level).is_some_and(|map| {
+                    map.contains(candidate) && map.tile(candidate).ok() == Some(TileKind::Floor)
+                }) && state.entities.items_at(shop_level, candidate).is_empty()
+                    && state
+                        .entities
+                        .alive_actor_at(shop_level, candidate)
+                        .is_none();
+                if is_open_floor {
+                    let item_id = spawn_item(
+                        &mut state.entities,
+                        registry,
+                        wares[placed],
+                        EntityLocation::OnMap {
+                            level: shop_level,
+                            pos: candidate,
+                        },
+                    )?;
+                    state.entities.set_item_unpaid(item_id, true);
+                    placed += 1;
+                }
+            }
+        }
+    }
+
+    // 3. Temple Priest on Main 3 adjacent to Altar
+    let main3 = LevelId::main(3);
+    if let Some(altar_pos) = find_tile_on_level(state, main3, TileKind::Altar) {
+        if let Some(priest_pos) = find_open_actor_tile(state, main3, altar_pos, Some(altar_pos)) {
+            let priest_id = state
+                .entities
+                .spawn_monster_with_faction(
+                    MonsterKind::TemplePriest,
+                    try_monster_template_from_registry(MonsterKind::TemplePriest, registry)?,
+                    Faction::Peaceful,
+                    priest_pos,
+                )
+                .map_err(allocation_content_error)?;
+            state
+                .entities
+                .set_actor_location(priest_id, main3, priest_pos);
+        }
+    }
+
+    // 4. Oracle on Main 4
+    let main4 = LevelId::main(4);
+    if let Some(sink_pos) = find_tile_on_level(state, main4, TileKind::Sink) {
+        if let Some(oracle_pos) = find_open_actor_tile(state, main4, sink_pos, Some(sink_pos)) {
+            let oracle_id = state
+                .entities
+                .spawn_monster_with_faction(
+                    MonsterKind::Oracle,
+                    try_monster_template_from_registry(MonsterKind::Oracle, registry)?,
+                    Faction::Peaceful,
+                    oracle_pos,
+                )
+                .map_err(allocation_content_error)?;
+            state
+                .entities
+                .set_actor_location(oracle_id, main4, oracle_pos);
+        }
+    }
+
+    // 5. Watchman on Mines 1 near the shop
+    let mines1 = LevelId {
+        branch: BranchId::Mines,
+        depth: 1,
+    };
+    if let Some(shop_pos) = find_tile_on_level(state, mines1, TileKind::Shop) {
+        if let Some(watch_pos) = find_open_actor_tile(state, mines1, shop_pos, Some(shop_pos)) {
+            let watch_id = state
+                .entities
+                .spawn_monster_with_faction(
+                    MonsterKind::Watchman,
+                    try_monster_template_from_registry(MonsterKind::Watchman, registry)?,
+                    Faction::Peaceful,
+                    watch_pos,
+                )
+                .map_err(allocation_content_error)?;
+            state
+                .entities
+                .set_actor_location(watch_id, mines1, watch_pos);
+        }
+    }
+
+    // 6. Medusa guardian in Main 6 Room 5 (optional deep vault chamber off the direct Room 0->3 corridor)
+    let main6 = LevelId::main(6);
+    if let Some(stairs_up) = state.levels.stairs_up_pos(main6) {
+        let preferred = Pos { x: 10, y: 15 };
+        if let Some(medusa_pos) = find_open_actor_tile(state, main6, preferred, Some(stairs_up)) {
+            let medusa_id = state
+                .entities
+                .spawn_monster_with_faction(
+                    MonsterKind::Medusa,
+                    try_monster_template_from_registry(MonsterKind::Medusa, registry)?,
+                    Faction::Hostile,
+                    medusa_pos,
+                )
+                .map_err(allocation_content_error)?;
+            state
+                .entities
+                .set_actor_location(medusa_id, main6, medusa_pos);
+        }
+    }
+    Ok(())
 }
 
 fn mark_level_initial_explored(state: &mut WorldState<EntityStore>) {
@@ -758,9 +1173,11 @@ pub fn initial_world(registry: &ContentRegistry) -> Result<WorldState<EntityStor
         status_timers: StatusTimers::default(),
         weapon_skills: BTreeMap::new(),
         spell_skill: BTreeMap::new(),
+        skill_practice: BTreeMap::new(),
         learned_spells: Vec::new(),
         generated_artifacts: BTreeSet::new(),
         ascension_altars: Vec::new(),
+        shop_debt: 0,
         last_death_cause: None,
     };
     mark_level_initial_explored(&mut state);

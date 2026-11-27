@@ -1,9 +1,13 @@
-use crate::{save::SavedWorldV1, world::GameWorld};
+use crate::{save::SavedWorldV1, systems::skills, world::GameWorld};
 use aihack_core::{
-    campaign::MAX_XP,
+    campaign::{
+        artifact_def, SkillCategory, SkillRank, ARTIFACT_INVOKE_COOLDOWN_TURNS, MAX_GOD_ANGER,
+        MAX_LUCK, MAX_PRAYER_TIMEOUT, MAX_XP, MIN_LUCK,
+    },
     domain::{entity::EntityLocation, item::ItemKind},
     event::{GameEvent, MessagePriority},
 };
+use std::collections::HashSet;
 
 pub(crate) fn award_xp(world: &mut GameWorld, difficulty: u16) -> Vec<GameEvent> {
     let Some(mut campaign) = world.campaign else {
@@ -61,14 +65,101 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
             || !world.status_timers.is_empty()
             || !world.weapon_skills.is_empty()
             || !world.spell_skill.is_empty()
+            || !world.skill_practice.is_empty()
             || !world.learned_spells.is_empty()
             || !world.generated_artifacts.is_empty()
             || !world.ascension_altars.is_empty()
+            || world.shop_debt > 0
         {
             return Err("legacy mode cannot have campaign P8/extended state".into());
         }
         return Ok(());
     };
+    if world.shop_debt > crate::systems::npc::MAX_SHOP_DEBT {
+        return Err("campaign shop_debt out of range".into());
+    }
+    if !campaign
+        .role
+        .is_valid_combo(campaign.race, campaign.alignment)
+    {
+        return Err("campaign role/race/alignment combo is invalid".into());
+    }
+    if !(MIN_LUCK..=MAX_LUCK).contains(&world.luck) {
+        return Err("campaign luck out of range".into());
+    }
+    if !(0..=MAX_GOD_ANGER).contains(&campaign.god_anger) {
+        return Err("campaign god_anger out of range".into());
+    }
+    if campaign.prayer_timeout > MAX_PRAYER_TIMEOUT {
+        return Err("campaign prayer_timeout out of range".into());
+    }
+    if campaign.artifact_invoke_cooldown > ARTIFACT_INVOKE_COOLDOWN_TURNS {
+        return Err("campaign artifact_invoke_cooldown out of range".into());
+    }
+    if world.learned_spells.len() > 32 {
+        return Err("learned_spells exceeds cap".into());
+    }
+    let mut seen_spells = HashSet::new();
+    for entry in &world.learned_spells {
+        if !seen_spells.insert(entry.spell) {
+            return Err("duplicate spell in learned_spells".into());
+        }
+    }
+    if world.ascension_altars.len() > 8 {
+        return Err("ascension_altars exceeds cap".into());
+    }
+    let mut seen_altar_keys = HashSet::new();
+    for &(level_id, pos) in &world.ascension_altars {
+        if !world
+            .levels
+            .map(level_id)
+            .is_some_and(|map| map.contains(pos))
+        {
+            return Err("ascension_altars contains invalid level or out-of-bounds pos".into());
+        }
+        if !seen_altar_keys.insert((level_id, pos)) {
+            return Err("duplicate entry in ascension_altars".into());
+        }
+    }
+    for art_id in &world.generated_artifacts {
+        if artifact_def(art_id).is_none() {
+            return Err(format!("unknown generated artifact id: {art_id}"));
+        }
+    }
+    for (key, rank_raw) in &world.weapon_skills {
+        let Some(cat) = SkillCategory::from_key(key) else {
+            return Err(format!("unknown weapon skill category: {key}"));
+        };
+        if cat.is_spell() {
+            return Err(format!("spell category {key} stored in weapon_skills"));
+        }
+        let Some(rank) = SkillRank::from_u8(*rank_raw) else {
+            return Err(format!("invalid weapon skill rank {rank_raw} for {key}"));
+        };
+        if rank > campaign.role.max_skill_rank(cat) {
+            return Err(format!("weapon skill {key} exceeds role cap"));
+        }
+    }
+    for (key, rank_raw) in &world.spell_skill {
+        let Some(cat) = SkillCategory::from_key(key) else {
+            return Err(format!("unknown spell skill category: {key}"));
+        };
+        if !cat.is_spell() {
+            return Err(format!("weapon category {key} stored in spell_skill"));
+        }
+        let Some(rank) = SkillRank::from_u8(*rank_raw) else {
+            return Err(format!("invalid spell skill rank {rank_raw} for {key}"));
+        };
+        if rank > campaign.role.max_skill_rank(cat) {
+            return Err(format!("spell skill {key} exceeds role cap"));
+        }
+    }
+    for key in world.skill_practice.keys() {
+        if SkillCategory::from_key(key).is_none() {
+            return Err(format!("unknown skill_practice category: {key}"));
+        }
+    }
+    let _ = skills::current_rank;
     if !campaign.attributes.is_valid() {
         return Err("campaign attributes out of range".into());
     }

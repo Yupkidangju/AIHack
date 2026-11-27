@@ -13,6 +13,7 @@ use aihack_core::{
 };
 
 use crate::{
+    appearance,
     systems::{combat::roll_die, death, items},
     world::GameWorld,
 };
@@ -46,7 +47,10 @@ pub fn drink_from_tile(world: &mut GameWorld, rng: &mut GameRng) -> Result<Vec<G
                 }
                 1 => {
                     let state = world.state_mut();
-                    state.luck = state.luck.saturating_add(1).min(3);
+                    state.luck = state
+                        .luck
+                        .saturating_add(1)
+                        .min(aihack_core::campaign::MAX_LUCK);
                     state.mp = state.mp.saturating_add(3).min(state.max_mp);
                     Ok(vec![GameEvent::Message {
                         priority: MessagePriority::Info,
@@ -111,24 +115,21 @@ pub fn drink_from_tile(world: &mut GameWorld, rng: &mut GameRng) -> Result<Vec<G
                         .then_some(candidate)
                     });
                     if let Some(bat_pos) = spawn_pos {
-                        if let Ok(template) =
-                            crate::domain::monster::try_monster_template_from_registry(
-                                MonsterKind::Bat,
-                                world.content_registry(),
-                            )
-                        {
-                            let level = world.current_level();
-                            if let Ok(bat_id) = world
-                                .state_mut()
-                                .entities
-                                .spawn_monster_with_template(MonsterKind::Bat, template, bat_pos)
-                            {
-                                world
-                                    .state_mut()
-                                    .entities
-                                    .set_actor_location(bat_id, level, bat_pos);
-                            }
-                        }
+                        let template = crate::domain::monster::try_monster_template_from_registry(
+                            MonsterKind::Bat,
+                            world.content_registry(),
+                        )
+                        .map_err(|err| err.to_string())?;
+                        let level = world.current_level();
+                        let bat_id = world
+                            .state_mut()
+                            .entities
+                            .spawn_monster_with_template(MonsterKind::Bat, template, bat_pos)
+                            .map_err(|err| err.to_string())?;
+                        world
+                            .state_mut()
+                            .entities
+                            .set_actor_location(bat_id, level, bat_pos);
                     }
                     Ok(vec![GameEvent::Message {
                         priority: MessagePriority::Warning,
@@ -230,6 +231,7 @@ pub fn drink_from_tile(world: &mut GameWorld, rng: &mut GameRng) -> Result<Vec<G
 }
 
 pub fn on_player_enter_tile(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
 ) -> (Vec<GameEvent>, Option<DeathCause>) {
@@ -280,11 +282,13 @@ pub fn on_player_enter_tile(
                     .into_iter()
                     .filter_map(|(_, opt)| opt)
                     .find(|id| {
-                        let erosion = world
-                            .entities
-                            .get(*id)
-                            .and_then(|e| e.item_erosion())
-                            .unwrap_or(0);
+                        let Some(entity) = world.entities.get(*id) else {
+                            return false;
+                        };
+                        if entity.item_artifact_id().is_some() {
+                            return false;
+                        }
+                        let erosion = entity.item_erosion().unwrap_or(0);
                         if erosion >= 3 {
                             return false;
                         }
@@ -308,7 +312,7 @@ pub fn on_player_enter_tile(
                     let _ = items::recompute_player_ac(world);
                     if let Some(kind) = world.entities.item_data(gear_id).map(|d| d.kind) {
                         let gear_name =
-                            aihack_content::item_display_name(kind, world.content_registry());
+                            appearance::display_name_for_world_item(seed, world, gear_id, kind);
                         events.push(GameEvent::Message {
                             priority: MessagePriority::Warning,
                             text: format!("Your {gear_name} looks rusty!"),

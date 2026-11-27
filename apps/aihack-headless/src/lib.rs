@@ -2,7 +2,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 use aihack_ai_contract::{
-    CommandIntent, Direction, DoorState, EntityKind, ItemKind, Observation, Pos, RunState,
+    CommandIntent, Direction, DoorState, EntityKind, Faction, ItemKind, Observation, Pos, RunState,
     SnapshotHash, SpellKind, TileKind,
 };
 use aihack_runtime::{save::ReplayLineV1, GameClient};
@@ -321,6 +321,9 @@ impl HeadlessPolicy {
 
 fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent> {
     let observation = session.observation();
+    let kind_known = |item: &aihack_ai_contract::observation::ItemObservation| {
+        observation.campaign.is_none() || item.identified || item.appearance.is_none()
+    };
 
     if observation.campaign.is_some()
         && (observation.player.poison_turns > 0
@@ -347,7 +350,7 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         if let Some(item) = observation
             .inventory
             .iter()
-            .find(|item| item.kind == ItemKind::PotionCure)
+            .find(|item| kind_known(item) && item.kind == ItemKind::PotionCure)
             .map(|item| item.item)
         {
             let command = CommandIntent::Quaff { item };
@@ -369,10 +372,13 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
             .inventory
             .iter()
             .find(|item| {
-                matches!(
-                    item.kind,
-                    ItemKind::PotionHealing | ItemKind::PotionExtraHealing | ItemKind::PotionCure
-                )
+                kind_known(item)
+                    && matches!(
+                        item.kind,
+                        ItemKind::PotionHealing
+                            | ItemKind::PotionExtraHealing
+                            | ItemKind::PotionCure
+                    )
             })
             .map(|item| item.item)
         {
@@ -402,6 +408,13 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         }
     }
 
+    if observation.campaign.is_some()
+        && observation.player.shop_debt > 0
+        && observation.legal_actions.contains(&CommandIntent::Pay)
+    {
+        return vec![CommandIntent::Pay];
+    }
+
     for direction in priority_directions() {
         if visible_hostile_in_direction(&observation, direction, 5) {
             let command = CommandIntent::Cast {
@@ -418,6 +431,7 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         let delta = direction.delta();
         let hostile_adjacent = observation.visible_entities.iter().any(|entity| {
             matches!(entity.kind, EntityKind::Monster(_))
+                && entity.faction.is_none_or(|f| f == Faction::Hostile)
                 && entity.pos.x == observation.player_pos.x + delta.dx
                 && entity.pos.y == observation.player_pos.y + delta.dy
         });
@@ -437,12 +451,13 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         )
     }) {
         if let Some(item) = observation.inventory.iter().find(|item| {
-            matches!(
-                item.kind,
-                ItemKind::RingPoisonResistance
-                    | ItemKind::RingFireResistance
-                    | ItemKind::RingProtection
-            )
+            kind_known(item)
+                && matches!(
+                    item.kind,
+                    ItemKind::RingPoisonResistance
+                        | ItemKind::RingFireResistance
+                        | ItemKind::RingProtection
+                )
         }) {
             let command = CommandIntent::PutOn { item: item.item };
             if observation.legal_actions.contains(&command) {
@@ -451,7 +466,13 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         }
     }
 
-    if observation.legal_actions.contains(&CommandIntent::Pickup) {
+    let unpaid_here = observation.campaign.is_some()
+        && observation.visible_entities.iter().any(|entity| {
+            matches!(entity.kind, EntityKind::Item(_))
+                && entity.pos == observation.player_pos
+                && entity.unpaid
+        });
+    if !unpaid_here && observation.legal_actions.contains(&CommandIntent::Pickup) {
         return vec![CommandIntent::Pickup];
     }
 
@@ -505,7 +526,10 @@ fn visible_hostile_in_direction(
             y: observation.player_pos.y + delta.dy * step,
         };
         if observation.visible_entities.iter().any(|entity| {
-            entity.alive && matches!(entity.kind, EntityKind::Monster(_)) && entity.pos == pos
+            entity.alive
+                && matches!(entity.kind, EntityKind::Monster(_))
+                && entity.faction.is_none_or(|f| f == Faction::Hostile)
+                && entity.pos == pos
         }) {
             return true;
         }

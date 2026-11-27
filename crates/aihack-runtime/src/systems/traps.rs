@@ -48,14 +48,14 @@ pub fn reveal_all_hidden_tiles(world: &mut GameWorld) -> Vec<GameEvent> {
 pub(crate) fn trigger_player_trap_with_kind(
     world: &mut GameWorld,
     rng: &mut GameRng,
-) -> (Vec<GameEvent>, Option<TrapKind>) {
+) -> Result<(Vec<GameEvent>, Option<TrapKind>), String> {
     let pos = world.player_pos();
     let Some(tile) = world.current_map().tile(pos).ok() else {
-        return (Vec::new(), None);
+        return Ok((Vec::new(), None));
     };
     let trap = match tile {
         TileKind::Trap(kind) | TileKind::HiddenTrap(kind) => kind,
-        _ => return (Vec::new(), None),
+        _ => return Ok((Vec::new(), None)),
     };
 
     let mut events = Vec::new();
@@ -71,7 +71,7 @@ pub(crate) fn trigger_player_trap_with_kind(
             priority: MessagePriority::Info,
             text: "You float over the trap.".to_string(),
         });
-        return (events, Some(trap));
+        return Ok((events, Some(trap)));
     }
     let player_id = world.player_id;
     let dex_reduction = world
@@ -103,6 +103,14 @@ pub(crate) fn trigger_player_trap_with_kind(
                 pos,
                 damage,
             });
+            if world
+                .entities
+                .actor_stats(player_id)
+                .is_none_or(|stats| stats.hp <= 0)
+                || !world.player_alive()
+            {
+                return Ok((events, Some(trap)));
+            }
             if let Some(next_level) =
                 BranchGraph::campaign_v3().descend_target(world.current_level())
             {
@@ -121,7 +129,7 @@ pub(crate) fn trigger_player_trap_with_kind(
                     });
                 }
             }
-            return (events, Some(trap));
+            return Ok((events, Some(trap)));
         }
         TrapKind::Teleport => {
             let level = world.current_level();
@@ -173,6 +181,14 @@ pub(crate) fn trigger_player_trap_with_kind(
                 .into_iter()
                 .filter_map(|(_, opt)| opt)
                 .find(|id| {
+                    if world
+                        .entities
+                        .get(*id)
+                        .and_then(|e| e.item_artifact_id())
+                        .is_some()
+                    {
+                        return false;
+                    }
                     world
                         .entities
                         .item_data(*id)
@@ -245,17 +261,21 @@ pub(crate) fn trigger_player_trap_with_kind(
                 raw
             };
             apply_trap_damage(world, player_id, damage);
-            if let Ok(rock_data) = crate::domain::item::try_item_data_from_registry(
+            let rock_data = crate::domain::item::try_item_data_from_registry(
                 ItemKind::Rock,
                 world.content_registry(),
-            ) {
-                let level = world.current_level();
-                let _ = world.state_mut().entities.spawn_item_with_data(
+            )
+            .map_err(|err| err.to_string())?;
+            let level = world.current_level();
+            world
+                .state_mut()
+                .entities
+                .spawn_item_with_data(
                     ItemKind::Rock,
                     rock_data,
                     EntityLocation::OnMap { level, pos },
-                );
-            }
+                )
+                .map_err(|err| err.to_string())?;
             events.push(GameEvent::Message {
                 priority: MessagePriority::Warning,
                 text: "A rock falls from the ceiling onto your head!".to_string(),
@@ -273,7 +293,10 @@ pub(crate) fn trigger_player_trap_with_kind(
                 });
             }
             1 => {
-                world.state_mut().luck = world.luck.saturating_add(1).min(3);
+                world.state_mut().luck = world
+                    .luck
+                    .saturating_add(1)
+                    .min(aihack_core::campaign::MAX_LUCK);
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
                     text: "You feel unexpectedly lucky!".to_string(),
@@ -316,7 +339,7 @@ pub(crate) fn trigger_player_trap_with_kind(
         pos,
         damage,
     });
-    (events, Some(trap))
+    Ok((events, Some(trap)))
 }
 
 fn apply_trap_damage(world: &mut GameWorld, player_id: aihack_core::ids::EntityId, damage: i16) {

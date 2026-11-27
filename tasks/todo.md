@@ -74,3 +74,30 @@
 - [x] S3-runtime: `tools`/`containers`/`dip`/`engrave`/`terrain` 시스템 구현, `traps`(12종)/`vision`/`monster_ai`(Elbereth/수면회피)/`combat`/`items`/`altar`/`shop`/`campaign_map`/`bootstrap`/`save`(양방향 컨테이너/녹/P9 검증) 통합.
 - [x] S3-adapters: TUI(`a`/`C`/`v`/`E`/`g`, 지형/함정/각인/녹 라벨) 및 Headless(`UnicornHorn` 치료, `Lava` 회피) 연동.
 - [x] S3-verify: `tests/stage3_p9.rs`(**5 PASS**) 및 `tests/campaign.rs`(`route()`) 정렬, 전체 gate(`fmt`, `clippy`, `test -j 2`: **537 PASS / 0 FAIL / 0 ignored**, 97 test binaries, `release`, `audit`, `deny`, `r7/r8`) PASS 및 최종 문서 마감.
+
+# Stage 4 (P10) 체크리스트 (2026-11-27)
+
+- [x] S4-doc: `DESIGN_DECISIONS.md` (`ADR-P10-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` 문서 기준 선행 확정.
+- [x] S4-core: 3 성향·5 종족·13 역할·조합 검증·`ARTIFACTS`·`SkillCategory`/`SkillRank`·`Invoke`/`Enhance` 코어·계약·LLM 확장.
+- [x] S4-content: 무기 5종(`LongSword`, `Katana`, `BattleAxe`, `Quarterstaff`, `BroadSword`) `items.toml`/스키마/레지스트리 및 `PROVENANCE.md` 동기화.
+- [x] S4-runtime: `systems/{artifacts,skills}.rs` 신설, 신앙/제단 심화·Excalibur·아티팩트 발동/저항·#enhance·SaveV3 검증·Observation 통합.
+- [x] S4-adapters: `aihack-tui` (`V`/`X`/13역할×5종족×3성향 생성 UI/제단 색상/HUD) 및 `aihack-headless` (`--role`/`--race`/`--alignment`) 구현.
+- [x] S4-verify: `tests/stage4_p10.rs` 작성, 전체 gate(`fmt`, `clippy`, `test -j 2`, `release`, `audit`, `deny`, `r7/r8`) PASS 및 완료 문서 마감.
+
+# P10-Audit-Fix 체크리스트 (`audit_report_35.md` 시정, 2026-11-27)
+
+- [x] AF-W0: `DESIGN_DECISIONS.md`(`ADR-P10-02` + `MIN-07`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` 기준 문서 선행 확정.
+- [x] AF-W1: `CRIT-01`(우선순위 정렬/`legal_actions`), `CRIT-02`(거부 롤백/선검증 후변이), `CRIT-03`(지형 근접/`Water|Lava` 추격 제외), `MAJ-01`(유니콘 뿔 종족 보정), `MAJ-02`(`MAX_LUCK` 상한).
+- [x] AF-W2: `MAJ-03`(미식별 색·로그·LLM·Headless 은닉), `MAJ-04`(60x24 TUI 13역할 생성 UI·키/마우스·동적 스탯), `MAJ-06`(`SaveV3` 검증·`Hole` 사망·대기 에너지·물/용암 정지/추락 피해).
+- [x] AF-W3: `MAJ-05`(`monster_resistances` 스폰/화염완드, `con_regen_reduction`, `spawn_depth_range`/`spawn_weight` 소비 연결).
+- [x] AF-W4: `MIN-01`~`MIN-07`(메뉴/색상/LOS/상자아티팩트/투척/`FloatingEye`/할당전파/Mines스폰/`items.toml`·해시·문서 동기화).
+- [x] AF-verify: `tests/audit35_remediation.rs` 작성, §7.2 전체 gate(`fmt`, `clippy`, `test -j 2`, `release`, `audit`, `deny`, `r7/r8`, legacy `rg`) PASS 및 완료 문서 마감.
+
+# Stage 5 (P11) 체크리스트 (2026-11-27)
+
+- [x] S5-doc: `DESIGN_DECISIONS.md` (`ADR-P11-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` D3D 기준 선행 확정.
+- [x] S5-core: `MonsterKind` 17종·`MonsterPassive` 6종·`Chat`/`Pay`·펫/미결제/채무 필드·`EntityStore`·`aihack-ai-contract`/`aihack-llm` 확장.
+- [x] S5-content: `monsters.toml` P11 17종 및 `ai_flags` 반영(LF SHA-256 `704e48b35aeb3f3661fdab8f054a31447dd5771713c60b790330581d674c165c`), `schema.rs`/`lib.rs` 확장, `PROVENANCE.md`·`registry.rs`(`309a24cc82322f66`) 동기화.
+- [x] S5-runtime: `systems/{pets,npc}.rs` 신설 및 우호 자리바꿈·계단 동반·상점 채무/도둑질·문열기·몬스터 장비/물약/완드·훔치기/녹/분열/소환/시선·파벌전·SaveV3 검증 통합.
+- [x] S5-adapters: `aihack-tui` (`faction` 색상/Inspect, `DEBT:` HUD, `'m'`/`'D'`/`'$'`) 및 `aihack-headless` (`Faction::Hostile` 판정·무단 미결제 회피·`Pay` 우선) 동기화.
+- [x] S5-verify: `tests/stage5_p11.rs`(**6 PASS**) 작성, 전체 gate(`fmt`, `clippy -D warnings`, `test -j 2`: **559 PASS / 0 FAIL / 0 ignored**, 101 binaries, `release`, `audit`, `deny`, `r7/r8`, legacy `rg` 0건) PASS 및 완료 문서 마감.

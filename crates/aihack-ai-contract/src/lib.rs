@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 pub mod llm;
 pub mod observation;
-pub use aihack_core::campaign::{Alignment, Attributes, Race, Role, SpellKind};
+pub use aihack_core::campaign::{
+    Alignment, Attributes, Race, Role, SkillCategory, SkillRank, SpellKind,
+};
 pub use aihack_core::{
     action::{
         ActionIntent, CommandIntent, DipTarget, DirectionalAction, EngravingMethod, EngravingText,
@@ -12,13 +14,14 @@ pub use aihack_core::{
     },
     domain::{
         combat::DeathCause,
-        entity::EntityKind,
+        entity::{EntityKind, Faction},
+        inventory::InventoryLetter,
         item::{BucStatus, EquipmentSlot, ItemClass, ItemKind, RingEffect, ToolAction},
         monster::MonsterKind,
         status::{Resistances, StatusTimers},
         tile::{DoorState, TileKind, TrapKind},
     },
-    event::GameEvent,
+    event::{GameEvent, MessagePriority},
     hash::SnapshotHash,
     ids::{BranchId, EntityId, LevelId},
     position::{Delta, Direction, Pos},

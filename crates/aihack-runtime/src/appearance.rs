@@ -1,4 +1,4 @@
-use aihack_core::domain::item::ItemKind;
+use aihack_core::{domain::item::ItemKind, ids::EntityId};
 
 const POTION_APPEARANCES: [&str; 10] = [
     "crimson potion",
@@ -95,6 +95,63 @@ pub fn appearance_for_kind(seed: u64, kind: ItemKind) -> Option<&'static str> {
         return Some(pool[index]);
     }
     None
+}
+
+/// 시드 기반 외형 문자열에만 의존하는 표시 색상이다(실제 ItemKind 색상을 노출하지 않는다).
+pub fn color_for_appearance(appearance: &str) -> &'static str {
+    match appearance {
+        "crimson potion" => "red",
+        "azure potion" => "blue",
+        "amber potion" => "yellow",
+        "jade potion" => "green",
+        "silver potion" => "white",
+        "violet potion" => "magenta",
+        "emerald potion" => "bright_green",
+        "indigo potion" => "bright_blue",
+        "scarlet potion" => "bright_red",
+        "smoky potion" => "gray",
+        "copper ring" => "brown",
+        "onyx ring" => "black",
+        "ivory ring" => "white",
+        "opal ring" => "cyan",
+        "bronze ring" => "yellow",
+        "granite ring" => "gray",
+        "circular amulet" | "triangular amulet" | "oval amulet" | "hexagonal amulet" => {
+            "bright_yellow"
+        }
+        _ => "white",
+    }
+}
+
+pub fn display_name_for_kind(seed: u64, world: &crate::world::GameWorld, kind: ItemKind) -> String {
+    if world.campaign.is_some() && !world.is_item_identified(kind) {
+        if let Some(app) = appearance_for_kind(seed, kind) {
+            return app.to_owned();
+        }
+    }
+    aihack_content::item_display_name(kind, world.content_registry())
+}
+
+pub fn display_name_for_world_item(
+    seed: u64,
+    world: &crate::world::GameWorld,
+    item: EntityId,
+    kind: ItemKind,
+) -> String {
+    if let Some(def) = crate::systems::artifacts::artifact_def_for_item(world, item) {
+        return def.name.to_owned();
+    }
+    if let Some(mk) = world
+        .entities
+        .get(item)
+        .and_then(|entity| entity.item_corpse_monster())
+    {
+        return format!(
+            "{} corpse",
+            aihack_content::monster_display_name(mk, world.content_registry())
+        );
+    }
+    display_name_for_kind(seed, world, kind)
 }
 
 fn shuffle<T>(seed: u64, slice: &mut [T]) {

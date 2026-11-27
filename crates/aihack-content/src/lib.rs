@@ -93,6 +93,23 @@ pub const fn monster_id(kind: MonsterKind) -> &'static str {
         MonsterKind::Minotaur => "monster.minotaur",
         MonsterKind::Dragon => "monster.dragon",
         MonsterKind::Bat => "monster.bat",
+        MonsterKind::Kitten => "monster.kitten",
+        MonsterKind::Housecat => "monster.housecat",
+        MonsterKind::LittleDog => "monster.little_dog",
+        MonsterKind::Dog => "monster.dog",
+        MonsterKind::Pony => "monster.pony",
+        MonsterKind::Warhorse => "monster.warhorse",
+        MonsterKind::Shopkeeper => "monster.shopkeeper",
+        MonsterKind::TemplePriest => "monster.temple_priest",
+        MonsterKind::Oracle => "monster.oracle",
+        MonsterKind::Watchman => "monster.watchman",
+        MonsterKind::Leprechaun => "monster.leprechaun",
+        MonsterKind::Nymph => "monster.nymph",
+        MonsterKind::RustMonster => "monster.rust_monster",
+        MonsterKind::BlackPudding => "monster.black_pudding",
+        MonsterKind::Dwarf => "monster.dwarf",
+        MonsterKind::Medusa => "monster.medusa",
+        MonsterKind::OrcCaptain => "monster.orc_captain",
     }
 }
 
@@ -112,6 +129,23 @@ pub fn monster_kind_from_id(id: &str) -> Result<MonsterKind, ContentError> {
         "monster.minotaur" => Ok(MonsterKind::Minotaur),
         "monster.dragon" => Ok(MonsterKind::Dragon),
         "monster.bat" => Ok(MonsterKind::Bat),
+        "monster.kitten" => Ok(MonsterKind::Kitten),
+        "monster.housecat" => Ok(MonsterKind::Housecat),
+        "monster.little_dog" => Ok(MonsterKind::LittleDog),
+        "monster.dog" => Ok(MonsterKind::Dog),
+        "monster.pony" => Ok(MonsterKind::Pony),
+        "monster.warhorse" => Ok(MonsterKind::Warhorse),
+        "monster.shopkeeper" => Ok(MonsterKind::Shopkeeper),
+        "monster.temple_priest" => Ok(MonsterKind::TemplePriest),
+        "monster.oracle" => Ok(MonsterKind::Oracle),
+        "monster.watchman" => Ok(MonsterKind::Watchman),
+        "monster.leprechaun" => Ok(MonsterKind::Leprechaun),
+        "monster.nymph" => Ok(MonsterKind::Nymph),
+        "monster.rust_monster" => Ok(MonsterKind::RustMonster),
+        "monster.black_pudding" => Ok(MonsterKind::BlackPudding),
+        "monster.dwarf" => Ok(MonsterKind::Dwarf),
+        "monster.medusa" => Ok(MonsterKind::Medusa),
+        "monster.orc_captain" => Ok(MonsterKind::OrcCaptain),
         _ => Err(ContentError::UnknownReference {
             owner: "monster kind".to_owned(),
             target: id.to_owned(),
@@ -172,6 +206,11 @@ pub const fn item_id(kind: ItemKind) -> &'static str {
         ItemKind::Chest => "item.tool.chest",
         ItemKind::PotionWater => "item.potion.water",
         ItemKind::ScrollBlank => "item.scroll.blank",
+        ItemKind::LongSword => "item.weapon.long_sword",
+        ItemKind::Katana => "item.weapon.katana",
+        ItemKind::BattleAxe => "item.weapon.battle_axe",
+        ItemKind::Quarterstaff => "item.weapon.quarterstaff",
+        ItemKind::BroadSword => "item.weapon.broad_sword",
     }
 }
 
@@ -180,6 +219,11 @@ pub fn item_kind_from_id(id: &str) -> Result<ItemKind, ContentError> {
     match id {
         "item.weapon.dagger" => Ok(ItemKind::Dagger),
         "item.weapon.short_sword" => Ok(ItemKind::ShortSword),
+        "item.weapon.long_sword" => Ok(ItemKind::LongSword),
+        "item.weapon.katana" => Ok(ItemKind::Katana),
+        "item.weapon.battle_axe" => Ok(ItemKind::BattleAxe),
+        "item.weapon.quarterstaff" => Ok(ItemKind::Quarterstaff),
+        "item.weapon.broad_sword" => Ok(ItemKind::BroadSword),
         "item.weapon.mace" => Ok(ItemKind::Mace),
         "item.food.ration" => Ok(ItemKind::FoodRation),
         "item.potion.healing" => Ok(ItemKind::PotionHealing),
@@ -266,6 +310,12 @@ pub fn monster_template_from_registry(
         Some("regenerate_hp") => Some(MonsterPassive::Regenerate),
         Some("fire_on_melee") => Some(MonsterPassive::FireOnMelee),
         Some("fire_breath") => Some(MonsterPassive::FireBreath),
+        Some("steal_gold") => Some(MonsterPassive::StealGold),
+        Some("steal_item") => Some(MonsterPassive::StealItem),
+        Some("rust_metal") => Some(MonsterPassive::RustMetal),
+        Some("split_on_hit") => Some(MonsterPassive::SplitOnHit),
+        Some("gaze_paralyze") => Some(MonsterPassive::GazeParalyze),
+        Some("summon_allies") => Some(MonsterPassive::SummonAllies),
         None => None,
         Some(value) => {
             return Err(ContentError::UnknownReference {
@@ -288,6 +338,18 @@ pub fn monster_template_from_registry(
         MonsterKind::Minotaur => "gore",
         MonsterKind::Dragon => "bite",
         MonsterKind::Bat => "bite",
+        MonsterKind::Kitten
+        | MonsterKind::Housecat
+        | MonsterKind::LittleDog
+        | MonsterKind::Dog
+        | MonsterKind::RustMonster => "bite",
+        MonsterKind::Pony | MonsterKind::Warhorse => "kick",
+        MonsterKind::Shopkeeper | MonsterKind::TemplePriest | MonsterKind::Watchman => "weapon",
+        MonsterKind::Oracle | MonsterKind::Nymph => "touch",
+        MonsterKind::Leprechaun => "claw",
+        MonsterKind::BlackPudding => "engulf",
+        MonsterKind::Dwarf | MonsterKind::OrcCaptain => "axe",
+        MonsterKind::Medusa => "snakes",
     };
     Ok(MonsterTemplate {
         kind,
@@ -300,7 +362,32 @@ pub fn monster_template_from_registry(
         speed: definition.speed,
         passive,
         difficulty: definition.difficulty as u16,
+        resistances: monster_resistances(kind, registry),
     })
+}
+
+pub fn weighted_monster_kinds_for_depth(
+    depth: i16,
+    registry: &ContentRegistry,
+) -> Vec<(MonsterKind, u32)> {
+    let mut entries: Vec<_> = registry
+        .monsters()
+        .filter_map(|def| {
+            let weight = u32::from(def.spawn_weight.unwrap_or(0));
+            if weight == 0 {
+                return None;
+            }
+            if let Some([min_d, max_d]) = def.spawn_depth_range {
+                if depth < min_d || depth > max_d {
+                    return None;
+                }
+            }
+            let kind = monster_kind_from_id(&def.id).ok()?;
+            Some((def.id.as_str(), kind, weight))
+        })
+        .collect();
+    entries.sort_by(|a, b| a.0.cmp(b.0));
+    entries.into_iter().map(|(_, k, w)| (k, w)).collect()
 }
 
 fn parse_damage(value: &str) -> Result<DamageRoll, ContentError> {
@@ -369,6 +456,11 @@ pub fn item_data_from_registry(
             let name = match kind {
                 ItemKind::Dagger => "dagger",
                 ItemKind::ShortSword => "short sword",
+                ItemKind::LongSword => "long sword",
+                ItemKind::Katana => "katana",
+                ItemKind::BattleAxe => "battle-axe",
+                ItemKind::Quarterstaff => "quarterstaff",
+                ItemKind::BroadSword => "broadsword",
                 ItemKind::Mace => "mace",
                 ItemKind::Rock => "rock",
                 _ => "weapon",
@@ -589,6 +681,12 @@ pub fn monster_glyph(kind: MonsterKind, registry: &ContentRegistry) -> char {
         .monster(monster_id(kind))
         .and_then(|d| d.glyph.chars().next())
         .unwrap_or('?')
+}
+
+pub fn monster_has_ai_flag(kind: MonsterKind, flag: &str, registry: &ContentRegistry) -> bool {
+    registry
+        .monster(monster_id(kind))
+        .is_some_and(|d| d.ai_flags.iter().any(|entry| entry == flag))
 }
 
 /// Content level definition을 core map에 적용할 tile override로 해석한다.

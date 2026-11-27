@@ -1,4 +1,5 @@
 pub(crate) mod altar;
+pub(crate) mod artifacts;
 pub(crate) mod ascension;
 pub(crate) mod combat;
 pub(crate) mod containers;
@@ -9,9 +10,12 @@ pub(crate) mod engrave;
 pub(crate) mod items;
 pub(crate) mod monster_ai;
 pub(crate) mod movement;
+pub(crate) mod npc;
+pub(crate) mod pets;
 pub(crate) mod projectiles;
 pub mod score;
 pub(crate) mod shop;
+pub(crate) mod skills;
 pub(crate) mod spells;
 pub(crate) mod stairs;
 pub(crate) mod terrain;

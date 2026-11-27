@@ -1,5 +1,5 @@
 use aihack_core::{
-    campaign::{Role, SpellKind},
+    campaign::{Role, SkillCategory, SpellKind},
     domain::combat::{AttackProfile, DamageRoll},
     event::{GameEvent, MessagePriority},
     position::Direction,
@@ -7,7 +7,7 @@ use aihack_core::{
 };
 
 use crate::{
-    systems::{combat, death, projectiles, traps},
+    systems::{combat, death, projectiles, skills, traps},
     world::GameWorld,
 };
 
@@ -44,19 +44,22 @@ pub fn cast(
         mp_after,
     }];
 
+    let spell_bonus = skills::current_rank(world, SkillCategory::Spellcasting).spell_power_bonus();
     match spell {
         SpellKind::ForceBolt => {
             let dir = validated_direction.expect("validated directional spell has direction");
             let outcome =
                 projectiles::trace_path_with_max_distance(world, world.player_pos(), dir, 5);
             if let Some(target) = outcome.hit_target {
+                events.extend(crate::systems::npc::provoke_actor(world, target));
                 let profile = AttackProfile {
                     name: "force bolt",
-                    hit_bonus: 4,
+                    hit_bonus: 4 + (spell_bonus / 2),
                     damage: DamageRoll::new(2, 6),
                 };
                 let extra_damage_bonus = i16::from(campaign.level() / 2)
-                    .saturating_add(campaign.attributes.int_spell_bonus());
+                    .saturating_add(campaign.attributes.int_spell_bonus())
+                    .saturating_add(spell_bonus);
                 if let Some(resolution) = combat::resolve_attack_with_profile_and_bonus(
                     world,
                     rng,
@@ -82,7 +85,8 @@ pub fn cast(
                 + combat::roll_die(rng, 6)
                 + 4
                 + i16::from(campaign.level())
-                + campaign.attributes.wis_heal_bonus();
+                + campaign.attributes.wis_heal_bonus()
+                + spell_bonus;
             let stats = world
                 .state_mut()
                 .entities
@@ -97,7 +101,9 @@ pub fn cast(
                 amount,
                 hp_after,
             });
-            if campaign.role == Role::Cleric && world.poison_turns > 0 {
+            if matches!(campaign.role, Role::Cleric | Role::Priest | Role::Monk)
+                && world.poison_turns > 0
+            {
                 world.state_mut().poison_turns = 0;
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
@@ -114,6 +120,7 @@ pub fn cast(
             });
         }
     }
+    skills::record_practice(world, SkillCategory::Spellcasting, 5);
 
     Ok(events)
 }

@@ -38,9 +38,11 @@ fn saved_world_roundtrip_preserves_persisted_state_and_resets_runtime_death_caus
         status_timers: StatusTimers::default(),
         weapon_skills: BTreeMap::new(),
         spell_skill: BTreeMap::new(),
+        skill_practice: BTreeMap::new(),
         learned_spells: Vec::new(),
         generated_artifacts: BTreeSet::new(),
         ascension_altars: Vec::new(),
+        shop_debt: 0,
         last_death_cause: Some(DeathCause::Combat {
             attacker: EntityId(9),
         }),

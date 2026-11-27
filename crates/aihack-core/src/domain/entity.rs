@@ -12,10 +12,14 @@ use crate::{
     error::EntityAllocationError,
     ids::{EntityId, LevelId},
     position::Pos,
-    world::{is_zero_i16, is_zero_u16, is_zero_u8},
+    world::{is_zero_i16, is_zero_u16, is_zero_u32, is_zero_u8},
 };
 
 pub const MAX_ABSOLUTE_ACTOR_STAT: i32 = 10_000;
+pub const MAX_PET_TAMENESS: u8 = 20;
+pub const MAX_PET_XP: u32 = 1_000;
+pub const MAX_PET_HUNGER: i16 = 1_500;
+pub const DEFAULT_PET_HUNGER: i16 = 600;
 
 fn is_zero_i8(value: &i8) -> bool {
     *value == 0
@@ -134,6 +138,12 @@ pub enum EntityPayload {
         alive: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         monster_inventory: Vec<EntityId>,
+        #[serde(default, skip_serializing_if = "is_zero_u8")]
+        tameness: u8,
+        #[serde(default, skip_serializing_if = "is_zero_u32")]
+        pet_xp: u32,
+        #[serde(default, skip_serializing_if = "is_zero_i16")]
+        pet_hunger: i16,
     },
     Item {
         kind: ItemKind,
@@ -167,6 +177,8 @@ pub enum EntityPayload {
         container_trapped: bool,
         #[serde(default, skip_serializing_if = "is_zero_u8")]
         erosion: u8,
+        #[serde(default, skip_serializing_if = "is_false")]
+        unpaid: bool,
     },
 }
 
@@ -413,6 +425,34 @@ impl Entity {
         }
     }
 
+    pub fn actor_tameness(&self) -> Option<u8> {
+        match &self.payload {
+            EntityPayload::Actor { tameness, .. } => Some(*tameness),
+            EntityPayload::Item { .. } => None,
+        }
+    }
+
+    pub fn actor_pet_xp(&self) -> Option<u32> {
+        match &self.payload {
+            EntityPayload::Actor { pet_xp, .. } => Some(*pet_xp),
+            EntityPayload::Item { .. } => None,
+        }
+    }
+
+    pub fn actor_pet_hunger(&self) -> Option<i16> {
+        match &self.payload {
+            EntityPayload::Actor { pet_hunger, .. } => Some(*pet_hunger),
+            EntityPayload::Item { .. } => None,
+        }
+    }
+
+    pub fn item_unpaid(&self) -> Option<bool> {
+        match &self.payload {
+            EntityPayload::Item { unpaid, .. } => Some(*unpaid),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
     pub fn item_mut(&mut self) -> Option<ItemViewMut<'_>> {
         match &mut self.payload {
             EntityPayload::Item {
@@ -494,6 +534,56 @@ impl Entity {
                 ..
             } => Some(AttackProfile::natural("bite", stats.damage)),
             EntityPayload::Actor {
+                kind:
+                    ActorKind::Monster(
+                        MonsterKind::Kitten
+                        | MonsterKind::Housecat
+                        | MonsterKind::LittleDog
+                        | MonsterKind::Dog
+                        | MonsterKind::RustMonster,
+                    ),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("bite", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Pony | MonsterKind::Warhorse),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("kick", stats.damage)),
+            EntityPayload::Actor {
+                kind:
+                    ActorKind::Monster(
+                        MonsterKind::Shopkeeper | MonsterKind::TemplePriest | MonsterKind::Watchman,
+                    ),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("weapon", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Oracle | MonsterKind::Nymph),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("touch", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Leprechaun),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("claw", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::BlackPudding),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("engulf", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Dwarf | MonsterKind::OrcCaptain),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("axe", stats.damage)),
+            EntityPayload::Actor {
+                kind: ActorKind::Monster(MonsterKind::Medusa),
+                stats,
+                ..
+            } => Some(AttackProfile::natural("snakes", stats.damage)),
+            EntityPayload::Actor {
                 kind: ActorKind::Player,
                 ..
             } => None,
@@ -554,9 +644,19 @@ impl EntityStore {
         template: MonsterTemplate,
         pos: Pos,
     ) -> Result<EntityId, EntityAllocationError> {
+        self.spawn_monster_with_faction(kind, template, Faction::Hostile, pos)
+    }
+
+    pub fn spawn_monster_with_faction(
+        &mut self,
+        kind: MonsterKind,
+        template: MonsterTemplate,
+        faction: Faction,
+        pos: Pos,
+    ) -> Result<EntityId, EntityAllocationError> {
         self.spawn_actor(
             ActorKind::Monster(kind),
-            Faction::Hostile,
+            faction,
             pos,
             ActorStats {
                 hp: template.hp,
@@ -569,7 +669,7 @@ impl EntityStore {
                 weapon_hit_bonus: template.attack_profile.hit_bonus,
                 speed: template.speed,
                 energy: 0,
-                resistances: Resistances::NONE,
+                resistances: template.resistances,
                 ai_kind: Some(template.ai_kind),
                 passive: template.passive,
                 difficulty: template.difficulty,
@@ -594,6 +694,9 @@ impl EntityStore {
                 stats,
                 alive: true,
                 monster_inventory: Vec::new(),
+                tameness: 0,
+                pet_xp: 0,
+                pet_hunger: 0,
             },
         });
         Ok(id)
@@ -627,6 +730,7 @@ impl EntityStore {
                 container_locked: false,
                 container_trapped: false,
                 erosion: 0,
+                unpaid: false,
             },
         });
         Ok(id)
@@ -689,6 +793,35 @@ impl EntityStore {
             .collect::<Vec<_>>();
         ids.sort_by_key(|id| id.0);
         ids
+    }
+
+    pub fn non_player_actors_on_level(&self, level: LevelId) -> Vec<EntityId> {
+        let mut ids = self
+            .entities
+            .iter()
+            .filter_map(|entity| {
+                let (kind, _, actor_level, _, _, alive) = entity.actor()?;
+                (alive && actor_level == level && matches!(kind, ActorKind::Monster(_)))
+                    .then_some(entity.id)
+            })
+            .collect::<Vec<_>>();
+        ids.sort_by_key(|id| id.0);
+        ids
+    }
+
+    pub fn alive_friendly_at(&self, level: LevelId, pos: Pos) -> Option<EntityId> {
+        self.entities.iter().find_map(|entity| {
+            let (kind, faction, actor_level, actor_pos, _, alive) = entity.actor()?;
+            (alive
+                && actor_level == level
+                && actor_pos == pos
+                && matches!(kind, ActorKind::Monster(_))
+                && matches!(
+                    faction,
+                    Faction::Pet | Faction::Peaceful | Faction::Shopkeeper
+                ))
+            .then_some(entity.id)
+        })
     }
 
     pub fn items_at(&self, level: LevelId, pos: Pos) -> Vec<EntityId> {
@@ -1015,6 +1148,119 @@ impl EntityStore {
         };
         contained_items.clear();
         true
+    }
+
+    pub fn set_item_unpaid(&mut self, id: EntityId, unpaid: bool) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item {
+            unpaid: unpaid_ref, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        *unpaid_ref = unpaid;
+        true
+    }
+
+    pub fn set_actor_faction(&mut self, id: EntityId, next: Faction) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Actor { faction, .. } = &mut entity.payload else {
+            return false;
+        };
+        *faction = next;
+        true
+    }
+
+    pub fn set_actor_kind(&mut self, id: EntityId, next: ActorKind) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Actor { kind, .. } = &mut entity.payload else {
+            return false;
+        };
+        *kind = next;
+        true
+    }
+
+    pub fn set_actor_tameness(&mut self, id: EntityId, next: u8) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Actor { tameness, .. } = &mut entity.payload else {
+            return false;
+        };
+        *tameness = next.min(MAX_PET_TAMENESS);
+        true
+    }
+
+    pub fn set_actor_pet_xp(&mut self, id: EntityId, next: u32) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Actor { pet_xp, .. } = &mut entity.payload else {
+            return false;
+        };
+        *pet_xp = next.min(MAX_PET_XP);
+        true
+    }
+
+    pub fn set_actor_pet_hunger(&mut self, id: EntityId, next: i16) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Actor { pet_hunger, .. } = &mut entity.payload else {
+            return false;
+        };
+        *pet_hunger = next.clamp(0, MAX_PET_HUNGER);
+        true
+    }
+
+    pub fn push_monster_inventory(&mut self, actor: EntityId, item: EntityId) -> bool {
+        let Some(entity) = self.get_mut(actor) else {
+            return false;
+        };
+        let EntityPayload::Actor {
+            monster_inventory, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        if !monster_inventory.contains(&item) {
+            monster_inventory.push(item);
+        }
+        true
+    }
+
+    pub fn remove_monster_inventory(&mut self, actor: EntityId, item: EntityId) -> bool {
+        let Some(entity) = self.get_mut(actor) else {
+            return false;
+        };
+        let EntityPayload::Actor {
+            monster_inventory, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        let before = monster_inventory.len();
+        monster_inventory.retain(|id| *id != item);
+        monster_inventory.len() != before
+    }
+
+    pub fn clear_monster_inventory(&mut self, actor: EntityId) -> Vec<EntityId> {
+        let Some(entity) = self.get_mut(actor) else {
+            return Vec::new();
+        };
+        let EntityPayload::Actor {
+            monster_inventory, ..
+        } = &mut entity.payload
+        else {
+            return Vec::new();
+        };
+        std::mem::take(monster_inventory)
     }
 
     pub fn clear_item_letter(&mut self, id: EntityId) -> bool {

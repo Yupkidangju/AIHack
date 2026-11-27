@@ -19,6 +19,29 @@ P1–P3 당시 로컬 검증은 전체 491 tests, fmt/clippy/release PASS를 기
 
 플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P4 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
 
+### Stage 5 (P11) 살아 있는 던전 — 펫 · NPC · 고급 몬스터 AI (2026-11-27)
+
+- 설계 결정 `ADR-P11-01`(`DESIGN_DECISIONS.md`), `spec.md`, `docs/campaign_spec.md`, `tasks/{plan,todo}.md`를 먼저 확정하고 Stage 5(`P11`) 전체를 구현·검증했다.
+- `crates/aihack-core`/`aihack-content`/`aihack-ai-contract`/`aihack-llm`: 신규 P11 몬스터·동료·NPC 17종(총 30종) 및 `MonsterPassive` 6종, `CommandIntent::{Chat, Pay}`(`Copy` 유지), optional `tameness`/`pet_xp`/`pet_hunger`/`unpaid`/`shop_debt`/`faction` 필드, `monsters.toml` LF SHA-256 `704e48b35aeb3f3661fdab8f054a31447dd5771713c60b790330581d674c165c` 및 golden `content_hash()` `309a24cc82322f66`, `LlmObservationView < 32,768B` 및 `ActionSpace <= 64`를 동기화했다.
+- `crates/aihack-runtime`: `systems/{pets,npc}.rs` 신설 및 시작 펫·우호 자리바꿈·음식 투척 길들이기·성장/진화·저주 회피·상점 절도·계단/분기 동반, `Shopkeeper`/`TemplePriest`/`Oracle`/`Watchman` NPC와 바닥 미결제 상품·`shop_debt`·`Chat`/`Pay`·도둑질 적대화(기존 `Buy`/`Sell` 호환), 고급 몬스터 AI(문 열기·아이템 줍기/착용/물약/완드 사용·사망 드롭·금화/아이템 훔치기+텔레포트·부식·분열·소환·실명 방어 시선 공격·오크 vs 드워프 파벌전), `SaveV3` 엄격 검증 및 레거시 V1 격리를 통합했다.
+- `apps/{aihack-tui, aihack-headless}`: TUI `Faction` 색상/Inspect·`DEBT:` HUD·비충돌 `'m'`/`'D'`/`'$'` 메뉴 및 Headless `SurvivalV1` 비적대 비공격·무단 미결제 회피·`Pay` 우선을 반영했다.
+- 검증: `tests/stage5_p11.rs` **6 PASS**, `cargo fmt --check`/`clippy -D warnings`/전체 `cargo test -j 2 --workspace --all-targets --locked --no-fail-fast` (**559 PASS / 0 FAIL / 0 ignored**, 101 binaries)/`release` 빌드/`cargo deny`/`cargo audit`/`r7_checkpoint.sh`/`r8_checkpoint.sh`/legacy `rg` 0건 모두 PASS. 커밋/푸시/태그는 미실행.
+
+### Stage 4.5 (P10-Audit-Fix) 감사 보고서 35 시정 (2026-11-27)
+
+- 기준 문서 `ADR-P10-02`(`DESIGN_DECISIONS.md`), `spec.md`, `docs/campaign_spec.md`, `docs/campaign_implementation.md`, `tasks/{plan,todo}.md`를 먼저 동기화한 뒤 `docs/audit/audit_report_35.md`의 `CRIT-01`~`03`, `MAJ-01`~`06`, `MIN-01`~`07`, `GAP-01`을 일괄 시정했다.
+- `crates/aihack-runtime` & `aihack-content`: `playing_actions()` `Wait` 우선+Tier 1~3 정렬, `submit()` 거부 시 상태 롤백(`Awaiting* -> Playing` 프롬프트 복귀 예외 보존) 및 선검증 후변이, P9 지형 근접 bump attack·추격 스폰 `Water|Lava` 제외, `UnicornHorn` 종족 보정, `MAX_LUCK(13)` 통일, 미식별 외형 색상/컨테이너/Dip/상점 로그 비누설, `monster_resistances` 스폰/화염완드 면역, `con_regen_reduction()` 및 `Main 2..=5` Room 5 가중치 스폰, `SaveV3` 무결성·치명적 `Hole` 잔류·`Bat` 에너지 클램프·대기/부유 만료 지형 피해, `items.toml`/`monsters.toml` 동기화(LF SHA-256 `2f4e9b632ff68117571f1368a99fb6dbafdc5a058e73f8b6d9d8b3de6780cc56` / `e454e6629f17e85afe6f6124d3965fbfd2baccb3c36df22cefe326219a5dac38`, golden `content_hash()` `d8db553af945fe74`)를 완료했다.
+- `crates/aihack-llm` & `apps/{aihack-tui,aihack-headless}`: `LlmObservationView` 미식별 `kind` 생략, `SurvivalV1` `kind_known` 제한, 60×24 13역할 생성 UI(키 충돌 해소·마우스 CTA·동적 스탯), `legal_actions` 기반 TUI 메뉴/`Apply` `.`/`'V'` Invoke/`render_map` 5색/`event_line` 24변형 완전 매치를 구현했다.
+- 검증: `tests/audit35_remediation.rs` **9 PASS**, `cargo fmt --check`/`clippy -D warnings`/전체 `cargo test -j 2 --workspace --all-targets --locked --no-fail-fast` (**553 PASS / 0 FAIL / 0 ignored**, 100 binaries)/`release` 빌드/`cargo deny`/`cargo audit`/`r7_checkpoint.sh`/`r8_checkpoint.sh`/legacy `rg` 0건 모두 PASS. 커밋/푸시/태그는 미실행.
+
+### Stage 4 (P10) 성향·종족·신앙·고유 아티팩트·13역할·숙련도(#enhance) (2026-11-27)
+
+- 설계 결정 `ADR-P10-01`(`DESIGN_DECISIONS.md`)·`spec.md`·`docs/campaign_spec.md`·`tasks/{plan,todo}.md` 확정 후 Stage 4(`P10`) 전체를 구현·검증했다.
+- `crates/aihack-core`/`aihack-ai-contract`/`aihack-llm`/`aihack-content`: 3성향(`Lawful`/`Neutral`/`Chaotic`), 5종족(`Human`/`Elf`/`Dwarf`/`Gnome`/`Orc` + 고유 내성·암시야), 13역할(`Knight`~`Archeologist`, `Role×Race×Alignment` 조합 검증 및 legacy 4역할 스타터 보존), 무기 5종(`LongSword`/`Katana`/`BattleAxe`/`Quarterstaff`/`BroadSword`, `items.toml` LF SHA-256 `eba715745046d08ef6fba30e5bdd93c6f848c42d6733acbba3b7e65afe591a27`, golden content hash `3aa9021924da9ea1`), 6종 고유 아티팩트(`ARTIFACTS`), 8종 `SkillCategory` × 6등급 `SkillRank`, `Invoke`/`Enhance` 명령·계약·LLM 뷰를 확장했다.
+- `crates/aihack-runtime`: `systems/{artifacts,skills}.rs` 신설 및 제단(`Main 3` 동맹 / `Mines 2` 적대)·신앙심(`luck -13..=+13`)·개종·하사·`Excalibur` 분수 담금기·침식 면역/`Sunsword` 광원/`Stormbringer` 흡혈·`'V'` 발동·`#enhance` 수련·SaveV3 엄격 변조 검증을 통합했다.
+- `apps/{aihack-tui, aihack-headless}`: 13역할×5종족×3성향 캐릭터 생성 UI, 제단 색상·상세 조회, `'V'`/`'X'` 메뉴·HUD 및 `--role`/`--race`/`--alignment` Headless 빌드를 구현했다.
+- 검증: `tests/stage4_p10.rs` **6 PASS**, `p10_cli_build` **1 PASS**, `cargo fmt --check`/`clippy -D warnings`/전체 `cargo test -j 2 --workspace --all-targets --locked --no-fail-fast` (**544 PASS / 0 FAIL / 0 ignored**, 99 binaries)/`release` 빌드/`cargo deny`/`cargo audit`/`r7_checkpoint.sh`/`r8_checkpoint.sh` 모두 PASS. 커밋/푸시/태그는 미실행.
+
 ### Stage 3 (P9) 도구·컨테이너·#dip/#engrave·지형/함정 생태계 (2026-11-27)
 
 현재 content registry hash는 `055379afe655af12`다(`items.toml` LF SHA-256 `b45ed709b09768670536e1d6a65e171c1787104ecd3078ee1e696e6470b340a3` 동기화). **P9-1~P9-5**: `ItemClass::Tool`/`ToolAction::Blindfold` 8종 도구(열쇠/자물쇠따개, 곡괭이/매톡 채굴, 오일 램프 시야/연료, 눈가리개/텔레파시, 호루라기, 유니콘 뿔)와 `CommandIntent::Apply`, `Sack`/`BagOfHolding`(BUC 무게 배율·중첩 폭발)/`Chest`(잠금/함정) 및 `EntityLocation::InContainer`·`ContainerPut`/`ContainerTake` 양방향 저장 검증, `PotionWater`/`ScrollBlank` 및 `CommandIntent::Dip`(제단 성수 축복·희석·세척·철제 녹 `erosion 0..=3`·연금술), `CommandIntent::Engrave` `Elbereth`(몬스터 회피·공격/시간 마모·혼란 왜곡), `TileKind::{Fountain, DryFountain, Sink, Water, Lava}`·12종 `TrapKind`·`DeathCause::{Drowning, Lava, Explosion}`·`Drink`를 구현하고 TUI(`a`/`C`/`v`/`E`/`g`)·Headless(`UnicornHorn`/`Lava`)·`tests/stage3_p9.rs`를 연결했다. legacy V1·R9 해시·`LlmObservationView < 32,768` bytes·`ActionSpace <= 64`를 보존하며 전체 검증은 97 test binaries **537 PASS / 0 FAIL / 0 ignored**, `fmt`/`clippy`/`release`/`deny`/`audit`/R7·R8 PASS를 기록했다.

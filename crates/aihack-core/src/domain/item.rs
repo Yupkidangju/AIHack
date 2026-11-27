@@ -72,6 +72,11 @@ pub enum ItemKind {
     Chest,
     PotionWater,
     ScrollBlank,
+    LongSword,
+    Katana,
+    BattleAxe,
+    Quarterstaff,
+    BroadSword,
 }
 
 impl ItemKind {

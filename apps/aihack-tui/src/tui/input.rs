@@ -1,6 +1,4 @@
-use crate::core::{
-    observation::ItemObservation, ActionIntent, CommandIntent, Direction, Observation, Pos,
-};
+use crate::core::{observation::ItemObservation, CommandIntent, Direction, Observation, Pos};
 use ratatui::layout::Rect;
 
 use super::{layout::TuiLayout, viewport::Viewport};
@@ -74,6 +72,9 @@ pub enum UiCommandCandidate {
     NewRun,
     CloseOverlay,
     BackToTitle,
+    CreationCycleRole(bool),
+    CreationCycleRace,
+    CreationCycleAlignment,
     InventoryLetter(char),
     FocusNext,
     FocusPrevious,
@@ -89,6 +90,18 @@ pub enum UiCommandCandidate {
     LlmBackspace,
     LlmSubmitInput,
     LlmCancelInput,
+}
+
+pub fn creation_role_for_key(ch: char) -> Option<aihack_ai_contract::Role> {
+    use aihack_ai_contract::Role;
+    match ch {
+        '1'..='9' => Some(Role::ALL[(ch as usize) - ('1' as usize)]),
+        'b' | 'B' => Some(Role::Barbarian),
+        'g' | 'G' => Some(Role::Ranger),
+        'm' | 'M' => Some(Role::Monk),
+        'k' | 'K' => Some(Role::Archeologist),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -107,9 +120,8 @@ pub fn command_panel_ctas(observation: &Observation) -> Vec<PanelCta> {
         PanelCta {
             label: "[. ] Wait".to_string(),
             candidate: observation
-                .action_space
-                .commands
-                .contains(&ActionIntent::Command(CommandIntent::Wait))
+                .legal_actions
+                .contains(&CommandIntent::Wait)
                 .then_some(UiCommandCandidate::Command(CommandIntent::Wait)),
         },
         PanelCta {
@@ -149,12 +161,7 @@ pub fn inventory_panel_ctas(observation: &Observation) -> Vec<PanelCta> {
                 identified
             );
             let candidate = primary_inventory_command(item)
-                .filter(|intent| {
-                    observation
-                        .action_space
-                        .commands
-                        .contains(&ActionIntent::Command(*intent))
-                })
+                .filter(|intent| observation.legal_actions.contains(intent))
                 .map(UiCommandCandidate::Command);
             PanelCta { label, candidate }
         })
@@ -221,6 +228,12 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
             .contains(&CommandIntent::Drink)
             .then_some(UiCommandCandidate::Command(CommandIntent::Drink));
     }
+    if key == 'D' {
+        return observation
+            .legal_actions
+            .contains(&CommandIntent::Pay)
+            .then_some(UiCommandCandidate::Command(CommandIntent::Pay));
+    }
     if matches!(
         key,
         'o' | 'c'
@@ -242,6 +255,9 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
             | 'C'
             | 'v'
             | 'E'
+            | 'V'
+            | 'X'
+            | 'm'
     ) {
         return Some(UiCommandCandidate::BeginAction(key));
     }
@@ -269,9 +285,8 @@ pub fn key_to_candidate(key: char, observation: &Observation) -> Option<UiComman
 
     let command_candidate = |intent: CommandIntent| {
         observation
-            .action_space
-            .commands
-            .contains(&ActionIntent::Command(intent))
+            .legal_actions
+            .contains(&intent)
             .then_some(UiCommandCandidate::Command(intent))
     };
 
@@ -473,6 +488,9 @@ pub(crate) fn item_observation_label(item: &ItemObservation) -> String {
     }
     if item.contained_count > 0 {
         parts.push(format!("({} items)", item.contained_count));
+    }
+    if item.unpaid {
+        parts.push("(unpaid)".to_string());
     }
     parts.join(" ")
 }

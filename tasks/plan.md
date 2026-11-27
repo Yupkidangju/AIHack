@@ -91,3 +91,40 @@
 | S3-runtime | `systems/{tools,containers,dip,engrave,terrain}.rs` 신설, `traps`/`vision`/`monster_ai`/`combat`/`items`/`altar`/`shop`/`campaign_map`/`bootstrap`/`world`/`snapshot`/`save`/`session`/`observation` 통합 | `crates/aihack-runtime/*` |
 | S3-adapters | `apps/aihack-tui`(`render_map`/`render_panels`/`input`/`play_menu`/`mod`, `a`/`C`/`v`/`E`/`g`) 및 `apps/aihack-headless`(캠페인 `UnicornHorn` 치료) 연동 | `apps/aihack-tui/*`, `apps/aihack-headless/*` |
 | S3-verify | `tests/campaign.rs` 지형 경로 정렬, `tests/stage3_p9.rs` E2E/저장 변조/TUI/LLM 예산/레거시 보존 테스트 작성, 전체 gate(`fmt`, `clippy`, `test -j 2`, `release`, `audit`, `deny`, `r7/r8`) 및 완료 문서 마감 | `tests/*`, `crates/*/tests/*`, `README.md`, `docs/campaign_implementation.md`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `tasks/todo.md` |
+
+## Stage 4 (P10) 실행 계획 (2026-11-27)
+
+| 단계 | 작업 요약 | 대상 파일 |
+| --- | --- | --- |
+| S4-doc | `DESIGN_DECISIONS.md` (`ADR-P10-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md`에 Stage 4 (`P10`) 계약 및 체크리스트 선행 기록 | `DESIGN_DECISIONS.md`, `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` |
+| S4-core | `campaign.rs`(3 성향·5 종족·13 역할·조합 검증·`SkillCategory`/`SkillRank`·`ARTIFACTS`), `domain/{item,combat,level}`, `world`, `save`, `action`, `aihack-ai-contract`, `aihack-llm` 확장 (`Copy`/`CampaignState`·레거시 V1 보존) | `crates/aihack-core/*`, `crates/aihack-ai-contract/*`, `crates/aihack-llm/*` |
+| S4-content | `items.toml` 무기 5종(`LongSword`, `Katana`, `BattleAxe`, `Quarterstaff`, `BroadSword`) 추가, `schema.rs`/`lib.rs` 매핑, `tests/content_validation.rs`, LF SHA-256/`PROVENANCE.md`/`registry.rs` 동기화 | `crates/aihack-content/*`, `docs/provenance/r7-content.sha256`, `PROVENANCE.md`, `tests/content_validation.rs` |
+| S4-runtime | `systems/{artifacts,skills}.rs` 신설, `altar`/`dip`/`combat`/`spells`/`items`/`vision`/`terrain`/`traps`/`projectiles`/`world`/`campaign`/`campaign_map`/`bootstrap`/`save`/`snapshot`/`session`/`observation` 통합 | `crates/aihack-runtime/*` |
+| S4-adapters | `apps/aihack-tui`(13 역할·5 종족·3 성향 생성 UI, `'V'` Invoke, `'X'` Enhance, 제단 정렬 색·분노/종족/성향 HUD) 및 `apps/aihack-headless` (`--role`/`--race`/`--alignment`) 확장 | `apps/aihack-tui/*`, `apps/aihack-headless/*` |
+| S4-verify | `tests/stage4_p10.rs` 작성 및 기존 테스트(`stage1_fixes.rs` 등) 호환 검증, 전체 gate(`fmt`, `clippy`, `test -j 2`, `release`, `audit`, `deny`, `r7/r8`) PASS 및 완료 문서 마감 | `tests/*`, `crates/*/tests/*`, `README.md`, `docs/campaign_implementation.md`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `tasks/todo.md` |
+
+## P10-Audit-Fix 실행 계획 (`audit_report_35.md` 시정, 2026-11-27)
+
+기준: `docs/audit/audit_report_35.md`, `DESIGN_DECISIONS.md` (`ADR-P10-02`), `spec.md`, `docs/campaign_spec.md` (`Stage 4.5`). 미커밋 `Stage 4` 55개 변경분을 보존하고 커밋/푸시는 하지 않는다.
+
+| 단계 | 작업 요약 | 대상 파일 |
+| --- | --- | --- |
+| AF-W0 | `DESIGN_DECISIONS.md`(`MIN-07` `i16` + `ADR-P10-02` + `GAP-01`/`P12` 아키텍처), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` D3D 선행 확정 | `DESIGN_DECISIONS.md`, `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` |
+| AF-W1 | `CRIT-01`(`playing_actions` 정렬+TUI `legal_actions`), `CRIT-02`(`submit` 롤백+선검증 후변이), `CRIT-03`(지형 공격/`Water|Lava` 제외), `MAJ-01`(`UnicornHorn` 종족), `MAJ-02`(`MAX_LUCK`) | `crates/aihack-runtime/*`, `apps/aihack-tui/src/tui/input.rs` |
+| AF-W2 | `MAJ-03`(미식별 색·로그·`LlmObservationView` 마스킹·Headless), `MAJ-04`(60x24 13역할 생성 UI·키/마우스·동적 스탯), `MAJ-06`(`SaveV3` P10 검증·`Hole`·대기 에너지 클램프·`Water`/`Lava` 대기/부유 만료) | `crates/aihack-{core,llm,runtime}/*`, `apps/aihack-{tui,headless}/*` |
+| AF-W3 | `MAJ-05`(`monster_resistances` 주입+`WandFire` 면역, `con_regen_reduction`, `weighted_monster_kinds_for_depth` 소비) | `crates/aihack-{core,content,runtime}/*` |
+| AF-W4 | `MIN-01`~`MIN-07`(`PutOn` 아뮬렛, TUI 색상/`Apply`/`'V'`/`event_line`, `Stormbringer` LOS, 상자 `ArtifactBlast`, `Throw` 보너스, `FloatingEye=5`, `FallingRock`/`Bat` 에러 전파, Mines 1/2 스폰 분리, `items.toml` 정리, LF SHA-256/`PROVENANCE.md`/`registry.rs`/`campaign_implementation.md` 동기화) | `crates/*`, `apps/*`, `docs/provenance/r7-content.sha256`, `PROVENANCE.md`, `docs/campaign_implementation.md` |
+| AF-verify | `tests/audit35_remediation.rs` 작성, 전체 gate(`fmt`, `clippy`, `test -j 2`, `release`, `audit`, `deny`, `r7/r8`, legacy `rg`) PASS 및 완료 문서 마감 | `tests/*`, `docs/*`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `tasks/todo.md` |
+
+## Stage 5 (P11) 실행 계획 (2026-11-27)
+
+기준: `docs/CODER_HANDOFF_P7_TO_P13.md` Stage 5 (`P11`), `DESIGN_DECISIONS.md` (`ADR-P11-01`), `spec.md`, `docs/campaign_spec.md` (`Stage 5 (P11)`). 레거시 2층 모드·R9 causal 해시·`CommandIntent: Copy`·`SaveV3`·`LlmObservationView < 32 KiB`·`ActionSpace <= 64`를 보존하며 커밋/푸시는 하지 않는다.
+
+| 단계 | 작업 요약 | 대상 파일 |
+| --- | --- | --- |
+| S5-doc | `DESIGN_DECISIONS.md` (`ADR-P11-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` D3D 기준 선행 확정 | `DESIGN_DECISIONS.md`, `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` |
+| S5-core | `MonsterKind` 17종·`MonsterPassive` 6종·`CommandIntent::{Chat, Pay}`·`EntityPayload::Actor`(`tameness`/`pet_xp`/`pet_hunger`)·`EntityPayload::Item`(`unpaid`)·`WorldState`/`SavedWorldV1`(`shop_debt`)·`EntityStore` 헬퍼·`aihack-ai-contract`/`aihack-llm` 확장 | `crates/aihack-core/*`, `crates/aihack-ai-contract/*`, `crates/aihack-llm/*` |
+| S5-content | `monsters.toml` P11 17종 추가 및 기존 인간형 `ai_flags` 보강, `schema.rs`/`lib.rs`(`monster_ai_flags` 포함) 확장, LF SHA-256/`PROVENANCE.md`/`registry.rs`/`content_validation.rs` 동기화 | `crates/aihack-content/*`, `docs/provenance/r7-content.sha256`, `PROVENANCE.md`, `tests/content_validation.rs` |
+| S5-runtime | `systems/{pets,npc}.rs` 신설, `movement`(우호 자리바꿈)·`stairs`(펫 동반)·`items`(미결제 청구/반납)·`projectiles`(음식 투척 길들이기)·`shop`(호환+적대 거부)·`monster_ai`(문 열기·아이템 줍기/사용·시선·소환·파벌전)·`combat`(장비 보너스·훔치기+텔레포트·부식·분열·적대화)·`death`(`monster_inventory` 드롭·상점주인 사망 정산)·`bootstrap`·`session`·`observation`·`save`/`campaign` 통합 | `crates/aihack-runtime/*` |
+| S5-adapters | `apps/aihack-tui`(`faction` 색상/Inspect, `DEBT:` HUD, `'m'` Chat / `'D'` Pay / `'$'` 메뉴) 및 `apps/aihack-headless`(비적대 비공격·미결제 회피·`Pay` 우선) 갱신 | `apps/aihack-tui/*`, `apps/aihack-headless/*` |
+| S5-verify | `tests/stage5_p11.rs` 작성(펫/길들이기/진화/저주회피/상점절도/층이동, 상점주인 채무/도둑질/사제/오라클/경비병, 몬스터 문열기/아이템사용/훔치기/녹/분열/소환/시선+실명방어/오크vs드워프 파벌전, SaveV3 변조/V1 격리/LLM 32KiB/TUI/Headless), 전체 gate PASS 및 완료 문서 마감 | `tests/*`, `docs/*`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `README.md`, `tasks/todo.md` |

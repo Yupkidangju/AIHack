@@ -242,3 +242,73 @@ P1–P6 캠페인 위에 제단·마나(MP)/주문, 시드별 미식별 외형·
 - `Water` 진입 시 `Levitation`은 무사 통과, 여유 무게(`carried_weight * 2 <= carrying_capacity`) 시 수영(철제 장비 1개 `erosion +1` 및 점등 램프 소등), 초과 무게 시 `2d6` 익사 피해(`DeathCause::Drowning`)를 입는다. `Lava`는 `Levitation` 무사 통과, 화염 저항 시 `1d6`, 비저항 시 `3d10` 화염 피해(`DeathCause::Lava`)를 입는다.
 - 기존 3종(`Pit`, `Dart`, `Bear`)에 `Teleport`, `SleepingGas`, `Rust`, `Polymorph`, `Hole`, `AntiMagic`, `FallingRock`, `Magic`, `Fire` 9종을 더해 총 12종 함정을 `campaign_map` Room 4/5 비-경로 좌표 및 `level_tile_overrides()`에 연결한다.
 - TUI 키(`'a'` Apply, `'C'` Container, `'v'` Dip, `'E'` Engrave, `'g'` Drink), Headless `survival-v1` 캠페인 전용 `UnicornHorn` 치료, `SAVE_SCHEMA_VERSION_V3 = 3` 양방향/범위 저장 검증을 적용한다.
+
+## Stage 4 (P10): 성향·종족·신앙·고유 아티팩트·13역할·#enhance 숙련도 (2026-11-27)
+
+`ADR-P10-01`에 따라 캠페인 플레이어 빌드, 신앙/제단 상호작용, 고유 아티팩트, 무기/주문 숙련도 루프를 구현한다. 레거시 모드(`campaign == None`, V1 세이브) 및 기존 `Knight`/`Scout`/`Mage`/`Cleric` × `Human` 기본 성향의 시작 계약을 유지한다.
+
+### P10-1 3 성향(`Alignment`) · 5 종족(`Race`) · 조합 검증
+- `Alignment`: `Lawful`, `Neutral`, `Chaotic` (`cross_alignment()`는 `Lawful↔Chaotic`, `Neutral→Chaotic`).
+- `Race`: `Human`(0 보정), `Elf`(`Str -1, Dex +2, Con -1, Int +2, Cha +1`, HP `-1`, MP `+2`, 내재 `SLEEP` 저항, 암시), `Dwarf`(`Str +2, Dex -1, Con +2, Int -1, Cha -1`, HP `+3`, MP `-1`, 암시), `Gnome`(`Str -1, Dex +1, Int +1, Wis +1`, HP `-1`, MP `+1`, 암시), `Orc`(`Str +2, Con +2, Int -2, Wis -1, Cha -2`, HP `+2`, MP `-2`, 내재 `POISON` 저항, 암시).
+- 암시(`has_infravision()`): 비실명 상태에서 어두운(`Dark`) 방에서도 맨해튼/체비셰프 거리 8 이하 시야선 내 살아 있는 몬스터를 감지해 가시 목록에 포함한다.
+- `Role::is_valid_combo(race, alignment)`로 `StartCampaign`, `CampaignState::new_custom`, `SaveV3`, Headless/TUI 캐릭터 생성을 검증한다.
+
+### P10-2 13종 역할(`Role`) 및 5종 무기 확장
+- 기존 4종(`Knight`, `Scout`, `Mage`, `Cleric`)을 보존하고 9종(`Valkyrie`, `Wizard`, `Rogue`, `Priest`, `Samurai`, `Barbarian`, `Ranger`, `Monk`, `Archeologist`)을 추가한다.
+- 신규 무기 5종(`LongSword`, `Katana`, `BattleAxe`, `Quarterstaff`, `BroadSword`)을 `items.toml`에 추가하고 역할별 시작 무기/방어구/주문/숙련 상한 및 `Monk` 맨손 보너스(`unarmed_bonus`)를 부여한다.
+
+### P10-3 신앙·제단 심화 (`altar_alignments`, `god_anger`, `prayer_timeout`)
+- `GameLevel::altar_alignments`에 제단 좌표를 저장한다(`Main 3` = 시작 성향 동정렬, `Mines 2` = `cross_alignment` 비정렬).
+- 비정렬 제단 `Pray` 또는 `god_anger > 0`/`prayer_timeout > 0` 상태에서 성급한 기도는 분노 누적과 신벌 피해(`DeathCause::DivineWrath`)를 일으킨다. 정상 동정렬 `Pray` 성공 시 `prayer_timeout = 100`이 설정되며, 매 accepted turn마다 1씩 감소한다.
+- 비정렬 제단에 시체 `#offer` 시 제단을 플레이어 성향으로 개종(`luck +1`, 분노 경감)한다. 동정렬 제단에 시체 `#offer` 시 분노를 경감(`god_anger - 2`)하고, `god_anger == 0 && (luck >= 2 || corpse_difficulty >= 2)`이면 아직 생성되지 않은 후보 고유 아티팩트 1종을 하사할 수 있다.
+- 비정렬 제단 `#dip`은 물을 저주된 물약(`Cursed PotionWater`)으로 오염시키고 `luck -1`, `god_anger +1`을 적용한다.
+
+### P10-4 고유 아티팩트 6종 & `CommandIntent::Invoke` (`'V'`)
+- 정적 아티팩트 6종(`excalibur`, `sunsword`, `magicbane`, `cleaver`, `stormbringer`, `sting`)을 정의하고 `WorldState::generated_artifacts`로 전역 1회만 생성한다(`sting`은 무성향 엘프 검, 나머지 5종은 고유 성향 보유).
+- `Lawful` 레벨 5+ 플레이어가 `Fountain`에 `LongSword`를 `#dip`하면(전역 1회) `excalibur`로 변환되고 분수는 고갈된다.
+- 비정렬 아티팩트를 줍기(`2d6` 피해 + 회수 또는 낙하 — 회수 시 장착/발동 불가), 장착(`4d4` 피해 + 장착 거부), 발동(`4d4` 피해 + 발동 거부) 시 `DeathCause::ArtifactBlast` 피해를 입는다. 모든 아티팩트는 부식(`erosion`)에 면역이다.
+- `Sunsword`는 반경 5 광원을 제공하며 각 아티팩트는 패시브 저항/추가 피해/생명력 흡수(`Stormbringer` +2 HP)를 제공한다. `CommandIntent::Invoke { item }`(`'V'`, 25턴 전역 쿨다운 `artifact_invoke_cooldown`)으로 아티팩트 고유 권능을 발동한다.
+
+### P10-5 `#enhance` 숙련도 (`SkillCategory`, `SkillRank`, `CommandIntent::Enhance`)
+- 8종 `SkillCategory`(`Dagger`, `Sword`, `Axe`, `Blunt`, `Staff`, `Thrown`, `BareHands`, `Spellcasting`)와 6단계 `SkillRank`(`0=Unskilled..=5=GrandMaster`)를 둔다.
+- 무기 사용(근접/투척) 및 주문 시전 시 `skill_practice`가 누적되며(필요 경험: `(rank + 1) * 20`), 역할별 `skill_caps()` 한도 내에서 `CommandIntent::Enhance { skill }` (`'X'`)로 승급한다.
+- 숙련 등급에 따라 명중/피해/주문 보너스를 적용하되 기존 역할 시작 무기/주문의 `Basic(1)`은 P9 기준선(`+0/+0`)을 유지한다. TUI(`'V'`/`'X'`/생성 UI/제단 색/HUD), Headless(`--role`, `--race`, `--alignment`), LLM 32 KiB / `ActionSpace <= 64` 및 SaveV3 검증을 동기화한다.
+
+## Stage 4.5 (`P10-Audit-Fix`): 감사 보고서 35 시정 계약 (2026-11-27)
+
+`docs/audit/audit_report_35.md` 및 `DESIGN_DECISIONS.md` `ADR-P10-02`에 따른 시정 계약이다.
+
+- **커맨드 우선순위 & TUI 판정 (`CRIT-01`)**: `playing_actions()`는 `Move`/기본 생존/단발 행동(Tier 1~2)을 `Throw`/`Zap`/`Apply(Some)`/`Drop`/`Container*`/`Dip`/`Identify`/비-`Elbereth` 각인(Tier 3)보다 먼저 생성해 `.take(64)` `ActionSpace` 내 `Move` 접근성을 보장한다. TUI(`input.rs`)는 64개 절단이 아닌 전체 `legal_actions`를 조회한다.
+- **트랜잭션 롤백 & 선검증 (`CRIT-02`)**: `GameSession::submit`은 `!outcome.accepted` 시 working copy를 항상 롤백한다. `items::read`, `containers::container_take`, `dip`, `engrave`는 사전 유효성·인벤토리 용량·각인 상한을 검증한 뒤 상태를 변이하며 `Err` 직전 `buc_known` 노출 부수효과를 제거한다.
+- **P9 지형 근접 공격 & 추격 스폰 (`CRIT-03`)**: `Fountain`/`DryFountain`/`Sink`/`Water`/`Lava` 타일 위 몬스터도 인접 근접 공격이 가능하며(`is_movement_passable()`), `ascension` 추격 스폰은 `Water`/`Lava`를 제외한다.
+- **종족·행운 보정 (`MAJ-01`, `MAJ-02`)**: `UnicornHorn` 능력치 복구 기준을 `campaign.role.base_attributes().with_race_deltas(campaign.race)`로 적용하고, `terrain`/`traps` 행운 상한을 `MAX_LUCK(13)`으로 통일한다.
+- **미식별 정보 격리 (`MAJ-03`)**: 캠페인 미식별 아이템의 맵/인벤토리 `color`는 시드 외형 색상(`color_for_appearance`)으로 마스킹하고, `containers`/`dip`/`terrain`/`shop` 로그는 외형명을 출력한다. `LlmObservationView`는 미식별 아이템 `kind`를 생략하고, `HeadlessPolicy::SurvivalV1`은 캠페인 모드에서 미식별 물약/반지를 종류 추측으로 사용하지 않는다(레거시 2층 모드 R9 해시 불변).
+- **TUI 캐릭터 생성 화면 (`MAJ-04`)**: `60x24` 이내 레이아웃으로 13역할(`1..=9`, `b`/`g`/`m`/`k`), 종족(`[R]`), 성향(`[A]`), `[Tab]` 순환(유효 조합 자동 스냅), 동적 시작 HP/MP/AC/능력치 프리뷰 및 13역할 전체 마우스 CTA를 제공한다.
+- **데이터 주도 연결 & `P12` 스케일업 (`MAJ-05`)**: `MonsterTemplate.resistances`·`ActorStats.resistances`에 `monster_resistances()`를 주입해 `WandFire` 화염 면역을 적용하고, `con_regen_reduction()`과 `weighted_monster_kinds_for_depth()`(`spawn_depth_range`/`spawn_weight`)를 연결한다. `P12` 전 `build.rs` 정적 데이터 테이블+디스패치 전환으로 수동 enum 복제를 제거한다.
+- **SaveV3·엣지 케이스·소결함 (`MAJ-06`, `MIN-01`~`07`, `GAP-01`)**: `god_anger(0..=100)`, `prayer_timeout(0..=2000)`, `artifact_invoke_cooldown(0..=25)`, `learned_spells` 유일성·상한(`<= 32`), `ascension_altars` 유효성(`<= 8`), `monster_inventory` 무결성, 비시체 `corpse_monster` 차단, 아티팩트 `erosion == 0`을 검증한다. `TrapKind::Hole` 사망 시 층 이동을 수행하지 않으며, 대기 몬스터 에너지를 클램프하고, 비이동 턴/부유 해제 직후 `Water`/`Lava` 피해를 판정한다. 던전 8층(`Sokoban`/`Quest` `P11`, `Gehennom`/`Main 1..20+` `P13`), `MAX_XP = 180`/`Polymorph`(`P12` 확장), `SaveV2` 비호환을 유지한다.
+
+## Stage 5 (P11): 살아 있는 던전 — 펫 · NPC · 고급 몬스터 AI (2026-11-27)
+
+`ADR-P11-01`에 따라 캠페인 모드에 반려동물(펫), 평화 NPC 및 상점 채무 경제, 고급 몬스터 AI와 파벌 생태계를 추가한다. 레거시 2층 모드(`campaign == None`, V1 세이브, R9 causal 해시)와 기존 `Buy`/`Sell` 호환성을 유지한다.
+
+### P11-1 반려동물(Pet) 시스템
+- 캠페인 시작 시 `Main 1` 플레이어 인접 빈 바닥에 역할/종족별 시작 펫(`Knight`/`Valkyrie`/`Samurai` → `Pony`, `Mage`/`Wizard`/`Rogue`/`Archeologist`/`Elf` → `Kitten`, 그 외 → `LittleDog`)을 `Faction::Pet`, `tameness = 5`, `pet_hunger = 600`으로 배치한다.
+- 플레이어가 인접 `Pet`/`Peaceful`/`Shopkeeper`로 `Move`하면 공격하지 않고 위치를 맞바꾸는 우호 자리바꿈을 수행한다.
+- 바닥/투척 음식(`FoodRation`, `Corpse`, `CorpseJackal`)으로 펫 허기를 회복하고 친밀도(`tameness`, 최대 `20`)를 높이며, 야생 `pet_capable` 동물에게 음식을 `Throw`하면 피해 없이 길들인다(`Faction::Pet`). 펫 허기가 0에 도달해 장기간 굶으면 친밀도가 감소해 `Hostile`로 야생화한다.
+- 펫은 적대 몬스터와 교전해 `pet_xp`를 쌓으며 `pet_xp >= 20` 도달 시 성체로 진화(`Kitten -> Housecat`, `LittleDog -> Dog`, `Pony -> Warhorse`)한다.
+- 펫은 바닥의 저주(`Cursed`) 아이템 타일 진입을 회피하며 `buc_known = true` 경고 메시지를 출력한다.
+- 펫은 상점 바닥의 `unpaid` 상품을 주워 상점 밖 플레이어 근처에 떨어뜨리며(`unpaid = false`, 상점 절도), 플레이어가 계단/분기(`Descend`/`Ascend`/`EnterBranch`)를 이동할 때 체비셰프 거리 `<= 2` 이내의 살아 있는 펫이 함께 이동한다.
+
+### P11-2 살아 있는 NPC 및 상점 채무 경제 (`Chat`, `Pay`)
+- `Main 2`·`Mines 1` 상점에 `Shopkeeper` (`Faction::Shopkeeper`)와 `unpaid = true` 진열 상품 3종을, `Main 3` 제단에 `TemplePriest` (`Faction::Peaceful`), `Main 4`에 `Oracle` (`Faction::Peaceful`), `Mines 1`에 `Watchman` (`Faction::Peaceful`)을 배치한다.
+- `unpaid` 아이템을 `Pickup`하면 `world.shop_debt`가 증가하고 상점 내 `Drop` 시 차감된다. `CommandIntent::Pay`(`'D'` / `'$'`)로 채무를 정산해 `unpaid = false`로 전환한다. `shop_debt > 0` 상태로 상점 구역(거리 > 4)을 벗어나거나 계단을 타거나 평화 NPC/상점주인을 공격하면 상점주인 및 같은 층 `Watchman`이 `Faction::Hostile`로 전환된다.
+- 기존 `TileKind::Shop` 위 `Buy`/`Sell`은 해당 층 `Shopkeeper`가 적대화되지 않은 한 호환 동작한다.
+- `CommandIntent::Chat(Direction)`(`'m'`)으로 인접 NPC/펫과 대화하며, `TemplePriest`에게 `Pay` 기부 시 신의 분노 경감·상태이상 회복·행운 상승·감정/치유 축복을, `Oracle`에게 `Pay`(50골드) 시 주요 상담(감정/숨김 탐지)을 얻는다.
+
+### P11-3 고급 몬스터 AI 및 특수 몬스터 생태계 (`ai_flags` / `MonsterPassive`)
+- `monsters.toml`에 P11 17종(`Kitten`, `Housecat`, `LittleDog`, `Dog`, `Pony`, `Warhorse`, `Shopkeeper`, `TemplePriest`, `Oracle`, `Watchman`, `Leprechaun`, `Nymph`, `RustMonster`, `BlackPudding`, `Dwarf`, `Medusa`, `OrcCaptain`)을 추가해 총 30종으로 확장한다.
+- `opens_doors` 플래그 몬스터는 추적 중 닫힌 문(`DoorState::Closed`)을 연다.
+- `picks_up`/`uses_items` 플래그 몬스터는 바닥 무기·방어구·치유 물약·공격 완드를 `monster_inventory`(최대 4개)에 줍고 공격/AC 보너스를 받으며, 체력 절반 이하 시 치유 물약 음용·시야선 완드 발사를 수행하고 사망 시 소지품을 바닥에 드롭한다.
+- 특수 패턴: `Leprechaun`(`StealGold`+텔레포트), `Nymph`(`StealItem`→`monster_inventory`+텔레포트), `RustMonster`(`RustMetal` 철/강 장비 `erosion +1`, 아티팩트 면역), `BlackPudding`(`SplitOnHit` HP `>= 6` 분열), `Medusa`(`GazeParalyze`)·`FloatingEye`(`ParalyzeOnMelee`) 시선 공격(`Blind`/`Blindfold` 방어), `OrcCaptain`(`SummonAllies` `Orc` 소환).
+- 파벌전: `Orc`/`OrcCaptain`과 `Dwarf`가 서로 교전하고, `Watchman`은 `Hostile` 몬스터와 교전하며, `Pet`은 적대 몬스터와 교전한다.
+- TUI(`faction` 색상/Inspect, `DEBT:` HUD, `'m'` Chat / `'D'` Pay), Headless(`Faction::Hostile` 전용 공격·무단 미결제 픽업 회피·`Pay`), `LlmObservationView < 32,768B`, `ActionSpace <= 64`, `SaveV3` 엄격 검증을 동기화한다.

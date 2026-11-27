@@ -104,7 +104,7 @@ fn belongs(command: C, key: char) -> bool {
             | ('t', C::Throw { .. })
             | ('z', C::Zap { .. })
             | ('r', C::Read { .. })
-            | ('$', C::Buy { .. } | C::Sell { .. })
+            | ('$', C::Buy { .. } | C::Sell { .. } | C::Pay)
             | ('O', C::Offer { .. })
             | ('Z', C::Cast { .. })
             | ('x', C::TakeOff { .. })
@@ -112,6 +112,9 @@ fn belongs(command: C, key: char) -> bool {
             | ('C', C::ContainerPut { .. } | C::ContainerTake { .. })
             | ('v', C::Dip { .. })
             | ('E', C::Engrave { .. })
+            | ('V', C::Invoke { .. })
+            | ('X', C::Enhance { .. })
+            | ('m', C::Chat(_))
     )
 }
 
@@ -129,7 +132,8 @@ fn item_of(command: C) -> Option<EntityId> {
         | C::Throw { item, .. }
         | C::Zap { item, .. }
         | C::Apply { item, .. }
-        | C::Dip { item, .. } => Some(item),
+        | C::Dip { item, .. }
+        | C::Invoke { item } => Some(item),
         _ => None,
     }
 }
@@ -146,15 +150,27 @@ pub(super) fn action_menu(
         .filter(|command| belongs(*command, key))
         .collect();
     let mut entries = Vec::new();
-    if matches!(key, 'o' | 'c' | 'K') || selected.is_some() {
+    if matches!(key, 'o' | 'c' | 'K' | 'm') || selected.is_some() {
         for command in commands {
             if selected.is_some() && item_of(command) != selected {
+                continue;
+            }
+            if let C::Apply {
+                direction: None, ..
+            } = command
+            {
+                entries.push(Entry {
+                    key: '.',
+                    label: "Here (chest / lock)".into(),
+                    candidate: U::Command(command),
+                });
                 continue;
             }
             let direction = match command {
                 C::Open(d)
                 | C::Close(d)
                 | C::Kick(d)
+                | C::Chat(d)
                 | C::Throw { direction: d, .. }
                 | C::Zap { direction: d, .. }
                 | C::Apply {
@@ -175,14 +191,18 @@ pub(super) fn action_menu(
         return PlayMenu::new("Choose direction", entries);
     }
     if key == 'Z' {
-        let mut spells = Vec::new();
-        for command in &commands {
-            if let C::Cast { spell, .. } = *command {
-                if !spells.contains(&spell) {
-                    spells.push(spell);
-                }
-            }
-        }
+        let spells: Vec<aihack_ai_contract::SpellKind> = [
+            aihack_ai_contract::SpellKind::ForceBolt,
+            aihack_ai_contract::SpellKind::Heal,
+            aihack_ai_contract::SpellKind::Detect,
+        ]
+        .into_iter()
+        .filter(|spell| {
+            commands
+                .iter()
+                .any(|command| matches!(command, C::Cast { spell: s, .. } if s == spell))
+        })
+        .collect();
         for (index, spell) in spells.into_iter().take(9).enumerate() {
             entries.push(Entry {
                 key: char::from(b'1' + index as u8),
@@ -219,6 +239,17 @@ pub(super) fn action_menu(
         return PlayMenu::new("Take off equipped", entries);
     }
     if key == '$' {
+        if commands.contains(&C::Pay) {
+            entries.push(Entry {
+                key: 'P',
+                label: if observation.player.shop_debt > 0 {
+                    format!("Pay shop debt ({}g)", observation.player.shop_debt)
+                } else {
+                    "Pay / Donate".into()
+                },
+                candidate: U::Command(C::Pay),
+            });
+        }
         let mut buy_index = 0u8;
         for command in &commands {
             if let C::Buy { kind } = command {
@@ -371,6 +402,76 @@ pub(super) fn action_menu(
             }
         }
         return PlayMenu::new("Engrave with", entries);
+    }
+    if key == 'V' {
+        for item in &observation.inventory {
+            if let Some(command) = commands
+                .iter()
+                .find(|c| matches!(c, C::Invoke { item: id } if *id == item.item))
+            {
+                entries.push(Entry {
+                    key: item.letter.0,
+                    label: item_observation_label(item),
+                    candidate: U::Command(*command),
+                });
+            }
+        }
+        let cd = observation
+            .campaign
+            .as_ref()
+            .map(|c| c.artifact_invoke_cooldown)
+            .unwrap_or(0);
+        let title = if cd > 0 {
+            format!("Invoke Artifact (Cooldown: {cd}t)")
+        } else {
+            "Invoke Artifact".to_string()
+        };
+        return PlayMenu::new(&title, entries);
+    }
+    if key == 'X' {
+        if let Some(campaign) = &observation.campaign {
+            for (idx, skill_obs) in campaign.skills.iter().enumerate() {
+                let key_char = char::from(b'1' + idx as u8);
+                let threshold = skill_obs.rank.practice_threshold();
+                let next_name = skill_obs
+                    .rank
+                    .next()
+                    .map(|r| r.display_name())
+                    .unwrap_or("MAX");
+                if skill_obs.ready
+                    && observation.legal_actions.contains(&C::Enhance {
+                        skill: skill_obs.category,
+                    })
+                {
+                    entries.push(Entry {
+                        key: key_char,
+                        label: format!(
+                            "{} [{} -> {}] READY!",
+                            skill_obs.category.display_name(),
+                            skill_obs.rank.display_name(),
+                            next_name
+                        ),
+                        candidate: U::Command(C::Enhance {
+                            skill: skill_obs.category,
+                        }),
+                    });
+                } else {
+                    entries.push(Entry {
+                        key: key_char,
+                        label: format!(
+                            "{} [{} / cap {} | prac {}/{}]",
+                            skill_obs.category.display_name(),
+                            skill_obs.rank.display_name(),
+                            skill_obs.cap.display_name(),
+                            skill_obs.practice,
+                            threshold
+                        ),
+                        candidate: U::CloseOverlay,
+                    });
+                }
+            }
+        }
+        return PlayMenu::new("Skills (#enhance)", entries);
     }
     if key == 'q' && commands.contains(&C::Drink) {
         entries.push(Entry {
@@ -584,6 +685,7 @@ pub(super) fn item_menu(observation: &Observation, item: EntityId) -> PlayMenu {
         ('z', "Zap"),
         ('a', "Apply"),
         ('v', "Dip"),
+        ('V', "Invoke"),
         ('$', "Sell"),
         ('O', "Offer"),
     ]
@@ -652,6 +754,7 @@ pub(super) fn commands_menu(observation: &Observation) -> PlayMenu {
         ('D', "Descend", C::Descend),
         ('U', "Ascend", C::Ascend),
         ('g', "Drink", C::Drink),
+        ('!', "Pay / Donate", C::Pay),
         ('.', "Wait", C::Wait),
     ]
     .into_iter()
@@ -690,6 +793,9 @@ pub(super) fn commands_menu(observation: &Observation) -> PlayMenu {
         ('C', "Container"),
         ('v', "Dip"),
         ('E', "Engrave"),
+        ('V', "Invoke"),
+        ('X', "Enhance"),
+        ('m', "Chat"),
     ] {
         entries.push(Entry {
             key,

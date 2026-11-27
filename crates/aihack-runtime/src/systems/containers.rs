@@ -11,7 +11,8 @@ use aihack_core::{
 };
 
 use crate::{
-    systems::{combat::roll_die, death, items},
+    appearance,
+    systems::{artifacts, combat::roll_die, death, items},
     world::GameWorld,
 };
 
@@ -183,6 +184,7 @@ fn collect_recursive_items(
 }
 
 pub fn container_put(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     container: EntityId,
@@ -213,11 +215,15 @@ pub fn container_put(
     if item_kind == ItemKind::AmuletAscension {
         return Err("The Amulet of Ascension resists being placed inside a container.".to_string());
     }
+    if item_entity.item_unpaid() == Some(true) {
+        return Err(
+            "Pay for unpaid shop merchandise before placing it in a container.".to_string(),
+        );
+    }
     if item_kind == ItemKind::Blindfold
         && item_entity.item_tool_active() == Some(true)
         && item_entity.item_buc() == Some(BucStatus::Cursed)
     {
-        world.state_mut().entities.set_item_buc_known(item, true);
         return Err("The blindfold is cursed and stuck to your face!".to_string());
     }
 
@@ -285,6 +291,8 @@ pub fn container_put(
         return Err("container does not have enough capacity".to_string());
     }
 
+    let item_name = appearance::display_name_for_world_item(seed, world, item, item_kind);
+    let container_name = appearance::display_name_for_kind(seed, world, container_kind);
     if matches!(item_kind, ItemKind::Blindfold | ItemKind::OilLamp) {
         world.state_mut().entities.set_item_tool_active(item, false);
     }
@@ -294,9 +302,6 @@ pub fn container_put(
     entities.set_item_location(item, EntityLocation::InContainer { container });
     entities.push_contained_item(container, item);
 
-    let item_name = aihack_content::item_display_name(item_kind, world.content_registry());
-    let container_name =
-        aihack_content::item_display_name(container_kind, world.content_registry());
     Ok(vec![GameEvent::Message {
         priority: MessagePriority::Info,
         text: format!("You put the {item_name} into the {container_name}."),
@@ -304,6 +309,7 @@ pub fn container_put(
 }
 
 pub fn container_take(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     container: EntityId,
@@ -325,8 +331,54 @@ pub fn container_take(
     if container_entity.item_container_locked() == Some(true) {
         return Err("The container is locked.".to_string());
     }
+    let container_trapped = container_entity.item_container_trapped() == Some(true);
+
+    // CRIT-02: 함정 발동/상태 변이 전에 대상 존재 여부와 인벤토리 수납 가능 여부를 먼저 검증한다.
+    let contained = container_entity
+        .item_contained_items()
+        .ok_or_else(|| "container has no contents".to_string())?;
+    if !contained.contains(&item) {
+        return Err("item is not inside that container".to_string());
+    }
+    let child = world
+        .entities
+        .get(item)
+        .ok_or_else(|| "contained item is missing".to_string())?;
+    let (item_kind, _, _, _, _) = child
+        .item()
+        .ok_or_else(|| "contained entity is not an item".to_string())?;
+    let child_buc = child.item_buc().unwrap_or(BucStatus::Uncursed);
+    let child_enchant = child.item_enchantment().unwrap_or(0);
+    let child_qty = child.item_quantity().unwrap_or(1);
+    let child_erosion = child.item_erosion().unwrap_or(0);
+    let item_name = appearance::display_name_for_world_item(seed, world, item, item_kind);
+    let container_name = appearance::display_name_for_kind(seed, world, container_kind);
+
+    let stack_target = if item_kind.is_stackable() && child_erosion == 0 {
+        world.inventory.entries.iter().find_map(|entry| {
+            let existing = world.entities.get(entry.item)?;
+            let (ek, _, _, _, _) = existing.item()?;
+            let eq = existing.item_quantity().unwrap_or(1);
+            if ek == item_kind
+                && existing.item_buc().unwrap_or(BucStatus::Uncursed) == child_buc
+                && existing.item_enchantment().unwrap_or(0) == child_enchant
+                && existing.item_erosion().unwrap_or(0) == 0
+                && eq.saturating_add(child_qty) <= aihack_core::domain::item::MAX_ITEM_STACK
+            {
+                Some((entry.item, entry.letter, eq + child_qty))
+            } else {
+                None
+            }
+        })
+    } else {
+        None
+    };
+    if stack_target.is_none() && !world.inventory.has_free_slot() {
+        return Err("inventory letter capacity exceeded".to_string());
+    }
+
     let mut events = Vec::new();
-    if container_entity.item_container_trapped() == Some(true) {
+    if container_trapped {
         world
             .state_mut()
             .entities
@@ -356,49 +408,8 @@ pub fn container_take(
         }
     }
 
-    let contained = world
-        .entities
-        .get(container)
-        .and_then(|e| e.item_contained_items())
-        .ok_or_else(|| "container has no contents".to_string())?;
-    if !contained.contains(&item) {
-        return Err("item is not inside that container".to_string());
-    }
-
-    let child = world
-        .entities
-        .get(item)
-        .ok_or_else(|| "contained item is missing".to_string())?;
-    let (item_kind, _, _, _, _) = child
-        .item()
-        .ok_or_else(|| "contained entity is not an item".to_string())?;
-    let child_buc = child.item_buc().unwrap_or(BucStatus::Uncursed);
-    let child_enchant = child.item_enchantment().unwrap_or(0);
-    let child_qty = child.item_quantity().unwrap_or(1);
-    let child_erosion = child.item_erosion().unwrap_or(0);
-
-    let stack_target = if item_kind.is_stackable() && child_erosion == 0 {
-        world.inventory.entries.iter().find_map(|entry| {
-            let existing = world.entities.get(entry.item)?;
-            let (ek, _, _, _, _) = existing.item()?;
-            let eq = existing.item_quantity().unwrap_or(1);
-            if ek == item_kind
-                && existing.item_buc().unwrap_or(BucStatus::Uncursed) == child_buc
-                && existing.item_enchantment().unwrap_or(0) == child_enchant
-                && existing.item_erosion().unwrap_or(0) == 0
-                && eq.saturating_add(child_qty) <= aihack_core::domain::item::MAX_ITEM_STACK
-            {
-                Some((entry.item, entry.letter, eq + child_qty))
-            } else {
-                None
-            }
-        })
-    } else {
-        None
-    };
-
     let player_id = world.player_id;
-    if let Some((existing_id, letter, next_qty)) = stack_target {
+    let took_item_id = if let Some((existing_id, letter, next_qty)) = stack_target {
         let entities = &mut world.state_mut().entities;
         entities.remove_contained_item(container, item);
         entities.set_item_quantity(existing_id, next_qty);
@@ -409,6 +420,7 @@ pub fn container_take(
             item: existing_id,
             letter,
         });
+        existing_id
     } else {
         let letter = world
             .state_mut()
@@ -424,15 +436,23 @@ pub fn container_take(
             item,
             letter,
         });
-    }
+        item
+    };
 
-    let item_name = aihack_content::item_display_name(item_kind, world.content_registry());
-    let container_name =
-        aihack_content::item_display_name(container_kind, world.content_registry());
     events.push(GameEvent::Message {
         priority: MessagePriority::Info,
         text: format!("You take the {item_name} from the {container_name}."),
     });
+    if let (Some(def), Some(campaign)) = (
+        artifacts::artifact_def_for_item(world, took_item_id),
+        world.campaign,
+    ) {
+        if artifacts::is_artifact_hostile_to(def, campaign.alignment) {
+            events.extend(artifacts::apply_artifact_blast(
+                world, rng, def, 2, 6, "take",
+            )?);
+        }
+    }
     Ok(events)
 }
 

@@ -16,7 +16,10 @@ use aihack_core::{
 use crate::{
     systems::{
         doors::door_state_in_direction,
-        movement::{is_bump_attack_for_legal_action, is_passable_for_legal_action},
+        movement::{
+            is_bump_attack_for_legal_action, is_friendly_swap_for_legal_action,
+            is_passable_for_legal_action,
+        },
         vision::visible_positions,
     },
     world::GameWorld,
@@ -36,6 +39,21 @@ fn tile_engraving(world: &GameWorld, pos: Pos) -> Option<String> {
             .find(|entry| entry.pos == pos)
             .map(|entry| entry.text.clone())
     })
+}
+
+fn tile_altar_alignment(
+    world: &GameWorld,
+    pos: Pos,
+    tile: TileKind,
+) -> Option<aihack_core::campaign::Alignment> {
+    world.campaign?;
+    if tile != TileKind::Altar {
+        return None;
+    }
+    world
+        .levels
+        .get(world.current_level())
+        .and_then(|level| level.altar_alignment(pos))
 }
 
 pub fn from_world(
@@ -60,6 +78,7 @@ pub fn from_world(
                     tile: tile.observation_equivalent(),
                     visible: true,
                     engraving: tile_engraving(world, pos),
+                    altar_alignment: tile_altar_alignment(world, pos, tile),
                 })
         })
         .collect::<Vec<_>>();
@@ -73,6 +92,7 @@ pub fn from_world(
                         tile: tile.observation_equivalent(),
                         visible: false,
                         engraving: tile_engraving(world, pos),
+                        altar_alignment: tile_altar_alignment(world, pos, tile),
                     });
                 }
             }
@@ -95,6 +115,10 @@ pub fn from_world(
                 attributes: Some(campaign.attributes),
                 alignment: Some(campaign.alignment),
                 race: Some(campaign.race),
+                god_anger: campaign.god_anger,
+                prayer_timeout: campaign.prayer_timeout,
+                artifact_invoke_cooldown: campaign.artifact_invoke_cooldown,
+                skills: crate::systems::skills::skill_observations(world),
             }),
         schema_version: OBSERVATION_SCHEMA_VERSION,
         seed,
@@ -178,6 +202,7 @@ fn player_observation(world: &GameWorld) -> PlayerObservation {
         invisible_turns: world.status_timers.invisible,
         blindfolded: world.campaign.is_some()
             && crate::systems::tools::is_player_blindfolded(world),
+        shop_debt: world.shop_debt,
     }
 }
 
@@ -187,6 +212,9 @@ fn visible_entities(seed: u64, world: &GameWorld) -> Vec<EntityObservation> {
         && world
             .effective_player_resistances()
             .contains(aihack_core::domain::status::Resistances::TELEPATHY);
+    let has_infravision = world.campaign.is_some_and(|c| c.race.has_infravision())
+        && world.status_timers.blind == 0
+        && !crate::systems::tools::is_player_blindfolded(world);
     let registry = world.content_registry();
     let mut entities = world
         .entities
@@ -196,10 +224,15 @@ fn visible_entities(seed: u64, world: &GameWorld) -> Vec<EntityObservation> {
             if entity.id == world.player_id {
                 return None;
             }
-            if let Some((actor_kind, _, level, pos, stats, alive)) = entity.actor() {
+            if let Some((actor_kind, faction, level, pos, stats, alive)) = entity.actor() {
+                let infravision_hit = has_infravision
+                    && level == world.current_level()
+                    && i32::from(world.player_pos().chebyshev_distance(pos))
+                        <= aihack_core::campaign::INFRAVISION_RADIUS
+                    && crate::systems::vision::has_line_of_sight(world, world.player_pos(), pos);
                 if alive
                     && level == world.current_level()
-                    && (visible.contains(&pos) || has_telepathy)
+                    && (visible.contains(&pos) || has_telepathy || infravision_hit)
                 {
                     let (glyph, name, color) = if world.campaign.is_some() {
                         match actor_kind {
@@ -225,6 +258,8 @@ fn visible_entities(seed: u64, world: &GameWorld) -> Vec<EntityObservation> {
                         glyph,
                         name,
                         color,
+                        faction: world.campaign.is_some().then_some(faction),
+                        unpaid: false,
                     });
                 }
             }
@@ -236,20 +271,18 @@ fn visible_entities(seed: u64, world: &GameWorld) -> Vec<EntityObservation> {
                         })
                         .flatten();
                     let (glyph, name, color) = if world.campaign.is_some() {
-                        let name = if let Some(ref app) = appearance {
-                            app.clone()
-                        } else if let Some(mk) = entity.item_corpse_monster() {
-                            format!(
-                                "{} corpse",
-                                aihack_content::monster_display_name(mk, registry)
-                            )
+                        let name = crate::appearance::display_name_for_world_item(
+                            seed, world, entity.id, kind,
+                        );
+                        let color = if let Some(ref app) = appearance {
+                            Some(crate::appearance::color_for_appearance(app).to_owned())
                         } else {
-                            aihack_content::item_display_name(kind, registry)
+                            aihack_content::item_color(kind, registry).map(str::to_owned)
                         };
                         (
                             Some(aihack_content::item_glyph(kind, registry)),
                             Some(name),
-                            aihack_content::item_color(kind, registry).map(str::to_owned),
+                            color,
                         )
                     } else {
                         (None, None, None)
@@ -264,6 +297,8 @@ fn visible_entities(seed: u64, world: &GameWorld) -> Vec<EntityObservation> {
                         glyph,
                         name,
                         color,
+                        faction: None,
+                        unpaid: world.campaign.is_some() && entity.item_unpaid().unwrap_or(false),
                     });
                 }
             }
@@ -313,26 +348,23 @@ fn inventory_observations(seed: u64, world: &GameWorld) -> Vec<ItemObservation> 
                 .then(|| crate::appearance::appearance_for_kind(seed, kind).map(str::to_owned))
                 .flatten();
             let (glyph, name, color, item_class) = if world.campaign.is_some() {
-                let item_name = if let Some(ref app) = appearance {
-                    app.clone()
-                } else if let Some(mk) = entity.item_corpse_monster() {
-                    format!(
-                        "{} corpse",
-                        aihack_content::monster_display_name(mk, registry)
-                    )
+                let item_name =
+                    crate::appearance::display_name_for_world_item(seed, world, entry.item, kind);
+                let color = if let Some(ref app) = appearance {
+                    Some(crate::appearance::color_for_appearance(app).to_owned())
                 } else {
-                    aihack_content::item_display_name(kind, registry)
+                    aihack_content::item_color(kind, registry).map(str::to_owned)
                 };
                 (
                     Some(aihack_content::item_glyph(kind, registry)),
                     Some(item_name),
-                    aihack_content::item_color(kind, registry).map(str::to_owned),
+                    color,
                     Some(data.class),
                 )
             } else {
                 (None, None, None, None)
             };
-            let (contained_count, tool_active, container_locked, erosion) =
+            let (contained_count, tool_active, container_locked, erosion, artifact_id) =
                 if world.campaign.is_some() {
                     (
                         u16::try_from(
@@ -345,9 +377,10 @@ fn inventory_observations(seed: u64, world: &GameWorld) -> Vec<ItemObservation> 
                         entity.item_tool_active().unwrap_or(false),
                         entity.item_container_locked().unwrap_or(false),
                         entity.item_erosion().unwrap_or(0),
+                        entity.item_artifact_id().map(str::to_owned),
                     )
                 } else {
-                    (0, false, false, 0)
+                    (0, false, false, 0, None)
                 };
             Some(ItemObservation {
                 item: entry.item,
@@ -369,6 +402,8 @@ fn inventory_observations(seed: u64, world: &GameWorld) -> Vec<ItemObservation> 
                 tool_active,
                 container_locked,
                 erosion,
+                artifact_id,
+                unpaid: world.campaign.is_some() && entity.item_unpaid().unwrap_or(false),
             })
         })
         .collect()
@@ -433,7 +468,13 @@ fn container_observations(seed: u64, world: &GameWorld) -> Vec<ContainerItemObse
             let appearance = (!identified)
                 .then(|| crate::appearance::appearance_for_kind(seed, kind).map(str::to_owned))
                 .flatten();
-            let name = if let Some(app) = appearance {
+            let artifact_id = child.item_artifact_id().map(str::to_owned);
+            let name = if let Some(def) = artifact_id
+                .as_deref()
+                .and_then(aihack_core::campaign::artifact_def)
+            {
+                def.name.to_owned()
+            } else if let Some(app) = appearance {
                 app
             } else if let Some(mk) = child.item_corpse_monster() {
                 format!(
@@ -454,6 +495,7 @@ fn container_observations(seed: u64, world: &GameWorld) -> Vec<ContainerItemObse
                 enchant_known,
                 enchantment,
                 erosion: child.item_erosion().unwrap_or(0),
+                artifact_id,
             });
         }
     }
@@ -465,13 +507,9 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
         RunState::CharacterCreation => {
             let mut actions = vec![CommandIntent::Wait, CommandIntent::Quit];
             actions.extend(
-                [
-                    aihack_core::campaign::Role::Knight,
-                    aihack_core::campaign::Role::Scout,
-                    aihack_core::campaign::Role::Mage,
-                    aihack_core::campaign::Role::Cleric,
-                ]
-                .map(|role| CommandIntent::StartCampaign { role }),
+                aihack_core::campaign::Role::ALL
+                    .into_iter()
+                    .map(|role| CommandIntent::StartCampaign { role }),
             );
             actions
         }
@@ -521,7 +559,9 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
                         }
                     }
                     InventoryAction::PutOn => {
-                        if item_has_class(world, item, ItemClass::Ring) {
+                        if item_has_class(world, item, ItemClass::Ring)
+                            || item_has_class(world, item, ItemClass::Amulet)
+                        {
                             actions.push(CommandIntent::PutOn { item });
                         }
                     }
@@ -556,14 +596,26 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
     if world.paralysis_turns > 0 {
         return vec![CommandIntent::Wait, CommandIntent::Quit];
     }
-    let mut actions = vec![
-        CommandIntent::Wait,
-        CommandIntent::Search,
-        CommandIntent::ShowInventory,
-    ];
-    if world.prayer_cooldown == 0 {
-        actions.push(CommandIntent::Pray);
+    let mut actions = Vec::new();
+    // Tier 1: 핵심 공간 이동·기본 생존·상호작용 명령을 action_space(<= 64) 앞쪽에 배치한다.
+    actions.push(CommandIntent::Wait);
+    for direction in Direction::ALL {
+        if is_passable_for_legal_action(world, direction)
+            || is_bump_attack_for_legal_action(world, direction)
+            || is_friendly_swap_for_legal_action(world, direction)
+        {
+            actions.push(CommandIntent::Move(direction));
+        }
     }
+    if crate::systems::npc::can_pay(world) {
+        actions.push(CommandIntent::Pay);
+    }
+    for direction in Direction::ALL {
+        if crate::systems::npc::can_chat_in_direction(world, direction) {
+            actions.push(CommandIntent::Chat(direction));
+        }
+    }
+    actions.push(CommandIntent::Search);
     if world
         .entities
         .item_at(world.current_level(), world.player_pos())
@@ -601,6 +653,43 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
         }
         _ => {}
     }
+    if world.prayer_cooldown == 0 {
+        actions.push(CommandIntent::Pray);
+    }
+    actions.push(CommandIntent::ShowInventory);
+    for direction in Direction::ALL {
+        match door_state_in_direction(world, direction) {
+            Some(DoorState::Closed) => actions.push(CommandIntent::Open(direction)),
+            Some(DoorState::Open) => actions.push(CommandIntent::Close(direction)),
+            Some(DoorState::Locked) | None => {}
+        }
+        if matches!(
+            world
+                .current_map()
+                .tile(world.player_pos().offset(direction.delta())),
+            Ok(TileKind::Door(DoorState::Closed | DoorState::Locked) | TileKind::HiddenDoor)
+        ) {
+            actions.push(CommandIntent::Kick(direction));
+        }
+    }
+    if let Some(campaign) = world.campaign {
+        for cat in aihack_core::campaign::SkillCategory::ALL {
+            if crate::systems::skills::can_enhance(world, cat) {
+                actions.push(CommandIntent::Enhance { skill: cat });
+            }
+        }
+        if campaign.artifact_invoke_cooldown == 0 {
+            for entry in &world.inventory.entries {
+                if crate::systems::artifacts::artifact_def_for_item(world, entry.item).is_some() {
+                    actions.push(CommandIntent::Invoke { item: entry.item });
+                }
+            }
+        }
+    }
+
+    // Tier 2: 단일 인벤토리·상점·제단·비방향 주문/도구 명령
+    let on_shop = crate::systems::shop::is_on_shop(world);
+    let on_altar = crate::systems::altar::is_on_altar(world);
     if world.inventory.equipped_ring.is_some() || world.inventory.equipped_right_ring.is_some() {
         actions.push(CommandIntent::RemoveRing);
     }
@@ -608,37 +697,6 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
         for (slot, item_opt) in world.inventory.equipped_slots() {
             if item_opt.is_some() && slot != EquipmentSlot::Melee {
                 actions.push(CommandIntent::TakeOff { slot });
-            }
-        }
-    }
-    if crate::systems::shop::is_on_shop(world) {
-        for kind in crate::systems::shop::SHOP_CATALOG {
-            if crate::systems::shop::can_buy_slot(world, kind)
-                && crate::systems::shop::buy_price_for_world(world, kind)
-                    .is_ok_and(|price| world.gold >= price)
-            {
-                actions.push(CommandIntent::Buy { kind });
-            }
-        }
-    }
-    let on_shop = crate::systems::shop::is_on_shop(world);
-    let on_altar = crate::systems::altar::is_on_altar(world);
-    if let Some(campaign) = world.campaign {
-        for &spell in campaign.known_spells() {
-            if world.mp >= spell.mana_cost() {
-                if spell.is_directional() {
-                    for direction in Direction::ALL {
-                        actions.push(CommandIntent::Cast {
-                            spell,
-                            direction: Some(direction),
-                        });
-                    }
-                } else {
-                    actions.push(CommandIntent::Cast {
-                        spell,
-                        direction: None,
-                    });
-                }
             }
         }
     }
@@ -664,95 +722,62 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             if data.class == ItemClass::Scroll {
                 actions.push(CommandIntent::Read { item: entry.item });
             }
-            if world.campaign.is_some() && data.class == ItemClass::Tool {
-                match data.tool_action {
+            if world.campaign.is_some()
+                && data.class == ItemClass::Tool
+                && match data.tool_action {
                     Some(
                         ToolAction::Light
                         | ToolAction::Blindfold
                         | ToolAction::Music
                         | ToolAction::Magic,
-                    ) => {
-                        actions.push(CommandIntent::Apply {
-                            item: entry.item,
-                            direction: None,
-                        });
-                    }
-                    Some(ToolAction::Unlock) => {
-                        let has_chest = world
-                            .entities
-                            .items_at(world.current_level(), world.player_pos())
-                            .into_iter()
-                            .chain(world.inventory.entries.iter().map(|e| e.item))
-                            .any(|id| {
-                                world
-                                    .entities
-                                    .item_data(id)
-                                    .is_some_and(|d| d.kind == ItemKind::Chest)
-                            });
-                        if has_chest {
-                            actions.push(CommandIntent::Apply {
-                                item: entry.item,
-                                direction: None,
-                            });
-                        }
-                        for direction in Direction::ALL {
-                            let target = world.player_pos().offset(direction.delta());
-                            if let Ok(tile) = world.current_map().tile(target) {
-                                if tile == TileKind::Door(DoorState::Locked)
-                                    || (data.kind == ItemKind::SkeletonKey
-                                        && tile == TileKind::Door(DoorState::Closed))
-                                {
-                                    actions.push(CommandIntent::Apply {
-                                        item: entry.item,
-                                        direction: Some(direction),
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    Some(ToolAction::Dig) => {
-                        let map = world.current_map();
-                        for direction in Direction::ALL {
-                            let target = world.player_pos().offset(direction.delta());
-                            if target.x > 0
-                                && target.x < map.width - 1
-                                && target.y > 0
-                                && target.y < map.height - 1
-                                && map.tile(target).ok() == Some(TileKind::Wall)
-                            {
-                                actions.push(CommandIntent::Apply {
-                                    item: entry.item,
-                                    direction: Some(direction),
-                                });
-                            }
-                        }
-                    }
-                    Some(ToolAction::Container) | None => {}
+                    ) => true,
+                    Some(ToolAction::Unlock) => world
+                        .entities
+                        .items_at(world.current_level(), world.player_pos())
+                        .into_iter()
+                        .chain(world.inventory.entries.iter().map(|e| e.item))
+                        .any(|id| {
+                            world
+                                .entities
+                                .item_data(id)
+                                .is_some_and(|d| d.kind == ItemKind::Chest)
+                        }),
+                    _ => false,
                 }
+            {
+                actions.push(CommandIntent::Apply {
+                    item: entry.item,
+                    direction: None,
+                });
             }
-            if on_shop && data.kind != aihack_core::domain::item::ItemKind::AmuletAscension {
+            if on_shop
+                && data.kind != aihack_core::domain::item::ItemKind::AmuletAscension
+                && world.entities.get(entry.item).and_then(|e| e.item_unpaid()) != Some(true)
+            {
                 actions.push(CommandIntent::Sell { item: entry.item });
             }
             if on_altar && data.kind != aihack_core::domain::item::ItemKind::AmuletAscension {
                 actions.push(CommandIntent::Offer { item: entry.item });
             }
-            if matches!(data.class, ItemClass::Weapon | ItemClass::Rock) {
-                for direction in Direction::ALL {
-                    actions.push(CommandIntent::Throw {
-                        item: entry.item,
-                        direction,
-                    });
-                }
+        }
+    }
+    if let Some(campaign) = world.campaign {
+        for &spell in campaign.known_spells() {
+            if world.mp >= spell.mana_cost() && !spell.is_directional() {
+                actions.push(CommandIntent::Cast {
+                    spell,
+                    direction: None,
+                });
             }
-            if data.class == ItemClass::Wand
-                && world.entities.item_charges(entry.item).unwrap_or(0) > 0
+        }
+    }
+    if on_shop {
+        for kind in crate::systems::shop::SHOP_CATALOG {
+            if crate::systems::shop::can_buy_slot(world, kind)
+                && crate::systems::shop::buy_price_for_world(world, kind)
+                    .is_ok_and(|price| world.gold >= price)
             {
-                for direction in Direction::ALL {
-                    actions.push(CommandIntent::Zap {
-                        item: entry.item,
-                        direction,
-                    });
-                }
+                actions.push(CommandIntent::Buy { kind });
             }
         }
     }
@@ -767,24 +792,81 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             text: EngravingText::Elbereth,
         });
     }
-    for direction in Direction::ALL {
-        if is_passable_for_legal_action(world, direction)
-            || is_bump_attack_for_legal_action(world, direction)
+
+    // Tier 3: 8방향 조합 폭발 명령·Drop·각인·컨테이너·Dip·감정
+    if let Some(campaign) = world.campaign {
+        for &spell in campaign.known_spells() {
+            if world.mp >= spell.mana_cost() && spell.is_directional() {
+                for direction in Direction::ALL {
+                    actions.push(CommandIntent::Cast {
+                        spell,
+                        direction: Some(direction),
+                    });
+                }
+            }
+        }
+    }
+    for entry in &world.inventory.entries {
+        let Some(data) = world.entities.item_data(entry.item) else {
+            continue;
+        };
+        if world.campaign.is_some() && data.class == ItemClass::Tool {
+            match data.tool_action {
+                Some(ToolAction::Unlock) => {
+                    for direction in Direction::ALL {
+                        let target = world.player_pos().offset(direction.delta());
+                        if let Ok(tile) = world.current_map().tile(target) {
+                            if tile == TileKind::Door(DoorState::Locked)
+                                || (data.kind == ItemKind::SkeletonKey
+                                    && tile == TileKind::Door(DoorState::Closed))
+                            {
+                                actions.push(CommandIntent::Apply {
+                                    item: entry.item,
+                                    direction: Some(direction),
+                                });
+                            }
+                        }
+                    }
+                }
+                Some(ToolAction::Dig) => {
+                    let map = world.current_map();
+                    for direction in Direction::ALL {
+                        let target = world.player_pos().offset(direction.delta());
+                        if target.x > 0
+                            && target.x < map.width - 1
+                            && target.y > 0
+                            && target.y < map.height - 1
+                            && map.tile(target).ok() == Some(TileKind::Wall)
+                        {
+                            actions.push(CommandIntent::Apply {
+                                item: entry.item,
+                                direction: Some(direction),
+                            });
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if matches!(data.class, ItemClass::Weapon | ItemClass::Rock)
+            || (world.campaign.is_some()
+                && matches!(data.class, ItemClass::Food | ItemClass::Corpse))
         {
-            actions.push(CommandIntent::Move(direction));
+            for direction in Direction::ALL {
+                actions.push(CommandIntent::Throw {
+                    item: entry.item,
+                    direction,
+                });
+            }
         }
-        match door_state_in_direction(world, direction) {
-            Some(DoorState::Closed) => actions.push(CommandIntent::Open(direction)),
-            Some(DoorState::Open) => actions.push(CommandIntent::Close(direction)),
-            Some(DoorState::Locked) | None => {}
-        }
-        if matches!(
-            world
-                .current_map()
-                .tile(world.player_pos().offset(direction.delta())),
-            Ok(TileKind::Door(DoorState::Closed | DoorState::Locked) | TileKind::HiddenDoor)
-        ) {
-            actions.push(CommandIntent::Kick(direction));
+        if data.class == ItemClass::Wand && world.entities.item_charges(entry.item).unwrap_or(0) > 0
+        {
+            for direction in Direction::ALL {
+                actions.push(CommandIntent::Zap {
+                    item: entry.item,
+                    direction,
+                });
+            }
         }
     }
     for entry in &world.inventory.entries {
@@ -882,7 +964,7 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
                 let Some((kind, data, _, _, _)) = item_entity.item() else {
                     continue;
                 };
-                if kind == ItemKind::AmuletAscension {
+                if kind == ItemKind::AmuletAscension || item_entity.item_unpaid() == Some(true) {
                     continue;
                 }
                 let qty = i32::from(item_entity.item_quantity().unwrap_or(1));
