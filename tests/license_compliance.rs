@@ -223,7 +223,7 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
 
     let modifications = project_file("MODIFICATIONS.md");
     for phrase in [
-        "2025-05-20..2026-11-27",
+        "2025-05-20..2026-11-28",
         "src/**",
         "crates/**",
         "apps/**",
@@ -242,8 +242,8 @@ fn owner_approval_and_bundle_carried_modification_evidence_are_traceable() {
     assert!(metadata.contains("commit=$Format:%H$"));
     assert!(metadata.contains("candidate_date=$Format:%cs$"));
     assert!(metadata.contains("owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01"));
-    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-11-27-01"));
-    validate_approval_modification_references(&approval, "AIHACK-MODIFICATIONS-2026-11-27-01")
+    assert!(metadata.contains("modification_notice=AIHACK-MODIFICATIONS-2026-11-28-01"));
+    validate_approval_modification_references(&approval, "AIHACK-MODIFICATIONS-2026-11-28-01")
         .unwrap();
 }
 
@@ -252,13 +252,13 @@ fn approval_record_rejects_stale_modification_notice_reference() {
     let approval = project_file("PROJECT_OWNER_LICENSE_APPROVAL.md");
     assert!(validate_approval_modification_references(
         &approval,
-        "AIHACK-MODIFICATIONS-2026-11-27-01"
+        "AIHACK-MODIFICATIONS-2026-11-28-01"
     )
     .is_ok());
     let stale = format!("{approval}\nstale ref: AIHACK-MODIFICATIONS-2026-08-24-01\n");
     assert!(validate_approval_modification_references(
         &stale,
-        "AIHACK-MODIFICATIONS-2026-11-27-01"
+        "AIHACK-MODIFICATIONS-2026-11-28-01"
     )
     .is_err());
 }
@@ -438,7 +438,7 @@ fn release_packaging_includes_license_notice_and_complete_source() {
     );
     for reference in [
         "owner_approval=AIHACK-OWNER-2026-07-20-NGPL-01",
-        "modification_notice=AIHACK-MODIFICATIONS-2026-11-27-01",
+        "modification_notice=AIHACK-MODIFICATIONS-2026-11-28-01",
     ] {
         assert!(linux.contains(reference), "build.sh 누락: {reference}");
         assert!(windows.contains(reference), "build.bat 누락: {reference}");

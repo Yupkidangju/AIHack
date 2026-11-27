@@ -80,7 +80,7 @@ P1–P3 첫 캠페인 위에 생성 던전의 문/비밀문/다종 함정(`Pit`/
 - 완료 표시는 `audit_roadmap.md`의 명령과 산출물 증거가 모두 통과한 뒤에만 변경한다.
 - 현재 구현과 목표 구현을 같은 문장에서 완료로 표현하지 않는다.
 - active 문서 구간은 현재 감사 보고서를 정확히 한 번 가리켜야 한다. predecessor를 현재 권위로 표현하거나 이미 Verified된 predecessor의 구현·로컬 gate·CI를 다음 단계 또는 pending으로 다시 여는 문장은 report 번호에서 파생하는 공통 negative gate로 거부한다. 역사 문맥은 명시적으로 구분된 historical 구간에서만 허용한다.
-- release candidate는 exact final commit의 `%cs`를 사용하며, bundled `MODIFICATIONS.md`의 단일 canonical Gregorian period가 그 날짜를 포함해야 한다. current release Notice ID는 `AIHACK-MODIFICATIONS-2026-11-27-01`, covered period는 `2025-05-20..2026-11-27`다. 이 증거가 stale하면 전체 test에서 actual bundle보다 먼저 실패하고 양 verifier도 staging 승격 전에 fail-closed한다.
+- release candidate는 exact final commit의 `%cs`를 사용하며, bundled `MODIFICATIONS.md`의 단일 canonical Gregorian period가 그 날짜를 포함해야 한다. current release Notice ID는 `AIHACK-MODIFICATIONS-2026-11-28-01`, covered period는 `2025-05-20..2026-11-28`다. 이 증거가 stale하면 전체 test에서 actual bundle보다 먼저 실패하고 양 verifier도 staging 승격 전에 fail-closed한다.
 - `legacy_nethack_port_reference/`의 코드, 데이터, 문자열을 출처 기록 없이 복사하지 않는다.
 - UI와 LLM은 `GameSession` 또는 `GameWorld`의 내부 상태를 직접 변경하지 않는다.
 - LLM 출력은 신뢰하지 않으며, 현재 turn과 snapshot hash를 재검증한다.

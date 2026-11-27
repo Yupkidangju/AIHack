@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $OwnerApprovalId = 'AIHACK-OWNER-2026-07-20-NGPL-01'
-$ModificationNoticeId = 'AIHACK-MODIFICATIONS-2026-11-27-01'
+$ModificationNoticeId = 'AIHACK-MODIFICATIONS-2026-11-28-01'
 $ArchiveName = 'aihack-0.3.0-source.zip'
 $ChecksumNames = @(
     'aihack.exe',

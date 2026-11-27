@@ -484,4 +484,4 @@ Linux/Windows release verifier는 fresh staging 또는 승격된 `output/` root�
 
 Report 31 summary lifecycle/FIN-F012는 successor `8c042d48/32741917348`와 Report 32에서 independent Closed로 종결됐다.
 
-현재 authority는 `docs/audit/audit_report_32.md`다. R32-DBG-F001/FIN-F015에 따라 final commit `%cs`가 `AIHACK-MODIFICATIONS-2026-11-27-01`의 `2025-05-20..2026-11-27` period 안인지 test와 양 verifier에서 확인한다. final same-SHA 양 OS evidence, 후속 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
+현재 authority는 `docs/audit/audit_report_32.md`다. R32-DBG-F001/FIN-F015에 따라 final commit `%cs`가 `AIHACK-MODIFICATIONS-2026-11-28-01`의 `2025-05-20..2026-11-28` period 안인지 test와 양 verifier에서 확인한다. final same-SHA 양 OS evidence, 후속 독립 PASS와 별도 사용자 게시 승인이 모두 충족되기 전까지 외부 게시는 수행하지 않는다.
