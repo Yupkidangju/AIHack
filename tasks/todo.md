@@ -101,3 +101,12 @@
 - [x] S5-runtime: `systems/{pets,npc}.rs` 신설 및 우호 자리바꿈·계단 동반·상점 채무/도둑질·문열기·몬스터 장비/물약/완드·훔치기/녹/분열/소환/시선·파벌전·SaveV3 검증 통합.
 - [x] S5-adapters: `aihack-tui` (`faction` 색상/Inspect, `DEBT:` HUD, `'m'`/`'D'`/`'$'`) 및 `aihack-headless` (`Faction::Hostile` 판정·무단 미결제 회피·`Pay` 우선) 동기화.
 - [x] S5-verify: `tests/stage5_p11.rs`(**6 PASS**) 작성, 전체 gate(`fmt`, `clippy -D warnings`, `test -j 2`: **559 PASS / 0 FAIL / 0 ignored**, 101 binaries, `release`, `audit`, `deny`, `r7/r8`, legacy `rg` 0건) PASS 및 완료 문서 마감.
+
+# Stage 6 (P12) 체크리스트 (2026-11-28)
+
+- [x] S6-doc: `DESIGN_DECISIONS.md` (`ADR-P12-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` D3D 기준 선행 확정.
+- [x] S6-core: `Resistances` 5플래그·`SpellSchool` 7학파·`SpellKind` 28종·`define_item_kinds!`(130종)·`define_monster_kinds!`(85종)·`AmuletEffect` 6종·`RingEffect` 12종·`WandEffect` 18종·`WishChoice`/`CommandIntent::Wish`·`aihack-ai-contract`/`aihack-llm` 확장.
+- [x] S6-content: `crates/aihack-content/build.rs` 정적 코드 생성, `items.toml` 130종·`monsters.toml` 85종 투입, `schema.rs`/`lib.rs`(`damage_small`/`damage_large`·`hp_dice`·`unidentified_pool`) 통합, LF SHA-256·`PROVENANCE.md`·`registry.rs` 동기화.
+- [x] S6-runtime: `appearance`·`spells`(마법서 학습/20,000턴 감퇴/실패율/28주문)·`items`·`projectiles`(18완드/소원/변이)·`death`(생명보존)·`combat`(크기별 무기/은)·`monster_ai`(반사/갈등/패시브)·`session`/`bootstrap`/`observation`/`save` 통합.
+- [x] S6-adapters: `aihack-tui`(동적 28주문/실패율·소원·마법서) 및 `aihack-headless`(부적/상급 치유) 동기화.
+- [x] S6-verify: `tests/stage6_p12.rs`(**6 PASS / 0 FAIL**), 전체 워크스페이스 102개 바이너리 **565 PASS / 0 FAIL / 0 ignored**(워크스페이스 561 PASS + ConPTY 단독 재실행 `conpty_contract` 4 PASS), `cargo fmt --all -- --check`, `cargo clippy`(0 warnings), `cargo build --release --locked`, `cargo audit`(0 vulnerabilities / 318 deps, 허용 경고 2건), `cargo deny`, 레거시 참조 0건, `r7_checkpoint.sh`/`r8_checkpoint.sh` 및 마감 문서 동기화 완료.

@@ -100,7 +100,7 @@ pub fn from_world(
     }
     visible_tiles.sort_by_key(|tile| (tile.pos.y, tile.pos.x));
 
-    let legal_actions = legal_actions(world, run_state);
+    let legal_actions = legal_actions(world, run_state, turn);
     Observation {
         campaign: world
             .campaign
@@ -119,6 +119,25 @@ pub fn from_world(
                 prayer_timeout: campaign.prayer_timeout,
                 artifact_invoke_cooldown: campaign.artifact_invoke_cooldown,
                 skills: crate::systems::skills::skill_observations(world),
+                learned_spells: world.learned_spells.clone(),
+                spell_failure_rates: {
+                    let mut spells: Vec<aihack_core::campaign::SpellKind> =
+                        campaign.known_spells().to_vec();
+                    for ls in &world.learned_spells {
+                        if !spells.contains(&ls.spell) {
+                            spells.push(ls.spell);
+                        }
+                    }
+                    spells
+                        .into_iter()
+                        .map(|spell| {
+                            (
+                                spell,
+                                crate::systems::spells::spell_failure_percent(world, spell),
+                            )
+                        })
+                        .collect()
+                },
             }),
         schema_version: OBSERVATION_SCHEMA_VERSION,
         seed,
@@ -197,9 +216,18 @@ fn player_observation(world: &GameWorld) -> PlayerObservation {
         blind_turns: world.status_timers.blind,
         confused_turns: world.status_timers.confused,
         stunned_turns: world.status_timers.stunned,
-        fast_turns: world.status_timers.fast,
-        levitation_turns: world.status_timers.levitation,
-        invisible_turns: world.status_timers.invisible,
+        fast_turns: world
+            .status_timers
+            .fast
+            .max(u8::from(world.campaign.is_some() && world.is_fast())),
+        levitation_turns: world
+            .status_timers
+            .levitation
+            .max(u8::from(world.campaign.is_some() && world.is_levitating())),
+        invisible_turns: world
+            .status_timers
+            .invisible
+            .max(u8::from(world.campaign.is_some() && world.is_invisible())),
         blindfolded: world.campaign.is_some()
             && crate::systems::tools::is_player_blindfolded(world),
         shop_debt: world.shop_debt,
@@ -502,7 +530,7 @@ fn container_observations(seed: u64, world: &GameWorld) -> Vec<ContainerItemObse
     out
 }
 
-fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
+fn legal_actions(world: &GameWorld, run_state: RunState, turn: u64) -> Vec<CommandIntent> {
     match run_state {
         RunState::CharacterCreation => {
             let mut actions = vec![CommandIntent::Wait, CommandIntent::Quit];
@@ -554,7 +582,10 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
                         }
                     }
                     InventoryAction::Read => {
-                        if item_has_class(world, item, ItemClass::Scroll) {
+                        if item_has_class(world, item, ItemClass::Scroll)
+                            || (world.campaign.is_some()
+                                && item_has_class(world, item, ItemClass::Spellbook))
+                        {
                             actions.push(CommandIntent::Read { item });
                         }
                     }
@@ -588,11 +619,11 @@ fn legal_actions(world: &GameWorld, run_state: RunState) -> Vec<CommandIntent> {
             actions.push(CommandIntent::Quit);
             actions
         }
-        RunState::Playing => playing_actions(world),
+        RunState::Playing => playing_actions(world, turn),
     }
 }
 
-fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
+fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
     if world.paralysis_turns > 0 {
         return vec![CommandIntent::Wait, CommandIntent::Quit];
     }
@@ -719,7 +750,9 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             {
                 actions.push(CommandIntent::Eat { item: entry.item });
             }
-            if data.class == ItemClass::Scroll {
+            if data.class == ItemClass::Scroll
+                || (world.campaign.is_some() && data.class == ItemClass::Spellbook)
+            {
                 actions.push(CommandIntent::Read { item: entry.item });
             }
             if world.campaign.is_some()
@@ -761,14 +794,25 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
             }
         }
     }
+    let mut active_spells: Vec<aihack_core::campaign::SpellKind> = Vec::new();
     if let Some(campaign) = world.campaign {
         for &spell in campaign.known_spells() {
-            if world.mp >= spell.mana_cost() && !spell.is_directional() {
-                actions.push(CommandIntent::Cast {
-                    spell,
-                    direction: None,
-                });
+            active_spells.push(spell);
+        }
+        for ls in &world.learned_spells {
+            if turn.saturating_sub(ls.learned_at_turn) < aihack_core::campaign::SPELL_MEMORY_TURNS
+                && !active_spells.contains(&ls.spell)
+            {
+                active_spells.push(ls.spell);
             }
+        }
+    }
+    for &spell in &active_spells {
+        if world.mp >= spell.mana_cost() && !spell.is_directional() {
+            actions.push(CommandIntent::Cast {
+                spell,
+                direction: None,
+            });
         }
     }
     if on_shop {
@@ -794,15 +838,13 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
     }
 
     // Tier 3: 8방향 조합 폭발 명령·Drop·각인·컨테이너·Dip·감정
-    if let Some(campaign) = world.campaign {
-        for &spell in campaign.known_spells() {
-            if world.mp >= spell.mana_cost() && spell.is_directional() {
-                for direction in Direction::ALL {
-                    actions.push(CommandIntent::Cast {
-                        spell,
-                        direction: Some(direction),
-                    });
-                }
+    for &spell in &active_spells {
+        if world.mp >= spell.mana_cost() && spell.is_directional() {
+            for direction in Direction::ALL {
+                actions.push(CommandIntent::Cast {
+                    spell,
+                    direction: Some(direction),
+                });
             }
         }
     }
@@ -861,6 +903,14 @@ fn playing_actions(world: &GameWorld) -> Vec<CommandIntent> {
         }
         if data.class == ItemClass::Wand && world.entities.item_charges(entry.item).unwrap_or(0) > 0
         {
+            if data.wand_effect == Some(WandEffect::Wishing) && world.campaign.is_some() {
+                for &(_, wish) in crate::systems::projectiles::CURATED_WISHES {
+                    actions.push(CommandIntent::Wish {
+                        item: entry.item,
+                        wish,
+                    });
+                }
+            }
             for direction in Direction::ALL {
                 actions.push(CommandIntent::Zap {
                     item: entry.item,

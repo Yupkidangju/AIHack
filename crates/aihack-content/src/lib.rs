@@ -19,12 +19,13 @@ pub use schema::{
     MAX_CONTENT_MONSTER_SPEED, MAX_CONTENT_NUTRITION,
 };
 
+use aihack_core::campaign::SpellKind;
 use aihack_core::domain::map::MapLayout;
 use aihack_core::domain::{
     combat::{AttackProfile, DamageRoll},
     item::{
-        ConsumableEffect, EquipmentSlot, ItemClass, ItemData as CoreItemData, ItemKind, RingEffect,
-        StatusEffectKind, ToolAction, WandEffect,
+        AmuletEffect, ConsumableEffect, EquipmentSlot, ItemClass, ItemData as CoreItemData,
+        ItemKind, RingEffect, StatusEffectKind, ToolAction, WandEffect,
     },
     monster::{MonsterAiKind, MonsterKind, MonsterPassive, MonsterTemplate},
     status::Resistances,
@@ -33,6 +34,8 @@ use aihack_core::domain::{
 use aihack_core::error::ContentError;
 use aihack_core::position::Pos;
 use serde::{Deserialize, Serialize};
+
+include!(concat!(env!("OUT_DIR"), "/generated_catalog.rs"));
 
 static EMBEDDED_REGISTRY: OnceLock<Result<ContentRegistry, ContentError>> = OnceLock::new();
 
@@ -79,204 +82,28 @@ pub fn load_level(level_id: &str) -> Result<LevelData, ContentError> {
 
 /// MonsterKind -> canonical TOML id.
 pub const fn monster_id(kind: MonsterKind) -> &'static str {
-    match kind {
-        MonsterKind::Jackal => "monster.jackal",
-        MonsterKind::Goblin => "monster.goblin",
-        MonsterKind::FloatingEye => "monster.floating_eye",
-        MonsterKind::Kobold => "monster.kobold",
-        MonsterKind::Orc => "monster.orc",
-        MonsterKind::Ogre => "monster.ogre",
-        MonsterKind::GiantSpider => "monster.giant_spider",
-        MonsterKind::GnollArcher => "monster.gnoll_archer",
-        MonsterKind::Troll => "monster.troll",
-        MonsterKind::FireAnt => "monster.fire_ant",
-        MonsterKind::Minotaur => "monster.minotaur",
-        MonsterKind::Dragon => "monster.dragon",
-        MonsterKind::Bat => "monster.bat",
-        MonsterKind::Kitten => "monster.kitten",
-        MonsterKind::Housecat => "monster.housecat",
-        MonsterKind::LittleDog => "monster.little_dog",
-        MonsterKind::Dog => "monster.dog",
-        MonsterKind::Pony => "monster.pony",
-        MonsterKind::Warhorse => "monster.warhorse",
-        MonsterKind::Shopkeeper => "monster.shopkeeper",
-        MonsterKind::TemplePriest => "monster.temple_priest",
-        MonsterKind::Oracle => "monster.oracle",
-        MonsterKind::Watchman => "monster.watchman",
-        MonsterKind::Leprechaun => "monster.leprechaun",
-        MonsterKind::Nymph => "monster.nymph",
-        MonsterKind::RustMonster => "monster.rust_monster",
-        MonsterKind::BlackPudding => "monster.black_pudding",
-        MonsterKind::Dwarf => "monster.dwarf",
-        MonsterKind::Medusa => "monster.medusa",
-        MonsterKind::OrcCaptain => "monster.orc_captain",
-    }
+    kind.toml_id()
 }
 
 /// Canonical TOML id -> MonsterKind.
 pub fn monster_kind_from_id(id: &str) -> Result<MonsterKind, ContentError> {
-    match id {
-        "monster.jackal" => Ok(MonsterKind::Jackal),
-        "monster.goblin" => Ok(MonsterKind::Goblin),
-        "monster.floating_eye" => Ok(MonsterKind::FloatingEye),
-        "monster.kobold" => Ok(MonsterKind::Kobold),
-        "monster.orc" => Ok(MonsterKind::Orc),
-        "monster.ogre" => Ok(MonsterKind::Ogre),
-        "monster.giant_spider" => Ok(MonsterKind::GiantSpider),
-        "monster.gnoll_archer" => Ok(MonsterKind::GnollArcher),
-        "monster.troll" => Ok(MonsterKind::Troll),
-        "monster.fire_ant" => Ok(MonsterKind::FireAnt),
-        "monster.minotaur" => Ok(MonsterKind::Minotaur),
-        "monster.dragon" => Ok(MonsterKind::Dragon),
-        "monster.bat" => Ok(MonsterKind::Bat),
-        "monster.kitten" => Ok(MonsterKind::Kitten),
-        "monster.housecat" => Ok(MonsterKind::Housecat),
-        "monster.little_dog" => Ok(MonsterKind::LittleDog),
-        "monster.dog" => Ok(MonsterKind::Dog),
-        "monster.pony" => Ok(MonsterKind::Pony),
-        "monster.warhorse" => Ok(MonsterKind::Warhorse),
-        "monster.shopkeeper" => Ok(MonsterKind::Shopkeeper),
-        "monster.temple_priest" => Ok(MonsterKind::TemplePriest),
-        "monster.oracle" => Ok(MonsterKind::Oracle),
-        "monster.watchman" => Ok(MonsterKind::Watchman),
-        "monster.leprechaun" => Ok(MonsterKind::Leprechaun),
-        "monster.nymph" => Ok(MonsterKind::Nymph),
-        "monster.rust_monster" => Ok(MonsterKind::RustMonster),
-        "monster.black_pudding" => Ok(MonsterKind::BlackPudding),
-        "monster.dwarf" => Ok(MonsterKind::Dwarf),
-        "monster.medusa" => Ok(MonsterKind::Medusa),
-        "monster.orc_captain" => Ok(MonsterKind::OrcCaptain),
-        _ => Err(ContentError::UnknownReference {
-            owner: "monster kind".to_owned(),
-            target: id.to_owned(),
-        }),
-    }
+    MonsterKind::from_toml_id(id).ok_or_else(|| ContentError::UnknownReference {
+        owner: "monster kind".to_owned(),
+        target: id.to_owned(),
+    })
 }
 
 /// ItemKind -> canonical TOML id.
 pub const fn item_id(kind: ItemKind) -> &'static str {
-    match kind {
-        ItemKind::Dagger => "item.weapon.dagger",
-        ItemKind::ShortSword => "item.weapon.short_sword",
-        ItemKind::Mace => "item.weapon.mace",
-        ItemKind::FoodRation => "item.food.ration",
-        ItemKind::PotionHealing => "item.potion.healing",
-        ItemKind::PotionExtraHealing => "item.potion.extra_healing",
-        ItemKind::PotionCure => "item.potion.cure",
-        ItemKind::PotionSpeed => "item.potion.speed",
-        ItemKind::PotionBlindness => "item.potion.blindness",
-        ItemKind::PotionConfusion => "item.potion.confusion",
-        ItemKind::PotionHallucination => "item.potion.hallucination",
-        ItemKind::PotionInvisibility => "item.potion.invisibility",
-        ItemKind::PotionLevitation => "item.potion.levitation",
-        ItemKind::WandMagicMissile => "item.wand.magic_missile",
-        ItemKind::WandFire => "item.wand.fire",
-        ItemKind::ScrollReveal => "item.scroll.reveal",
-        ItemKind::ScrollIdentify => "item.scroll.identify",
-        ItemKind::ScrollLevelTeleport => "item.scroll.teleport",
-        ItemKind::ScrollCharging => "item.scroll.charging",
-        ItemKind::ScrollEnchantWeapon => "item.scroll.enchant_weapon",
-        ItemKind::ScrollEnchantArmor => "item.scroll.enchant_armor",
-        ItemKind::ScrollRemoveCurse => "item.scroll.remove_curse",
-        ItemKind::Rock => "item.weapon.rock",
-        ItemKind::ArmorLeather => "item.armor.leather",
-        ItemKind::ArmorChainMail => "item.armor.chain_mail",
-        ItemKind::ArmorShield => "item.armor.small_shield",
-        ItemKind::ArmorHelm => "item.armor.iron_helm",
-        ItemKind::ArmorCloak => "item.armor.cloak_protection",
-        ItemKind::ArmorGloves => "item.armor.leather_gloves",
-        ItemKind::ArmorBoots => "item.armor.low_boots",
-        ItemKind::RingPoisonResistance => "item.ring.poison_resistance",
-        ItemKind::RingFireResistance => "item.ring.fire_resistance",
-        ItemKind::RingProtection => "item.ring.protection",
-        ItemKind::AmuletEsp => "item.amulet.esp",
-        ItemKind::CorpseJackal => "item.corpse.jackal",
-        ItemKind::Corpse => "item.corpse.generic",
-        ItemKind::AmuletAscension => "item.quest.ascension",
-        ItemKind::SkeletonKey => "item.tool.skeleton_key",
-        ItemKind::LockPick => "item.tool.lock_pick",
-        ItemKind::PickAxe => "item.tool.pick_axe",
-        ItemKind::DwarvishMattock => "item.tool.dwarvish_mattock",
-        ItemKind::TinWhistle => "item.tool.tin_whistle",
-        ItemKind::OilLamp => "item.tool.oil_lamp",
-        ItemKind::Blindfold => "item.tool.blindfold",
-        ItemKind::UnicornHorn => "item.tool.unicorn_horn",
-        ItemKind::Sack => "item.tool.sack",
-        ItemKind::BagOfHolding => "item.tool.bag_of_holding",
-        ItemKind::Chest => "item.tool.chest",
-        ItemKind::PotionWater => "item.potion.water",
-        ItemKind::ScrollBlank => "item.scroll.blank",
-        ItemKind::LongSword => "item.weapon.long_sword",
-        ItemKind::Katana => "item.weapon.katana",
-        ItemKind::BattleAxe => "item.weapon.battle_axe",
-        ItemKind::Quarterstaff => "item.weapon.quarterstaff",
-        ItemKind::BroadSword => "item.weapon.broad_sword",
-    }
+    kind.toml_id()
 }
 
 /// Canonical TOML id -> ItemKind.
 pub fn item_kind_from_id(id: &str) -> Result<ItemKind, ContentError> {
-    match id {
-        "item.weapon.dagger" => Ok(ItemKind::Dagger),
-        "item.weapon.short_sword" => Ok(ItemKind::ShortSword),
-        "item.weapon.long_sword" => Ok(ItemKind::LongSword),
-        "item.weapon.katana" => Ok(ItemKind::Katana),
-        "item.weapon.battle_axe" => Ok(ItemKind::BattleAxe),
-        "item.weapon.quarterstaff" => Ok(ItemKind::Quarterstaff),
-        "item.weapon.broad_sword" => Ok(ItemKind::BroadSword),
-        "item.weapon.mace" => Ok(ItemKind::Mace),
-        "item.food.ration" => Ok(ItemKind::FoodRation),
-        "item.potion.healing" => Ok(ItemKind::PotionHealing),
-        "item.potion.extra_healing" => Ok(ItemKind::PotionExtraHealing),
-        "item.potion.cure" => Ok(ItemKind::PotionCure),
-        "item.potion.speed" => Ok(ItemKind::PotionSpeed),
-        "item.potion.blindness" => Ok(ItemKind::PotionBlindness),
-        "item.potion.confusion" => Ok(ItemKind::PotionConfusion),
-        "item.potion.hallucination" => Ok(ItemKind::PotionHallucination),
-        "item.potion.invisibility" => Ok(ItemKind::PotionInvisibility),
-        "item.potion.levitation" => Ok(ItemKind::PotionLevitation),
-        "item.potion.water" => Ok(ItemKind::PotionWater),
-        "item.wand.magic_missile" => Ok(ItemKind::WandMagicMissile),
-        "item.wand.fire" => Ok(ItemKind::WandFire),
-        "item.scroll.reveal" => Ok(ItemKind::ScrollReveal),
-        "item.scroll.identify" => Ok(ItemKind::ScrollIdentify),
-        "item.scroll.teleport" => Ok(ItemKind::ScrollLevelTeleport),
-        "item.scroll.charging" => Ok(ItemKind::ScrollCharging),
-        "item.scroll.enchant_weapon" => Ok(ItemKind::ScrollEnchantWeapon),
-        "item.scroll.enchant_armor" => Ok(ItemKind::ScrollEnchantArmor),
-        "item.scroll.remove_curse" => Ok(ItemKind::ScrollRemoveCurse),
-        "item.scroll.blank" => Ok(ItemKind::ScrollBlank),
-        "item.weapon.rock" => Ok(ItemKind::Rock),
-        "item.armor.leather" => Ok(ItemKind::ArmorLeather),
-        "item.armor.chain_mail" => Ok(ItemKind::ArmorChainMail),
-        "item.armor.small_shield" => Ok(ItemKind::ArmorShield),
-        "item.armor.iron_helm" => Ok(ItemKind::ArmorHelm),
-        "item.armor.cloak_protection" => Ok(ItemKind::ArmorCloak),
-        "item.armor.leather_gloves" => Ok(ItemKind::ArmorGloves),
-        "item.armor.low_boots" => Ok(ItemKind::ArmorBoots),
-        "item.ring.poison_resistance" => Ok(ItemKind::RingPoisonResistance),
-        "item.ring.fire_resistance" => Ok(ItemKind::RingFireResistance),
-        "item.ring.protection" => Ok(ItemKind::RingProtection),
-        "item.amulet.esp" => Ok(ItemKind::AmuletEsp),
-        "item.corpse.jackal" => Ok(ItemKind::CorpseJackal),
-        "item.corpse.generic" => Ok(ItemKind::Corpse),
-        "item.quest.ascension" => Ok(ItemKind::AmuletAscension),
-        "item.tool.skeleton_key" => Ok(ItemKind::SkeletonKey),
-        "item.tool.lock_pick" => Ok(ItemKind::LockPick),
-        "item.tool.pick_axe" => Ok(ItemKind::PickAxe),
-        "item.tool.dwarvish_mattock" => Ok(ItemKind::DwarvishMattock),
-        "item.tool.tin_whistle" => Ok(ItemKind::TinWhistle),
-        "item.tool.oil_lamp" => Ok(ItemKind::OilLamp),
-        "item.tool.blindfold" => Ok(ItemKind::Blindfold),
-        "item.tool.unicorn_horn" => Ok(ItemKind::UnicornHorn),
-        "item.tool.sack" => Ok(ItemKind::Sack),
-        "item.tool.bag_of_holding" => Ok(ItemKind::BagOfHolding),
-        "item.tool.chest" => Ok(ItemKind::Chest),
-        _ => Err(ContentError::UnknownReference {
-            owner: "item kind".to_owned(),
-            target: id.to_owned(),
-        }),
-    }
+    ItemKind::from_toml_id(id).ok_or_else(|| ContentError::UnknownReference {
+        owner: "item kind".to_owned(),
+        target: id.to_owned(),
+    })
 }
 
 /// Registry definition을 core가 소비하는 monster template으로 변환한다.
@@ -310,6 +137,10 @@ pub fn monster_template_from_registry(
         Some("regenerate_hp") => Some(MonsterPassive::Regenerate),
         Some("fire_on_melee") => Some(MonsterPassive::FireOnMelee),
         Some("fire_breath") => Some(MonsterPassive::FireBreath),
+        Some("cold_breath") => Some(MonsterPassive::ColdBreath),
+        Some("lightning_breath") => Some(MonsterPassive::LightningBreath),
+        Some("sleep_on_melee") => Some(MonsterPassive::SleepOnMelee),
+        Some("drain_life") => Some(MonsterPassive::DrainLife),
         Some("steal_gold") => Some(MonsterPassive::StealGold),
         Some("steal_item") => Some(MonsterPassive::StealItem),
         Some("rust_metal") => Some(MonsterPassive::RustMetal),
@@ -324,33 +155,7 @@ pub fn monster_template_from_registry(
             })
         }
     };
-    let name = match kind {
-        MonsterKind::Jackal => "bite",
-        MonsterKind::Goblin => "short sword",
-        MonsterKind::FloatingEye => "gaze",
-        MonsterKind::Kobold => "spear",
-        MonsterKind::Orc => "scimitar",
-        MonsterKind::Ogre => "club",
-        MonsterKind::GiantSpider => "fangs",
-        MonsterKind::GnollArcher => "arrow",
-        MonsterKind::Troll => "claw",
-        MonsterKind::FireAnt => "fire bite",
-        MonsterKind::Minotaur => "gore",
-        MonsterKind::Dragon => "bite",
-        MonsterKind::Bat => "bite",
-        MonsterKind::Kitten
-        | MonsterKind::Housecat
-        | MonsterKind::LittleDog
-        | MonsterKind::Dog
-        | MonsterKind::RustMonster => "bite",
-        MonsterKind::Pony | MonsterKind::Warhorse => "kick",
-        MonsterKind::Shopkeeper | MonsterKind::TemplePriest | MonsterKind::Watchman => "weapon",
-        MonsterKind::Oracle | MonsterKind::Nymph => "touch",
-        MonsterKind::Leprechaun => "claw",
-        MonsterKind::BlackPudding => "engulf",
-        MonsterKind::Dwarf | MonsterKind::OrcCaptain => "axe",
-        MonsterKind::Medusa => "snakes",
-    };
+    let name = kind.natural_attack_name();
     Ok(MonsterTemplate {
         kind,
         ai_kind,
@@ -431,6 +236,8 @@ pub fn item_data_from_registry(
         "corpse" => ItemClass::Corpse,
         "quest" => ItemClass::Quest,
         "tool" => ItemClass::Tool,
+        "spellbook" => ItemClass::Spellbook,
+        "gem" => ItemClass::Gem,
         other => {
             return Err(ContentError::UnknownReference {
                 owner: id.to_owned(),
@@ -455,13 +262,18 @@ pub fn item_data_from_registry(
         .map(|value| {
             let name = match kind {
                 ItemKind::Dagger => "dagger",
+                ItemKind::ElvenDagger => "elven dagger",
                 ItemKind::ShortSword => "short sword",
                 ItemKind::LongSword => "long sword",
+                ItemKind::SilverSaber => "silver saber",
                 ItemKind::Katana => "katana",
+                ItemKind::TwoHandedSword => "two-handed sword",
                 ItemKind::BattleAxe => "battle-axe",
+                ItemKind::WarHammer => "war hammer",
                 ItemKind::Quarterstaff => "quarterstaff",
                 ItemKind::BroadSword => "broadsword",
                 ItemKind::Mace => "mace",
+                ItemKind::Spear => "spear",
                 ItemKind::Rock => "rock",
                 _ => "weapon",
             };
@@ -472,11 +284,46 @@ pub fn item_data_from_registry(
             })
         })
         .transpose()?;
-    let ring_effect = match definition.effect.as_deref() {
-        Some("poison_resistance") => Some(RingEffect::PoisonResistance),
-        Some("fire_resistance") => Some(RingEffect::FireResistance),
-        Some("protection") => Some(RingEffect::Protection),
-        _ => None,
+    let ring_effect = if class == ItemClass::Ring {
+        match definition.effect.as_deref() {
+            Some("poison_resistance") => Some(RingEffect::PoisonResistance),
+            Some("fire_resistance") => Some(RingEffect::FireResistance),
+            Some("protection") => Some(RingEffect::Protection),
+            Some("cold_resistance") => Some(RingEffect::ColdResistance),
+            Some("shock_resistance") => Some(RingEffect::ShockResistance),
+            Some("sleep_resistance") => Some(RingEffect::SleepResistance),
+            Some("invisibility") => Some(RingEffect::Invisibility),
+            Some("levitation") => Some(RingEffect::Levitation),
+            Some("conflict") => Some(RingEffect::Conflict),
+            Some("searching") => Some(RingEffect::Searching),
+            Some("teleport_control") => Some(RingEffect::TeleportControl),
+            Some("see_invisible") => Some(RingEffect::SeeInvisible),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let amulet_effect = if class == ItemClass::Amulet {
+        match definition.effect.as_deref() {
+            Some("esp") => Some(AmuletEffect::Esp),
+            Some("life_saving") => Some(AmuletEffect::LifeSaving),
+            Some("reflection") => Some(AmuletEffect::Reflection),
+            Some("magical_breathing") => Some(AmuletEffect::MagicalBreathing),
+            Some("poison_resistance") => Some(AmuletEffect::PoisonResistance),
+            Some("unchanging") => Some(AmuletEffect::Unchanging),
+            None if kind == ItemKind::AmuletEsp => Some(AmuletEffect::Esp),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let spellbook_spell = if class == ItemClass::Spellbook {
+        definition
+            .effect
+            .as_deref()
+            .and_then(SpellKind::from_toml_key)
+    } else {
+        None
     };
     let armor_slot = match definition.slot.as_deref() {
         Some("shield") => Some(EquipmentSlot::Shield),
@@ -486,63 +333,73 @@ pub fn item_data_from_registry(
         Some("boots") => Some(EquipmentSlot::Boots),
         _ => None,
     };
-    let consumable_effect = match definition.effect.as_deref() {
-        Some("heal_1d8_plus_4") => Some(ConsumableEffect::Heal {
-            dice: 1,
-            sides: 8,
-            bonus: 4,
-        }),
-        Some("heal_2d8_plus_8") => Some(ConsumableEffect::Heal {
-            dice: 2,
-            sides: 8,
-            bonus: 8,
-        }),
-        Some("reveal") => Some(ConsumableEffect::RevealLevel),
-        Some("identify") => Some(ConsumableEffect::IdentifySingle),
-        Some("teleport") => Some(ConsumableEffect::LevelTeleport),
-        Some("charging") => Some(ConsumableEffect::RechargeWand),
-        Some("enchant_weapon") => Some(ConsumableEffect::EnchantWeapon),
-        Some("enchant_armor") => Some(ConsumableEffect::EnchantArmor),
-        Some("remove_curse") => Some(ConsumableEffect::RemoveCurse),
-        Some("cure_status") => Some(ConsumableEffect::CureStatus),
-        Some("speed") => Some(ConsumableEffect::ApplyStatus {
-            effect: StatusEffectKind::Fast,
-            turns: 20,
-        }),
-        Some("blindness") => Some(ConsumableEffect::ApplyStatus {
-            effect: StatusEffectKind::Blind,
-            turns: 12,
-        }),
-        Some("confusion") => Some(ConsumableEffect::ApplyStatus {
-            effect: StatusEffectKind::Confused,
-            turns: 12,
-        }),
-        Some("hallucination") => Some(ConsumableEffect::ApplyStatus {
-            effect: StatusEffectKind::Hallucinating,
-            turns: 15,
-        }),
-        Some("invisibility") => Some(ConsumableEffect::ApplyStatus {
-            effect: StatusEffectKind::Invisible,
-            turns: 20,
-        }),
-        Some("levitation") => Some(ConsumableEffect::ApplyStatus {
-            effect: StatusEffectKind::Levitation,
-            turns: 20,
-        }),
-        Some("water") => Some(ConsumableEffect::Water),
-        Some("blank") => Some(ConsumableEffect::BlankPaper),
-        Some("magic_missile")
-        | Some("fire")
-        | Some("poison_resistance")
-        | Some("fire_resistance")
-        | Some("protection")
-        | None => None,
-        Some(effect) => {
-            return Err(ContentError::UnknownReference {
-                owner: id.to_owned(),
-                target: effect.to_owned(),
-            })
+    let consumable_effect = if matches!(
+        class,
+        ItemClass::Potion | ItemClass::Scroll | ItemClass::Food
+    ) {
+        match definition.effect.as_deref() {
+            Some("heal_1d8_plus_4") => Some(ConsumableEffect::Heal {
+                dice: 1,
+                sides: 8,
+                bonus: 4,
+            }),
+            Some("heal_2d8_plus_8") => Some(ConsumableEffect::Heal {
+                dice: 2,
+                sides: 8,
+                bonus: 8,
+            }),
+            Some("heal_4d8_plus_16") => Some(ConsumableEffect::Heal {
+                dice: 4,
+                sides: 8,
+                bonus: 16,
+            }),
+            Some("reveal") => Some(ConsumableEffect::RevealLevel),
+            Some("identify") => Some(ConsumableEffect::IdentifySingle),
+            Some("teleport") => Some(ConsumableEffect::LevelTeleport),
+            Some("magic_mapping") => Some(ConsumableEffect::MagicMapping),
+            Some("charging") => Some(ConsumableEffect::RechargeWand),
+            Some("enchant_weapon") => Some(ConsumableEffect::EnchantWeapon),
+            Some("enchant_armor") => Some(ConsumableEffect::EnchantArmor),
+            Some("remove_curse") => Some(ConsumableEffect::RemoveCurse),
+            Some("cure_status") => Some(ConsumableEffect::CureStatus),
+            Some("speed") => Some(ConsumableEffect::ApplyStatus {
+                effect: StatusEffectKind::Fast,
+                turns: 20,
+            }),
+            Some("blindness") => Some(ConsumableEffect::ApplyStatus {
+                effect: StatusEffectKind::Blind,
+                turns: 12,
+            }),
+            Some("confusion") => Some(ConsumableEffect::ApplyStatus {
+                effect: StatusEffectKind::Confused,
+                turns: 12,
+            }),
+            Some("hallucination") => Some(ConsumableEffect::ApplyStatus {
+                effect: StatusEffectKind::Hallucinating,
+                turns: 15,
+            }),
+            Some("invisibility") => Some(ConsumableEffect::ApplyStatus {
+                effect: StatusEffectKind::Invisible,
+                turns: 20,
+            }),
+            Some("levitation") => Some(ConsumableEffect::ApplyStatus {
+                effect: StatusEffectKind::Levitation,
+                turns: 20,
+            }),
+            Some("gain_level") => Some(ConsumableEffect::GainLevel),
+            Some("polymorph_self") => Some(ConsumableEffect::PolymorphSelf),
+            Some("water") => Some(ConsumableEffect::Water),
+            Some("blank") => Some(ConsumableEffect::BlankPaper),
+            None => None,
+            Some(effect) => {
+                return Err(ContentError::UnknownReference {
+                    owner: id.to_owned(),
+                    target: effect.to_owned(),
+                })
+            }
         }
+    } else {
+        None
     };
     let tool_action = match definition.tool_action.as_deref() {
         Some("light") => Some(ToolAction::Light),
@@ -573,15 +430,37 @@ pub fn item_data_from_registry(
         ac_bonus: definition.ac_bonus.unwrap_or_default(),
         attack_profile,
         consumable_effect,
-        wand_effect: match definition.effect.as_deref() {
-            Some("magic_missile") => Some(WandEffect::MagicMissile),
-            Some("fire") => Some(WandEffect::Fire),
-            _ => None,
+        wand_effect: if class == ItemClass::Wand {
+            match definition.effect.as_deref() {
+                Some("magic_missile") => Some(WandEffect::MagicMissile),
+                Some("fire") => Some(WandEffect::Fire),
+                Some("cold") => Some(WandEffect::Cold),
+                Some("lightning") => Some(WandEffect::Lightning),
+                Some("sleep") => Some(WandEffect::Sleep),
+                Some("digging") => Some(WandEffect::Digging),
+                Some("teleport") => Some(WandEffect::Teleport),
+                Some("polymorph") => Some(WandEffect::Polymorph),
+                Some("cancellation") => Some(WandEffect::Cancellation),
+                Some("death") => Some(WandEffect::Death),
+                Some("wishing") => Some(WandEffect::Wishing),
+                Some("striking") => Some(WandEffect::Striking),
+                Some("slow_monster") => Some(WandEffect::SlowMonster),
+                Some("speed_monster") => Some(WandEffect::SpeedMonster),
+                Some("opening") => Some(WandEffect::Opening),
+                Some("locking") => Some(WandEffect::Locking),
+                Some("make_invisible") => Some(WandEffect::MakeInvisible),
+                Some("create_monster") => Some(WandEffect::CreateMonster),
+                _ => None,
+            }
+        } else {
+            None
         },
         ring_effect,
+        amulet_effect,
         armor_slot,
         tool_action,
         container_capacity: definition.container_capacity,
+        spellbook_spell,
         max_charges: definition.charges,
         nutrition: definition.nutrition,
     })
@@ -626,8 +505,22 @@ pub fn item_extrinsic_resistances(kind: ItemKind, registry: &ContentRegistry) ->
     let mut flags = Resistances::NONE;
     match kind {
         ItemKind::RingFireResistance => flags.insert(Resistances::FIRE),
-        ItemKind::RingPoisonResistance => flags.insert(Resistances::POISON),
+        ItemKind::RingPoisonResistance | ItemKind::AmuletPoisonResistance => {
+            flags.insert(Resistances::POISON);
+        }
+        ItemKind::RingColdResistance => flags.insert(Resistances::COLD),
+        ItemKind::RingShockResistance => flags.insert(Resistances::SHOCK),
+        ItemKind::RingSleepResistance => flags.insert(Resistances::SLEEP),
+        ItemKind::RingConflict => flags.insert(Resistances::CONFLICT),
+        ItemKind::RingSearching => flags.insert(Resistances::SEARCHING),
+        ItemKind::RingTeleportControl => flags.insert(Resistances::TELEPORT_CONTROL),
         ItemKind::AmuletEsp => flags.insert(Resistances::TELEPATHY),
+        ItemKind::AmuletReflection
+        | ItemKind::ArmorSilverDragonScale
+        | ItemKind::ArmorShieldReflection => flags.insert(Resistances::REFLECTION),
+        ItemKind::ArmorGrayDragonScale | ItemKind::ArmorCloakMagicResistance => {
+            flags.insert(Resistances::MAGIC_RESISTANCE);
+        }
         _ => {}
     }
     if let Some(def) = registry.item(item_id(kind)) {
@@ -687,6 +580,80 @@ pub fn monster_has_ai_flag(kind: MonsterKind, flag: &str, registry: &ContentRegi
     registry
         .monster(monster_id(kind))
         .is_some_and(|d| d.ai_flags.iter().any(|entry| entry == flag))
+}
+
+pub fn item_unidentified_pool(kind: ItemKind) -> Option<&'static str> {
+    let id = item_id(kind);
+    GENERATED_ITEM_APPEARANCE_POOLS
+        .iter()
+        .find(|&&(entry_id, _)| entry_id == id)
+        .map(|&(_, pool)| pool)
+}
+
+pub fn item_material(kind: ItemKind, registry: &ContentRegistry) -> Option<&str> {
+    registry
+        .item(item_id(kind))
+        .and_then(|d| d.material.as_deref())
+}
+
+pub fn weapon_damage_for_size(
+    kind: ItemKind,
+    target_is_large: bool,
+    registry: &ContentRegistry,
+) -> Option<DamageRoll> {
+    let def = registry.item(item_id(kind))?;
+    let spec = if target_is_large {
+        def.damage_large.as_deref().or(def.damage.as_deref())
+    } else {
+        def.damage_small.as_deref().or(def.damage.as_deref())
+    }?;
+    parse_damage(spec).ok()
+}
+
+pub fn monster_is_large(kind: MonsterKind, registry: &ContentRegistry) -> bool {
+    monster_has_ai_flag(kind, "large", registry)
+        || matches!(
+            kind,
+            MonsterKind::Ogre
+                | MonsterKind::Troll
+                | MonsterKind::Minotaur
+                | MonsterKind::Dragon
+                | MonsterKind::Pony
+                | MonsterKind::Warhorse
+                | MonsterKind::HillGiant
+                | MonsterKind::StoneGiant
+                | MonsterKind::FrostGiant
+                | MonsterKind::FireGiant
+                | MonsterKind::Ettin
+                | MonsterKind::Centaur
+                | MonsterKind::TrollIce
+                | MonsterKind::TrollRock
+                | MonsterKind::GelatinousCube
+                | MonsterKind::BlackPudding
+                | MonsterKind::WhiteDragon
+                | MonsterKind::BlueDragon
+                | MonsterKind::SilverDragon
+                | MonsterKind::AirElemental
+        )
+}
+
+pub fn roll_monster_hp_from_dice(
+    kind: MonsterKind,
+    registry: &ContentRegistry,
+    rng: &mut aihack_core::rng::GameRng,
+) -> Option<i16> {
+    let def = registry.monster(monster_id(kind))?;
+    let dice = def.hp_dice.as_deref()?;
+    let roll = parse_damage(dice).ok()?;
+    if roll.dice <= 0 || roll.sides <= 0 {
+        return Some(def.hp.max(1));
+    }
+    let mut total: i32 = 0;
+    let sides = u64::from(roll.sides as u32);
+    for _ in 0..roll.dice {
+        total += (rng.next_u64() % sides) as i32 + 1;
+    }
+    Some(total.clamp(1, i16::MAX as i32) as i16)
 }
 
 /// Content level definition을 core map에 적용할 tile override로 해석한다.

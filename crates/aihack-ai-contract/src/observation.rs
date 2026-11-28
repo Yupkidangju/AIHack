@@ -1,6 +1,6 @@
 use aihack_core::{
     action::{ActionIntent, CommandIntent},
-    campaign::{Alignment, Attributes, Race, SkillCategory, SkillRank},
+    campaign::{Alignment, Attributes, LearnedSpell, Race, SkillCategory, SkillRank, SpellKind},
     domain::{
         entity::{EntityKind, Faction},
         inventory::InventoryLetter,
@@ -226,6 +226,10 @@ pub struct CampaignObservation {
     pub artifact_invoke_cooldown: u16,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillObservation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub learned_spells: Vec<LearnedSpell>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spell_failure_rates: Vec<(SpellKind, u8)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

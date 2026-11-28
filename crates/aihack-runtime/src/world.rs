@@ -4,10 +4,10 @@ use aihack_content::ContentRegistry;
 use aihack_core::{
     domain::{
         inventory::Inventory,
-        item::ItemKind,
+        item::{AmuletEffect, ItemKind, RingEffect},
         level::LevelRegistry,
         map::GameMap,
-        status::{HungerState, Status},
+        status::{HungerState, Resistances, Status},
     },
     error::ContentError,
     ids::{EntityId, LevelId},
@@ -216,7 +216,7 @@ impl GameWorld {
     pub(crate) fn identify_item_kind(&mut self, kind: ItemKind) {
         if !self.state.identified_items.contains(&kind) {
             self.state.identified_items.push(kind);
-            self.state.identified_items.sort_by_key(|kind| *kind as u8);
+            self.state.identified_items.sort_by_key(|kind| *kind as u16);
         }
     }
 
@@ -271,6 +271,77 @@ impl GameWorld {
             self,
         ));
         total
+    }
+
+    pub fn has_ring_effect(&self, effect: RingEffect) -> bool {
+        [
+            self.inventory.equipped_ring,
+            self.inventory.equipped_right_ring,
+        ]
+        .into_iter()
+        .flatten()
+        .any(|id| {
+            self.entities
+                .item_data(id)
+                .is_some_and(|d| d.ring_effect == Some(effect))
+        })
+    }
+
+    pub fn has_amulet_effect(&self, effect: AmuletEffect) -> bool {
+        self.inventory.equipped_amulet.is_some_and(|id| {
+            self.entities
+                .item_data(id)
+                .is_some_and(|d| d.amulet_effect == Some(effect))
+        })
+    }
+
+    pub fn has_reflection(&self) -> bool {
+        self.effective_player_resistances()
+            .contains(Resistances::REFLECTION)
+    }
+
+    pub fn has_magic_resistance(&self) -> bool {
+        self.effective_player_resistances()
+            .contains(Resistances::MAGIC_RESISTANCE)
+    }
+
+    pub fn is_levitating(&self) -> bool {
+        self.status_timers.levitation > 0 || self.has_ring_effect(RingEffect::Levitation)
+    }
+
+    pub fn is_invisible(&self) -> bool {
+        self.status_timers.invisible > 0 || self.has_ring_effect(RingEffect::Invisibility)
+    }
+
+    pub fn has_see_invisible(&self) -> bool {
+        self.has_ring_effect(RingEffect::SeeInvisible)
+            || self
+                .effective_player_resistances()
+                .contains(Resistances::SEE_INVISIBLE)
+    }
+
+    pub fn is_fast(&self) -> bool {
+        self.status_timers.fast > 0
+            || self.inventory.equipped_boots.is_some_and(|id| {
+                self.entities
+                    .item_data(id)
+                    .is_some_and(|d| d.kind == ItemKind::ArmorSpeedBoots)
+            })
+    }
+
+    pub fn has_conflict(&self) -> bool {
+        self.effective_player_resistances()
+            .contains(Resistances::CONFLICT)
+    }
+
+    pub fn has_searching(&self) -> bool {
+        self.effective_player_resistances()
+            .contains(Resistances::SEARCHING)
+    }
+
+    pub fn has_teleport_control(&self) -> bool {
+        self.effective_player_resistances()
+            .contains(Resistances::TELEPORT_CONTROL)
     }
 
     pub fn status(&self) -> Status {

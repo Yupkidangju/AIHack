@@ -218,6 +218,15 @@ impl EntityStore {
         self.0.set_actor_kind(id, next)
     }
 
+    pub fn polymorph_monster(
+        &mut self,
+        id: EntityId,
+        new_kind: MonsterKind,
+        new_stats: ActorStats,
+    ) -> bool {
+        self.0.polymorph_monster(id, new_kind, new_stats)
+    }
+
     pub fn set_actor_tameness(&mut self, id: EntityId, next: u8) -> bool {
         self.0.set_actor_tameness(id, next)
     }

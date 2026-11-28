@@ -1,6 +1,6 @@
 use aihack_core::{domain::item::ItemKind, ids::EntityId};
 
-const POTION_APPEARANCES: [&str; 10] = [
+const POTION_APPEARANCES: &[&str] = &[
     "crimson potion",
     "azure potion",
     "amber potion",
@@ -11,9 +11,13 @@ const POTION_APPEARANCES: [&str; 10] = [
     "indigo potion",
     "scarlet potion",
     "smoky potion",
+    "golden potion",
+    "effervescent potion",
+    "murky potion",
+    "swirling potion",
 ];
 
-const SCROLL_APPEARANCES: [&str; 10] = [
+const SCROLL_APPEARANCES: &[&str] = &[
     "scroll labeled ARDEN VEX",
     "scroll labeled KORIM SOL",
     "scroll labeled THALEN RUX",
@@ -24,101 +28,192 @@ const SCROLL_APPEARANCES: [&str; 10] = [
     "scroll labeled CALEN TIR",
     "scroll labeled DURAL FEN",
     "scroll labeled NYRA KOS",
+    "scroll labeled VERAN TUL",
+    "scroll labeled ZELOR QIN",
 ];
 
-const RING_APPEARANCES: [&str; 6] = [
+const RING_APPEARANCES: &[&str] = &[
     "copper ring",
     "onyx ring",
     "ivory ring",
     "opal ring",
     "bronze ring",
     "granite ring",
+    "silver ring",
+    "gold ring",
+    "sapphire ring",
+    "ruby ring",
+    "jade ring",
+    "twisted ring",
+    "wooden ring",
+    "pearl ring",
 ];
 
-const AMULET_APPEARANCES: [&str; 4] = [
+const AMULET_APPEARANCES: &[&str] = &[
     "circular amulet",
     "triangular amulet",
     "oval amulet",
     "hexagonal amulet",
+    "square amulet",
+    "octagonal amulet",
+    "pyramidal amulet",
+    "concave amulet",
 ];
 
-const POTION_KINDS: [ItemKind; 9] = [
-    ItemKind::PotionHealing,
-    ItemKind::PotionExtraHealing,
-    ItemKind::PotionCure,
-    ItemKind::PotionSpeed,
-    ItemKind::PotionBlindness,
-    ItemKind::PotionConfusion,
-    ItemKind::PotionHallucination,
-    ItemKind::PotionInvisibility,
-    ItemKind::PotionLevitation,
+const WAND_APPEARANCES: &[&str] = &[
+    "glass wand",
+    "oak wand",
+    "ebony wand",
+    "brass wand",
+    "copper wand",
+    "silver wand",
+    "runed wand",
+    "maple wand",
+    "marble wand",
+    "crystal wand",
+    "iron wand",
+    "tin wand",
+    "platinum wand",
+    "bone wand",
+    "bamboo wand",
+    "hexagonal wand",
+    "short wand",
+    "jeweled wand",
 ];
 
-const SCROLL_KINDS: [ItemKind; 7] = [
-    ItemKind::ScrollReveal,
-    ItemKind::ScrollIdentify,
-    ItemKind::ScrollLevelTeleport,
-    ItemKind::ScrollCharging,
-    ItemKind::ScrollEnchantWeapon,
-    ItemKind::ScrollEnchantArmor,
-    ItemKind::ScrollRemoveCurse,
+const SPELLBOOK_APPEARANCES: &[&str] = &[
+    "parchment spellbook",
+    "vellum spellbook",
+    "rag-paper spellbook",
+    "dog-eared spellbook",
+    "indigo spellbook",
+    "crimson spellbook",
+    "bronze spellbook",
+    "azure spellbook",
+    "jade spellbook",
+    "violet spellbook",
+    "silver-bound spellbook",
+    "gilded spellbook",
+    "stained spellbook",
+    "mottled spellbook",
+    "thick spellbook",
+    "thin spellbook",
+    "wide spellbook",
+    "big spellbook",
+    "small spellbook",
+    "glossy spellbook",
+    "dull spellbook",
+    "tattered spellbook",
+    "obsidian spellbook",
+    "ash-gray spellbook",
+    "scarlet spellbook",
+    "emerald spellbook",
+    "amber spellbook",
+    "cyan spellbook",
+    "ochre spellbook",
+    "clothbound spellbook",
 ];
 
-const RING_KINDS: [ItemKind; 3] = [
-    ItemKind::RingPoisonResistance,
-    ItemKind::RingFireResistance,
-    ItemKind::RingProtection,
-];
+fn pool_appearance(
+    seed: u64,
+    salt: u64,
+    pool_name: &str,
+    kind: ItemKind,
+    appearances: &[&'static str],
+) -> Option<&'static str> {
+    let mut index = 0usize;
+    let mut found = None;
+    for &candidate in ItemKind::ALL {
+        if aihack_content::item_unidentified_pool(candidate) == Some(pool_name) {
+            if candidate == kind {
+                found = Some(index);
+                break;
+            }
+            index += 1;
+        }
+    }
+    let idx = found?;
+    let mut pool = appearances.to_vec();
+    shuffle(seed ^ salt, &mut pool);
+    pool.get(idx).copied()
+}
 
-const AMULET_KINDS: [ItemKind; 1] = [ItemKind::AmuletEsp];
-
-/// 시드 기반 독립 SplitMix64 셔플로 미식별 포션/두루마리/반지/아뮬렛 외형을 결정한다.
+/// 시드 기반 독립 SplitMix64 셔플로 미식별 아이템 외형을 결정한다.
 pub fn appearance_for_kind(seed: u64, kind: ItemKind) -> Option<&'static str> {
-    if let Some(index) = POTION_KINDS.iter().position(|candidate| *candidate == kind) {
-        let mut pool = POTION_APPEARANCES;
-        shuffle(seed ^ 0x517c_c1b7_2722_0a95, &mut pool);
-        return Some(pool[index]);
+    let pool_name = aihack_content::item_unidentified_pool(kind)?;
+    match pool_name {
+        "potion" => pool_appearance(
+            seed,
+            0x517c_c1b7_2722_0a95,
+            "potion",
+            kind,
+            POTION_APPEARANCES,
+        ),
+        "scroll" => pool_appearance(
+            seed,
+            0x94d0_49bb_1331_11eb,
+            "scroll",
+            kind,
+            SCROLL_APPEARANCES,
+        ),
+        "ring" => pool_appearance(seed, 0xa076_1d64_78bd_642f, "ring", kind, RING_APPEARANCES),
+        "amulet" => pool_appearance(
+            seed,
+            0xe703_7ed1_a0b4_28db,
+            "amulet",
+            kind,
+            AMULET_APPEARANCES,
+        ),
+        "wand" => pool_appearance(seed, 0x369d_ea0f_31a5_3f85, "wand", kind, WAND_APPEARANCES),
+        "spellbook" => pool_appearance(
+            seed,
+            0x7b93_1244_88c5_e211,
+            "spellbook",
+            kind,
+            SPELLBOOK_APPEARANCES,
+        ),
+        _ => None,
     }
-    if let Some(index) = SCROLL_KINDS.iter().position(|candidate| *candidate == kind) {
-        let mut pool = SCROLL_APPEARANCES;
-        shuffle(seed ^ 0x94d0_49bb_1331_11eb, &mut pool);
-        return Some(pool[index]);
-    }
-    if let Some(index) = RING_KINDS.iter().position(|candidate| *candidate == kind) {
-        let mut pool = RING_APPEARANCES;
-        shuffle(seed ^ 0xa076_1d64_78bd_642f, &mut pool);
-        return Some(pool[index]);
-    }
-    if let Some(index) = AMULET_KINDS.iter().position(|candidate| *candidate == kind) {
-        let mut pool = AMULET_APPEARANCES;
-        shuffle(seed ^ 0xe703_7ed1_a0b4_28db, &mut pool);
-        return Some(pool[index]);
-    }
-    None
 }
 
 /// 시드 기반 외형 문자열에만 의존하는 표시 색상이다(실제 ItemKind 색상을 노출하지 않는다).
 pub fn color_for_appearance(appearance: &str) -> &'static str {
     match appearance {
-        "crimson potion" => "red",
-        "azure potion" => "blue",
-        "amber potion" => "yellow",
-        "jade potion" => "green",
-        "silver potion" => "white",
-        "violet potion" => "magenta",
-        "emerald potion" => "bright_green",
-        "indigo potion" => "bright_blue",
-        "scarlet potion" => "bright_red",
-        "smoky potion" => "gray",
-        "copper ring" => "brown",
-        "onyx ring" => "black",
-        "ivory ring" => "white",
-        "opal ring" => "cyan",
-        "bronze ring" => "yellow",
-        "granite ring" => "gray",
-        "circular amulet" | "triangular amulet" | "oval amulet" | "hexagonal amulet" => {
-            "bright_yellow"
-        }
+        "crimson potion" | "crimson spellbook" | "ruby ring" => "red",
+        "azure potion" | "azure spellbook" | "sapphire ring" => "blue",
+        "amber potion" | "amber spellbook" | "golden potion" | "gold ring" | "bronze ring"
+        | "bronze spellbook" | "ochre spellbook" => "yellow",
+        "jade potion" | "jade ring" | "jade spellbook" => "green",
+        "silver potion"
+        | "ivory ring"
+        | "silver ring"
+        | "pearl ring"
+        | "silver wand"
+        | "silver-bound spellbook"
+        | "platinum wand"
+        | "bone wand"
+        | "marble wand" => "white",
+        "violet potion" | "violet spellbook" => "magenta",
+        "emerald potion" | "emerald spellbook" => "bright_green",
+        "indigo potion" | "indigo spellbook" | "crystal wand" => "bright_blue",
+        "scarlet potion" | "scarlet spellbook" => "bright_red",
+        "smoky potion" | "granite ring" | "iron wand" | "tin wand" | "ash-gray spellbook"
+        | "dull spellbook" => "gray",
+        "copper ring"
+        | "copper wand"
+        | "oak wand"
+        | "maple wand"
+        | "wooden ring"
+        | "bamboo wand"
+        | "parchment spellbook"
+        | "vellum spellbook"
+        | "tattered spellbook" => "brown",
+        "onyx ring" | "ebony wand" | "obsidian spellbook" => "black",
+        "opal ring" | "cyan spellbook" | "glass wand" => "cyan",
+        "effervescent potion" | "swirling potion" | "runed wand" => "bright_cyan",
+        "gilded spellbook" | "circular amulet" | "triangular amulet" | "oval amulet"
+        | "hexagonal amulet" | "square amulet" | "octagonal amulet" | "pyramidal amulet"
+        | "concave amulet" | "brass wand" | "jeweled wand" => "bright_yellow",
         _ => "white",
     }
 }

@@ -19,6 +19,13 @@ P1–P3 당시 로컬 검증은 전체 491 tests, fmt/clippy/release PASS를 기
 
 플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P4 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
 
+### Stage 6 (P12) 마법 체계 심화 & 대규모 도감 투입 (2026-11-28)
+
+Stage 6 (`P12`, `ADR-P12-01`)은 `Cargo.lock` 변경·외부 크레이트 추가 없이 NetHack 핵심 마법·유틸리티 체계와 대규모 콘텐츠 도감을 구현했다:
+- 도감/코드생성: `crates/aihack-content/build.rs` 정적 `std` TOML 검증·코드 생성기와 `items.toml` **130종**(LF SHA-256 `b41be10c0062df65bfd4ca868217a906f2276dc59335698f212d70c975cd493f`)·`monsters.toml` **85종**(LF SHA-256 `a9842fc24763791e2e78885080505812de179446f1e99ff1258d37fdbab1e6f1`, `registry.content_hash()` `"be911e628f7b01b5"`)를 `aihack-core`(`define_item_kinds!`, `define_monster_kinds!`)와 1:1 동기화했다.
+- 마법/장신구/전투: `SpellSchool` 7학파·28종 `SpellKind`·마법서(`'r'`) 학습 및 `SPELL_MEMORY_TURNS = 20_000` 기억 감퇴·금속 방어구/방패 실패율(`+25%`/`+15%`, 비무장 고유 주문 0%), 18종 `WandEffect`·`CommandIntent::Wish`(`'z'`/`CURATED_WISHES`), 12종 `RingEffect`·6종 `AmuletEffect`·5종 `Resistances`(`REFLECTION`/`MAGIC_RESISTANCE`/`CONFLICT`/`TELEPORT_CONTROL`/`SEARCHING`), `AmuletLifeSaving` 부활, 크기별 무기 피해·은 특공, 신규 몬스터 패시브 4종, `SaveV3` 엄격 검증 및 레거시 V1 격리, TUI 동적 28주문/소원 메뉴와 Headless 부적/상급 치유 대응을 통합했다.
+- 검증: `tests/stage6_p12.rs` (**6 PASS / 0 FAIL**), 102개 테스트 바이너리 **565 PASS / 0 FAIL / 0 ignored**(워크스페이스 561 PASS + ConPTY 단독 재실행 4 PASS), `cargo fmt --check`, `cargo clippy`(0 warnings), `--release` 빌드, `cargo audit`(0 vulnerabilities across 318 deps, 허용 2건), `cargo deny`, 레거시 참조 0건, `scripts/r7_checkpoint.sh`·`scripts/r8_checkpoint.sh` 모두 통과했다. 상세 기록은 `docs/campaign_implementation.md`에 있다.
+
 ### Stage 5 (P11) 살아 있는 던전 — 펫 · NPC · 고급 몬스터 AI (2026-11-27)
 
 - 설계 결정 `ADR-P11-01`(`DESIGN_DECISIONS.md`), `spec.md`, `docs/campaign_spec.md`, `tasks/{plan,todo}.md`를 먼저 확정하고 Stage 5(`P11`) 전체를 구현·검증했다.

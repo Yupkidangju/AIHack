@@ -2,7 +2,7 @@ use aihack_core::{
     domain::{
         entity::EntityLocation,
         item::{
-            BucStatus, ConsumableEffect, EquipmentSlot, ItemClass, StatusEffectKind,
+            AmuletEffect, BucStatus, ConsumableEffect, EquipmentSlot, ItemClass, StatusEffectKind,
             MAX_ITEM_ENCHANTMENT, MAX_ITEM_STACK, MIN_ITEM_ENCHANTMENT,
         },
         level::{
@@ -440,6 +440,128 @@ pub fn quaff(
                 }
             }
         }
+        Some(ConsumableEffect::GainLevel) => {
+            consume_one_from_inventory(world, item)?;
+            if world.campaign.is_some() {
+                world.identify_item_kind(data.kind);
+            }
+            let player_id = world.player_id;
+            let mut msg = "You feel more experienced!";
+            let (before_hp, hp_after) = if let Some(mut campaign) = world.campaign {
+                let before_level = campaign.level();
+                let before_max_hp = campaign.max_hp();
+                if campaign.xp < aihack_core::campaign::MAX_XP {
+                    campaign.xp = campaign
+                        .xp
+                        .saturating_add(20)
+                        .min(aihack_core::campaign::MAX_XP);
+                    let new_max_hp = campaign.max_hp();
+                    let new_max_mp = campaign.max_mp();
+                    let mp_delta =
+                        campaign.role.mp_per_level() * i16::from(campaign.level() - before_level);
+                    let hp_gain = (new_max_hp - before_max_hp).max(4);
+                    let state = world.state_mut();
+                    state.campaign = Some(campaign);
+                    state.max_mp = new_max_mp;
+                    state.mp = state.mp.saturating_add(mp_delta).min(state.max_mp);
+                    let stats = state
+                        .entities
+                        .actor_stats_mut(player_id)
+                        .ok_or_else(|| "player actor stats are missing".to_string())?;
+                    let old_hp = stats.hp;
+                    stats.max_hp = new_max_hp;
+                    stats.hp = stats.hp.saturating_add(hp_gain).min(stats.max_hp);
+                    stats.hit_bonus = campaign.hit_bonus();
+                    stats.damage_bonus = campaign.damage_bonus();
+                    (old_hp, stats.hp)
+                } else {
+                    msg = "You feel a surge of transcendent vitality!";
+                    let state = world.state_mut();
+                    let cap_mp = campaign.max_mp().saturating_add(40);
+                    state.max_mp = state.max_mp.saturating_add(2).min(cap_mp);
+                    state.mp = state.mp.saturating_add(2).min(state.max_mp);
+                    let cap_hp = campaign.max_hp().saturating_add(60);
+                    let stats = state
+                        .entities
+                        .actor_stats_mut(player_id)
+                        .ok_or_else(|| "player actor stats are missing".to_string())?;
+                    let old_hp = stats.hp;
+                    stats.max_hp = stats.max_hp.saturating_add(3).min(cap_hp);
+                    stats.hp = stats.hp.saturating_add(3).min(stats.max_hp);
+                    (old_hp, stats.hp)
+                }
+            } else {
+                let stats = world
+                    .state_mut()
+                    .entities
+                    .actor_stats_mut(player_id)
+                    .ok_or_else(|| "player actor stats are missing".to_string())?;
+                let old_hp = stats.hp;
+                stats.max_hp = stats.max_hp.saturating_add(3);
+                stats.hp = stats.hp.saturating_add(3).min(stats.max_hp);
+                (old_hp, stats.hp)
+            };
+            return Ok(vec![
+                GameEvent::ItemConsumed {
+                    entity: player_id,
+                    item,
+                },
+                GameEvent::EntityHealed {
+                    entity: player_id,
+                    amount: hp_after - before_hp,
+                    hp_after,
+                },
+                GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: msg.to_string(),
+                },
+            ]);
+        }
+        Some(ConsumableEffect::PolymorphSelf) => {
+            consume_one_from_inventory(world, item)?;
+            if world.campaign.is_some() {
+                world.identify_item_kind(data.kind);
+            }
+            let player_id = world.player_id;
+            if world.has_amulet_effect(AmuletEffect::Unchanging) {
+                return Ok(vec![
+                    GameEvent::ItemConsumed {
+                        entity: player_id,
+                        item,
+                    },
+                    GameEvent::Message {
+                        priority: MessagePriority::Info,
+                        text: "Your amulet keeps your form steadfast and unchanged!".to_string(),
+                    },
+                ]);
+            }
+            let heal = roll_die(rng, 6);
+            let (amount, hp_after) = {
+                let stats = world
+                    .state_mut()
+                    .entities
+                    .actor_stats_mut(player_id)
+                    .ok_or_else(|| "player actor stats are missing".to_string())?;
+                let before = stats.hp;
+                stats.hp = stats.hp.saturating_add(heal).min(stats.max_hp);
+                (stats.hp - before, stats.hp)
+            };
+            return Ok(vec![
+                GameEvent::ItemConsumed {
+                    entity: player_id,
+                    item,
+                },
+                GameEvent::EntityHealed {
+                    entity: player_id,
+                    amount,
+                    hp_after,
+                },
+                GameEvent::Message {
+                    priority: MessagePriority::Warning,
+                    text: "You undergo a brief physical transformation!".to_string(),
+                },
+            ]);
+        }
         _ => return Err("item is not a potion".to_string()),
     };
 
@@ -622,6 +744,18 @@ pub fn eat(
                             });
                         }
                     }
+                    "grant_magic_resistance" => {
+                        if rng.next_u64() % 100 < 50 {
+                            world
+                                .state_mut()
+                                .intrinsic_resistances
+                                .insert(Resistances::MAGIC_RESISTANCE);
+                            events.push(GameEvent::Message {
+                                priority: MessagePriority::Info,
+                                text: "You feel protected from magic!".to_string(),
+                            });
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -631,10 +765,11 @@ pub fn eat(
     Ok(events)
 }
 
-pub fn read(
+pub fn read_at(
     world: &mut GameWorld,
     rng: &mut GameRng,
     item: EntityId,
+    turn: u64,
 ) -> Result<Vec<GameEvent>, String> {
     if !world.inventory.contains(item) {
         return Err("item is not in player inventory".to_string());
@@ -643,6 +778,9 @@ pub fn read(
         .entities
         .item_data(item)
         .ok_or_else(|| "entity is not an item".to_string())?;
+    if data.class == ItemClass::Spellbook {
+        return crate::systems::spells::study_spellbook(world, rng, item, turn);
+    }
     if data.class != ItemClass::Scroll {
         return Err("item is not a scroll".to_string());
     }
@@ -732,14 +870,38 @@ pub fn read(
                         .collect();
                     candidates.sort_by_key(|id| id.depth);
                     if !candidates.is_empty() {
-                        let pick = (rng.next_u64() as usize) % candidates.len();
-                        let to_level = candidates[pick];
+                        let controlled = world.has_teleport_control();
+                        let to_level = if controlled {
+                            if crate::campaign::has_amulet(world) {
+                                candidates
+                                    .iter()
+                                    .copied()
+                                    .rev()
+                                    .find(|id| id.depth < from.depth)
+                                    .unwrap_or(candidates[0])
+                            } else {
+                                candidates
+                                    .iter()
+                                    .copied()
+                                    .find(|id| id.depth > from.depth)
+                                    .unwrap_or(candidates[candidates.len() - 1])
+                            }
+                        } else {
+                            let pick = (rng.next_u64() as usize) % candidates.len();
+                            candidates[pick]
+                        };
                         let to_pos = world
                             .levels
                             .stairs_up_pos(to_level)
                             .or_else(|| world.levels.stairs_down_pos(to_level))
                             .ok_or("teleport landing is missing")?;
                         world.set_player_location(to_level, to_pos);
+                        if controlled {
+                            events.push(GameEvent::Message {
+                                priority: MessagePriority::Info,
+                                text: "You control your level teleport!".to_string(),
+                            });
+                        }
                         events.push(GameEvent::LevelChanged {
                             entity: world.player_id,
                             from,
@@ -981,21 +1143,7 @@ pub fn read(
                 });
             }
             BucStatus::Uncursed => {
-                let equipped_cursed: Vec<EntityId> = world
-                    .inventory
-                    .equipped_slots()
-                    .into_iter()
-                    .filter_map(|(_, item)| item)
-                    .filter(|id| {
-                        world.entities.get(*id).and_then(|entity| entity.item_buc())
-                            == Some(BucStatus::Cursed)
-                    })
-                    .collect();
-                for id in equipped_cursed {
-                    let entities = &mut world.state_mut().entities;
-                    entities.set_item_buc(id, BucStatus::Uncursed);
-                    entities.set_item_buc_known(id, true);
-                }
+                let _ = uncurse_equipped_items(world);
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
                     text: "You feel as if someone is helping you.".to_string(),
@@ -1008,6 +1156,13 @@ pub fn read(
                 });
             }
         },
+        ConsumableEffect::MagicMapping => {
+            events.extend(crate::systems::spells::reveal_entire_level_map(world));
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "A map crystallizes in your mind!".to_string(),
+            });
+        }
         ConsumableEffect::BlankPaper => {
             events.push(GameEvent::Message {
                 priority: MessagePriority::Info,
@@ -1017,6 +1172,8 @@ pub fn read(
         ConsumableEffect::Heal { .. }
         | ConsumableEffect::CureStatus
         | ConsumableEffect::ApplyStatus { .. }
+        | ConsumableEffect::GainLevel
+        | ConsumableEffect::PolymorphSelf
         | ConsumableEffect::Water => {
             return Err("item is not a scroll".to_string());
         }
@@ -1059,7 +1216,26 @@ pub fn identify(
     Ok(events)
 }
 
-fn identify_inventory_target(world: &mut GameWorld, target: EntityId) -> Vec<GameEvent> {
+pub(crate) fn uncurse_equipped_items(world: &mut GameWorld) -> usize {
+    let equipped_cursed: Vec<EntityId> = world
+        .inventory
+        .equipped_slots()
+        .into_iter()
+        .filter_map(|(_, item)| item)
+        .filter(|id| {
+            world.entities.get(*id).and_then(|entity| entity.item_buc()) == Some(BucStatus::Cursed)
+        })
+        .collect();
+    let count = equipped_cursed.len();
+    for id in equipped_cursed {
+        let entities = &mut world.state_mut().entities;
+        entities.set_item_buc(id, BucStatus::Uncursed);
+        entities.set_item_buc_known(id, true);
+    }
+    count
+}
+
+pub(crate) fn identify_inventory_target(world: &mut GameWorld, target: EntityId) -> Vec<GameEvent> {
     let mut events = Vec::new();
     if let Some(kind) = world
         .entities

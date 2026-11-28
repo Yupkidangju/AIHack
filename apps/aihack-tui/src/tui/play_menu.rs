@@ -1,6 +1,7 @@
 use super::input::{item_observation_label, UiCommandCandidate as U};
 use aihack_ai_contract::{
-    CommandIntent as C, DipTarget, EngravingMethod, EngravingText, EntityId, Observation, SpellKind,
+    CommandIntent as C, DipTarget, EngravingMethod, EngravingText, EntityId, ItemKind, Observation,
+    SpellKind, WishChoice,
 };
 use ratatui::layout::Rect;
 
@@ -102,7 +103,7 @@ fn belongs(command: C, key: char) -> bool {
             | ('f', C::Eat { .. })
             | ('d', C::Drop { .. })
             | ('t', C::Throw { .. })
-            | ('z', C::Zap { .. })
+            | ('z', C::Zap { .. } | C::Wish { .. })
             | ('r', C::Read { .. })
             | ('$', C::Buy { .. } | C::Sell { .. } | C::Pay)
             | ('O', C::Offer { .. })
@@ -131,6 +132,7 @@ fn item_of(command: C) -> Option<EntityId> {
         | C::Read { item }
         | C::Throw { item, .. }
         | C::Zap { item, .. }
+        | C::Wish { item, .. }
         | C::Apply { item, .. }
         | C::Dip { item, .. }
         | C::Invoke { item } => Some(item),
@@ -150,6 +152,22 @@ pub(super) fn action_menu(
         .filter(|command| belongs(*command, key))
         .collect();
     let mut entries = Vec::new();
+    if key == 'z' {
+        if let Some(wand) = selected {
+            let is_wish_wand = observation
+                .inventory
+                .iter()
+                .find(|i| i.item == wand)
+                .is_some_and(|i| i.kind == ItemKind::WandWishing);
+            if is_wish_wand
+                && commands
+                    .iter()
+                    .any(|c| matches!(c, C::Wish { item, .. } if *item == wand))
+            {
+                return wish_menu_from_obs(observation, wand);
+            }
+        }
+    }
     if matches!(key, 'o' | 'c' | 'K' | 'm') || selected.is_some() {
         for command in commands {
             if selected.is_some() && item_of(command) != selected {
@@ -191,22 +209,36 @@ pub(super) fn action_menu(
         return PlayMenu::new("Choose direction", entries);
     }
     if key == 'Z' {
-        let spells: Vec<aihack_ai_contract::SpellKind> = [
-            aihack_ai_contract::SpellKind::ForceBolt,
-            aihack_ai_contract::SpellKind::Heal,
-            aihack_ai_contract::SpellKind::Detect,
-        ]
-        .into_iter()
-        .filter(|spell| {
-            commands
-                .iter()
-                .any(|command| matches!(command, C::Cast { spell: s, .. } if s == spell))
-        })
-        .collect();
-        for (index, spell) in spells.into_iter().take(9).enumerate() {
+        const MENU_KEYS: &[char] = &[
+            '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+            'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+        ];
+        let spells: Vec<SpellKind> = SpellKind::ALL
+            .iter()
+            .copied()
+            .filter(|spell| {
+                commands
+                    .iter()
+                    .any(|command| matches!(command, C::Cast { spell: s, .. } if s == spell))
+            })
+            .collect();
+        for (index, spell) in spells.into_iter().enumerate() {
+            let Some(&key_char) = MENU_KEYS.get(index) else {
+                break;
+            };
+            let fail_pct = observation
+                .campaign
+                .as_ref()
+                .and_then(|camp| {
+                    camp.spell_failure_rates
+                        .iter()
+                        .find(|&&(s, _)| s == spell)
+                        .map(|&(_, pct)| pct)
+                })
+                .unwrap_or(0);
             entries.push(Entry {
-                key: char::from(b'1' + index as u8),
-                label: spell_label(spell, spell.mana_cost()),
+                key: key_char,
+                label: spell_label(spell, spell.mana_cost(), fail_pct),
                 candidate: if spell.is_directional() {
                     U::ChooseSpell(spell)
                 } else {
@@ -485,7 +517,9 @@ pub(super) fn action_menu(
             entries.push(Entry {
                 key: item.letter.0,
                 label: item_observation_label(item),
-                candidate: if matches!(key, 't' | 'z') {
+                candidate: if key == 'z' && item.kind == ItemKind::WandWishing {
+                    U::ChooseWish(item.item)
+                } else if matches!(key, 't' | 'z') {
                     U::ChooseItem {
                         action: key,
                         item: item.item,
@@ -645,13 +679,52 @@ pub(super) fn identify_target_menu(observation: &Observation, scroll: EntityId) 
     PlayMenu::new("Identify item", entries)
 }
 
-fn spell_label(spell: SpellKind, cost: i16) -> String {
-    let name = match spell {
-        SpellKind::ForceBolt => "Force Bolt",
-        SpellKind::Heal => "Heal",
-        SpellKind::Detect => "Detect",
-    };
-    format!("{name} (MP {cost})")
+fn spell_label(spell: SpellKind, cost: i16, fail_pct: u8) -> String {
+    format!("{} (MP {cost}, fail {fail_pct}%)", spell.display_name())
+}
+
+pub(super) fn wish_menu_from_obs(observation: &Observation, wand: EntityId) -> PlayMenu {
+    let entries = observation
+        .legal_actions
+        .iter()
+        .copied()
+        .filter_map(|c| match c {
+            C::Wish { item, wish } if item == wand => Some((c, wish)),
+            _ => None,
+        })
+        .enumerate()
+        .take(9)
+        .map(|(idx, (command, wish))| Entry {
+            key: char::from(b'1' + idx as u8),
+            label: wish_label(wish),
+            candidate: U::Command(command),
+        })
+        .collect();
+    PlayMenu::new("Make a Wish", entries)
+}
+
+fn wish_label(wish: WishChoice) -> String {
+    match wish {
+        WishChoice::Item {
+            kind,
+            blessed,
+            enchant,
+        } => {
+            let b_str = if blessed { "blessed " } else { "" };
+            let e_str = if enchant != 0 {
+                format!("{enchant:+} ")
+            } else {
+                String::new()
+            };
+            format!("{e_str}{b_str}{kind:?}")
+        }
+        WishChoice::ArtifactExcalibur => "Excalibur".to_string(),
+        WishChoice::ArtifactSunsword => "Sunsword".to_string(),
+        WishChoice::ArtifactMagicbane => "Magicbane".to_string(),
+        WishChoice::ArtifactCleaver => "Cleaver".to_string(),
+        WishChoice::ArtifactStormbringer => "Stormbringer".to_string(),
+        WishChoice::ArtifactSting => "Sting".to_string(),
+    }
 }
 
 pub(super) fn inventory_menu(observation: &Observation) -> PlayMenu {
@@ -699,11 +772,20 @@ pub(super) fn item_menu(observation: &Observation, item: EntityId) -> PlayMenu {
         Some(Entry {
             key,
             label: label.into(),
-            candidate: if matches!(key, 't' | 'z')
+            candidate: if key == 'z'
+                && observation
+                    .inventory
+                    .iter()
+                    .find(|i| i.item == item)
+                    .is_some_and(|i| i.kind == ItemKind::WandWishing)
+            {
+                U::ChooseWish(item)
+            } else if matches!(key, 't' | 'z')
                 || (key == 'a'
                     && observation.legal_actions.iter().any(
                         |c| matches!(c, C::Apply { item: i, direction: Some(_) } if *i == item),
-                    )) {
+                    ))
+            {
                 U::ChooseItem { action: key, item }
             } else if key == 'v' {
                 U::ChooseDipSource(item)

@@ -64,9 +64,7 @@ pub(crate) fn trigger_player_trap_with_kind(
             events.push(event);
         }
     }
-    if world.status_timers.levitation > 0
-        && matches!(trap, TrapKind::Pit | TrapKind::Bear | TrapKind::Hole)
-    {
+    if world.is_levitating() && matches!(trap, TrapKind::Pit | TrapKind::Bear | TrapKind::Hole) {
         events.push(GameEvent::Message {
             priority: MessagePriority::Info,
             text: "You float over the trap.".to_string(),

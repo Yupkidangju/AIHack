@@ -344,6 +344,34 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
                 return vec![command];
             }
         }
+        let cure_spell = CommandIntent::Cast {
+            spell: SpellKind::CureSickness,
+            direction: None,
+        };
+        if observation.legal_actions.contains(&cure_spell) {
+            return vec![cure_spell];
+        }
+    }
+
+    if observation.campaign.is_some()
+        && !observation
+            .inventory
+            .iter()
+            .any(|item| item.equipped_slot == Some(aihack_ai_contract::EquipmentSlot::Amulet))
+    {
+        if let Some(amulet) = observation.inventory.iter().find(|item| {
+            kind_known(item)
+                && matches!(
+                    item.kind,
+                    ItemKind::AmuletLifeSaving | ItemKind::AmuletReflection
+                )
+                && !(item.buc_known && item.buc == aihack_ai_contract::BucStatus::Cursed)
+        }) {
+            let command = CommandIntent::PutOn { item: amulet.item };
+            if observation.legal_actions.contains(&command) {
+                return vec![command];
+            }
+        }
     }
 
     if observation.player.poison_turns > 0 {
@@ -361,12 +389,14 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
     }
 
     if observation.player.hp.saturating_mul(2) <= observation.player.max_hp {
-        let heal_spell = CommandIntent::Cast {
-            spell: SpellKind::Heal,
-            direction: None,
-        };
-        if observation.legal_actions.contains(&heal_spell) {
-            return vec![heal_spell];
+        for spell in [SpellKind::ExtraHealing, SpellKind::Heal] {
+            let heal_spell = CommandIntent::Cast {
+                spell,
+                direction: None,
+            };
+            if observation.legal_actions.contains(&heal_spell) {
+                return vec![heal_spell];
+            }
         }
         if let Some(item) = observation
             .inventory

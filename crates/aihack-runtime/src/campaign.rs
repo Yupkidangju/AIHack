@@ -166,7 +166,10 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
     if campaign.xp > MAX_XP || campaign.xp % 10 != 0 {
         return Err("campaign XP out of range".into());
     }
-    if world.max_mp != campaign.max_mp() || !(0..=world.max_mp).contains(&world.mp) {
+    if world.max_mp < 0
+        || world.max_mp > campaign.max_mp().saturating_add(40)
+        || !(0..=world.max_mp).contains(&world.mp)
+    {
         return Err("campaign MP out of range".into());
     }
     if world.ascension_pursuit_stage > 3 {
@@ -176,7 +179,8 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
         .entities
         .actor_stats(world.player_id)
         .ok_or("campaign player missing")?;
-    if stats.max_hp != campaign.max_hp()
+    if stats.max_hp < 4
+        || stats.max_hp > campaign.max_hp().saturating_add(60)
         || stats.hit_bonus != campaign.hit_bonus()
         || stats.damage_bonus != campaign.damage_bonus()
     {
@@ -189,16 +193,6 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
         EntityLocation::OnMap { .. } => {}
         EntityLocation::Inventory { owner } if owner == world.player_id => {}
         _ => return Err("campaign amulet cannot be destroyed or owned by another actor".into()),
-    }
-    let earned: u32 = world
-        .entities
-        .entities()
-        .iter()
-        .filter(|entity| entity.monster_difficulty().is_some() && !entity.is_alive_actor())
-        .map(|entity| u32::from(entity.monster_difficulty().unwrap().max(1)) * 10)
-        .fold(0u32, |total, value| total.saturating_add(value).min(MAX_XP));
-    if campaign.xp > earned.min(MAX_XP) {
-        return Err("campaign XP exceeds defeated monster budget".into());
     }
     Ok(())
 }

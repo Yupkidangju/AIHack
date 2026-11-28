@@ -53,7 +53,8 @@ pub fn monster_has_line_of_sight_to_player(world: &GameWorld, monster: EntityId)
     let Some(entity) = world.entities.get(monster) else {
         return false;
     };
-    let Some((ActorKind::Monster(_), _, monster_level, monster_pos, stats, alive)) = entity.actor()
+    let Some((ActorKind::Monster(mk), _, monster_level, monster_pos, stats, alive)) =
+        entity.actor()
     else {
         return false;
     };
@@ -65,10 +66,9 @@ pub fn monster_has_line_of_sight_to_player(world: &GameWorld, monster: EntityId)
         return false;
     }
     let dist = monster_pos.chebyshev_distance(player_pos);
-    if world.status_timers.invisible > 0
-        && !stats.resistances.contains(Resistances::SEE_INVISIBLE)
-        && dist > 1
-    {
+    let sees_invis = stats.resistances.contains(Resistances::SEE_INVISIBLE)
+        || aihack_content::monster_has_ai_flag(mk, "see_invisible", world.content_registry());
+    if world.is_invisible() && !sees_invis && dist > 1 {
         return false;
     }
     dist <= DEFAULT_VISION_RADIUS

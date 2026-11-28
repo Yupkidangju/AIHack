@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use aihack_core::domain::{entity::MAX_ABSOLUTE_ACTOR_STAT, status::Resistances};
+use aihack_core::{
+    campaign::SpellKind,
+    domain::{entity::MAX_ABSOLUTE_ACTOR_STAT, status::Resistances},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::core::error::ContentError;
@@ -390,62 +393,10 @@ fn validate(
 }
 
 fn canonical_item_kind(id: &str) -> Option<&'static str> {
-    match id {
-        "item.weapon.dagger"
-        | "item.weapon.short_sword"
-        | "item.weapon.long_sword"
-        | "item.weapon.katana"
-        | "item.weapon.battle_axe"
-        | "item.weapon.quarterstaff"
-        | "item.weapon.broad_sword"
-        | "item.weapon.mace"
-        | "item.weapon.rock" => Some("weapon"),
-        "item.food.ration" => Some("food"),
-        "item.potion.healing"
-        | "item.potion.extra_healing"
-        | "item.potion.cure"
-        | "item.potion.speed"
-        | "item.potion.blindness"
-        | "item.potion.confusion"
-        | "item.potion.hallucination"
-        | "item.potion.invisibility"
-        | "item.potion.levitation" => Some("potion"),
-        "item.wand.magic_missile" | "item.wand.fire" => Some("wand"),
-        "item.scroll.reveal"
-        | "item.scroll.identify"
-        | "item.scroll.teleport"
-        | "item.scroll.charging"
-        | "item.scroll.enchant_weapon"
-        | "item.scroll.enchant_armor"
-        | "item.scroll.remove_curse" => Some("scroll"),
-        "item.armor.leather"
-        | "item.armor.chain_mail"
-        | "item.armor.small_shield"
-        | "item.armor.iron_helm"
-        | "item.armor.cloak_protection"
-        | "item.armor.leather_gloves"
-        | "item.armor.low_boots" => Some("armor"),
-        "item.ring.poison_resistance" | "item.ring.fire_resistance" | "item.ring.protection" => {
-            Some("ring")
-        }
-        "item.amulet.esp" => Some("amulet"),
-        "item.corpse.jackal" | "item.corpse.generic" => Some("corpse"),
-        "item.quest.ascension" => Some("quest"),
-        "item.tool.skeleton_key"
-        | "item.tool.lock_pick"
-        | "item.tool.pick_axe"
-        | "item.tool.dwarvish_mattock"
-        | "item.tool.tin_whistle"
-        | "item.tool.oil_lamp"
-        | "item.tool.blindfold"
-        | "item.tool.unicorn_horn"
-        | "item.tool.sack"
-        | "item.tool.bag_of_holding"
-        | "item.tool.chest" => Some("tool"),
-        "item.potion.water" => Some("potion"),
-        "item.scroll.blank" => Some("scroll"),
-        _ => None,
-    }
+    crate::GENERATED_CANONICAL_ITEM_KINDS
+        .iter()
+        .find(|&&(entry_id, _)| entry_id == id)
+        .map(|&(_, kind)| kind)
 }
 
 fn is_valid_color(color: &str) -> bool {
@@ -536,7 +487,16 @@ fn validate_item_metadata(item: &ItemData) -> Result<(), ContentError> {
     }
     for effect in &item.effects {
         if Resistances::from_name(effect).is_none()
-            && !matches!(effect.as_str(), "protection" | "luck")
+            && !matches!(
+                effect.as_str(),
+                "protection"
+                    | "luck"
+                    | "life_saving"
+                    | "magical_breathing"
+                    | "unchanging"
+                    | "invisibility"
+                    | "levitation"
+            )
         {
             return item_contract_error(item, "has unsupported effects entry");
         }
@@ -597,6 +557,8 @@ fn validate_monster_metadata(monster: &MonsterData) -> Result<(), ContentError> 
                 | "grant_poison_resistance"
                 | "grant_cold_resistance"
                 | "grant_shock_resistance"
+                | "grant_sleep_resistance"
+                | "grant_magic_resistance"
                 | "grant_telepathy"
                 | "hallucinogenic"
                 | "revive_troll"
@@ -658,6 +620,7 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                     Some(
                         "heal_1d8_plus_4"
                             | "heal_2d8_plus_8"
+                            | "heal_4d8_plus_16"
                             | "cure_status"
                             | "speed"
                             | "blindness"
@@ -665,6 +628,8 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                             | "hallucination"
                             | "invisibility"
                             | "levitation"
+                            | "gain_level"
+                            | "polymorph_self"
                             | "water"
                     )
                 )
@@ -676,7 +641,29 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
             item.slot.is_none()
                 && item.hit_bonus.is_none()
                 && item.damage.is_none()
-                && matches!(item.effect.as_deref(), Some("magic_missile" | "fire"))
+                && matches!(
+                    item.effect.as_deref(),
+                    Some(
+                        "magic_missile"
+                            | "fire"
+                            | "cold"
+                            | "lightning"
+                            | "sleep"
+                            | "digging"
+                            | "teleport"
+                            | "polymorph"
+                            | "cancellation"
+                            | "death"
+                            | "wishing"
+                            | "striking"
+                            | "slow_monster"
+                            | "speed_monster"
+                            | "opening"
+                            | "locking"
+                            | "make_invisible"
+                            | "create_monster"
+                    )
+                )
                 && item.charges.is_some_and(|charges| charges > 0)
                 && item.nutrition.is_none()
                 && item.ac_bonus.is_none()
@@ -695,6 +682,7 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                             | "enchant_weapon"
                             | "enchant_armor"
                             | "remove_curse"
+                            | "magic_mapping"
                             | "blank"
                     )
                 )
@@ -720,7 +708,11 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                 && item.charges.is_none()
                 && item.nutrition.is_none()
                 && match item.effect.as_deref() {
-                    Some("poison_resistance" | "fire_resistance") => item.ac_bonus.is_none(),
+                    Some(
+                        "poison_resistance" | "fire_resistance" | "cold_resistance"
+                        | "shock_resistance" | "sleep_resistance" | "invisibility" | "levitation"
+                        | "conflict" | "searching" | "teleport_control" | "see_invisible",
+                    ) => item.ac_bonus.is_none(),
                     Some("protection") => item.ac_bonus.is_some(),
                     _ => false,
                 }
@@ -731,6 +723,39 @@ fn validate_item_shape(item: &ItemData) -> Result<(), ContentError> {
                 && item.damage.is_none()
                 && item.charges.is_none()
                 && item.nutrition.is_none()
+                && matches!(
+                    item.effect.as_deref(),
+                    None | Some(
+                        "esp"
+                            | "life_saving"
+                            | "reflection"
+                            | "magical_breathing"
+                            | "poison_resistance"
+                            | "unchanging"
+                    )
+                )
+        }
+        "spellbook" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.charges.is_some_and(|charges| charges > 0)
+                && item
+                    .effect
+                    .as_deref()
+                    .and_then(SpellKind::from_toml_key)
+                    .is_some()
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
+        }
+        "gem" => {
+            item.slot.is_none()
+                && item.hit_bonus.is_none()
+                && item.damage.is_none()
+                && item.effect.is_none()
+                && item.charges.is_none()
+                && item.nutrition.is_none()
+                && item.ac_bonus.is_none()
         }
         "tool" => {
             let valid_tool_fields = match item.tool_action.as_deref() {

@@ -76,7 +76,7 @@ pub fn run_monster_turn(
             continue;
         };
         let speed = stats.speed;
-        let effective_gain = if world.status_timers.fast > 0 && speed > 0 {
+        let effective_gain = if world.is_fast() && speed > 0 {
             (speed / 2).max(1)
         } else {
             speed
@@ -398,16 +398,23 @@ fn step_campaign_actor(
         }
     }
 
-    // 4. Target selection: faction rival, adjacent pet/watchman, or player
+    // 4. Target selection: conflict, faction rival, adjacent pet/watchman, or player
     let player_id = world.player_id;
     let player_pos = world.player_pos();
+    let conflict_target = if world.has_conflict() {
+        find_conflict_target(world, actor, level, actor_pos)
+    } else {
+        None
+    };
     let rival_target = find_faction_rival(world, actor, mk, level, actor_pos);
     let adjacent_ally_target = find_adjacent_pet_or_watch(world, level, actor_pos);
     let player_dist = actor_pos.chebyshev_distance(player_pos);
     let player_visible =
         player_dist <= 1 || vision::monster_has_line_of_sight_to_player(world, actor);
 
-    let (target_id, target_pos, targeting_player) = if let Some((rid, rpos)) = rival_target {
+    let (target_id, target_pos, targeting_player) = if let Some((cid, cpos)) = conflict_target {
+        (cid, cpos, false)
+    } else if let Some((rid, rpos)) = rival_target {
         if !player_visible || actor_pos.chebyshev_distance(rpos) <= player_dist {
             (rid, rpos, false)
         } else {
@@ -449,12 +456,29 @@ fn step_campaign_actor(
         return Ok(true);
     }
 
-    // 7. Medusa gaze attack (blocked by Blind or Blindfold; avoids infinite stunlock)
+    // 7. Medusa gaze attack (blocked by Reflection, Blind, or Blindfold; avoids infinite stunlock)
     if passive == Some(MonsterPassive::GazeParalyze)
         && targeting_player
         && player_visible
         && player_dist <= 5
     {
+        if world.has_reflection() {
+            if let Some(mstats) = world.state_mut().entities.actor_stats_mut(actor) {
+                mstats.hp = 0;
+            }
+            events.push(GameEvent::PassiveAttackTriggered {
+                source: actor,
+                target: player_id,
+            });
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "Medusa sees her reflection and turns to stone!".to_string(),
+            });
+            events.extend(death::collect_death_events_after_attack(
+                world, player_id, actor,
+            )?);
+            return Ok(true);
+        }
         if world.status_timers.blind > 0 || tools::is_player_blindfolded(world) {
             events.push(GameEvent::Message {
                 priority: MessagePriority::Info,
@@ -493,6 +517,17 @@ fn step_campaign_actor(
             let e = world.entities.get(id)?;
             let (_, data, _, _, ch) = e.item()?;
             let eff = data.wand_effect?;
+            if !matches!(
+                eff,
+                WandEffect::MagicMissile
+                    | WandEffect::Fire
+                    | WandEffect::Cold
+                    | WandEffect::Lightning
+                    | WandEffect::Death
+                    | WandEffect::Striking
+            ) {
+                return None;
+            }
             let count = ch?;
             (count > 0).then_some((id, eff, count))
         }) {
@@ -501,18 +536,34 @@ fn step_campaign_actor(
                 .state_mut()
                 .entities
                 .set_item_charges(wand_id, Some(charges - 1));
-            let target_fire_res = if target_id == player_id {
-                items::has_fire_resistance(world)
+            let reflected = target_id == player_id && world.has_reflection();
+            let actual_target = if reflected { actor } else { target_id };
+            if reflected {
+                events.push(GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: format!(
+                        "The {monster_name}'s wand ray reflects off you back at the {monster_name}!"
+                    ),
+                });
+            }
+            let target_res = if actual_target == player_id {
+                world.effective_player_resistances()
             } else {
                 world
                     .entities
-                    .actor_stats(target_id)
-                    .is_some_and(|s| s.resistances.contains(Resistances::FIRE))
+                    .actor_stats(actual_target)
+                    .map(|s| s.resistances)
+                    .unwrap_or(Resistances::NONE)
             };
-            if wand_effect == WandEffect::Fire && target_fire_res {
+            if (wand_effect == WandEffect::Fire && target_res.contains(Resistances::FIRE))
+                || (wand_effect == WandEffect::Cold && target_res.contains(Resistances::COLD))
+                || (wand_effect == WandEffect::Lightning && target_res.contains(Resistances::SHOCK))
+                || (wand_effect == WandEffect::Death
+                    && target_res.contains(Resistances::MAGIC_RESISTANCE))
+            {
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
-                    text: format!("The {monster_name} zaps a fire wand, but the fire is resisted!"),
+                    text: format!("The {monster_name} zaps a wand, but it is resisted!"),
                 });
             } else {
                 let (dmg, label) = match wand_effect {
@@ -520,9 +571,29 @@ fn step_campaign_actor(
                         combat::roll_die(rng, 6) + combat::roll_die(rng, 6),
                         "fire wand",
                     ),
-                    WandEffect::MagicMissile => (combat::roll_die(rng, 6) + 2, "wand"),
+                    WandEffect::Cold => (
+                        combat::roll_die(rng, 6) + combat::roll_die(rng, 6),
+                        "cold wand",
+                    ),
+                    WandEffect::Lightning => (
+                        combat::roll_die(rng, 6) + combat::roll_die(rng, 6) + 2,
+                        "lightning wand",
+                    ),
+                    WandEffect::Death => {
+                        let cur_hp = world
+                            .entities
+                            .actor_stats(actual_target)
+                            .map(|s| s.hp.max(1))
+                            .unwrap_or(100);
+                        (cur_hp, "wand of death")
+                    }
+                    WandEffect::Striking => (
+                        combat::roll_die(rng, 12) + combat::roll_die(rng, 6),
+                        "wand of striking",
+                    ),
+                    _ => (combat::roll_die(rng, 6) + 2, "wand"),
                 };
-                if let Some(s) = world.state_mut().entities.actor_stats_mut(target_id) {
+                if let Some(s) = world.state_mut().entities.actor_stats_mut(actual_target) {
                     s.hp = s.hp.saturating_sub(dmg);
                 }
                 events.push(GameEvent::Message {
@@ -530,7 +601,9 @@ fn step_campaign_actor(
                     text: format!("The {monster_name} zaps a {label} for {dmg} damage!"),
                 });
                 events.extend(death::collect_death_events_after_attack(
-                    world, actor, target_id,
+                    world,
+                    actor,
+                    actual_target,
                 )?);
             }
             return Ok(true);
@@ -740,6 +813,34 @@ fn find_adjacent_pet_or_watch(
     })
 }
 
+fn find_conflict_target(
+    world: &GameWorld,
+    actor: EntityId,
+    level: LevelId,
+    actor_pos: Pos,
+) -> Option<(EntityId, Pos)> {
+    world
+        .entities
+        .entities()
+        .iter()
+        .filter_map(|e| {
+            if e.id == actor {
+                return None;
+            }
+            let (ActorKind::Monster(_), _, l, pos, _, true) = e.actor()? else {
+                return None;
+            };
+            if l != level {
+                return None;
+            }
+            let dist = actor_pos.chebyshev_distance(pos);
+            (dist <= 6 && (dist <= 1 || vision::has_line_of_sight(world, actor_pos, pos)))
+                .then_some((e.id, pos, dist))
+        })
+        .min_by_key(|&(_, _, d)| d)
+        .map(|(id, pos, _)| (id, pos))
+}
+
 fn teleport_monster_safely(
     world: &mut GameWorld,
     rng: &mut GameRng,
@@ -945,10 +1046,80 @@ fn apply_monster_intent(
                             });
                         }
                     }
+                    Some(MonsterPassive::SleepOnMelee) => {
+                        if world
+                            .effective_player_resistances()
+                            .contains(Resistances::SLEEP)
+                        {
+                            events.push(GameEvent::Message {
+                                priority: MessagePriority::Info,
+                                text: "You resist the drowsy touch!".to_string(),
+                            });
+                        } else {
+                            world.state_mut().paralysis_turns = world.paralysis_turns.max(2);
+                            events.push(GameEvent::PassiveAttackTriggered {
+                                source: attacker,
+                                target: defender,
+                            });
+                            events.push(GameEvent::Message {
+                                priority: MessagePriority::Warning,
+                                text: "A wave of drowsiness puts you to sleep!".to_string(),
+                            });
+                        }
+                    }
+                    Some(MonsterPassive::DrainLife) => {
+                        if world.has_magic_resistance() {
+                            events.push(GameEvent::Message {
+                                priority: MessagePriority::Info,
+                                text: "Your magic resistance wards off the life-draining chill!"
+                                    .to_string(),
+                            });
+                        } else {
+                            let drain_dmg = combat::roll_die(rng, 6) + combat::roll_die(rng, 4);
+                            if let Some(mut campaign) = world.campaign {
+                                if campaign.xp >= 20 {
+                                    campaign.xp -= 20;
+                                    let cap_hp = campaign.max_hp();
+                                    let cap_mp = campaign.max_mp();
+                                    let state = world.state_mut();
+                                    state.campaign = Some(campaign);
+                                    state.max_mp = state.max_mp.min(cap_mp);
+                                    state.mp = state.mp.min(state.max_mp);
+                                    if let Some(stats) = state.entities.actor_stats_mut(defender) {
+                                        stats.max_hp = stats.max_hp.min(cap_hp).max(10);
+                                        stats.hp =
+                                            stats.hp.saturating_sub(drain_dmg).min(stats.max_hp);
+                                        stats.hit_bonus = campaign.hit_bonus();
+                                        stats.damage_bonus = campaign.damage_bonus();
+                                    }
+                                } else if let Some(stats) =
+                                    world.state_mut().entities.actor_stats_mut(defender)
+                                {
+                                    stats.max_hp = (stats.max_hp - 2).max(10);
+                                    stats.hp = stats.hp.saturating_sub(drain_dmg).min(stats.max_hp);
+                                }
+                            } else if let Some(stats) =
+                                world.state_mut().entities.actor_stats_mut(defender)
+                            {
+                                stats.max_hp = (stats.max_hp - 2).max(10);
+                                stats.hp = stats.hp.saturating_sub(drain_dmg).min(stats.max_hp);
+                            }
+                            events.push(GameEvent::PassiveAttackTriggered {
+                                source: attacker,
+                                target: defender,
+                            });
+                            events.push(GameEvent::Message {
+                                priority: MessagePriority::Danger,
+                                text: "You feel your life force drained away!".to_string(),
+                            });
+                        }
+                    }
                     Some(
                         MonsterPassive::ParalyzeOnMelee
                         | MonsterPassive::Regenerate
                         | MonsterPassive::FireBreath
+                        | MonsterPassive::ColdBreath
+                        | MonsterPassive::LightningBreath
                         | MonsterPassive::StealGold
                         | MonsterPassive::StealItem
                         | MonsterPassive::RustMetal
@@ -971,30 +1142,64 @@ fn apply_monster_intent(
                 .entities
                 .get(attacker)
                 .and_then(|entity| entity.monster_passive());
-            if passive == Some(MonsterPassive::FireBreath) && defender == world.player_id {
-                if items::has_fire_resistance(world) {
-                    events.push(GameEvent::Message {
-                        priority: MessagePriority::Info,
-                        text: "You resist the dragon's fire breath!".to_string(),
-                    });
-                } else {
-                    let fire_dmg = combat::roll_die(rng, 6) + combat::roll_die(rng, 6);
-                    if let Some(stats) = world.state_mut().entities.actor_stats_mut(defender) {
-                        stats.hp = stats.hp.saturating_sub(fire_dmg);
+            if let Some((breath_res, breath_label)) = match passive {
+                Some(MonsterPassive::FireBreath) => Some((Resistances::FIRE, "fire")),
+                Some(MonsterPassive::ColdBreath) => Some((Resistances::COLD, "frost")),
+                Some(MonsterPassive::LightningBreath) => Some((Resistances::SHOCK, "lightning")),
+                _ => None,
+            } {
+                if defender == world.player_id {
+                    let reflected = world.has_reflection();
+                    let actual_victim = if reflected { attacker } else { defender };
+                    if reflected {
+                        events.push(GameEvent::Message {
+                            priority: MessagePriority::Info,
+                            text: format!(
+                                "The dragon's {breath_label} breath reflects right back at it!"
+                            ),
+                        });
                     }
-                    events.push(GameEvent::PassiveAttackTriggered {
-                        source: attacker,
-                        target: defender,
-                    });
-                    events.push(GameEvent::Message {
-                        priority: MessagePriority::Warning,
-                        text: format!("The dragon breathes fire for {fire_dmg} damage!"),
-                    });
-                    events.extend(death::collect_death_events_after_attack(
-                        world, attacker, defender,
-                    )?);
+                    let victim_res = if actual_victim == world.player_id {
+                        world.effective_player_resistances()
+                    } else {
+                        world
+                            .entities
+                            .actor_stats(actual_victim)
+                            .map(|s| s.resistances)
+                            .unwrap_or(Resistances::NONE)
+                    };
+                    if victim_res.contains(breath_res) {
+                        events.push(GameEvent::Message {
+                            priority: MessagePriority::Info,
+                            text: if actual_victim == world.player_id {
+                                format!("You resist the dragon's {breath_label} breath!")
+                            } else {
+                                format!("The dragon resists its own {breath_label} breath.")
+                            },
+                        });
+                    } else {
+                        let dmg = combat::roll_die(rng, 6) + combat::roll_die(rng, 6);
+                        if let Some(stats) =
+                            world.state_mut().entities.actor_stats_mut(actual_victim)
+                        {
+                            stats.hp = stats.hp.saturating_sub(dmg);
+                        }
+                        events.push(GameEvent::PassiveAttackTriggered {
+                            source: attacker,
+                            target: actual_victim,
+                        });
+                        events.push(GameEvent::Message {
+                            priority: MessagePriority::Warning,
+                            text: format!("The dragon breathes {breath_label} for {dmg} damage!"),
+                        });
+                        events.extend(death::collect_death_events_after_attack(
+                            world,
+                            attacker,
+                            actual_victim,
+                        )?);
+                    }
+                    return Ok(());
                 }
-                return Ok(());
             }
             let Some(resolution) = combat::resolve_attack(world, rng, attacker, defender) else {
                 return Ok(());

@@ -96,6 +96,26 @@ pub fn resolve_attack(
                 }
                 active_drains_life = def.drains_life;
             }
+            if world.campaign.is_some() {
+                if let Some(def_mk) = defender_monster {
+                    if let Some(weapon_kind) = world.entities.item_data(weapon_id).map(|d| d.kind) {
+                        let reg = world.content_registry();
+                        let is_large = aihack_content::monster_is_large(def_mk, reg);
+                        if let Some(sized_dmg) =
+                            aihack_content::weapon_damage_for_size(weapon_kind, is_large, reg)
+                        {
+                            profile.damage = sized_dmg;
+                        }
+                        if aihack_content::item_material(weapon_kind, reg) == Some("silver")
+                            && (aihack_content::monster_has_ai_flag(def_mk, "undead", reg)
+                                || aihack_content::monster_has_ai_flag(def_mk, "demon", reg))
+                        {
+                            extra_damage_bonus =
+                                extra_damage_bonus.saturating_add(roll_die(rng, 10));
+                        }
+                    }
+                }
+            }
         }
     } else if world.campaign.is_some() {
         if let Some(best_weapon_id) = monster_best_carried_weapon(world, &attacker) {

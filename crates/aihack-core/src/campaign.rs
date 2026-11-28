@@ -16,6 +16,8 @@ pub const MIN_LUCK: i16 = -13;
 pub const MAX_LUCK: i16 = 13;
 pub const MAX_GOD_ANGER: i16 = 100;
 pub const MAX_PRAYER_TIMEOUT: u16 = 2000;
+pub const SPELL_MEMORY_TURNS: u64 = 20_000;
+pub const MAX_LEARNED_SPELLS: usize = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum Alignment {
@@ -180,15 +182,17 @@ impl SkillCategory {
 
     pub const fn for_weapon_kind(kind: ItemKind) -> Option<Self> {
         match kind {
-            ItemKind::Dagger => Some(Self::Dagger),
+            ItemKind::Dagger | ItemKind::ElvenDagger => Some(Self::Dagger),
             ItemKind::ShortSword
             | ItemKind::LongSword
             | ItemKind::BroadSword
-            | ItemKind::Katana => Some(Self::Sword),
+            | ItemKind::Katana
+            | ItemKind::SilverSaber
+            | ItemKind::TwoHandedSword => Some(Self::Sword),
             ItemKind::BattleAxe => Some(Self::Axe),
-            ItemKind::Mace => Some(Self::Blunt),
+            ItemKind::Mace | ItemKind::WarHammer => Some(Self::Blunt),
             ItemKind::Quarterstaff => Some(Self::Staff),
-            ItemKind::Rock => Some(Self::Thrown),
+            ItemKind::Rock | ItemKind::Spear => Some(Self::Thrown),
             _ => None,
         }
     }
@@ -540,24 +544,149 @@ impl Attributes {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SpellKind {
-    ForceBolt,
-    Heal,
-    Detect,
+pub enum SpellSchool {
+    Attack,
+    Healing,
+    Divination,
+    Enchantment,
+    Clerical,
+    Escape,
+    Matter,
 }
 
-impl SpellKind {
-    pub const fn mana_cost(self) -> i16 {
+impl SpellSchool {
+    pub const ALL: [Self; 7] = [
+        Self::Attack,
+        Self::Healing,
+        Self::Divination,
+        Self::Enchantment,
+        Self::Clerical,
+        Self::Escape,
+        Self::Matter,
+    ];
+
+    pub const fn display_name(self) -> &'static str {
         match self {
-            Self::ForceBolt => 4,
-            Self::Heal => 5,
-            Self::Detect => 3,
+            Self::Attack => "Attack",
+            Self::Healing => "Healing",
+            Self::Divination => "Divination",
+            Self::Enchantment => "Enchantment",
+            Self::Clerical => "Clerical",
+            Self::Escape => "Escape",
+            Self::Matter => "Matter",
         }
     }
+}
 
-    pub const fn is_directional(self) -> bool {
-        matches!(self, Self::ForceBolt)
-    }
+macro_rules! define_spells {
+    (
+        $(
+            $variant:ident => {
+                school: $school:ident,
+                level: $level:expr,
+                mana: $mana:expr,
+                directional: $dir:expr,
+                display: $display:expr,
+                wire: $wire:expr,
+                toml: $toml:expr $(,)?
+            }
+        ),* $(,)?
+    ) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        pub enum SpellKind {
+            $($variant,)*
+        }
+
+        impl SpellKind {
+            pub const ALL: &'static [Self] = &[$(Self::$variant,)*];
+
+            pub const fn school(self) -> SpellSchool {
+                match self {
+                    $(Self::$variant => SpellSchool::$school,)*
+                }
+            }
+
+            pub const fn spell_level(self) -> u8 {
+                match self {
+                    $(Self::$variant => $level,)*
+                }
+            }
+
+            pub const fn mana_cost(self) -> i16 {
+                match self {
+                    $(Self::$variant => $mana,)*
+                }
+            }
+
+            pub const fn is_directional(self) -> bool {
+                match self {
+                    $(Self::$variant => $dir,)*
+                }
+            }
+
+            pub const fn display_name(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $display,)*
+                }
+            }
+
+            pub const fn wire_name(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $wire,)*
+                }
+            }
+
+            pub const fn toml_key(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $toml,)*
+                }
+            }
+
+            pub fn from_toml_key(raw: &str) -> Option<Self> {
+                match raw {
+                    $($toml => Some(Self::$variant),)*
+                    _ => None,
+                }
+            }
+        }
+    };
+}
+
+define_spells! {
+    ForceBolt => { school: Attack, level: 1, mana: 4, directional: true, display: "Force Bolt", wire: "FORCE_BOLT", toml: "force_bolt" },
+    MagicMissile => { school: Attack, level: 2, mana: 6, directional: true, display: "Magic Missile", wire: "MAGIC_MISSILE", toml: "magic_missile" },
+    Fireball => { school: Attack, level: 4, mana: 12, directional: true, display: "Fireball", wire: "FIREBALL", toml: "fireball" },
+    ConeOfCold => { school: Attack, level: 4, mana: 12, directional: true, display: "Cone of Cold", wire: "CONE_OF_COLD", toml: "cone_of_cold" },
+    LightningBolt => { school: Attack, level: 5, mana: 14, directional: true, display: "Lightning Bolt", wire: "LIGHTNING_BOLT", toml: "lightning_bolt" },
+    FingerOfDeath => { school: Attack, level: 7, mana: 20, directional: true, display: "Finger of Death", wire: "FINGER_OF_DEATH", toml: "finger_of_death" },
+
+    Heal => { school: Healing, level: 1, mana: 5, directional: false, display: "Heal", wire: "HEAL", toml: "heal" },
+    ExtraHealing => { school: Healing, level: 3, mana: 9, directional: false, display: "Extra Healing", wire: "EXTRA_HEALING", toml: "extra_healing" },
+    CureSickness => { school: Healing, level: 3, mana: 8, directional: false, display: "Cure Sickness", wire: "CURE_SICKNESS", toml: "cure_sickness" },
+    StoneToFlesh => { school: Healing, level: 3, mana: 9, directional: true, display: "Stone to Flesh", wire: "STONE_TO_FLESH", toml: "stone_to_flesh" },
+
+    Detect => { school: Divination, level: 1, mana: 3, directional: false, display: "Detect", wire: "DETECT", toml: "detect" },
+    IdentifySpell => { school: Divination, level: 3, mana: 8, directional: false, display: "Identify", wire: "IDENTIFY_SPELL", toml: "identify_spell" },
+    MagicMapping => { school: Divination, level: 5, mana: 14, directional: false, display: "Magic Mapping", wire: "MAGIC_MAPPING", toml: "magic_mapping" },
+    DetectTreasure => { school: Divination, level: 4, mana: 10, directional: false, display: "Detect Treasure", wire: "DETECT_TREASURE", toml: "detect_treasure" },
+
+    SleepSpell => { school: Enchantment, level: 1, mana: 5, directional: true, display: "Sleep", wire: "SLEEP_SPELL", toml: "sleep_spell" },
+    ConfuseMonster => { school: Enchantment, level: 2, mana: 6, directional: true, display: "Confuse Monster", wire: "CONFUSE_MONSTER", toml: "confuse_monster" },
+    CharmMonster => { school: Enchantment, level: 3, mana: 9, directional: true, display: "Charm Monster", wire: "CHARM_MONSTER", toml: "charm_monster" },
+    SlowMonster => { school: Enchantment, level: 2, mana: 6, directional: true, display: "Slow Monster", wire: "SLOW_MONSTER", toml: "slow_monster" },
+
+    RemoveCurseSpell => { school: Clerical, level: 3, mana: 9, directional: false, display: "Remove Curse", wire: "REMOVE_CURSE_SPELL", toml: "remove_curse_spell" },
+    Protection => { school: Clerical, level: 1, mana: 5, directional: false, display: "Protection", wire: "PROTECTION", toml: "protection" },
+    TurnUndead => { school: Clerical, level: 4, mana: 11, directional: false, display: "Turn Undead", wire: "TURN_UNDEAD", toml: "turn_undead" },
+    CreateFamiliar => { school: Clerical, level: 5, mana: 15, directional: false, display: "Create Familiar", wire: "CREATE_FAMILIAR", toml: "create_familiar" },
+
+    Jumping => { school: Escape, level: 1, mana: 4, directional: true, display: "Jumping", wire: "JUMPING", toml: "jumping" },
+    HasteSelf => { school: Escape, level: 3, mana: 9, directional: false, display: "Haste Self", wire: "HASTE_SELF", toml: "haste_self" },
+    TeleportAway => { school: Escape, level: 5, mana: 14, directional: true, display: "Teleport Away", wire: "TELEPORT_AWAY", toml: "teleport_away" },
+
+    Knock => { school: Matter, level: 1, mana: 4, directional: true, display: "Knock", wire: "KNOCK", toml: "knock" },
+    WizardLock => { school: Matter, level: 2, mana: 6, directional: true, display: "Wizard Lock", wire: "WIZARD_LOCK", toml: "wizard_lock" },
+    DigSpell => { school: Matter, level: 5, mana: 14, directional: true, display: "Dig", wire: "DIG_SPELL", toml: "dig_spell" },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

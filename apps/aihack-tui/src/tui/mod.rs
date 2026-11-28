@@ -772,9 +772,10 @@ impl TuiApp {
                 Some(aihack_ai_contract::ItemClass::Corpse) => {
                     CommandIntent::Eat { item: item.item }
                 }
-                Some(aihack_ai_contract::ItemClass::Scroll) => {
-                    CommandIntent::Read { item: item.item }
-                }
+                Some(
+                    aihack_ai_contract::ItemClass::Scroll
+                    | aihack_ai_contract::ItemClass::Spellbook,
+                ) => CommandIntent::Read { item: item.item },
                 Some(aihack_ai_contract::ItemClass::Tool) => CommandIntent::Apply {
                     item: item.item,
                     direction: None,
@@ -782,7 +783,8 @@ impl TuiApp {
                 Some(
                     aihack_ai_contract::ItemClass::Wand
                     | aihack_ai_contract::ItemClass::Rock
-                    | aihack_ai_contract::ItemClass::Quest,
+                    | aihack_ai_contract::ItemClass::Quest
+                    | aihack_ai_contract::ItemClass::Gem,
                 )
                 | None => {
                     let _ = ItemKind::Dagger;
@@ -848,6 +850,10 @@ impl TuiApp {
             }
             UiCommandCandidate::ChooseSpell(spell) => {
                 self.menu = Some(play_menu::spell_direction_menu(&self.observation(), spell));
+                Ok(false)
+            }
+            UiCommandCandidate::ChooseWish(wand) => {
+                self.menu = Some(play_menu::wish_menu_from_obs(&self.observation(), wand));
                 Ok(false)
             }
             UiCommandCandidate::ChooseIdentifyTarget(scroll) => {

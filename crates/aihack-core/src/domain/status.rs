@@ -19,6 +19,11 @@ impl Resistances {
     pub const DISINTEGRATION: Self = Self(1 << 5);
     pub const TELEPATHY: Self = Self(1 << 6);
     pub const SEE_INVISIBLE: Self = Self(1 << 7);
+    pub const REFLECTION: Self = Self(1 << 8);
+    pub const MAGIC_RESISTANCE: Self = Self(1 << 9);
+    pub const CONFLICT: Self = Self(1 << 10);
+    pub const TELEPORT_CONTROL: Self = Self(1 << 11);
+    pub const SEARCHING: Self = Self(1 << 12);
 
     pub const fn is_empty(&self) -> bool {
         self.0 == 0
@@ -50,6 +55,11 @@ impl Resistances {
             "disintegration" => Some(Self::DISINTEGRATION),
             "telepathy" => Some(Self::TELEPATHY),
             "see_invisible" => Some(Self::SEE_INVISIBLE),
+            "reflection" => Some(Self::REFLECTION),
+            "magic_resistance" => Some(Self::MAGIC_RESISTANCE),
+            "conflict" => Some(Self::CONFLICT),
+            "teleport_control" => Some(Self::TELEPORT_CONTROL),
+            "searching" => Some(Self::SEARCHING),
             _ => None,
         }
     }
@@ -65,6 +75,11 @@ impl Resistances {
             (Self::DISINTEGRATION, 'D'),
             (Self::TELEPATHY, 'T'),
             (Self::SEE_INVISIBLE, 'I'),
+            (Self::REFLECTION, 'R'),
+            (Self::MAGIC_RESISTANCE, 'M'),
+            (Self::CONFLICT, 'X'),
+            (Self::TELEPORT_CONTROL, 'K'),
+            (Self::SEARCHING, '?'),
         ] {
             if self.contains(flag) {
                 out.push(ch);

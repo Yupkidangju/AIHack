@@ -16,6 +16,14 @@ Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c0
 
 ## 1. 문서 운영 규칙
 
+### Stage 6 (P12) 마법 체계 심화 및 대규모 도감 기준 (`P12`, 2026-11-28)
+
+`docs/CODER_HANDOFF_P7_TO_P13.md`의 Stage 6(`P12`, `ADR-P12-01`) 및 `ADR-P10-02` 6항에 따라 아래 시스템을 확장한다. 세부 계약은 `docs/campaign_spec.md` `## Stage 6 (P12)`, 의사결정은 `DESIGN_DECISIONS.md` `ADR-P12-01`, 실행 계획은 `tasks/plan.md`를 따른다:
+- **하이브리드 `build.rs` 정적 카탈로그 + 매크로 단일 테이블**: `crates/aihack-content/build.rs`(표준 라이브러리 전용, `Cargo.lock` 불변)와 `define_item_kinds!`/`define_monster_kinds!` 매크로 단일 테이블로 130종 아이템·85종 몬스터를 관리하고 `unidentified_pool`·`damage_small`/`damage_large`·`hp_dice`를 런타임에서 소비한다.
+- **마법서(`+`) 학습 · 기억 감퇴 · 실패율 · 7학파 28주문**: `ItemClass::Spellbook`, 7개 `SpellSchool` 28종 `SpellKind`, `SPELL_MEMORY_TURNS = 20_000`턴 기억 만료·재학습, `spell_failure_percent`(`Int`·주문 난이도·금속 갑옷/방패·`Spellcasting` 숙련도)를 구현한다.
+- **18종 완드 · 소원 · 변이 · 12종 반지 · 6종 아뮬렛 · 5종 확장 저항**: `Resistances`(`REFLECTION`, `MAGIC_RESISTANCE`, `CONFLICT`, `TELEPORT_CONTROL`, `SEARCHING`), `WandEffect` 18종(`Polymorph`, `Death`, `Digging`, `Teleport`, `Cancellation`, `Wishing` 등)과 `CommandIntent::Wish { item, wish: WishChoice }`(`Copy` 유지), `AmuletLifeSaving`, `AmuletReflection`, `RingConflict` 등을 구현한다.
+- **대규모 도감 130 아이템 · 85 몬스터**: 전 도감 스폰·관찰·TUI 렌더링·시체/전리품 스모크 테스트, 동적 TUI 마법/소원 메뉴, Headless 부적/주문 연동, `SaveV3`/레거시 V1 격리(`MAX_XP = 180`·`long_run.rs` R9 해시·`LlmObservationView < 32 KiB`·`ActionSpace <= 64` 보존)를 완료한다.
+
 ### Stage 4 (P10) 감사 보고서 35 시정 기준 (`P10-Audit-Fix`, 2026-11-27)
 
 `docs/audit/audit_report_35.md` 및 `ADR-P10-02`에 따라 Stage 4.5 시정 계약을 적용한다. 세부 계약은 `docs/campaign_spec.md` `## Stage 4.5 (P10-Audit-Fix)`, 의사결정은 `DESIGN_DECISIONS.md` `ADR-P10-02`, 실행 계획은 `tasks/plan.md`를 따른다:
@@ -915,8 +923,9 @@ release `output/` directory 전체가 게시 bundle이다. build는 workspace �
 
 R9-1은 semantic delta/witness 테스트 기반, R9-2는 음식·영양·시체, R9-3은 content behavior projection, R9-4는 경제·점수, R9-5는 상태 orphan 폐쇄, R9-6은 3 seed 장기 회귀와 전체 감사다. 각 단계는 RED 테스트를 먼저 만들고 해당 단계의 workspace build/test가 통과한 뒤 다음 단계로 진행한다.
 
-## 20. 캠페인 확장 기준 (`Stage 1` ~ `Stage 5 / P11`)
+## 20. 캠페인 확장 기준 (`Stage 1` ~ `Stage 6 / P12`)
 
-- 캠페인 모드(`campaign.is_some()`, `SAVE_SCHEMA_VERSION_V3 = 3`)의 세부 계약은 `docs/campaign_spec.md`와 `DESIGN_DECISIONS.md` (`ADR-P7-01` ~ `ADR-P11-01`)을 따른다.
+- 캠페인 모드(`campaign.is_some()`, `SAVE_SCHEMA_VERSION_V3 = 3`)의 세부 계약은 `docs/campaign_spec.md`와 `DESIGN_DECISIONS.md` (`ADR-P7-01` ~ `ADR-P12-01`)을 따른다.
 - `Stage 5 (P11, ADR-P11-01)`은 캠페인 전용 반려동물(펫) 동반·길들이기·성장·진화·저주 회피·상점 절도·층간 동반, 실제 NPC(`Shopkeeper`, `TemplePriest`, `Oracle`, `Watchman`)·바닥 진열 상품·`shop_debt` 채무 정산(`Chat`/`Pay`)·도둑질 적대화, 고급 몬스터 AI(문 열기·아이템 줍기/장착/사용/사망 드롭·금화/아이템 훔치기+텔레포트·금속 부식·분열·소환·실명 방어 시선 공격·파벌전)를 추가한다.
+- `Stage 6 (P12, ADR-P12-01)`은 `build.rs` 정적 카탈로그 + 선언적 매크로 단일 테이블, `ItemClass::Spellbook` 학습/20,000턴 감퇴/실패율/7학파 28종 `SpellKind`, 18종 `WandEffect`·`CommandIntent::Wish`·변이, 12종 `RingEffect`·6종 `AmuletEffect`(`LifeSaving`/`Reflection`/`MagicalBreathing`/`Unchanging`)·5종 확장 저항(`REFLECTION`/`MAGIC_RESISTANCE`/`CONFLICT`/`TELEPORT_CONTROL`/`SEARCHING`), 130종 아이템·85종 몬스터 대규모 도감을 추가한다.
 - 레거시 2층 모드(`campaign.is_none()`, `SAVE_SCHEMA_VERSION_V1 = 1`), `CommandIntent: Copy`, `LlmObservationView < 32,768B`, `ActionSpace <= 64`, `tests/long_run.rs` R9 causal 해시 불변조건은 모든 캠페인 확장에서도 유지한다.

@@ -45,6 +45,21 @@ pub enum EngravingMethod {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WishChoice {
+    Item {
+        kind: ItemKind,
+        blessed: bool,
+        enchant: i8,
+    },
+    ArtifactExcalibur,
+    ArtifactSunsword,
+    ArtifactMagicbane,
+    ArtifactCleaver,
+    ArtifactStormbringer,
+    ArtifactSting,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EngravingText {
     Elbereth,
     Warning,
@@ -163,6 +178,10 @@ pub enum CommandIntent {
     },
     Chat(Direction),
     Pay,
+    Wish {
+        item: EntityId,
+        wish: WishChoice,
+    },
     Descend,
     Ascend,
     AcknowledgeMore,

@@ -469,120 +469,13 @@ impl Entity {
     pub fn natural_attack_profile(&self) -> Option<AttackProfile> {
         match &self.payload {
             EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Jackal),
+                kind: ActorKind::Monster(mk),
                 stats,
                 ..
-            } => Some(AttackProfile::natural("bite", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Goblin),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("short sword", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::FloatingEye),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("gaze", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Kobold),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("spear", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Orc),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("scimitar", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Ogre),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("club", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::GiantSpider),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("fangs", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::GnollArcher),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("arrow", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Troll),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("claw", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::FireAnt),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("fire bite", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Minotaur),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("gore", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Dragon),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("bite", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Bat),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("bite", stats.damage)),
-            EntityPayload::Actor {
-                kind:
-                    ActorKind::Monster(
-                        MonsterKind::Kitten
-                        | MonsterKind::Housecat
-                        | MonsterKind::LittleDog
-                        | MonsterKind::Dog
-                        | MonsterKind::RustMonster,
-                    ),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("bite", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Pony | MonsterKind::Warhorse),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("kick", stats.damage)),
-            EntityPayload::Actor {
-                kind:
-                    ActorKind::Monster(
-                        MonsterKind::Shopkeeper | MonsterKind::TemplePriest | MonsterKind::Watchman,
-                    ),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("weapon", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Oracle | MonsterKind::Nymph),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("touch", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Leprechaun),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("claw", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::BlackPudding),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("engulf", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Dwarf | MonsterKind::OrcCaptain),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("axe", stats.damage)),
-            EntityPayload::Actor {
-                kind: ActorKind::Monster(MonsterKind::Medusa),
-                stats,
-                ..
-            } => Some(AttackProfile::natural("snakes", stats.damage)),
+            } => Some(AttackProfile::natural(
+                mk.natural_attack_name(),
+                stats.damage,
+            )),
             EntityPayload::Actor {
                 kind: ActorKind::Player,
                 ..
@@ -1183,6 +1076,29 @@ impl EntityStore {
             return false;
         };
         *kind = next;
+        true
+    }
+
+    pub fn polymorph_monster(
+        &mut self,
+        id: EntityId,
+        new_kind: MonsterKind,
+        new_stats: ActorStats,
+    ) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Actor {
+            kind, stats, alive, ..
+        } = &mut entity.payload
+        else {
+            return false;
+        };
+        if !*alive || *kind == ActorKind::Player {
+            return false;
+        }
+        *kind = ActorKind::Monster(new_kind);
+        *stats = new_stats;
         true
     }
 

@@ -12,6 +12,33 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-P12-01: Stage 6 (P12) 마법 체계 심화 · 대규모 도감 투입 · build.rs 데이터 주도 전환 계약 (Accepted)
+
+- **Decision Date**: 2026-11-28
+- **Context**: `Stage 5 (P11)` 완료 시점에서 AIHack은 55종 아이템·30종 몬스터·3종 주문(`ForceBolt`/`Heal`/`Detect`)·2종 완드(`MagicMissile`/`Fire`)·3종 반지·1종 아뮬렛을 보유하고 있으며, 신규 아이템/몬스터 추가 시 여러 크레이트에 수동 `match`가 분산되어 있었다. `docs/CODER_HANDOFF_P7_TO_P13.md` Stage 6 (`P12`) 및 `ADR-P10-02` 6항의 스케일업 결정에 따라 (1) `build.rs` 정적 카탈로그 코드 생성과 선언적 매크로 단일 테이블로 수동 `match` 복제를 제거하고 `unidentified_pool`·`damage_small`/`damage_large`·`hp_dice`를 런타임 소비하며, (2) 마법서(`+`) 학습·20,000턴 기억 감퇴·실패율 계산·7학파 28종 주문을 구현하고, (3) 18종 완드(`Polymorph`/`Death`/`Digging`/`Teleport`/`Cancellation`/`Wishing` 포함)·12종 반지·6종 아뮬렛(`LifeSaving`/`Reflection`/`MagicalBreathing`/`Unchanging` 포함)·5종 확장 저항을 구현하며, (4) **130종 아이템 · 85종 몬스터** 도감을 투입해야 한다. 동시에 레거시 2층 모드(`campaign.is_none()`, `SAVE_SCHEMA_VERSION_V1 = 1`), `tests/long_run.rs` R9 causal 해시, `MAX_XP = 180`, `CommandIntent: Copy`, `SAVE_SCHEMA_VERSION_V3 = 3`, `LlmObservationView < 32,768B`, `ActionSpace <= 64`, 무추가 외부 의존성(`Cargo.lock` 불변)을 보존한다.
+- **Decision**:
+  1. **하이브리드 `build.rs` 정적 카탈로그 + 선언적 매크로 단일 테이블 (`Cargo.lock` 불변)**:
+     - `crates/aihack-content/build.rs`(표준 라이브러리만 사용)가 `items.toml`/`monsters.toml`을 빌드 시 파싱하여 `$OUT_DIR/generated_catalog.rs`에 `GENERATED_ITEM_COUNT`, `GENERATED_MONSTER_COUNT`, `GENERATED_CANONICAL_ITEM_KINDS`, `GENERATED_ITEM_APPEARANCE_POOLS`, `GENERATED_MONSTER_IDS`를 생성한다.
+     - `crates/aihack-core`는 `define_item_kinds!` / `define_monster_kinds!` 선언적 매크로 단일 테이블로 `ItemKind`(130종)·`MonsterKind`(85종)·`toml_id`/`from_toml_id`·`is_stackable`·`has_randomized_appearance`·`is_legacy_v1_allowed`·`ai_kind`·`difficulty`·`natural_attack_name`을 일괄 생성하여 모든 수동 ID/명칭 `match`를 제거하고 `Copy` + 기존 serde variant 이름을 보존한다.
+     - `unidentified_pool`(외형 풀 매핑), `damage_small`/`damage_large`(몬스터 크기별 무기 피해), `hp_dice`(변이/소환 시 몬스터 HP 결정론적 롤)를 런타임에서 소비한다.
+  2. **마법서(`ItemClass::Spellbook`, `'+'`) 학습 · `SPELL_MEMORY_TURNS = 20_000` 기억 감퇴 · 실패율**:
+     - `SpellSchool` 7학파(`Attack`, `Healing`, `Divination`, `Enchantment`, `Clerical`, `Escape`, `Matter`)와 `SpellKind` 28종을 정의한다.
+     - `CommandIntent::Read`로 마법서를 읽으면(Blessed 확정 습득/갱신, Uncursed `Int`·레벨·`Spellcasting` 숙련도 판정, Cursed 혼란/실명/피해 역풍) `world.learned_spells`에 `LearnedSpell { spell, learned_at_turn }`을 기록·갱신하며, `charges == 0` 시 책이 소멸한다.
+     - 비고유(non-innate) 습득 주문은 `turn - learned_at_turn < 20_000` 동안만 기억되며 20,000턴 경과 후 시전 시 기억 만료로 거부되고 마법서 재독서로 갱신된다.
+     - `spell_failure_percent(world, spell)`: 장착된 금속 방어구/방패(`iron`/`steel`/`mithril`) 패널티, `Int`, `campaign.level()`, `Spellcasting` 숙련도, `spell_level(1..=7)`로 실패율(`0..=100%`)을 산출한다(단, 기존 직업 고유 시작 주문 + 비금속 무장 상태는 `0%`를 유지해 P7~P11 호환성을 보존한다). 시전 실패 시 MP 절반(최소 1) 소비·소량 숙련도 획득 후 주문이 불발한다.
+  3. **18종 완드 · 소원(`CommandIntent::Wish: Copy`) · 12종 반지 · 6종 아뮬렛 · 5종 확장 저항**:
+     - `Resistances` 비트셋(기존 `u16`)에 `REFLECTION`(bit 8), `MAGIC_RESISTANCE`(bit 9), `CONFLICT`(bit 10), `TELEPORT_CONTROL`(bit 11), `SEARCHING`(bit 12)을 추가한다.
+     - `CommandIntent::Wish { item, wish: WishChoice }` (`CURATED_WISHES` 고정 enum으로 `CommandIntent: Copy` 보존)를 추가하며 `WandWishing` 충전을 소비해 아이템(축복/인챈트 포함) 또는 미생성 고유 아티팩트를 소환하고 `AmuletAscension`/`WandWishing`/`|enchant| > 3` 금지 소원을 거부한다.
+     - `WandPolymorph`는 살아 있는 비고유 NPC 몬스터를 다른 `MonsterKind`로 변이(`EntityStore::polymorph_monster` + `hp_dice`)시키고 `AmuletUnchanging`은 자가 변이를 차단한다.
+     - `AmuletLifeSaving`은 치명 피해 직전 자동 발동해 아뮬렛을 소멸시키고 플레이어 HP를 `max_hp`까지 회복·상태이상을 해제하며, `AmuletReflection`/`ArmorShieldReflection`/`ArmorSilverDragonScale`의 `REFLECTION`은 브레스·시선(`Medusa`/`FloatingEye`)·공격 완드를 공격자에게 반사한다. `RingConflict`는 주변 몬스터 간 상호 공격을 유발한다.
+  4. **대규모 도감(130 아이템 · 85 몬스터) · 고난도 스폰 격리 · SaveV3/LLM/TUI/Headless**:
+     - `items.toml` 130종(기존 55 + P12 75종) 및 `monsters.toml` 85종(기존 30 + P12 55종)을 투입한다. 기존 55+30 TOML 라인과 기존 `WandMagicMissile`/`WandFire` 비외형 계약, `MAX_XP = 180`을 그대로 보존하며, `difficulty >= 6` 고난도 몬스터는 `spawn_depth_range = [6, 20]`으로 배치해 `Main 2..=5` 기존 경로 호환성을 지킨다.
+     - `save.rs`는 `is_legacy_v1_allowed()` 및 `Spellbook`/`Gem` 거부를 통해 레거시 V1과 R9 causal 해시를 불변으로 격리한다. `CampaignObservation`에 `learned_spells`/`spell_failure_rates`를 추가하되 `LlmObservationView` 32,768B 및 `ActionSpace` Tier 1~3 `<= 64` 상한을 유지한다.
+- **Alternatives Considered**:
+  - `Cargo.lock`을 변경하여 외부 `toml` 크레이트를 `build-dependencies`에 추가하는 안 → `Cargo.lock` SHA/license 감사 범위를 불필요하게 건드리므로 `build.rs`는 `std`만 사용해 무의존성 정적 코드 생성을 구현한다.
+  - `CommandIntent::Wish`에 임의 `String`을 넣는 안 → `CommandIntent: Copy` 불변조건이 깨지므로 `WishChoice` enum(`Copy`) + `CURATED_WISHES`를 사용한다.
+- **Outcome**: 7학파 28주문·마법서 학습/감퇴/실패율·18완드/소원/변이·12반지·6아뮬렛·130아이템·85몬스터 도감이 `build.rs`+매크로 데이터 주도 계층과 기존 V1/V3/LLM/TUI/Headless 계약 안에서 통합 완성된다.
+
 ## ADR-P11-01: Stage 5 (P11) 살아 있는 던전 — 펫·NPC·상점 채무·고급 몬스터 AI 계약 (Accepted)
 
 - **Decision Date**: 2026-11-27

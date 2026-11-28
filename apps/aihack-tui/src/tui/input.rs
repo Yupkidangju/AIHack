@@ -54,6 +54,7 @@ pub enum UiCommandCandidate {
         item: aihack_ai_contract::EntityId,
     },
     ChooseSpell(aihack_ai_contract::SpellKind),
+    ChooseWish(aihack_ai_contract::EntityId),
     ChooseIdentifyTarget(aihack_ai_contract::EntityId),
     ChooseContainer(aihack_ai_contract::EntityId),
     ChooseDipSource(aihack_ai_contract::EntityId),
@@ -436,7 +437,7 @@ fn primary_inventory_command(item: &ItemObservation) -> Option<CommandIntent> {
         Some(aihack_ai_contract::ItemClass::Potion) => {
             Some(CommandIntent::Quaff { item: item.item })
         }
-        Some(aihack_ai_contract::ItemClass::Scroll) => {
+        Some(aihack_ai_contract::ItemClass::Scroll | aihack_ai_contract::ItemClass::Spellbook) => {
             Some(CommandIntent::Read { item: item.item })
         }
         Some(aihack_ai_contract::ItemClass::Tool) => Some(CommandIntent::Apply {

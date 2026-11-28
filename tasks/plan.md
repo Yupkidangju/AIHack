@@ -128,3 +128,16 @@
 | S5-runtime | `systems/{pets,npc}.rs` 신설, `movement`(우호 자리바꿈)·`stairs`(펫 동반)·`items`(미결제 청구/반납)·`projectiles`(음식 투척 길들이기)·`shop`(호환+적대 거부)·`monster_ai`(문 열기·아이템 줍기/사용·시선·소환·파벌전)·`combat`(장비 보너스·훔치기+텔레포트·부식·분열·적대화)·`death`(`monster_inventory` 드롭·상점주인 사망 정산)·`bootstrap`·`session`·`observation`·`save`/`campaign` 통합 | `crates/aihack-runtime/*` |
 | S5-adapters | `apps/aihack-tui`(`faction` 색상/Inspect, `DEBT:` HUD, `'m'` Chat / `'D'` Pay / `'$'` 메뉴) 및 `apps/aihack-headless`(비적대 비공격·미결제 회피·`Pay` 우선) 갱신 | `apps/aihack-tui/*`, `apps/aihack-headless/*` |
 | S5-verify | `tests/stage5_p11.rs` 작성(펫/길들이기/진화/저주회피/상점절도/층이동, 상점주인 채무/도둑질/사제/오라클/경비병, 몬스터 문열기/아이템사용/훔치기/녹/분열/소환/시선+실명방어/오크vs드워프 파벌전, SaveV3 변조/V1 격리/LLM 32KiB/TUI/Headless), 전체 gate PASS 및 완료 문서 마감 | `tests/*`, `docs/*`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `README.md`, `tasks/todo.md` |
+
+## Stage 6 (P12) 실행 계획 (2026-11-28)
+
+기준: `docs/CODER_HANDOFF_P7_TO_P13.md` Stage 6 (`P12`), `DESIGN_DECISIONS.md` (`ADR-P12-01`), `spec.md`, `docs/campaign_spec.md` (`Stage 6 (P12)`). 레거시 2층 모드·R9 causal 해시·`MAX_XP = 180`·`CommandIntent: Copy`·`SaveV3`·`LlmObservationView < 32 KiB`·`ActionSpace <= 64`·`Cargo.lock` 불변을 유지하며 커밋/푸시는 하지 않는다.
+
+| 단계 | 작업 요약 | 대상 파일 |
+| --- | --- | --- |
+| S6-doc | `DESIGN_DECISIONS.md` (`ADR-P12-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` D3D 기준 선행 확정 | `DESIGN_DECISIONS.md`, `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` |
+| S6-core | `Resistances` 5플래그·`SpellSchool` 7학파·`SpellKind` 28종·`SPELL_MEMORY_TURNS = 20_000`·`define_item_kinds!`(130종)·`define_monster_kinds!`(85종)·`AmuletEffect` 6종·`RingEffect` 12종·`WandEffect` 18종·`MonsterPassive` 15종·`WishChoice`/`CommandIntent::Wish`·`EntityStore::polymorph_monster`·`aihack-ai-contract`/`aihack-llm` 확장 | `crates/aihack-core/*`, `crates/aihack-ai-contract/*`, `crates/aihack-llm/*` |
+| S6-content | `crates/aihack-content/build.rs` 정적 카탈로그 코드 생성, `items.toml`(130종)·`monsters.toml`(85종) 확장, `schema.rs`/`lib.rs`(`damage_small`/`damage_large`·`hp_dice`·`unidentified_pool`) 통합, LF SHA-256/`PROVENANCE.md`/`registry.rs` 동기화 | `crates/aihack-content/*`, `docs/provenance/r7-content.sha256`, `PROVENANCE.md` |
+| S6-runtime | `appearance`(풀 확장)·`spells`(마법서 학습/20,000턴 감퇴/실패율/28주문)·`items`(마법서 독서·레벨업/자기변이/매직매핑·텔레포트 제어)·`projectiles`(18완드·소원·몬스터 변이)·`death`(생명보존 부적)·`combat`(크기별 피해·은무기)·`monster_ai`(반사·갈등·신규 패시브·투명/가속)·`session`/`bootstrap`/`observation`/`save` 통합 | `crates/aihack-runtime/*` |
+| S6-adapters | `apps/aihack-tui`(동적 28주문 메뉴+실패율, 소원 메뉴, 마법서 `r`) 및 `apps/aihack-headless`(생명보존/반사 아뮬렛·상급 치유 연동) 갱신 | `apps/aihack-tui/*`, `apps/aihack-headless/*` |
+| S6-verify | `tests/stage6_p12.rs` 작성(마법서/기억감퇴/실패율/7학파 28주문/18완드/소원/변이/반사/생명보존/갈등/전 도감 130·85 스폰·관찰·TUI·시체 스모크/SaveV3/V1 격리/LLM 32KiB/ActionSpace <= 64), 전체 gate PASS 및 완료 문서 마감 | `tests/*`, `docs/*`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `README.md`, `tasks/todo.md` |

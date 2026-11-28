@@ -2,7 +2,7 @@ use aihack_core::{
     domain::{
         combat::DeathCause,
         entity::ActorKind,
-        item::{BucStatus, ItemKind},
+        item::{AmuletEffect, BucStatus, ItemKind},
         monster::MonsterKind,
         status::Resistances,
         tile::{TileKind, TrapKind},
@@ -242,11 +242,20 @@ pub fn on_player_enter_tile(
     let player_id = world.player_id;
     match tile {
         TileKind::Water => {
-            if world.status_timers.levitation > 0 {
+            if world.is_levitating() {
                 return (
                     vec![GameEvent::Message {
                         priority: MessagePriority::Info,
                         text: "You float safely over the water.".to_string(),
+                    }],
+                    None,
+                );
+            }
+            if world.has_amulet_effect(AmuletEffect::MagicalBreathing) {
+                return (
+                    vec![GameEvent::Message {
+                        priority: MessagePriority::Info,
+                        text: "You breathe effortlessly beneath the water.".to_string(),
                     }],
                     None,
                 );
@@ -339,7 +348,7 @@ pub fn on_player_enter_tile(
             }
         }
         TileKind::Lava => {
-            if world.status_timers.levitation > 0 {
+            if world.is_levitating() {
                 return (
                     vec![GameEvent::Message {
                         priority: MessagePriority::Info,
@@ -380,7 +389,20 @@ pub fn on_player_enter_tile(
 
 pub fn monster_can_traverse(kind: MonsterKind, tile: TileKind) -> bool {
     match tile {
-        TileKind::Water | TileKind::Lava => matches!(kind, MonsterKind::Bat | MonsterKind::Dragon),
+        TileKind::Water | TileKind::Lava => matches!(
+            kind,
+            MonsterKind::Bat
+                | MonsterKind::Dragon
+                | MonsterKind::WhiteDragon
+                | MonsterKind::BlueDragon
+                | MonsterKind::SilverDragon
+                | MonsterKind::AirElemental
+                | MonsterKind::FireVortex
+                | MonsterKind::IceVortex
+                | MonsterKind::Gargoyle
+                | MonsterKind::Imp
+                | MonsterKind::Wraith
+        ),
         _ => true,
     }
 }

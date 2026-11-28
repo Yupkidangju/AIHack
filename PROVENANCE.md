@@ -1,5 +1,9 @@
 # AIHack Provenance and License Gate
 
+## Stage 6 (P12) 콘텐츠 확장 기록 (2026-11-28)
+
+`ADR-P12-01` 및 `docs/campaign_spec.md` `## Stage 6 (P12)`에 따라 `crates/aihack-content/build.rs` 정적 카탈로그 코드젠을 도입하고 `crates/aihack-content/src/data/items.toml`에 신규 아이템 75종(총 130종: 28종 마법책, 16종 지팡이, 9종 반지, 5종 아뮬렛, 5종 무기, 5종 방어구, 3종 포션, 1종 두루마리, 1종 식량, 2종 보석) 및 `crates/aihack-content/src/data/monsters.toml`에 신규 몬스터 55종(총 85종)을 추가했다. 기존 55개 item과 30개 monster의 레거시 id·스탯 및 `main_1.toml`·`main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `items.toml` SHA256은 `2f4e9b632ff68117571f1368a99fb6dbafdc5a058e73f8b6d9d8b3de6780cc56`에서 `b41be10c0062df65bfd4ca868217a906f2276dc59335698f212d70c975cd493f`로, LF `monsters.toml` SHA256은 `704e48b35aeb3f3661fdab8f054a31447dd5771713c60b790330581d674c165c`에서 `a9842fc24763791e2e78885080505812de179446f1e99ff1258d37fdbab1e6f1`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.
+
 ## Stage 5 (P11) 콘텐츠 확장 기록 (2026-11-27)
 
 `ADR-P11-01` 및 `docs/campaign_spec.md` `## Stage 5 (P11)`에 따라 `crates/aihack-content/src/data/monsters.toml`에 신규 P11 몬스터·동료·NPC 17종(`monster.kitten`, `monster.housecat`, `monster.little_dog`, `monster.dog`, `monster.pony`, `monster.warhorse`, `monster.shopkeeper`, `monster.temple_priest`, `monster.oracle`, `monster.watchman`, `monster.leprechaun`, `monster.nymph`, `monster.rust_monster`, `monster.black_pudding`, `monster.dwarf`, `monster.medusa`, `monster.orc_captain`)을 추가하고 기존 인간형 몬스터 5종(`goblin`/`kobold`/`orc`/`ogre`/`gnoll_archer`)의 `ai_flags`를 확장했다. 기존 아이템 55종과 `main_1.toml`·`main_2.toml`은 변경하지 않았으며 NetHack 원본 텍스트나 `legacy_nethack_port_reference/` 자산을 복사하지 않았다. LF `monsters.toml` SHA256은 `e454e6629f17e85afe6f6124d3965fbfd2baccb3c36df22cefe326219a5dac38`에서 `704e48b35aeb3f3661fdab8f054a31447dd5771713c60b790330581d674c165c`로 갱신된다. 아래 소유자 승인 기록(`AIHACK-OWNER-2026-07-20-NGPL-01`)의 일자·주체를 새 승인으로 대체하지 않으며 외부 release/게시 승인은 별개다.

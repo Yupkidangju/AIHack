@@ -5,18 +5,21 @@ use serde::{Deserialize, Serialize};
 pub mod llm;
 pub mod observation;
 pub use aihack_core::campaign::{
-    Alignment, Attributes, Race, Role, SkillCategory, SkillRank, SpellKind,
+    Alignment, Attributes, LearnedSpell, Race, Role, SkillCategory, SkillRank, SpellKind,
+    SpellSchool,
 };
 pub use aihack_core::{
     action::{
         ActionIntent, CommandIntent, DipTarget, DirectionalAction, EngravingMethod, EngravingText,
-        InventoryAction, NarrativeTopic,
+        InventoryAction, NarrativeTopic, WishChoice,
     },
     domain::{
         combat::DeathCause,
         entity::{EntityKind, Faction},
         inventory::InventoryLetter,
-        item::{BucStatus, EquipmentSlot, ItemClass, ItemKind, RingEffect, ToolAction},
+        item::{
+            AmuletEffect, BucStatus, EquipmentSlot, ItemClass, ItemKind, RingEffect, ToolAction,
+        },
         monster::MonsterKind,
         status::{Resistances, StatusTimers},
         tile::{DoorState, TileKind, TrapKind},

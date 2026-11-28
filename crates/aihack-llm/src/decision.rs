@@ -315,6 +315,11 @@ fn wire_command_value(command: CommandIntent) -> Value {
         CommandIntent::Enhance { skill } => json!({ "type": "ENHANCE", "skill": skill }),
         CommandIntent::Chat(direction) => direction_action("CHAT", direction),
         CommandIntent::Pay => json!({ "type": "PAY" }),
+        CommandIntent::Wish { item, wish } => json!({
+            "type": "WISH",
+            "item": item.0,
+            "wish": wish,
+        }),
         CommandIntent::Descend => json!({ "type": "DESCEND" }),
         CommandIntent::Ascend => json!({ "type": "ASCEND" }),
         CommandIntent::AcknowledgeMore => json!({ "type": "ACKNOWLEDGE_MORE" }),
@@ -330,11 +335,7 @@ fn item_action(kind: &str, item: u32) -> Value {
 }
 
 fn spell_name(spell: SpellKind) -> &'static str {
-    match spell {
-        SpellKind::ForceBolt => "FORCE_BOLT",
-        SpellKind::Heal => "HEAL",
-        SpellKind::Detect => "DETECT",
-    }
+    spell.wire_name()
 }
 
 fn direction_name(direction: Direction) -> &'static str {

@@ -340,6 +340,15 @@ pub(crate) fn campaign_world_with_build(
                     BucStatus::Uncursed,
                     0,
                 ));
+                floor_items.push((
+                    ItemKind::SpellbookMagicMissile,
+                    Pos {
+                        x: centers[4].x,
+                        y: centers[4].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
             (aihack_core::ids::BranchId::Main, 2) => {
                 floor_items.push((
@@ -436,6 +445,15 @@ pub(crate) fn campaign_world_with_build(
                     BucStatus::Uncursed,
                     0,
                 ));
+                floor_items.push((
+                    ItemKind::SpellbookRemoveCurse,
+                    Pos {
+                        x: centers[4].x,
+                        y: centers[4].y + 1,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
             }
             (aihack_core::ids::BranchId::Main, 4) => {
                 floor_items.push((
@@ -519,6 +537,15 @@ pub(crate) fn campaign_world_with_build(
                     Pos {
                         x: centers[4].x - 1,
                         y: centers[4].y,
+                    },
+                    BucStatus::Uncursed,
+                    0,
+                ));
+                floor_items.push((
+                    ItemKind::WandCold,
+                    Pos {
+                        x: centers[4].x,
+                        y: centers[4].y + 1,
                     },
                     BucStatus::Uncursed,
                     0,

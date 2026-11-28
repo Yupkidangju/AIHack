@@ -2,10 +2,10 @@ use aihack_core::{
     domain::{
         combat::DeathCause,
         entity::{EntityKind, EntityLocation},
-        item::ItemKind,
+        item::{AmuletEffect, ItemKind},
         monster::MonsterKind,
     },
-    event::GameEvent,
+    event::{GameEvent, MessagePriority},
     ids::EntityId,
     run_state::RunState,
 };
@@ -35,6 +35,33 @@ pub fn collect_death_events_if_hp_depleted(
         .unwrap_or(false);
     if !alive || stats.hp > 0 {
         return Ok(Vec::new());
+    }
+
+    if entity == world.player_id
+        && world.campaign.is_some()
+        && world.has_amulet_effect(AmuletEffect::LifeSaving)
+    {
+        if let Some(amulet_id) = world.inventory.equipped_amulet {
+            let state = world.state_mut();
+            state.inventory.equipped_amulet = None;
+            let _ = state.inventory.remove(amulet_id);
+            state
+                .entities
+                .set_item_location(amulet_id, EntityLocation::Consumed);
+            state.poison_turns = 0;
+            state.paralysis_turns = 0;
+            state.nutrition = state.nutrition.max(300);
+            if let Some(pstats) = state.entities.actor_stats_mut(entity) {
+                pstats.hp = pstats.max_hp;
+            }
+        }
+        world.identify_item_kind(ItemKind::AmuletLifeSaving);
+        return Ok(vec![GameEvent::Message {
+            priority: MessagePriority::Warning,
+            text:
+                "Your amulet of life saving glows brightly, disintegrates, and restores your life!"
+                    .to_string(),
+        }]);
     }
 
     let location = world.entities.actor_location(entity);

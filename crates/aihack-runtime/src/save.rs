@@ -714,12 +714,29 @@ fn validate_saved_world_inner(
                         || matches!(location, EntityLocation::InContainer { .. })
                         || data.tool_action.is_some()
                         || data.container_capacity.is_some()
-                        || data.class == ItemClass::Tool
-                        || is_p9_only_item_kind(*kind))
+                        || matches!(
+                            data.class,
+                            ItemClass::Tool | ItemClass::Spellbook | ItemClass::Gem
+                        )
+                        || data.spellbook_spell.is_some()
+                        || data.amulet_effect.is_some()
+                        || !kind.is_legacy_v1_allowed())
                 {
                     return invalid_world(
                         "legacy mode cannot contain extended item metadata".to_string(),
                     );
+                }
+                if data.spellbook_spell.is_some() != (data.class == ItemClass::Spellbook) {
+                    return invalid_world(format!(
+                        "item {} has invalid spellbook metadata",
+                        entity.id.0
+                    ));
+                }
+                if data.amulet_effect.is_some() && data.class != ItemClass::Amulet {
+                    return invalid_world(format!(
+                        "non-amulet item {} has amulet_effect metadata",
+                        entity.id.0
+                    ));
                 }
                 if *unpaid
                     && (*kind == ItemKind::AmuletAscension
@@ -927,9 +944,11 @@ fn item_data_matches_registry(
         && persisted.max_charges == expected.max_charges
         && persisted.nutrition == expected.nutrition
         && persisted.ring_effect == expected.ring_effect
+        && persisted.amulet_effect == expected.amulet_effect
         && persisted.armor_slot == expected.armor_slot
         && persisted.tool_action == expected.tool_action
         && persisted.container_capacity == expected.container_capacity
+        && persisted.spellbook_spell == expected.spellbook_spell
 }
 
 fn is_p9_only_tile(tile: TileKind) -> bool {
@@ -953,30 +972,6 @@ fn is_p9_only_tile(tile: TileKind) -> bool {
         ),
         _ => false,
     }
-}
-
-fn is_p9_only_item_kind(kind: ItemKind) -> bool {
-    matches!(
-        kind,
-        ItemKind::SkeletonKey
-            | ItemKind::LockPick
-            | ItemKind::PickAxe
-            | ItemKind::DwarvishMattock
-            | ItemKind::TinWhistle
-            | ItemKind::OilLamp
-            | ItemKind::Blindfold
-            | ItemKind::UnicornHorn
-            | ItemKind::Sack
-            | ItemKind::BagOfHolding
-            | ItemKind::Chest
-            | ItemKind::PotionWater
-            | ItemKind::ScrollBlank
-            | ItemKind::LongSword
-            | ItemKind::Katana
-            | ItemKind::BattleAxe
-            | ItemKind::Quarterstaff
-            | ItemKind::BroadSword
-    )
 }
 
 fn validate_containers(world: &SavedWorldV1) -> Result<(), GameError> {

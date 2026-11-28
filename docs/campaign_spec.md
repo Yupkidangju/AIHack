@@ -312,3 +312,27 @@ P1–P6 캠페인 위에 제단·마나(MP)/주문, 시드별 미식별 외형·
 - 특수 패턴: `Leprechaun`(`StealGold`+텔레포트), `Nymph`(`StealItem`→`monster_inventory`+텔레포트), `RustMonster`(`RustMetal` 철/강 장비 `erosion +1`, 아티팩트 면역), `BlackPudding`(`SplitOnHit` HP `>= 6` 분열), `Medusa`(`GazeParalyze`)·`FloatingEye`(`ParalyzeOnMelee`) 시선 공격(`Blind`/`Blindfold` 방어), `OrcCaptain`(`SummonAllies` `Orc` 소환).
 - 파벌전: `Orc`/`OrcCaptain`과 `Dwarf`가 서로 교전하고, `Watchman`은 `Hostile` 몬스터와 교전하며, `Pet`은 적대 몬스터와 교전한다.
 - TUI(`faction` 색상/Inspect, `DEBT:` HUD, `'m'` Chat / `'D'` Pay), Headless(`Faction::Hostile` 전용 공격·무단 미결제 픽업 회피·`Pay`), `LlmObservationView < 32,768B`, `ActionSpace <= 64`, `SaveV3` 엄격 검증을 동기화한다.
+
+## Stage 6 (P12): 마법 체계 심화 & 대규모 도감 투입 (2026-11-28)
+
+`ADR-P12-01`에 따라 데이터 주도 하이브리드 카탈로그(`build.rs` + 선언적 매크로), 마법서 기반 7학파 28주문 체계, 18종 완드·소원(`WishChoice`)·변이, 12종 반지·6종 아뮬렛·5종 확장 저항, 그리고 **130종 아이템 · 85종 몬스터** 도감을 투입한다. 레거시 2층 모드(`campaign == None`, V1 세이브, R9 causal 해시), `MAX_XP = 180`, `SaveV3`, `CommandIntent: Copy`를 보존한다.
+
+### P12-1 하이브리드 데이터 주도 카탈로그 (`build.rs` & 매크로 단일 테이블)
+- `crates/aihack-content/build.rs`(표준 라이브러리 전용, `Cargo.lock` 불변)가 `items.toml`·`monsters.toml`로부터 `$OUT_DIR/generated_catalog.rs`를 생성해 canonical kind/pool/ID/카운트 상수를 단일 원천화한다.
+- `crates/aihack-core`의 `define_item_kinds!`/`define_monster_kinds!` 매크로가 `ItemKind`(130종)·`MonsterKind`(85종)와 모든 매핑 테이블을 생성하며 `unidentified_pool`·`damage_small`/`damage_large`·`hp_dice`를 런타임에서 소비한다.
+
+### P12-2 마법서(`+`), 7학파 28주문, 기억 감퇴, 실패율
+- `ItemClass::Spellbook`(`+`)을 `CommandIntent::Read`로 학습한다(`Blessed` 확정 습득, `Uncursed` `Int`/레벨/`Spellcasting` 판정, `Cursed` 혼란·실명·1d6 피해 역풍). 읽을 때마다 `charges`가 감소하고 0이 되면 소멸한다.
+- 7학파(`Attack`, `Healing`, `Divination`, `Enchantment`, `Clerical`, `Escape`, `Matter`) 28종 `SpellKind`를 지원한다.
+- 비고유(non-innate) 습득 주문은 `SPELL_MEMORY_TURNS = 20_000`턴 동안 기억되며 이후 만료되어 마법서 재학습을 요구한다.
+- `spell_failure_percent`는 `spell_level`, `Int`, 캐릭터 레벨, `Spellcasting` 숙련도, 장착 금속 갑옷·방패 페널티를 반영한다(단, 고유 시작 주문 + 비금속 상태는 0% 유지).
+
+### P12-3 18종 완드 · 소원 · 변이 · 12종 반지 · 6종 아뮬렛 · 확장 저항
+- `Resistances`에 `REFLECTION`(bit 8), `MAGIC_RESISTANCE`(bit 9), `CONFLICT`(bit 10), `TELEPORT_CONTROL`(bit 11), `SEARCHING`(bit 12)을 추가한다.
+- `WandEffect` 18종(`Cold`, `Lightning`, `Sleep`, `Digging`, `Teleport`, `Polymorph`, `Cancellation`, `Death`, `Wishing`, `Striking`, `SlowMonster`, `SpeedMonster`, `Opening`, `Locking`, `MakeInvisible`, `CreateMonster` 추가) 및 `CommandIntent::Wish { item, wish: WishChoice }` 소원 규칙(`AmuletAscension`/`WandWishing` 거부, 아티팩트 1회 생성 준수)을 구현한다.
+- `WandPolymorph`는 `EntityStore::polymorph_monster`와 `hp_dice`로 몬스터를 변이시키며, `AmuletUnchanging`은 자가 변이를 차단한다.
+- `AmuletLifeSaving`은 치명 피해 직전 자동 발동해 소멸하며 `hp = max_hp` 및 상태이상 정화로 생존시킨다. `REFLECTION`은 브레스·시선(`Medusa`/`FloatingEye`)·공격 완드를 반사하고, `RingConflict`는 주변 몬스터 간 상호 교전을 유발하며, `RingSearching`·`RingLevitation`·`RingInvisibility`·`RingTeleportControl`·`ArmorSpeedBoots`·`AmuletMagicalBreathing`이 런타임에 연동된다.
+
+### P12-4 130종 아이템 · 85종 몬스터 대규모 도감 및 검증 계약
+- `items.toml` 130종(신규 마법서 28·완드 16·반지 9·아뮬렛 5·무기 5·방어구 5·물약/두루마리 4·식량/보석 3)과 `monsters.toml` 85종(신규 55종, 고난도 `difficulty >= 6`은 `spawn_depth_range = [6, 20]`)을 투입하고 LF 체크섬·`PROVENANCE.md`·golden hash를 동기화한다.
+- 도감 전 종(130 아이템 · 85 몬스터) 스폰·관찰·TUI 렌더링·시체/전리품 스모크 테스트, TUI 동적 마법/소원 메뉴, Headless 부적 장착/주문 연동, `SaveV3`/레거시 V1 차단, `LlmObservationView < 32,768B` 및 `ActionSpace <= 64`를 검증한다.

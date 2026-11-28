@@ -5,7 +5,7 @@ use aihack_content::ContentRegistry;
 use aihack_core::{
     action::{
         CommandIntent, DipTarget, DirectionalAction, EngravingMethod, EngravingText,
-        InventoryAction,
+        InventoryAction, WishChoice,
     },
     campaign::SpellKind,
     domain::{
@@ -326,6 +326,7 @@ impl GameSession {
             CommandIntent::Identify { scroll, target } => self.submit_identify(scroll, target),
             CommandIntent::Offer { item } => self.submit_offer(item),
             CommandIntent::Cast { spell, direction } => self.submit_cast(spell, direction),
+            CommandIntent::Wish { item, wish } => self.submit_wish(item, wish),
             CommandIntent::Pray => self.submit_pray(),
             CommandIntent::Descend => self.submit_descend(),
             CommandIntent::Ascend => self.submit_ascend(),
@@ -843,8 +844,9 @@ impl GameSession {
     }
 
     fn submit_read(&mut self, item: EntityId) -> TurnOutcome {
+        let turn = self.turn;
         let state = &mut self.inner;
-        match items::read(&mut state.world, &mut state.rng, item) {
+        match items::read_at(&mut state.world, &mut state.rng, item, turn) {
             Ok(events) => self.accept_turn(events),
             Err(error) => self.reject(error),
         }
@@ -932,14 +934,22 @@ impl GameSession {
     }
 
     fn submit_cast(&mut self, spell: SpellKind, direction: Option<Direction>) -> TurnOutcome {
+        let turn = self.turn;
         let state = &mut self.inner;
-        match spells::cast(&mut state.world, &mut state.rng, spell, direction) {
+        match spells::cast_at(&mut state.world, &mut state.rng, spell, direction, turn) {
             Ok(events) => {
                 self.inner.state =
                     death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
                 self.accept_turn(events)
             }
-            Err(error) => self.abort_transaction(error),
+            Err(error) => self.reject(error),
+        }
+    }
+
+    fn submit_wish(&mut self, item: EntityId, wish: WishChoice) -> TurnOutcome {
+        match projectiles::wish(&mut self.inner.world, item, wish) {
+            Ok(events) => self.accept_turn(events),
+            Err(error) => self.reject(error),
         }
     }
 
@@ -1230,8 +1240,7 @@ impl GameSession {
                                 | aihack_core::domain::tile::TileKind::Lava
                         )
                     )
-                    && (levitation_expired
-                        || (!moved_this_turn && self.world.status_timers.levitation == 0))
+                    && (levitation_expired || (!moved_this_turn && !self.world.is_levitating()))
                 {
                     let seed = self.meta.seed;
                     let (terrain_events, terrain_cause) = {
@@ -1441,6 +1450,15 @@ impl GameSession {
                 Err(error) => return self.abort_transaction(error),
             };
             events.extend(monster_events);
+        }
+        if self.world.campaign.is_some()
+            && !matches!(
+                self.state,
+                RunState::GameOver { .. } | RunState::Victory { .. }
+            )
+            && self.world.has_searching()
+        {
+            events.extend(traps::search(&mut self.inner.world));
         }
         self.inner.world.mark_current_level_explored();
         self.inner.event_log.extend(events.clone());

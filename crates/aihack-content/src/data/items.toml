@@ -894,3 +894,1295 @@ tags=["weapon", "blade"]
 spawn_depth_range=[1, 6]
 spawn_weight=10
 
+[[item]]
+id="item.spellbook.force_bolt"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="force_bolt"
+base_price=100
+name="spellbook of force bolt"
+color="bright_blue"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "attack"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.spellbook.magic_missile"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="magic_missile"
+base_price=200
+name="spellbook of magic missile"
+color="blue"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "attack"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.spellbook.fireball"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="fireball"
+base_price=400
+name="spellbook of fireball"
+color="red"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "attack"]
+spawn_depth_range=[3, 12]
+spawn_weight=6
+
+[[item]]
+id="item.spellbook.cone_of_cold"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="cone_of_cold"
+base_price=400
+name="spellbook of cone of cold"
+color="bright_cyan"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "attack"]
+spawn_depth_range=[3, 12]
+spawn_weight=6
+
+[[item]]
+id="item.spellbook.lightning_bolt"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="lightning_bolt"
+base_price=500
+name="spellbook of lightning bolt"
+color="bright_yellow"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "attack"]
+spawn_depth_range=[4, 15]
+spawn_weight=5
+
+[[item]]
+id="item.spellbook.finger_of_death"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=2
+effect="finger_of_death"
+base_price=700
+name="spellbook of finger of death"
+color="black"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "attack"]
+spawn_depth_range=[6, 20]
+spawn_weight=2
+
+[[item]]
+id="item.spellbook.heal"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="heal"
+base_price=100
+name="spellbook of healing"
+color="bright_green"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "healing"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.spellbook.extra_healing"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="extra_healing"
+base_price=300
+name="spellbook of extra healing"
+color="green"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "healing"]
+spawn_depth_range=[2, 10]
+spawn_weight=8
+
+[[item]]
+id="item.spellbook.cure_sickness"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="cure_sickness"
+base_price=300
+name="spellbook of cure sickness"
+color="bright_green"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "healing"]
+spawn_depth_range=[2, 10]
+spawn_weight=7
+
+[[item]]
+id="item.spellbook.stone_to_flesh"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="stone_to_flesh"
+base_price=300
+name="spellbook of stone to flesh"
+color="brown"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "healing"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.spellbook.detect"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="detect"
+base_price=100
+name="spellbook of detect monsters"
+color="yellow"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "divination"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.spellbook.identify"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="identify_spell"
+base_price=300
+name="spellbook of identify"
+color="white"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "divination"]
+spawn_depth_range=[1, 8]
+spawn_weight=8
+
+[[item]]
+id="item.spellbook.magic_mapping"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="magic_mapping"
+base_price=500
+name="spellbook of magic mapping"
+color="cyan"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "divination"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.spellbook.detect_treasure"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="detect_treasure"
+base_price=400
+name="spellbook of detect treasure"
+color="bright_yellow"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "divination"]
+spawn_depth_range=[2, 10]
+spawn_weight=7
+
+[[item]]
+id="item.spellbook.sleep"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="sleep_spell"
+base_price=100
+name="spellbook of sleep"
+color="magenta"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "enchantment"]
+spawn_depth_range=[1, 6]
+spawn_weight=9
+
+[[item]]
+id="item.spellbook.confuse_monster"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="confuse_monster"
+base_price=200
+name="spellbook of confuse monster"
+color="orange"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "enchantment"]
+spawn_depth_range=[2, 8]
+spawn_weight=8
+
+[[item]]
+id="item.spellbook.charm_monster"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="charm_monster"
+base_price=300
+name="spellbook of charm monster"
+color="bright_magenta"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "enchantment"]
+spawn_depth_range=[2, 10]
+spawn_weight=6
+
+[[item]]
+id="item.spellbook.slow_monster"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="slow_monster"
+base_price=200
+name="spellbook of slow monster"
+color="gray"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "enchantment"]
+spawn_depth_range=[2, 8]
+spawn_weight=8
+
+[[item]]
+id="item.spellbook.remove_curse"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="remove_curse_spell"
+base_price=300
+name="spellbook of remove curse"
+color="white"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "clerical"]
+spawn_depth_range=[2, 10]
+spawn_weight=6
+
+[[item]]
+id="item.spellbook.protection"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="protection"
+base_price=100
+name="spellbook of protection"
+color="bright_yellow"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "clerical"]
+spawn_depth_range=[1, 6]
+spawn_weight=9
+
+[[item]]
+id="item.spellbook.turn_undead"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="turn_undead"
+base_price=400
+name="spellbook of turn undead"
+color="white"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "clerical"]
+spawn_depth_range=[2, 10]
+spawn_weight=6
+
+[[item]]
+id="item.spellbook.create_familiar"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="create_familiar"
+base_price=500
+name="spellbook of create familiar"
+color="bright_green"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "clerical"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.spellbook.jumping"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="jumping"
+base_price=100
+name="spellbook of jumping"
+color="cyan"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "escape"]
+spawn_depth_range=[1, 6]
+spawn_weight=8
+
+[[item]]
+id="item.spellbook.haste_self"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="haste_self"
+base_price=300
+name="spellbook of haste self"
+color="bright_cyan"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "escape"]
+spawn_depth_range=[2, 10]
+spawn_weight=7
+
+[[item]]
+id="item.spellbook.teleport_away"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="teleport_away"
+base_price=500
+name="spellbook of teleport away"
+color="blue"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "escape"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.spellbook.knock"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="knock"
+base_price=100
+name="spellbook of knock"
+color="brown"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "matter"]
+spawn_depth_range=[1, 6]
+spawn_weight=9
+
+[[item]]
+id="item.spellbook.wizard_lock"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="wizard_lock"
+base_price=200
+name="spellbook of wizard lock"
+color="gray"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "matter"]
+spawn_depth_range=[2, 8]
+spawn_weight=7
+
+[[item]]
+id="item.spellbook.dig"
+kind="spellbook"
+glyph="+"
+weight=50
+charges=3
+effect="dig_spell"
+base_price=500
+name="spellbook of dig"
+color="brown"
+material="paper"
+unidentified_pool="spellbook"
+stackable=false
+tags=["spellbook", "matter"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.wand.cold"
+kind="wand"
+glyph="/"
+weight=7
+charges=5
+effect="cold"
+base_price=175
+name="wand of cold"
+color="bright_cyan"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "cold", "attack"]
+spawn_depth_range=[2, 10]
+spawn_weight=10
+
+[[item]]
+id="item.wand.lightning"
+kind="wand"
+glyph="/"
+weight=7
+charges=5
+effect="lightning"
+base_price=175
+name="wand of lightning"
+color="bright_yellow"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "shock", "attack"]
+spawn_depth_range=[3, 12]
+spawn_weight=8
+
+[[item]]
+id="item.wand.sleep"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="sleep"
+base_price=175
+name="wand of sleep"
+color="magenta"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "sleep"]
+spawn_depth_range=[1, 8]
+spawn_weight=10
+
+[[item]]
+id="item.wand.digging"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="digging"
+base_price=150
+name="wand of digging"
+color="brown"
+material="iron"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "dig"]
+spawn_depth_range=[2, 10]
+spawn_weight=9
+
+[[item]]
+id="item.wand.teleport"
+kind="wand"
+glyph="/"
+weight=7
+charges=5
+effect="teleport"
+base_price=200
+name="wand of teleportation"
+color="blue"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "escape"]
+spawn_depth_range=[2, 12]
+spawn_weight=8
+
+[[item]]
+id="item.wand.polymorph"
+kind="wand"
+glyph="/"
+weight=7
+charges=4
+effect="polymorph"
+base_price=200
+name="wand of polymorph"
+color="bright_magenta"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "polymorph"]
+spawn_depth_range=[4, 15]
+spawn_weight=5
+
+[[item]]
+id="item.wand.cancellation"
+kind="wand"
+glyph="/"
+weight=7
+charges=4
+effect="cancellation"
+base_price=200
+name="wand of cancellation"
+color="white"
+material="silver"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "utility"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.wand.death"
+kind="wand"
+glyph="/"
+weight=7
+charges=3
+effect="death"
+base_price=500
+name="wand of death"
+color="black"
+material="iron"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "attack"]
+spawn_depth_range=[6, 20]
+spawn_weight=2
+
+[[item]]
+id="item.wand.wishing"
+kind="wand"
+glyph="/"
+weight=7
+charges=3
+effect="wishing"
+base_price=500
+name="wand of wishing"
+color="bright_yellow"
+material="gold"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "wish"]
+spawn_depth_range=[6, 20]
+spawn_weight=1
+
+[[item]]
+id="item.wand.striking"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="striking"
+base_price=150
+name="wand of striking"
+color="gray"
+material="iron"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "attack"]
+spawn_depth_range=[1, 8]
+spawn_weight=10
+
+[[item]]
+id="item.wand.slow_monster"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="slow_monster"
+base_price=150
+name="wand of slow monster"
+color="gray"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "status"]
+spawn_depth_range=[1, 8]
+spawn_weight=10
+
+[[item]]
+id="item.wand.speed_monster"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="speed_monster"
+base_price=150
+name="wand of speed monster"
+color="cyan"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "status"]
+spawn_depth_range=[2, 8]
+spawn_weight=8
+
+[[item]]
+id="item.wand.opening"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="opening"
+base_price=150
+name="wand of opening"
+color="yellow"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "utility"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.wand.locking"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="locking"
+base_price=150
+name="wand of locking"
+color="brown"
+material="iron"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "utility"]
+spawn_depth_range=[1, 6]
+spawn_weight=10
+
+[[item]]
+id="item.wand.make_invisible"
+kind="wand"
+glyph="/"
+weight=7
+charges=5
+effect="make_invisible"
+base_price=150
+name="wand of make invisible"
+color="white"
+material="glass"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "status"]
+spawn_depth_range=[2, 10]
+spawn_weight=8
+
+[[item]]
+id="item.wand.create_monster"
+kind="wand"
+glyph="/"
+weight=7
+charges=6
+effect="create_monster"
+base_price=200
+name="wand of create monster"
+color="green"
+material="wood"
+unidentified_pool="wand"
+stackable=false
+tags=["wand", "summon"]
+spawn_depth_range=[3, 12]
+spawn_weight=6
+
+[[item]]
+id="item.ring.cold_resistance"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="cold_resistance"
+base_price=150
+name="ring of cold resistance"
+color="bright_cyan"
+material="silver"
+unidentified_pool="ring"
+stackable=false
+effects=["cold"]
+tags=["ring", "resistance"]
+spawn_depth_range=[2, 10]
+spawn_weight=10
+
+[[item]]
+id="item.ring.shock_resistance"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="shock_resistance"
+base_price=150
+name="ring of shock resistance"
+color="bright_yellow"
+material="gold"
+unidentified_pool="ring"
+stackable=false
+effects=["shock"]
+tags=["ring", "resistance"]
+spawn_depth_range=[2, 10]
+spawn_weight=9
+
+[[item]]
+id="item.ring.sleep_resistance"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="sleep_resistance"
+base_price=150
+name="ring of free action"
+color="green"
+material="iron"
+unidentified_pool="ring"
+stackable=false
+effects=["sleep"]
+tags=["ring", "resistance"]
+spawn_depth_range=[2, 10]
+spawn_weight=9
+
+[[item]]
+id="item.ring.invisibility"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="invisibility"
+base_price=150
+name="ring of invisibility"
+color="white"
+material="silver"
+unidentified_pool="ring"
+stackable=false
+effects=["invisibility"]
+tags=["ring", "buff"]
+spawn_depth_range=[3, 12]
+spawn_weight=7
+
+[[item]]
+id="item.ring.levitation"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="levitation"
+base_price=200
+name="ring of levitation"
+color="bright_blue"
+material="mithril"
+unidentified_pool="ring"
+stackable=false
+effects=["levitation"]
+tags=["ring", "buff"]
+spawn_depth_range=[3, 12]
+spawn_weight=7
+
+[[item]]
+id="item.ring.conflict"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="conflict"
+base_price=300
+name="ring of conflict"
+color="red"
+material="gold"
+unidentified_pool="ring"
+stackable=false
+effects=["conflict"]
+tags=["ring", "chaos"]
+spawn_depth_range=[5, 20]
+spawn_weight=4
+
+[[item]]
+id="item.ring.searching"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="searching"
+base_price=200
+name="ring of searching"
+color="yellow"
+material="silver"
+unidentified_pool="ring"
+stackable=false
+effects=["searching"]
+tags=["ring", "detection"]
+spawn_depth_range=[1, 8]
+spawn_weight=10
+
+[[item]]
+id="item.ring.teleport_control"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="teleport_control"
+base_price=300
+name="ring of teleport control"
+color="cyan"
+material="mithril"
+unidentified_pool="ring"
+stackable=false
+effects=["teleport_control"]
+tags=["ring", "utility"]
+spawn_depth_range=[4, 15]
+spawn_weight=5
+
+[[item]]
+id="item.ring.see_invisible"
+kind="ring"
+glyph="="
+weight=3
+slot="ring"
+effect="see_invisible"
+base_price=150
+name="ring of see invisible"
+color="bright_green"
+material="silver"
+unidentified_pool="ring"
+stackable=false
+effects=["see_invisible"]
+tags=["ring", "detection"]
+spawn_depth_range=[2, 10]
+spawn_weight=8
+
+[[item]]
+id="item.amulet.life_saving"
+kind="amulet"
+glyph='"'
+weight=10
+slot="amulet"
+effect="life_saving"
+ac_bonus=0
+base_price=300
+name="amulet of life saving"
+color="bright_yellow"
+material="gold"
+unidentified_pool="amulet"
+stackable=false
+effects=["life_saving"]
+tags=["amulet", "defense"]
+spawn_depth_range=[4, 20]
+spawn_weight=4
+
+[[item]]
+id="item.amulet.reflection"
+kind="amulet"
+glyph='"'
+weight=10
+slot="amulet"
+effect="reflection"
+ac_bonus=0
+base_price=300
+name="amulet of reflection"
+color="white"
+material="silver"
+unidentified_pool="amulet"
+stackable=false
+effects=["reflection"]
+tags=["amulet", "defense"]
+spawn_depth_range=[4, 20]
+spawn_weight=4
+
+[[item]]
+id="item.amulet.magical_breathing"
+kind="amulet"
+glyph='"'
+weight=10
+slot="amulet"
+effect="magical_breathing"
+ac_bonus=0
+base_price=150
+name="amulet of magical breathing"
+color="cyan"
+material="iron"
+unidentified_pool="amulet"
+stackable=false
+effects=["magical_breathing"]
+tags=["amulet", "survival"]
+spawn_depth_range=[2, 12]
+spawn_weight=6
+
+[[item]]
+id="item.amulet.poison_resistance"
+kind="amulet"
+glyph='"'
+weight=10
+slot="amulet"
+effect="poison_resistance"
+ac_bonus=0
+base_price=150
+name="amulet versus poison"
+color="green"
+material="iron"
+unidentified_pool="amulet"
+stackable=false
+effects=["poison"]
+tags=["amulet", "resistance"]
+spawn_depth_range=[1, 8]
+spawn_weight=7
+
+[[item]]
+id="item.amulet.unchanging"
+kind="amulet"
+glyph='"'
+weight=10
+slot="amulet"
+effect="unchanging"
+ac_bonus=0
+base_price=150
+name="amulet of unchanging"
+color="brown"
+material="iron"
+unidentified_pool="amulet"
+stackable=false
+effects=["unchanging"]
+tags=["amulet", "defense"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.weapon.silver_saber"
+kind="weapon"
+glyph=")"
+weight=40
+slot="melee"
+hit_bonus=2
+damage="1d8"
+damage_small="1d8"
+damage_large="1d8"
+base_price=75
+name="silver saber"
+color="white"
+material="silver"
+stackable=false
+tags=["weapon", "silver", "blade"]
+spawn_depth_range=[2, 12]
+spawn_weight=8
+
+[[item]]
+id="item.weapon.two_handed_sword"
+kind="weapon"
+glyph=")"
+weight=150
+slot="melee"
+hit_bonus=0
+damage="1d12"
+damage_small="1d12"
+damage_large="3d6"
+base_price=50
+name="two-handed sword"
+color="gray"
+material="steel"
+stackable=false
+tags=["weapon", "blade"]
+spawn_depth_range=[3, 12]
+spawn_weight=7
+
+[[item]]
+id="item.weapon.war_hammer"
+kind="weapon"
+glyph=")"
+weight=50
+slot="melee"
+hit_bonus=1
+damage="1d6"
+damage_small="1d6"
+damage_large="1d4"
+base_price=15
+name="war hammer"
+color="gray"
+material="iron"
+stackable=false
+tags=["weapon", "blunt"]
+spawn_depth_range=[1, 8]
+spawn_weight=12
+
+[[item]]
+id="item.weapon.elven_dagger"
+kind="weapon"
+glyph=")"
+weight=10
+slot="melee"
+hit_bonus=2
+damage="1d5"
+damage_small="1d5"
+damage_large="1d4"
+base_price=12
+name="elven dagger"
+color="bright_cyan"
+material="mithril"
+stackable=false
+tags=["weapon", "blade"]
+spawn_depth_range=[2, 10]
+spawn_weight=10
+
+[[item]]
+id="item.weapon.spear"
+kind="weapon"
+glyph=")"
+weight=30
+slot="melee"
+hit_bonus=1
+damage="1d6"
+damage_small="1d6"
+damage_large="1d8"
+base_price=8
+name="spear"
+color="brown"
+material="iron"
+stackable=true
+tags=["weapon", "throwable"]
+spawn_depth_range=[1, 8]
+spawn_weight=14
+
+[[item]]
+id="item.armor.silver_dragon_scale"
+kind="armor"
+glyph="["
+weight=40
+slot="body"
+ac_bonus=9
+base_price=1200
+name="silver dragon scale mail"
+color="white"
+material="dragonhide"
+stackable=false
+effects=["reflection"]
+tags=["armor", "body", "dragon"]
+spawn_depth_range=[6, 20]
+spawn_weight=1
+
+[[item]]
+id="item.armor.gray_dragon_scale"
+kind="armor"
+glyph="["
+weight=40
+slot="body"
+ac_bonus=9
+base_price=1200
+name="gray dragon scale mail"
+color="gray"
+material="dragonhide"
+stackable=false
+effects=["magic_resistance"]
+tags=["armor", "body", "dragon"]
+spawn_depth_range=[6, 20]
+spawn_weight=1
+
+[[item]]
+id="item.armor.shield_reflection"
+kind="armor"
+glyph="["
+weight=50
+slot="shield"
+ac_bonus=2
+base_price=50
+name="shield of reflection"
+color="white"
+material="silver"
+stackable=false
+effects=["reflection"]
+tags=["armor", "shield"]
+spawn_depth_range=[4, 15]
+spawn_weight=4
+
+[[item]]
+id="item.armor.cloak_magic_resistance"
+kind="armor"
+glyph="["
+weight=10
+slot="cloak"
+ac_bonus=1
+base_price=60
+name="cloak of magic resistance"
+color="bright_magenta"
+material="cloth"
+stackable=false
+effects=["magic_resistance"]
+tags=["armor", "cloak"]
+spawn_depth_range=[4, 15]
+spawn_weight=4
+
+[[item]]
+id="item.armor.speed_boots"
+kind="armor"
+glyph="["
+weight=20
+slot="boots"
+ac_bonus=1
+base_price=50
+name="speed boots"
+color="bright_cyan"
+material="leather"
+stackable=false
+tags=["armor", "boots", "speed"]
+spawn_depth_range=[3, 12]
+spawn_weight=5
+
+[[item]]
+id="item.potion.full_healing"
+kind="potion"
+glyph="!"
+weight=20
+effect="heal_4d8_plus_16"
+base_price=200
+name="full healing potion"
+color="bright_red"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "healing"]
+spawn_depth_range=[4, 15]
+spawn_weight=8
+
+[[item]]
+id="item.potion.gain_level"
+kind="potion"
+glyph="!"
+weight=20
+effect="gain_level"
+base_price=300
+name="potion of gain level"
+color="bright_yellow"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "buff"]
+spawn_depth_range=[4, 20]
+spawn_weight=4
+
+[[item]]
+id="item.potion.polymorph"
+kind="potion"
+glyph="!"
+weight=20
+effect="polymorph_self"
+base_price=200
+name="potion of polymorph"
+color="magenta"
+material="glass"
+unidentified_pool="potion"
+stackable=true
+tags=["potion", "polymorph"]
+spawn_depth_range=[3, 15]
+spawn_weight=5
+
+[[item]]
+id="item.scroll.magic_mapping"
+kind="scroll"
+glyph="?"
+weight=5
+effect="magic_mapping"
+base_price=100
+name="scroll of magic mapping"
+color="bright_cyan"
+material="paper"
+unidentified_pool="scroll"
+stackable=true
+tags=["scroll", "detection"]
+spawn_depth_range=[2, 12]
+spawn_weight=9
+
+[[item]]
+id="item.food.lembas_wafer"
+kind="food"
+glyph="%"
+weight=5
+nutrition=800
+base_price=45
+name="lembas wafer"
+color="bright_yellow"
+material="organic"
+stackable=true
+tags=["food", "elven"]
+spawn_depth_range=[1, 10]
+spawn_weight=12
+
+[[item]]
+id="item.gem.diamond"
+kind="gem"
+glyph="*"
+weight=1
+base_price=4000
+name="diamond"
+color="white"
+material="gemstone"
+stackable=true
+tags=["gem", "valuable"]
+spawn_depth_range=[4, 20]
+spawn_weight=4
+
+[[item]]
+id="item.gem.ruby"
+kind="gem"
+glyph="*"
+weight=1
+base_price=3500
+name="ruby"
+color="bright_red"
+material="gemstone"
+stackable=true
+tags=["gem", "valuable"]
+spawn_depth_range=[4, 20]
+spawn_weight=4
+
+
