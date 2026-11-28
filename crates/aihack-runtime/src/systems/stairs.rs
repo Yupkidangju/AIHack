@@ -15,11 +15,28 @@ pub fn enter_branch(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
         .current_map()
         .tile(world.player_pos())
         .map_err(|error| error.to_string())?;
-    let to = BranchGraph::campaign_v3()
+    let graph = BranchGraph::campaign_v3();
+    let to = graph
         .branch_entry_from(from, tile)
+        .or_else(|| {
+            (tile == TileKind::MagicPortal)
+                .then(|| graph.portal_target(from))
+                .flatten()
+        })
         .ok_or_else(|| "no branch portal at player position".to_string())?;
     if !world.levels.contains(to) {
         return Err("target branch level does not exist".into());
+    }
+    transfer(world, to, true)
+}
+
+pub fn enter_planes(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
+    if world.campaign.is_none() {
+        return Err("planes entry requires campaign mode".into());
+    }
+    let to = LevelId::new(aihack_core::ids::BranchId::Planes, 1);
+    if !world.levels.contains(to) {
+        return Err("Plane of Earth does not exist".into());
     }
     transfer(world, to, true)
 }
@@ -57,8 +74,10 @@ pub fn descend(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
     }
 
     let to = if world.campaign.is_some() {
-        BranchGraph::campaign_v3()
+        let graph = BranchGraph::campaign_v3();
+        graph
             .descend_target(from)
+            .or_else(|| graph.branch_entry_from(from, TileKind::StairsDown))
             .ok_or_else(|| "target level for stairs down does not exist".to_string())?
     } else {
         let target_depth = from
@@ -90,18 +109,38 @@ pub fn descend(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
     Ok(events)
 }
 
-/// 현재 위치의 위층 계단을 통해 고정된 이전 레벨로 이동한다.
+/// 현재 위치의 위층 계단이나 매직 포털을 통해 이전/상위 레벨로 이동한다.
 pub fn ascend(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
     let from = world.current_level();
     let player_pos = world.player_pos();
-    match world.current_map().tile(player_pos) {
-        Ok(TileKind::StairsUp) => {}
-        Ok(_) => return Err("player is not standing on stairs up".to_string()),
-        Err(error) => return Err(format!("cannot inspect stairs up tile: {error}")),
+    let tile = world
+        .current_map()
+        .tile(player_pos)
+        .map_err(|error| format!("cannot inspect stairs up tile: {error}"))?;
+    match tile {
+        TileKind::StairsUp => {}
+        TileKind::MagicPortal
+            if world.campaign.is_some() && from.branch == aihack_core::ids::BranchId::Planes => {}
+        _ => return Err("player is not standing on stairs up".to_string()),
     }
 
     if world.campaign.is_some() {
         let graph = BranchGraph::campaign_v3();
+        if from.branch == aihack_core::ids::BranchId::Planes {
+            if tile == TileKind::MagicPortal {
+                if let Some(to) = graph.portal_target(from) {
+                    if !world.levels.contains(to) {
+                        return Err("target plane level does not exist".to_string());
+                    }
+                    return transfer(world, to, true);
+                }
+            }
+            return Err(if from.depth == 5 {
+                "offer the Amulet at your high altar to ascend".to_string()
+            } else {
+                "step onto the magic portal to ascend further".to_string()
+            });
+        }
         if let Some(to) = graph.ascend_target(from) {
             let returning_from_branch_root = from.depth == 1
                 && graph
@@ -109,7 +148,9 @@ pub fn ascend(world: &mut GameWorld) -> Result<Vec<GameEvent>, String> {
                     .and_then(|def| def.parent)
                     .is_some();
             if returning_from_branch_root {
-                return transfer(world, to, true);
+                let landing_up = graph
+                    .has_branch_entry(to, aihack_core::domain::level::BranchEntryKind::StairsUp);
+                return transfer(world, to, landing_up);
             }
             if !world.levels.contains(to) {
                 return Err("target level for stairs up does not exist".to_string());

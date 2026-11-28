@@ -445,6 +445,32 @@ fn survival_candidates<C: GameClient + ?Sized>(session: &C) -> Vec<CommandIntent
         return vec![CommandIntent::Pay];
     }
 
+    if let Some(campaign) = &observation.campaign {
+        if campaign.has_amulet
+            && campaign.on_high_altar.is_some()
+            && campaign.on_high_altar == campaign.alignment
+        {
+            if let Some(offer_amulet) = observation.inventory.iter().find_map(|item| {
+                if item.kind == ItemKind::AmuletAscension {
+                    let cmd = CommandIntent::Offer { item: item.item };
+                    observation.legal_actions.contains(&cmd).then_some(cmd)
+                } else {
+                    None
+                }
+            }) {
+                return vec![offer_amulet];
+            }
+        }
+        if campaign.has_amulet
+            && campaign.on_magic_portal
+            && observation
+                .legal_actions
+                .contains(&CommandIntent::EnterBranch)
+        {
+            return vec![CommandIntent::EnterBranch];
+        }
+    }
+
     for direction in priority_directions() {
         if visible_hostile_in_direction(&observation, direction, 5) {
             let command = CommandIntent::Cast {
@@ -569,6 +595,7 @@ fn visible_hostile_in_direction(
                 && !matches!(
                     tile.tile,
                     TileKind::Wall
+                        | TileKind::Boulder
                         | TileKind::Door(DoorState::Closed | DoorState::Locked)
                         | TileKind::HiddenDoor
                 )

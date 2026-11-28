@@ -19,7 +19,7 @@ use aihack_core::{
     ids::{BranchId, EntityId, LevelId},
     position::{Direction, Pos},
     run_state::RunState,
-    save::{SAVE_SCHEMA_VERSION_V1, SAVE_SCHEMA_VERSION_V3},
+    save::{SAVE_SCHEMA_VERSION_V1, SAVE_SCHEMA_VERSION_V4},
 };
 use aihack_headless::{run_to_turn, HeadlessPolicy};
 use aihack_llm::{service::LlmObservationView, transport::REQUEST_BODY_LIMIT};
@@ -974,7 +974,7 @@ fn p9_3_dip_holy_unholy_dilution_alchemy_and_erosion() {
         Some(1)
     );
     assert_eq!(fsess.observation().player.ac, ac_before_rust + 1);
-    assert_eq!(fsess.to_save_data().schema_version, SAVE_SCHEMA_VERSION_V3);
+    assert_eq!(fsess.to_save_data().schema_version, SAVE_SCHEMA_VERSION_V4);
     let reloaded = GameSession::from_save_data(fsess.to_save_data()).unwrap();
     assert_eq!(reloaded.observation().player.ac, ac_before_rust + 1);
 

@@ -19,6 +19,24 @@ P1–P3 당시 로컬 검증은 전체 491 tests, fmt/clippy/release PASS를 기
 
 플레이 시정 근거는 `docs/multi_audit/2/final_audit_report_2.md`다. P0 기록은 `docs/multi_audit/2/remediation.md`, 후속 P1–P4 계약·검증은 `docs/campaign_spec.md`와 `docs/campaign_implementation.md`에 있다. TUI-only 메뉴는 concrete submit을 사용한다. Enter의 legacy run과 V1 저장은 보존하고 campaign만 V2 save를 쓴다. 아래 release 감사 권위와 이 플레이 기능 작업은 별개다.
 
+### Stage 7.2 (Audit 37 시정, `ADR-P13-02`) (2026-11-28)
+
+`docs/audit/audit_report_37.md`의 7건(`A37-01`~`A37-07`)을 시정하고 연계 문서·회귀 테스트를 동기화했다:
+- 상점 채무 원장 & 스냅샷 해시(`A37-01`, `A37-02`, `A37-06`): `WorldState`/`SavedWorldV1`에 `shop_debts: Vec<(LevelId, u32)>`, `EntitySnapshot`에 `unpaid_level`, `GameSnapshot`에 `shop_debts`를 optional serde로 추가(레거시 V1/R9 해시 불변). `mark_item_consumed`·`items::drop`(외부/타층 드롭) 시 `unpaid`/`unpaid_level`을 정리하되 `shop_debts[origin]` 채무를 보존하고, `npc::{pay, can_pay, on_shopkeeper_died, check_shop_theft_on_move_or_stairs, chat}`를 해당 상점 층 잔액으로만 제한했다.
+- 소코반 필수 퍼즐·소원 완드/도감·저장 호환(`A37-03`, `A37-04`, `A37-05`, `A37-07`): `Sokoban 1..4` `x = 42` 벽 장벽 + 미충전 구덩이 도보/점프 차단(`A37-04`), `Gehennom 1` `WandWishing` 확정 희귀 배치 + 13분기 층 28마법서/17완드 결정론 순회 공급(`A37-03`), `SAVE_SCHEMA_VERSION_V4 = 4` 승격 및 미수정 P12 8층 `V3`(`!Victory`) 비파괴 메모리 내 `V3 -> V4` 업그레이드·절단/위조 거부(`A37-05`), `BUILD_GUIDE.md`/`spec.md` 동기화(`A37-07`) 및 `tests/audit37_remediation.rs`(**6 PASS**)를 완료했다.
+
+### Stage 7.1 (Audit 36 시정) (2026-11-28)
+
+`docs/audit/audit_report_36.md`의 차단 결함 12건(`DBG-F001`~`F006`, `IMP-F001`~`F006`, `SEC-F001`~`F003`)을 시정하고 연계 문서·회귀 테스트를 동기화했다:
+- 영속성/변조/맵 무결성: `campaign_map.rs` 잠긴 문 전이(`Closed|Open|HiddenDoor -> Locked`, `DBG-F001`)·소코반 메워진 구덩이 위 2번째 바위 전이(`DBG-F002`), `altar.rs`/`observation.rs`/`campaign.rs`/`save.rs`의 `Planes 5` 대제단 개종 차단 및 `{Lawful, Neutral, Chaotic}` 3좌표 불변성 검증(`IMP-F001`/`SEC-F003`), `campaign::validate` Turn-0/XP·HP·MP 위조 차단(`SEC-F001`).
+- 마법/NPC/소원/정보 은닉: `ADR-P12-01`/`campaign_spec.md`/`spells.rs` 미스릴 패널티 면제·레벨 감쇠·`0..=100%`·저주/고난도 마법서·실패 시 반감 MP+숙련(`IMP-F002`/`IMP-F006`), `monsters.toml` 11종 `"npc"` 플래그(LF SHA-256 `a01b37d5206117792a95a7d116663959452f4af9dd7af3b41559fb81acbb6c97`, `content_hash()` `"d4166bdceb5398dd"`) 및 `CharmMonster`/`CreateFamiliar` `pet_hunger` 초기화(`IMP-F003`), `WandMakeInvisible`·소원 `-3..=3`·적대 아티팩트 폭발(`IMP-F004`), `unpaid_level` 상점주인 사망 범위 제한 및 오라클 `enchant_known`+`TileRevealed`(`DBG-F003`), `observation.rs`/`play_menu.rs`/`dip.rs`/`pets.rs`/`monster_ai.rs` 미식별·BUC 비누설(`SEC-F002`)·Sokoban/`Planes 2..5` 비굴착 필터(`DBG-F004`), `death.rs`/`monster_ai.rs`/`artifacts.rs`/`build.rs` 엣지 케이스(`DBG-F005`) 및 `tests/stage{6_p12,7_p13}.rs`·`tests/audit36_remediation.rs`(**11 PASS**) 회귀 스위트를 완료했다.
+
+### Stage 7 (P13) 풀 엔드게임 · 특수 분기 · 로컬 LLM 심화 통합 (2026-11-28)
+
+Stage 7 (`P13`, `ADR-P13-01`)은 24층 캠페인 브랜치 그래프, 95종 몬스터, 13직업 퀘스트 아티팩트, 4원소계+아스트랄계 다중 고위 제단 승천, 구조화 로컬 LLM 통합을 구현했다:
+- 월드/분기/도감: `BranchId::Planes` (`Main 1..6`, `Mines 1..2`, `Sokoban 1..4`, `Quest 1..3`, `Gehennom 1..4`, `Planes 1..5`: 총 **24층**), `TileKind::{Boulder, MagicPortal}`, `monsters.toml` 엔드게임 10종 추가(총 **95종**), `ARTIFACTS` 13직업 고유 퀘스트 아티팩트(`quest_role: Some(role)`), `WorldState.ascension_altars`를 추가했다.
+- 게임플레이/LLM/보안: 소코반 바위·구덩이 물리 및 보상, `Quest 3` 성소 네메시스, `Gehennom 4` 아뮬렛 이관 및 `ascension_pursuit_stage` `1..=5` 추격, `Planes 1..5` 차원 포탈 및 `Planes 5` 성향 일치 고위 제단 봉헌 `Victory`, `LlmCampaignSummary` 32KiB 단계적 압축을 통합하고 `docs/audit/audit_report_36.md` 시정 사항(소코반/잠긴문 `SaveV3`, `Planes 5` 고위 제단 불변성, 주문 실패율·연구·MP/숙련, 고유 NPC 플래그/펫 허기, 투명/소원 범위·아티팩트 폭발, 상점 사망 범위/오라클, Turn-0 위조 차단, 미식별 은닉, 비굴착 `Dig` 필터)을 반영한다.
+
 ### Stage 6 (P12) 마법 체계 심화 & 대규모 도감 투입 (2026-11-28)
 
 Stage 6 (`P12`, `ADR-P12-01`)은 `Cargo.lock` 변경·외부 크레이트 추가 없이 NetHack 핵심 마법·유틸리티 체계와 대규모 콘텐츠 도감을 구현했다:

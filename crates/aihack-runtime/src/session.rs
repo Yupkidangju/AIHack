@@ -228,7 +228,7 @@ impl GameSession {
                 self.accept_without_turn(vec![GameEvent::Message {
                     priority: MessagePriority::Info,
                     text: format!(
-                        "{role:?}: recover the Amulet on Main 6 and return to the surface."
+                        "{role:?}: recover the Amulet in Gehennom 4 and offer it on your Astral high altar."
                     ),
                 }])
             }
@@ -268,7 +268,7 @@ impl GameSession {
                 self.accept_without_turn(vec![GameEvent::Message {
                     priority: MessagePriority::Info,
                     text: format!(
-                        "{} {} {}: recover the Amulet on Main 6 and return to the surface.",
+                        "{} {} {}: recover the Amulet in Gehennom 4 and offer it on your Astral high altar.",
                         alignment.as_str(),
                         race.as_str(),
                         role.display_name()
@@ -298,7 +298,23 @@ impl GameSession {
                 self.reject("role is chosen only during creation".into())
             }
             CommandIntent::EnterBranch => match stairs::enter_branch(&mut self.inner.world) {
-                Ok(events) => self.accept_turn(events),
+                Ok(mut events) => {
+                    let entered_to = events.iter().find_map(|event| match event {
+                        GameEvent::LevelChanged { entity, to, .. }
+                            if *entity == self.world.player_id =>
+                        {
+                            Some(*to)
+                        }
+                        _ => None,
+                    });
+                    if let Some(to) = entered_to {
+                        match ascension::on_level_entered(&mut self.inner.world, to) {
+                            Ok(pursuit_events) => events.extend(pursuit_events),
+                            Err(error) => return self.abort_transaction(error),
+                        }
+                    }
+                    self.accept_turn(events)
+                }
                 Err(error) => self.reject(error),
             },
             CommandIntent::Wait => self.submit_wait(),
@@ -538,6 +554,40 @@ impl GameSession {
                 };
             }
         }
+        if self.world.campaign.is_some()
+            && self.world.current_map().tile(to).ok()
+                == Some(aihack_core::domain::tile::TileKind::Boulder)
+        {
+            return match movement::push_boulder(&mut self.inner.world, direction) {
+                Ok((old_pos, new_pos, plugged)) => {
+                    let mut events = Vec::new();
+                    if let Some(event) = stagger_event {
+                        events.push(event);
+                    }
+                    events.push(GameEvent::EntityMoved {
+                        entity: self.world.player_id(),
+                        from: old_pos,
+                        to: new_pos,
+                    });
+                    events.push(GameEvent::Message {
+                        priority: MessagePriority::Info,
+                        text: if plugged {
+                            "You push the boulder into the pit, plugging it!".to_string()
+                        } else {
+                            "You push the boulder.".to_string()
+                        },
+                    });
+                    events.extend(crate::systems::npc::check_shop_theft_on_move_or_stairs(
+                        &mut self.inner.world,
+                        false,
+                    ));
+                    self.inner.state =
+                        death::state_after_deaths_at(&self.world, self.turn.saturating_add(1));
+                    self.accept_turn(events)
+                }
+                Err(error) => self.reject(format!("{error}")),
+            };
+        }
         match movement::move_player(&mut self.inner.world, direction) {
             Ok(()) => {
                 let to = self.world.player_pos();
@@ -699,11 +749,22 @@ impl GameSession {
                                 )
                             })
                             .unwrap_or_else(|| "item".to_string());
+                        let here_debt = crate::systems::npc::shop_debt_on(
+                            &self.world,
+                            self.world.current_level(),
+                        );
+                        let debt_note = if self.world.shop_debt > here_debt {
+                            format!(
+                                "Shop debt: {here_debt} gold (total: {} gold).",
+                                self.world.shop_debt
+                            )
+                        } else {
+                            format!("Shop debt: {here_debt} gold.")
+                        };
                         events.push(GameEvent::Message {
                             priority: MessagePriority::Info,
                             text: format!(
-                                "You pick up {item_name} (unpaid, {price} gold). Shop debt: {} gold.",
-                                self.world.shop_debt
+                                "You pick up {item_name} (unpaid, {price} gold). {debt_note}"
                             ),
                         });
                     }
@@ -845,9 +906,13 @@ impl GameSession {
 
     fn submit_read(&mut self, item: EntityId) -> TurnOutcome {
         let turn = self.turn;
+        let next_turn = turn.saturating_add(1);
         let state = &mut self.inner;
         match items::read_at(&mut state.world, &mut state.rng, item, turn) {
-            Ok(events) => self.accept_turn(events),
+            Ok(events) => {
+                self.inner.state = death::state_after_deaths_at(&self.world, next_turn);
+                self.accept_turn(events)
+            }
             Err(error) => self.reject(error),
         }
     }
@@ -891,9 +956,34 @@ impl GameSession {
     }
 
     fn submit_offer(&mut self, item: EntityId) -> TurnOutcome {
+        let next_turn = self.turn.saturating_add(1);
+        let astral_victory_eligible =
+            self.world.campaign.is_some_and(|campaign| {
+                let level = self.world.current_level();
+                let pos = self.world.player_pos();
+                level == aihack_core::ids::LevelId::new(BranchId::Planes, 5)
+                    && self.world.ascension_altars.contains(&(level, pos))
+                    && altar::altar_alignment(&self.world) == Some(campaign.alignment)
+                    && self.world.entities.item_data(item).is_some_and(|d| {
+                        d.kind == aihack_core::domain::item::ItemKind::AmuletAscension
+                    })
+                    && self.world.player_alive()
+            });
         let state = &mut self.inner;
         match altar::offer(&mut state.world, &mut state.rng, item) {
-            Ok(events) => self.accept_turn(events),
+            Ok(events) => {
+                if astral_victory_eligible {
+                    let Some(final_score) =
+                        score::death_score(&self.world, next_turn).checked_add(10_000)
+                    else {
+                        return self.abort_transaction("victory score overflows".into());
+                    };
+                    self.inner.state = RunState::Victory { final_score };
+                } else {
+                    self.inner.state = death::state_after_deaths_at(&self.world, next_turn);
+                }
+                self.accept_turn(events)
+            }
             Err(error) => self.reject(error),
         }
     }
@@ -947,8 +1037,13 @@ impl GameSession {
     }
 
     fn submit_wish(&mut self, item: EntityId, wish: WishChoice) -> TurnOutcome {
-        match projectiles::wish(&mut self.inner.world, item, wish) {
-            Ok(events) => self.accept_turn(events),
+        let next_turn = self.turn.saturating_add(1);
+        let state = &mut self.inner;
+        match projectiles::wish(&mut state.world, &mut state.rng, item, wish) {
+            Ok(events) => {
+                self.inner.state = death::state_after_deaths_at(&self.world, next_turn);
+                self.accept_turn(events)
+            }
             Err(error) => self.reject(error),
         }
     }
@@ -985,16 +1080,22 @@ impl GameSession {
             if !crate::campaign::has_amulet(&self.world) || !self.world.player_alive() {
                 return self.reject("return with the Amulet of Ascension".into());
             }
-            let Some(final_score) =
-                score::death_score(&self.world, self.turn + 1).checked_add(10_000)
-            else {
-                return self.abort_transaction("victory score overflows".into());
-            };
-            self.inner.state = RunState::Victory { final_score };
-            return self.accept_turn(vec![GameEvent::Message {
-                priority: MessagePriority::Info,
-                text: "Ascended! The Amulet has reached the surface.".into(),
-            }]);
+            match stairs::enter_planes(&mut self.inner.world) {
+                Ok(mut events) => {
+                    events.push(GameEvent::Message {
+                        priority: MessagePriority::Info,
+                        text: "You ascend beyond the dungeon into the Plane of Earth!".into(),
+                    });
+                    if let Err(error) = ascension::on_level_entered(
+                        &mut self.inner.world,
+                        aihack_core::ids::LevelId::new(BranchId::Planes, 1),
+                    ) {
+                        return self.abort_transaction(error);
+                    }
+                    return self.accept_turn(events);
+                }
+                Err(error) => return self.reject(error),
+            }
         }
         match stairs::ascend(&mut self.inner.world) {
             Ok(mut events) => {
@@ -1439,8 +1540,10 @@ impl GameSession {
             self.state,
             RunState::GameOver { .. } | RunState::Victory { .. }
         ) {
+            let seed = self.meta.seed;
             let state = &mut self.inner;
             let monster_events = match monster_ai::run_monster_turn(
+                seed,
                 &mut state.world,
                 &mut state.rng,
                 &mut state.state,

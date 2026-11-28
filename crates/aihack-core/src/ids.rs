@@ -16,6 +16,7 @@ pub enum BranchId {
     Sokoban,
     Quest,
     Gehennom,
+    Planes,
 }
 
 impl BranchId {
@@ -26,6 +27,7 @@ impl BranchId {
             Self::Sokoban => "Sokoban",
             Self::Quest => "Quest",
             Self::Gehennom => "Gehennom",
+            Self::Planes => "Planes",
         }
     }
 }

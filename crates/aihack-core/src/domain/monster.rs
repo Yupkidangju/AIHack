@@ -181,6 +181,18 @@ define_monster_kinds! {
     BlueDragon => { id: "monster.blue_dragon", ai: RangedOnSight, diff: 9, atk: "bite", v1: false },
     SilverDragon => { id: "monster.silver_dragon", ai: RangedOnSight, diff: 10, atk: "bite", v1: false },
     AirElemental => { id: "monster.air_elemental", ai: ChaseVisiblePlayer, diff: 8, atk: "engulf", v1: false },
+
+    // --- P13 10 Endgame monsters (95 total) ---
+    WizardOfYendor => { id: "monster.wizard_of_yendor", ai: RangedOnSight, diff: 15, atk: "touch", v1: false },
+    HighPriestMoloch => { id: "monster.high_priest_moloch", ai: ChaseVisiblePlayer, diff: 14, atk: "mace", v1: false },
+    Orcus => { id: "monster.orcus", ai: RangedOnSight, diff: 14, atk: "wand", v1: false },
+    QuestNemesis => { id: "monster.quest_nemesis", ai: RangedOnSight, diff: 11, atk: "strike", v1: false },
+    EarthElemental => { id: "monster.earth_elemental", ai: ChaseVisiblePlayer, diff: 9, atk: "fist", v1: false },
+    FireElemental => { id: "monster.fire_elemental", ai: ChaseVisiblePlayer, diff: 9, atk: "burn", v1: false },
+    WaterElemental => { id: "monster.water_elemental", ai: ChaseVisiblePlayer, diff: 9, atk: "engulf", v1: false },
+    RiderDeath => { id: "monster.rider_death", ai: ChaseVisiblePlayer, diff: 16, atk: "touch", v1: false },
+    RiderPestilence => { id: "monster.rider_pestilence", ai: ChaseVisiblePlayer, diff: 15, atk: "touch", v1: false },
+    RiderFamine => { id: "monster.rider_famine", ai: ChaseVisiblePlayer, diff: 15, atk: "touch", v1: false },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

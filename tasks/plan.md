@@ -141,3 +141,41 @@
 | S6-runtime | `appearance`(풀 확장)·`spells`(마법서 학습/20,000턴 감퇴/실패율/28주문)·`items`(마법서 독서·레벨업/자기변이/매직매핑·텔레포트 제어)·`projectiles`(18완드·소원·몬스터 변이)·`death`(생명보존 부적)·`combat`(크기별 피해·은무기)·`monster_ai`(반사·갈등·신규 패시브·투명/가속)·`session`/`bootstrap`/`observation`/`save` 통합 | `crates/aihack-runtime/*` |
 | S6-adapters | `apps/aihack-tui`(동적 28주문 메뉴+실패율, 소원 메뉴, 마법서 `r`) 및 `apps/aihack-headless`(생명보존/반사 아뮬렛·상급 치유 연동) 갱신 | `apps/aihack-tui/*`, `apps/aihack-headless/*` |
 | S6-verify | `tests/stage6_p12.rs` 작성(마법서/기억감퇴/실패율/7학파 28주문/18완드/소원/변이/반사/생명보존/갈등/전 도감 130·85 스폰·관찰·TUI·시체 스모크/SaveV3/V1 격리/LLM 32KiB/ActionSpace <= 64), 전체 gate PASS 및 완료 문서 마감 | `tests/*`, `docs/*`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `README.md`, `tasks/todo.md` |
+
+## Stage 7 (P13) 실행 계획 (2026-11-28)
+
+기준: `docs/CODER_HANDOFF_P7_TO_P13.md` Stage 7 (`P13`), `DESIGN_DECISIONS.md` (`ADR-P13-01`), `spec.md`, `docs/campaign_spec.md` (`Stage 7 (P13)`). 레거시 2층 모드·R9 causal 해시·`MAX_XP = 180`·`CommandIntent: Copy`·`SaveV3`·`LlmObservationView < 32 KiB`·`ActionSpace <= 64`·`Cargo.lock` 불변을 유지하며 Stage 7 완료 후 별도 커밋/푸시는 하지 않는다.
+
+| 단계 | 작업 요약 | 대상 파일 |
+| --- | --- | --- |
+| S7-doc | `DESIGN_DECISIONS.md` (`ADR-P13-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` D3D 기준 선행 확정 | `DESIGN_DECISIONS.md`, `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` |
+| S7-core | `BranchId::Planes`, `TileKind::{Boulder, MagicPortal}`, `BranchGraph` 24층 활성화(`portal_target`/`has_branch_entry`), `MonsterKind` 10종(총 95종), `ARTIFACTS` 13직업 퀘스트 유물(`quest_role`/`quest_artifact_for_role`), `CampaignObservation` 엔드게임 필드 확장 | `crates/aihack-core/*`, `crates/aihack-ai-contract/*` |
+| S7-content | `monsters.toml` P13 10종(총 95종) 투입, `lib.rs`(`monster_is_large`) 갱신, LF SHA-256/`PROVENANCE.md`/`registry.rs` 동기화 | `crates/aihack-content/*`, `docs/provenance/r7-content.sha256`, `PROVENANCE.md` |
+| S7-runtime | `campaign_map.rs`(Sokoban 4층/Quest 3층/Gehennom 4층/Planes 5층 생성 + 바위/구덩이/포탈 검증), `bootstrap.rs`(24층 스폰·아뮬렛 `Gehennom 4` 이관·3고위 제단/13퀘스트 유물/소코반 보상), `movement.rs`/`session.rs`(바위 밀기/구덩이 메우기/Gehennom→Planes→Astral 전이), `tools`/`projectiles`/`spells`(굴착 제한·바위 차단), `artifacts`(13유물 `#invoke`), `stairs`/`ascension`/`altar`(포탈 이동·추격 5단계·아스트랄 성향 봉헌 승리), `save`/`campaign`/`observation` 통합 | `crates/aihack-runtime/*` |
+| S7-llm-adapters | `aihack-llm`(`LlmCampaignSummary` 구조화 + 24KB/32KiB 단계적 압축·내러티브/프롬프트 보강), `aihack-tui`(`Boulder`/`MagicPortal` 렌더·라벨·HUD 특수층·아스트랄 `Offer`), `aihack-headless`(`Boulder` 차단) 동기화 | `crates/aihack-llm/*`, `apps/aihack-tui/*`, `apps/aihack-headless/*` |
+| S7-verify | `tests/stage2_p8.rs`·`tests/campaign.rs`(24층·Gehennom→Planes→Astral 투어) 갱신, `tests/stage7_p13.rs`(소코반/퀘스트/게헤놈/4원소계+아스트랄/LLM 심화/95종+V1/TUI) 작성, 전체 gate PASS 및 완료 문서 마감 | `tests/*`, `docs/*`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `README.md`, `tasks/todo.md` |
+
+## Audit 36 시정 실행 계획 (2026-11-28)
+
+기준: `docs/audit/audit_report_36.md`, `DESIGN_DECISIONS.md` (`ADR-P12-01`·`ADR-P13-01`), `docs/campaign_spec.md`. Critical 2 + Major 8 + Open Test 1 + Minor 3 + Clarification 1 전 항목을 D3D 문서 선행 후 코드·테스트 수정하고 8개 검증 게이트 EXIT 0을 달성한다.
+
+| 단계 | 작업 요약 | 대상 파일 |
+| --- | --- | --- |
+| A36-doc | `DESIGN_DECISIONS.md`(`IMP-F006` mithril 면제 확정·`XPF-F001` 아스트랄 제단), `docs/campaign_spec.md`(`IMP-F005`·`IMP-F006`), `PROVENANCE.md`(`DEP-EXC-0001` `2027-02-20`), `IMPLEMENTATION_SUMMARY.md`(Stage 7 추가), `tasks/{plan,todo}.md` 동기화 | 루트 및 `docs/`, `tasks/` 문서 |
+| A36-content | `monsters.toml` 11종 `"npc"` 플래그 추가(LF 유지), `build.rs` TOML 주석/이스케이프/필수키 검증 보강, LF SHA-256·`PROVENANCE.md`·`registry.rs` 동기화 | `crates/aihack-content/*`, `docs/provenance/r7-content.sha256`, `PROVENANCE.md` |
+| A36-core | `EntityPayload::Actor.invisible` 및 `EntityPayload::Item.unpaid_level` optional serde 필드 + `EntitySnapshot.invisible` 추가 (V1/R9 해시 보존) | `crates/aihack-core/*`, `crates/aihack-runtime/*` |
+| A36-persist | `campaign_map.rs`(`DBG-F001` `Locked` 전이, `DBG-F002` 소코반 `Pit->Floor\|Boulder`), `campaign.rs`·`save.rs`(`SEC-F003` `Planes 5` 고위 제단 좌표/정렬 불변, `SEC-F001` Turn-0/진행 XP·HP·MP 검증) | `crates/aihack-runtime/src/{campaign_map,campaign,save}.rs` |
+| A36-systems | `altar.rs`(`IMP-F001`), `spells.rs`(`IMP-F002`·`IMP-F003`), `projectiles.rs`/`combat.rs`(`IMP-F004`), `npc.rs`/`bootstrap.rs`/`items.rs`(`DBG-F003`), `observation.rs`/`play_menu.rs`/`pets.rs`/`monster_ai.rs`(`SEC-F002`·`DBG-F004`), `death.rs`/`artifacts.rs`(`DBG-F005`), `session.rs`/`render_panels.rs`(`IMP-F005`) | `crates/aihack-runtime/*`, `apps/aihack-tui/*` |
+| A36-verify | `stage6_p12.rs`·`stage7_p13.rs`·`stage4_p10.rs`·`stage2_p8.rs` 정비(`DBG-F001`·`DBG-F006`), `tests/audit36_remediation.rs` 작성, 8개 게이트 전부 EXIT 0 및 마감 문서 동기화 | `tests/*`, `docs/campaign_implementation.md`, `CHANGELOG.md`, `tasks/todo.md` |
+
+## Audit 37 시정 실행 계획 (2026-11-28)
+
+기준: `docs/audit/audit_report_37.md`, `DESIGN_DECISIONS.md` (`ADR-P13-02`), `docs/campaign_spec.md` (`Stage 7.5`). 기존 감사 보고서 및 `target/audit37-20261128-1859/` 원본(`p12-run37.json`, `p12-v1-run37.json`)·`Cargo.lock`·레거시 V1/R9 해시를 보존하며 커밋/푸시는 하지 않는다.
+
+| 단계 | 작업 요약 | 대상 파일 |
+| --- | --- | --- |
+| A37-doc | `DESIGN_DECISIONS.md`(`ADR-P13-02`), `docs/campaign_spec.md`, `BUILD_GUIDE.md`(`A37-07`), `spec.md`(`A37-07`), `tasks/{plan,todo}.md` D3D 기준 선행 확정 | `DESIGN_DECISIONS.md`, `docs/campaign_spec.md`, `BUILD_GUIDE.md`, `spec.md`, `tasks/{plan,todo}.md` |
+| A37-ledger | `WorldState`/`SavedWorldV1` `shop_debts: Vec<(LevelId, u32)>`, `snapshot.rs`(`unpaid_level`/`shop_debts`, `A37-06`), `items.rs` `mark_item_consumed` 및 전 소비/드롭 경계(`A37-01`), `npc.rs` 층별 채무/사망/지불/대화(`A37-02`), `campaign.rs`·`save.rs` 원장 불변조건 검증 | `crates/aihack-core/src/{world,save}.rs`, `crates/aihack-runtime/src/{snapshot,campaign,save}.rs`, `crates/aihack-runtime/src/systems/{npc,items,spells,death,containers,pets,monster_ai,projectiles,shop}.rs` |
+| A37-sokoban-loot | `campaign_map.rs`·`movement.rs` 소코반 `x = 42` 벽 장벽 + 미충전 구덩이 도보 차단(`A37-04`), `bootstrap.rs` `populate_p13_branch_levels` 분리 및 `Gehennom 1` `WandWishing` 확정 배치 + 28마법서/17완드 분기 순회 공급(`A37-03`) | `crates/aihack-runtime/src/{campaign_map,movement,bootstrap}.rs` (and `systems/movement.rs`) |
+| A37-compat | `SAVE_SCHEMA_VERSION_V4 = 4` 승격, 미수정 P12 `V3` 8층(`!Victory`) 비파괴 메모리 내 `V3 -> V4` 업그레이드 및 `V4` 8층 절단/변조 거부(`A37-05`), 기존 `schema_version == 3` 테스트 갱신 | `crates/aihack-core/src/save.rs`, `crates/aihack-runtime/src/{save,campaign_map}.rs`, `tests/*`, `apps/aihack-headless/tests/*` |
+| A37-verify | `tests/audit37_remediation.rs` 양성/음성 대조 작성, Audit 37 공개 CLI 대조 재검증(원본 SHA-256 불변), 8개 게이트 전부 EXIT 0 및 완료 문서 동기화 | `tests/audit37_remediation.rs`, `IMPLEMENTATION_SUMMARY.md`, `CHANGELOG.md`, `tasks/todo.md` |

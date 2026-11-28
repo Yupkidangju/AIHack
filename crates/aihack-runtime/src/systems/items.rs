@@ -58,7 +58,7 @@ pub fn pickup(world: &mut GameWorld) -> Result<GameEvent, String> {
                     if let Some((existing_id, existing_letter, next_qty)) = target {
                         let entities = &mut world.state_mut().entities;
                         entities.set_item_quantity(existing_id, next_qty);
-                        entities.set_item_location(item, EntityLocation::Consumed);
+                        mark_item_consumed(entities, item);
                         entities.set_item_quantity(item, 1);
                         return Ok(GameEvent::ItemPickedUp {
                             entity: player_id,
@@ -84,6 +84,15 @@ pub fn pickup(world: &mut GameWorld) -> Result<GameEvent, String> {
         && world.entities.get(item).and_then(|e| e.item_unpaid()) == Some(true)
         && crate::systems::npc::has_peaceful_shopkeeper_on_level(world)
     {
+        let origin = world
+            .entities
+            .get(item)
+            .and_then(|e| e.item_unpaid_level())
+            .unwrap_or_else(|| world.current_level());
+        world
+            .state_mut()
+            .entities
+            .set_item_unpaid_level(item, Some(origin));
         let price = crate::systems::npc::unpaid_item_price(world, item);
         let qty = u32::from(
             world
@@ -93,11 +102,7 @@ pub fn pickup(world: &mut GameWorld) -> Result<GameEvent, String> {
                 .unwrap_or(1),
         );
         let charge = price.saturating_mul(qty);
-        let next = world
-            .shop_debt
-            .saturating_add(charge)
-            .min(crate::systems::npc::MAX_SHOP_DEBT);
-        world.state_mut().shop_debt = next;
+        crate::systems::npc::add_shop_debt(world, origin, charge);
     }
 
     Ok(GameEvent::ItemPickedUp {
@@ -105,6 +110,15 @@ pub fn pickup(world: &mut GameWorld) -> Result<GameEvent, String> {
         item,
         letter,
     })
+}
+
+pub(crate) fn mark_item_consumed(
+    entities: &mut crate::domain::entity::EntityStore,
+    item: EntityId,
+) {
+    entities.set_item_unpaid(item, false);
+    entities.set_item_unpaid_level(item, None);
+    entities.set_item_location(item, EntityLocation::Consumed);
 }
 
 pub(crate) fn consume_one_from_inventory(
@@ -124,10 +138,7 @@ pub(crate) fn consume_one_from_inventory(
         Ok(false)
     } else {
         remove_inventory_item(world, item)?;
-        world
-            .state_mut()
-            .entities
-            .set_item_location(item, EntityLocation::Consumed);
+        mark_item_consumed(&mut world.state_mut().entities, item);
         Ok(true)
     }
 }
@@ -219,21 +230,28 @@ pub fn drop(world: &mut GameWorld, item: EntityId) -> Result<GameEvent, String> 
     let level = world.current_level();
     let pos = world.player_pos();
     let was_unpaid = world.entities.get(item).and_then(|e| e.item_unpaid()) == Some(true);
-    if world.campaign.is_some()
-        && was_unpaid
-        && crate::systems::npc::has_peaceful_shopkeeper_on_level(world)
-        && crate::systems::npc::is_in_shop_zone(world, pos)
-    {
-        let price = crate::systems::npc::unpaid_item_price(world, item);
-        let qty = u32::from(
-            world
-                .entities
-                .get(item)
-                .and_then(|e| e.item_quantity())
-                .unwrap_or(1),
-        );
-        let credit = price.saturating_mul(qty);
-        world.state_mut().shop_debt = world.shop_debt.saturating_sub(credit);
+    if was_unpaid {
+        let origin = world.entities.get(item).and_then(|e| e.item_unpaid_level());
+        if world.campaign.is_some()
+            && origin == Some(level)
+            && crate::systems::npc::has_peaceful_shopkeeper_on_level(world)
+            && crate::systems::npc::is_in_shop_zone(world, pos)
+        {
+            let price = crate::systems::npc::unpaid_item_price(world, item);
+            let qty = u32::from(
+                world
+                    .entities
+                    .get(item)
+                    .and_then(|e| e.item_quantity())
+                    .unwrap_or(1),
+            );
+            let credit = price.saturating_mul(qty);
+            crate::systems::npc::sub_shop_debt(world, level, credit);
+        } else {
+            let entities = &mut world.state_mut().entities;
+            entities.set_item_unpaid(item, false);
+            entities.set_item_unpaid_level(item, None);
+        }
     }
     world
         .state_mut()

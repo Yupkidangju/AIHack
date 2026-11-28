@@ -138,6 +138,26 @@ pub fn from_world(
                         })
                         .collect()
                 },
+                special_level_id: world
+                    .levels
+                    .get(world.current_level())
+                    .and_then(|level| level.special_level_id.clone()),
+                special_room: world
+                    .levels
+                    .get(world.current_level())
+                    .and_then(|level| level.special_room),
+                on_magic_portal: world.current_map().tile(world.player_pos()).ok()
+                    == Some(TileKind::MagicPortal),
+                on_high_altar: if world.current_level()
+                    == aihack_core::ids::LevelId::new(aihack_core::ids::BranchId::Planes, 5)
+                    && world
+                        .ascension_altars
+                        .contains(&(world.current_level(), world.player_pos()))
+                {
+                    crate::systems::altar::altar_alignment(world)
+                } else {
+                    None
+                },
             }),
         schema_version: OBSERVATION_SCHEMA_VERSION,
         seed,
@@ -262,6 +282,13 @@ fn visible_entities(seed: u64, world: &GameWorld) -> Vec<EntityObservation> {
                     && level == world.current_level()
                     && (visible.contains(&pos) || has_telepathy || infravision_hit)
                 {
+                    if world.campaign.is_some()
+                        && entity.actor_invisible() == Some(true)
+                        && !world.has_see_invisible()
+                        && !has_telepathy
+                    {
+                        return None;
+                    }
                     let (glyph, name, color) = if world.campaign.is_some() {
                         match actor_kind {
                             aihack_core::domain::entity::ActorKind::Monster(mk) => (
@@ -606,9 +633,19 @@ fn legal_actions(world: &GameWorld, run_state: RunState, turn: u64) -> Vec<Comma
                         }
                     }
                     InventoryAction::Offer => {
+                        let on_astral_high_altar = world.current_level()
+                            == aihack_core::ids::LevelId::new(
+                                aihack_core::ids::BranchId::Planes,
+                                5,
+                            )
+                            && world
+                                .ascension_altars
+                                .contains(&(world.current_level(), world.player_pos()));
                         if crate::systems::altar::is_on_altar(world)
                             && world.entities.item_data(item).is_some_and(|data| {
-                                data.kind != aihack_core::domain::item::ItemKind::AmuletAscension
+                                on_astral_high_altar
+                                    || data.kind
+                                        != aihack_core::domain::item::ItemKind::AmuletAscension
                             })
                         {
                             actions.push(CommandIntent::Offer { item });
@@ -634,6 +671,7 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
         if is_passable_for_legal_action(world, direction)
             || is_bump_attack_for_legal_action(world, direction)
             || is_friendly_swap_for_legal_action(world, direction)
+            || crate::systems::movement::is_boulder_push_for_legal_action(world, direction)
         {
             actions.push(CommandIntent::Move(direction));
         }
@@ -654,21 +692,58 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
     {
         actions.push(CommandIntent::Pickup);
     }
-    match world.current_map().tile(world.player_pos()) {
-        Ok(TileKind::StairsDown) => actions.push(CommandIntent::Descend),
-        Ok(tile @ TileKind::StairsUp) => {
-            if world.campaign.is_none()
-                || world.current_level() != aihack_core::ids::LevelId::main(1)
-                || crate::campaign::has_amulet(world)
-            {
-                actions.push(CommandIntent::Ascend);
+    let on_astral_high_altar = world.current_level()
+        == aihack_core::ids::LevelId::new(aihack_core::ids::BranchId::Planes, 5)
+        && world
+            .ascension_altars
+            .contains(&(world.current_level(), world.player_pos()));
+    if on_astral_high_altar && crate::systems::altar::is_on_altar(world) {
+        if let Some(campaign) = world.campaign {
+            if crate::campaign::has_amulet(world) {
+                actions.push(CommandIntent::Offer {
+                    item: campaign.amulet,
+                });
             }
+        }
+    }
+    match world.current_map().tile(world.player_pos()) {
+        Ok(tile @ TileKind::StairsDown) => {
+            actions.push(CommandIntent::Descend);
             if world.campaign.is_some()
                 && aihack_core::domain::level::BranchGraph::campaign_v3()
                     .branch_entry_from(world.current_level(), tile)
                     .is_some()
             {
                 actions.push(CommandIntent::EnterBranch);
+            }
+        }
+        Ok(tile @ TileKind::StairsUp) => {
+            let graph = aihack_core::domain::level::BranchGraph::campaign_v3();
+            let can_ascend = match world.campaign {
+                None => true,
+                Some(_) if world.current_level() == aihack_core::ids::LevelId::main(1) => {
+                    crate::campaign::has_amulet(world)
+                }
+                Some(_) => graph.ascend_target(world.current_level()).is_some(),
+            };
+            if can_ascend {
+                actions.push(CommandIntent::Ascend);
+            }
+            if world.campaign.is_some()
+                && graph
+                    .branch_entry_from(world.current_level(), tile)
+                    .is_some()
+            {
+                actions.push(CommandIntent::EnterBranch);
+            }
+        }
+        Ok(TileKind::MagicPortal) if world.campaign.is_some() => {
+            if aihack_core::domain::level::BranchGraph::campaign_v3()
+                .portal_target(world.current_level())
+                .is_some()
+            {
+                actions.push(CommandIntent::EnterBranch);
+                actions.push(CommandIntent::Ascend);
             }
         }
         Ok(tile) if world.campaign.is_some() => {
@@ -721,6 +796,11 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
     // Tier 2: 단일 인벤토리·상점·제단·비방향 주문/도구 명령
     let on_shop = crate::systems::shop::is_on_shop(world);
     let on_altar = crate::systems::altar::is_on_altar(world);
+    let allow_non_amulet_offer = on_altar
+        && !(on_astral_high_altar
+            && world.campaign.is_some_and(|c| {
+                crate::systems::altar::altar_alignment(world).is_some_and(|a| a != c.alignment)
+            }));
     if world.inventory.equipped_ring.is_some() || world.inventory.equipped_right_ring.is_some() {
         actions.push(CommandIntent::RemoveRing);
     }
@@ -789,7 +869,9 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
             {
                 actions.push(CommandIntent::Sell { item: entry.item });
             }
-            if on_altar && data.kind != aihack_core::domain::item::ItemKind::AmuletAscension {
+            if allow_non_amulet_offer
+                && data.kind != aihack_core::domain::item::ItemKind::AmuletAscension
+            {
                 actions.push(CommandIntent::Offer { item: entry.item });
             }
         }
@@ -871,19 +953,25 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
                     }
                 }
                 Some(ToolAction::Dig) => {
-                    let map = world.current_map();
-                    for direction in Direction::ALL {
-                        let target = world.player_pos().offset(direction.delta());
-                        if target.x > 0
-                            && target.x < map.width - 1
-                            && target.y > 0
-                            && target.y < map.height - 1
-                            && map.tile(target).ok() == Some(TileKind::Wall)
-                        {
-                            actions.push(CommandIntent::Apply {
-                                item: entry.item,
-                                direction: Some(direction),
-                            });
+                    let cur_level = world.current_level();
+                    let can_dig_level = cur_level.branch != aihack_core::ids::BranchId::Sokoban
+                        && !(cur_level.branch == aihack_core::ids::BranchId::Planes
+                            && cur_level.depth >= 2);
+                    if can_dig_level {
+                        let map = world.current_map();
+                        for direction in Direction::ALL {
+                            let target = world.player_pos().offset(direction.delta());
+                            if target.x > 0
+                                && target.x < map.width - 1
+                                && target.y > 0
+                                && target.y < map.height - 1
+                                && map.tile(target).ok() == Some(TileKind::Wall)
+                            {
+                                actions.push(CommandIntent::Apply {
+                                    item: entry.item,
+                                    direction: Some(direction),
+                                });
+                            }
                         }
                     }
                 }
@@ -903,7 +991,10 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
         }
         if data.class == ItemClass::Wand && world.entities.item_charges(entry.item).unwrap_or(0) > 0
         {
-            if data.wand_effect == Some(WandEffect::Wishing) && world.campaign.is_some() {
+            if data.wand_effect == Some(WandEffect::Wishing)
+                && world.campaign.is_some()
+                && world.is_item_identified(data.kind)
+            {
                 for &(_, wish) in crate::systems::projectiles::CURATED_WISHES {
                     actions.push(CommandIntent::Wish {
                         item: entry.item,
@@ -946,7 +1037,9 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
                 };
                 let can_engrave = data.class == ItemClass::Weapon
                     || data.tool_action == Some(ToolAction::Dig)
-                    || (data.wand_effect == Some(WandEffect::Fire) && charges.unwrap_or(0) > 0);
+                    || (data.wand_effect == Some(WandEffect::Fire)
+                        && world.is_item_identified(data.kind)
+                        && charges.unwrap_or(0) > 0);
                 if can_engrave {
                     for text in [
                         EngravingText::Elbereth,
@@ -1038,17 +1131,38 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
                     target: DipTarget::Tile,
                 });
             }
-        } else if tile == Some(TileKind::Altar) && world.mp >= 3 {
-            for entry in &world.inventory.entries {
-                if let Some(e) = world.entities.get(entry.item) {
-                    if e.item()
-                        .is_some_and(|(k, _, _, _, _)| k == ItemKind::PotionWater)
-                        && e.item_buc() == Some(BucStatus::Uncursed)
-                    {
-                        actions.push(CommandIntent::Dip {
-                            item: entry.item,
-                            target: DipTarget::Tile,
-                        });
+        } else if tile == Some(TileKind::Altar) {
+            let cross_aligned = world.campaign.is_some_and(|c| {
+                crate::systems::altar::altar_alignment(world)
+                    .is_some_and(|align| align != c.alignment)
+            });
+            if cross_aligned {
+                for entry in &world.inventory.entries {
+                    actions.push(CommandIntent::Dip {
+                        item: entry.item,
+                        target: DipTarget::Tile,
+                    });
+                }
+            } else if world.mp >= 3 {
+                for entry in &world.inventory.entries {
+                    if let Some(e) = world.entities.get(entry.item) {
+                        if let Some((k, d, _, _, _)) = e.item() {
+                            if d.class != ItemClass::Potion {
+                                continue;
+                            }
+                            let known_kind = world.is_item_identified(k);
+                            if known_kind && k != ItemKind::PotionWater {
+                                continue;
+                            }
+                            let known_buc = e.item_buc_known().unwrap_or(false);
+                            if known_buc && e.item_buc() != Some(BucStatus::Uncursed) {
+                                continue;
+                            }
+                            actions.push(CommandIntent::Dip {
+                                item: entry.item,
+                                target: DipTarget::Tile,
+                            });
+                        }
                     }
                 }
             }
@@ -1063,6 +1177,8 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
             if target_data.class != ItemClass::Potion {
                 continue;
             }
+            let target_known_kind = world.is_item_identified(target_kind);
+            let target_known_buc = target_entity.item_buc_known().unwrap_or(false);
             for item_entry in &world.inventory.entries {
                 if item_entry.item == target_entry.item {
                     continue;
@@ -1073,11 +1189,17 @@ fn playing_actions(world: &GameWorld, turn: u64) -> Vec<CommandIntent> {
                 let Some((item_kind, item_data, _, _, _)) = item_entity.item() else {
                     continue;
                 };
-                let eligible = if target_kind == ItemKind::PotionWater {
-                    !(item_kind == ItemKind::PotionWater
-                        && target_entity.item_buc() == Some(BucStatus::Uncursed))
+                let item_known_kind = world.is_item_identified(item_kind);
+                let eligible = if target_known_kind && target_kind != ItemKind::PotionWater {
+                    item_data.class == ItemClass::Potion
+                        && !(item_known_kind && item_kind == ItemKind::PotionWater)
                 } else {
-                    item_data.class == ItemClass::Potion && item_kind != ItemKind::PotionWater
+                    !(target_known_kind
+                        && target_kind == ItemKind::PotionWater
+                        && target_known_buc
+                        && target_entity.item_buc() == Some(BucStatus::Uncursed)
+                        && item_known_kind
+                        && item_kind == ItemKind::PotionWater)
                 };
                 if eligible {
                     actions.push(CommandIntent::Dip {

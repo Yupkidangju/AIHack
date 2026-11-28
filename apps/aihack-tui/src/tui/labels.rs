@@ -102,10 +102,18 @@ pub fn collect_auto_labels(observation: &Observation, current_time_ms: u64) -> V
         });
     }
 
-    // 계단 체크
+    // 계단 및 매직 포털 체크
     for tile in &observation.visible_tiles {
         use crate::domain::tile::TileKind;
-        if tile.visible && matches!(tile.tile, TileKind::StairsDown | TileKind::StairsUp) {
+        if tile.visible && tile.tile == TileKind::MagicPortal {
+            candidates.push(AutoLabel {
+                kind: LabelKind::Stairs,
+                pos: tile.pos,
+                text: "[Portal]".to_string(),
+                created_at_ms: current_time_ms,
+                duration_ms: 1200,
+            });
+        } else if tile.visible && matches!(tile.tile, TileKind::StairsDown | TileKind::StairsUp) {
             candidates.push(AutoLabel {
                 kind: LabelKind::Stairs,
                 pos: tile.pos,

@@ -34,6 +34,7 @@ use crate::{domain::entity::EntityStore, session::GameSession, world::GameWorld}
 
 pub use aihack_core::save::{
     ReplayLineV1, SAVE_SCHEMA_VERSION_V1, SAVE_SCHEMA_VERSION_V2, SAVE_SCHEMA_VERSION_V3,
+    SAVE_SCHEMA_VERSION_V4,
 };
 pub type SavedWorldV1 = aihack_core::save::SavedWorldV1<EntityStore>;
 pub type SaveDataV1 = aihack_core::save::SaveDataV1<EntityStore>;
@@ -347,7 +348,7 @@ impl GameSession {
         let world = self.world();
         SaveDataV1 {
             schema_version: if world.campaign.is_some() {
-                SAVE_SCHEMA_VERSION_V3
+                SAVE_SCHEMA_VERSION_V4
             } else {
                 SAVE_SCHEMA_VERSION_V1
             },
@@ -368,17 +369,26 @@ impl GameSession {
         save: SaveDataV1,
         registry: &aihack_content::ContentRegistry,
     ) -> Result<Self, GameError> {
-        let expected = if save.world.campaign.is_some() {
-            SAVE_SCHEMA_VERSION_V3
+        let save = if save.world.campaign.is_some() {
+            match save.schema_version {
+                SAVE_SCHEMA_VERSION_V4 => save,
+                SAVE_SCHEMA_VERSION_V3 => upgrade_p12_v3_save_to_v4(save, registry)?,
+                actual => {
+                    return Err(GameError::SaveSchemaVersionMismatch {
+                        expected: SAVE_SCHEMA_VERSION_V4,
+                        actual,
+                    });
+                }
+            }
         } else {
-            SAVE_SCHEMA_VERSION_V1
+            if save.schema_version != SAVE_SCHEMA_VERSION_V1 {
+                return Err(GameError::SaveSchemaVersionMismatch {
+                    expected: SAVE_SCHEMA_VERSION_V1,
+                    actual: save.schema_version,
+                });
+            }
+            save
         };
-        if save.schema_version != expected {
-            return Err(GameError::SaveSchemaVersionMismatch {
-                expected,
-                actual: save.schema_version,
-            });
-        }
         validate_save_data_with_registry(&save, registry)?;
         Ok(Self {
             inner: SessionState {
@@ -392,6 +402,160 @@ impl GameSession {
             transaction_aborted: false,
         })
     }
+}
+
+fn upgrade_p12_v3_save_to_v4(
+    save: SaveDataV1,
+    registry: &aihack_content::ContentRegistry,
+) -> Result<SaveDataV1, GameError> {
+    use aihack_core::ids::BranchId;
+    use std::collections::BTreeMap;
+
+    if matches!(save.run_state, RunState::Victory { .. }) {
+        return Err(invalid_world_error(
+            "P12 V3 saves that already achieved Victory on Main 1 cannot be migrated to the P13 Astral Plane campaign",
+        ));
+    }
+    let p12_expected: HashSet<LevelId> = crate::campaign_map::p12_level_ids().into_iter().collect();
+    let mut p12_actual = HashSet::new();
+    for level in &save.world.levels.levels {
+        if !p12_actual.insert(level.id) {
+            return Err(invalid_world_error(&format!(
+                "duplicate level id in P12 V3 save: {:?}",
+                level.id
+            )));
+        }
+    }
+    if p12_actual != p12_expected {
+        return Err(invalid_world_error(
+            "V3 campaign upgrade requires an unmodified 8-level P12 save (Main 1..6, Mines 1..2); P13 24-level saves must use schema version 4",
+        ));
+    }
+    if !save.world.ascension_altars.is_empty() {
+        return Err(invalid_world_error(
+            "P12 V3 save cannot predefine ascension_altars",
+        ));
+    }
+    for level in &save.world.levels.levels {
+        crate::campaign_map::validate_persisted_p12_map(save.seed, level)
+            .map_err(|reason| invalid_world_error(&reason))?;
+    }
+
+    let mut world_state = aihack_core::world::WorldState::from(save.world);
+    let campaign = world_state
+        .campaign
+        .ok_or_else(|| invalid_world_error("P12 V3 campaign state missing"))?;
+
+    let main6_stairs = crate::campaign_map::main6_gehennom_stairs_pos(save.seed)
+        .map_err(|e| invalid_world_error(&e.to_string()))?;
+    let main6_map = world_state
+        .levels
+        .map_mut(LevelId::main(6))
+        .ok_or_else(|| invalid_world_error("Main 6 missing in P12 V3 save"))?;
+    if main6_map.tile(main6_stairs).ok() == Some(TileKind::Floor) {
+        main6_map
+            .set_tile(main6_stairs, TileKind::StairsDown)
+            .map_err(|e| invalid_world_error(&e.to_string()))?;
+    }
+
+    let (_, gehennom4_pos) = crate::bootstrap::install_p13_branch_levels(
+        &mut world_state,
+        registry,
+        save.seed,
+        campaign.role,
+        campaign.alignment,
+        false,
+    )
+    .map_err(|e| invalid_world_error(&e.to_string()))?;
+
+    let amulet_on_main6 = world_state
+        .entities
+        .get(campaign.amulet)
+        .and_then(|e| e.item())
+        .is_some_and(|(_, _, loc, _, _)| {
+            matches!(loc, EntityLocation::OnMap { level, .. } if level == LevelId::main(6))
+        });
+    if amulet_on_main6 {
+        world_state.entities.set_item_location(
+            campaign.amulet,
+            EntityLocation::OnMap {
+                level: LevelId::new(BranchId::Gehennom, 4),
+                pos: gehennom4_pos,
+            },
+        );
+    }
+
+    // Backfill unpaid_level metadata and per-shop shop_debts ledger for unmodified P12 V3 saves.
+    let fallback_shop_level = if matches!(
+        (
+            world_state.current_level.branch,
+            world_state.current_level.depth
+        ),
+        (BranchId::Main, 2) | (BranchId::Mines, 1)
+    ) {
+        world_state.current_level
+    } else {
+        LevelId::main(2)
+    };
+    let mut unpaid_updates = Vec::new();
+    let mut inv_debt_by_level: BTreeMap<LevelId, u32> = BTreeMap::new();
+    for entity in world_state.entities.entities() {
+        if entity.item_unpaid() != Some(true) {
+            continue;
+        }
+        let Some((_, data, loc, _, _)) = entity.item() else {
+            continue;
+        };
+        let qty = u32::from(entity.item_quantity().unwrap_or(1));
+        match loc {
+            EntityLocation::OnMap { level, .. } => {
+                if entity.item_unpaid_level().is_none() {
+                    unpaid_updates.push((entity.id, level));
+                }
+            }
+            EntityLocation::Inventory { owner } if owner == world_state.player_id => {
+                let origin = entity.item_unpaid_level().unwrap_or(fallback_shop_level);
+                if entity.item_unpaid_level().is_none() {
+                    unpaid_updates.push((entity.id, origin));
+                }
+                let price = crate::systems::npc::unpaid_item_price_for_data(Some(campaign), data);
+                let amt = price.saturating_mul(qty);
+                *inv_debt_by_level.entry(origin).or_insert(0) += amt;
+            }
+            _ => {}
+        }
+    }
+    for (id, level) in unpaid_updates {
+        world_state.entities.set_item_unpaid_level(id, Some(level));
+    }
+    if world_state.shop_debt > 0 && world_state.shop_debts.is_empty() {
+        let mut remaining = world_state.shop_debt;
+        let mut ledger: BTreeMap<LevelId, u32> = BTreeMap::new();
+        for (lvl, amt) in inv_debt_by_level {
+            if remaining == 0 {
+                break;
+            }
+            let portion = amt.min(remaining);
+            if portion > 0 {
+                *ledger.entry(lvl).or_insert(0) += portion;
+                remaining -= portion;
+            }
+        }
+        if remaining > 0 {
+            *ledger.entry(fallback_shop_level).or_insert(0) += remaining;
+        }
+        world_state.shop_debts = ledger.into_iter().filter(|&(_, a)| a > 0).collect();
+    }
+
+    Ok(SaveDataV1 {
+        schema_version: SAVE_SCHEMA_VERSION_V4,
+        seed: save.seed,
+        turn: save.turn,
+        run_state: save.run_state,
+        rng_state: save.rng_state,
+        world: SavedWorldV1::from(&world_state),
+        event_log: save.event_log,
+    })
 }
 
 pub(crate) fn validate_save_data_with_registry(
@@ -424,7 +588,7 @@ pub(crate) fn validate_save_data_with_registry(
         .into());
     }
     validate_events(&save.event_log)?;
-    validate_saved_world_for_run_state(&save.world, save.run_state, registry)?;
+    validate_saved_world_for_run_state(&save.world, save.run_state, save.turn, registry)?;
     if save.world.campaign.is_some() {
         for level in &save.world.levels.levels {
             crate::campaign_map::validate_persisted_map(save.seed, level)
@@ -434,16 +598,25 @@ pub(crate) fn validate_save_data_with_registry(
     validate_consumer_safe_arithmetic(save)?;
     if let RunState::Victory { final_score } = save.run_state {
         let world = GameWorld::from_saved_world_with_registry(save.world.clone(), registry)?;
+        let level_id = world.current_level();
+        let pos = world.player_pos();
+        let high_altar_coaligned = world.ascension_altars.contains(&(level_id, pos))
+            && world
+                .levels
+                .get(level_id)
+                .and_then(|lvl| lvl.altar_alignment(pos))
+                == world.campaign.map(|c| c.alignment);
         if !world.player_alive()
             || !crate::campaign::has_amulet(&world)
-            || world.current_level() != LevelId::main(1)
-            || world.current_map().tile(world.player_pos()).ok()
-                != Some(aihack_core::domain::tile::TileKind::StairsUp)
+            || level_id != LevelId::new(aihack_core::ids::BranchId::Planes, 5)
+            || world.current_map().tile(pos).ok()
+                != Some(aihack_core::domain::tile::TileKind::Altar)
+            || !high_altar_coaligned
             || crate::systems::score::death_score(&world, save.turn).checked_add(10_000)
                 != Some(final_score)
         {
             return invalid_world(
-                "victory requires live player, carried amulet, surface exit and matching score"
+                "victory requires live player, carried amulet, co-aligned astral high altar and matching score"
                     .into(),
             );
         }
@@ -500,26 +673,28 @@ fn validate_events(events: &[GameEvent]) -> Result<(), GameError> {
 }
 
 pub(crate) fn validate_saved_world(world: &SavedWorldV1) -> Result<(), GameError> {
-    validate_saved_world_inner(world, false, None, aihack_content::registry()?)
+    validate_saved_world_inner(world, false, None, None, aihack_content::registry()?)
 }
 
 #[cfg(feature = "testing")]
 pub(crate) fn validate_depleted_saved_world(world: &SavedWorldV1) -> Result<(), GameError> {
-    validate_saved_world_inner(world, true, None, aihack_content::registry()?)
+    validate_saved_world_inner(world, true, None, None, aihack_content::registry()?)
 }
 
 fn validate_saved_world_for_run_state(
     world: &SavedWorldV1,
     run_state: RunState,
+    turn: u64,
     registry: &aihack_content::ContentRegistry,
 ) -> Result<(), GameError> {
-    validate_saved_world_inner(world, false, Some(run_state), registry)
+    validate_saved_world_inner(world, false, Some(run_state), Some(turn), registry)
 }
 
 fn validate_saved_world_inner(
     world: &SavedWorldV1,
     allow_depleted_actor: bool,
     run_state: Option<RunState>,
+    turn: Option<u64>,
     registry: &aihack_content::ContentRegistry,
 ) -> Result<(), GameError> {
     let mut level_ids = HashSet::new();
@@ -630,12 +805,14 @@ fn validate_saved_world_inner(
                 tameness,
                 pet_xp,
                 pet_hunger,
+                invisible,
             } => {
                 if world.campaign.is_none() {
                     if !monster_inventory.is_empty()
                         || *tameness > 0
                         || *pet_xp > 0
                         || *pet_hunger != 0
+                        || *invisible
                     {
                         return invalid_world(
                             "legacy mode cannot contain monster inventories or pet state"
@@ -701,6 +878,7 @@ fn validate_saved_world_inner(
                 container_trapped,
                 erosion,
                 unpaid,
+                unpaid_level,
                 ..
             } => {
                 if world.campaign.is_none()
@@ -711,6 +889,7 @@ fn validate_saved_world_inner(
                         || *container_trapped
                         || *erosion > 0
                         || *unpaid
+                        || unpaid_level.is_some()
                         || matches!(location, EntityLocation::InContainer { .. })
                         || data.tool_action.is_some()
                         || data.container_capacity.is_some()
@@ -747,6 +926,19 @@ fn validate_saved_world_inner(
                 {
                     return invalid_world(format!(
                         "item {} has invalid unpaid location or kind",
+                        entity.id.0
+                    ));
+                }
+                if let Some(u_lvl) = unpaid_level {
+                    if !*unpaid || !world.levels.contains(*u_lvl) {
+                        return invalid_world(format!(
+                            "item {} has invalid unpaid_level metadata",
+                            entity.id.0
+                        ));
+                    }
+                } else if *unpaid && matches!(location, EntityLocation::Inventory { .. }) {
+                    return invalid_world(format!(
+                        "inventory unpaid item {} is missing unpaid_level metadata",
                         entity.id.0
                     ));
                 }
@@ -918,7 +1110,7 @@ fn validate_saved_world_inner(
         return invalid_world("player location/current level mismatch".to_string());
     }
     validate_inventory(world)?;
-    crate::campaign::validate(world).map_err(|reason| invalid_world_error(&reason))
+    crate::campaign::validate(world, turn).map_err(|reason| invalid_world_error(&reason))
 }
 
 fn item_data_matches_registry(
@@ -957,7 +1149,9 @@ fn is_p9_only_tile(tile: TileKind) -> bool {
         | TileKind::DryFountain
         | TileKind::Sink
         | TileKind::Water
-        | TileKind::Lava => true,
+        | TileKind::Lava
+        | TileKind::Boulder
+        | TileKind::MagicPortal => true,
         TileKind::Trap(trap) | TileKind::HiddenTrap(trap) => matches!(
             trap,
             TrapKind::Hole

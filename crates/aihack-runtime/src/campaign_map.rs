@@ -22,6 +22,30 @@ pub(crate) fn level_ids() -> Vec<LevelId> {
     BranchGraph::campaign_v3().active_level_ids()
 }
 
+pub(crate) fn p12_level_ids() -> Vec<LevelId> {
+    let mut out = Vec::with_capacity(8);
+    for depth in 1..=6 {
+        out.push(LevelId::main(depth));
+    }
+    for depth in 1..=2 {
+        out.push(LevelId::new(BranchId::Mines, depth));
+    }
+    out
+}
+
+pub(crate) fn p13_branch_level_ids() -> Vec<LevelId> {
+    let p12 = p12_level_ids();
+    level_ids()
+        .into_iter()
+        .filter(|id| !p12.contains(id))
+        .collect()
+}
+
+pub(crate) fn main6_gehennom_stairs_pos(seed: u64) -> Result<Pos, ContentError> {
+    let (_, centers) = generate(seed, LevelId::main(6))?;
+    Ok(centers[3])
+}
+
 struct Layout(Vec<(Pos, TileKind)>);
 impl MapLayout for Layout {
     fn level_id(&self) -> &str {
@@ -63,6 +87,7 @@ fn seed_for_level(seed: u64, id: LevelId) -> u64 {
         BranchId::Sokoban => 0xe703_7ed1_a0b4_28db,
         BranchId::Quest => 0x8ebc_6af0_9c88_c6e3,
         BranchId::Gehennom => 0x5899_65cc_7537_4cc3,
+        BranchId::Planes => 0x4b72_9d41_e310_829f,
     };
     seed ^ (id.depth as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15) ^ branch_salt
 }
@@ -70,6 +95,13 @@ fn seed_for_level(seed: u64, id: LevelId) -> u64 {
 /// Combat RNG와 독립인 Generator v3 (`80x21`).
 /// 가변 6개 방, 스패닝 트리 + 루프 통로, 어둠/조명, 특수방, 문·비밀문·함정을 배치하고 BFS 도달성을 보장한다.
 pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 6]), ContentError> {
+    match id.branch {
+        BranchId::Sokoban => return generate_sokoban(id),
+        BranchId::Quest => return generate_quest(seed, id),
+        BranchId::Gehennom => return generate_gehennom(seed, id),
+        BranchId::Planes => return generate_planes(seed, id),
+        BranchId::Main | BranchId::Mines => {}
+    }
     let mut state = seed_for_level(seed, id);
 
     // 3 columns x 2 rows 구역에 6개 가변 방을 비중첩 배치한다.
@@ -516,7 +548,9 @@ pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 6]), 
 
     // 계단 배치
     grid[tile_idx(rooms[0].center)] = TileKind::StairsUp;
-    let has_down = BranchGraph::campaign_v3().descend_target(id).is_some();
+    let graph = BranchGraph::campaign_v3();
+    let has_down = graph.descend_target(id).is_some()
+        || graph.has_branch_entry(id, aihack_core::domain::level::BranchEntryKind::StairsDown);
     if has_down {
         grid[tile_idx(rooms[3].center)] = TileKind::StairsDown;
     }
@@ -562,6 +596,448 @@ pub(crate) fn generate(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 6]), 
         },
         centers,
     ))
+}
+
+fn branch_tile_idx(pos: Pos) -> usize {
+    (pos.y as usize * CAMPAIGN_MAP_WIDTH as usize) + pos.x as usize
+}
+
+fn carve_floor_rect(
+    grid: &mut [TileKind],
+    lit_tiles: &mut [bool],
+    x1: i16,
+    y1: i16,
+    x2: i16,
+    y2: i16,
+    lit: bool,
+) {
+    for y in y1..=y2 {
+        for x in x1..=x2 {
+            let p = Pos { x, y };
+            let idx = branch_tile_idx(p);
+            grid[idx] = TileKind::Floor;
+            if lit {
+                lit_tiles[idx] = true;
+            }
+        }
+    }
+    if lit {
+        for y in (y1 - 1).max(0)..=(y2 + 1).min(CAMPAIGN_MAP_HEIGHT - 1) {
+            for x in (x1 - 1).max(0)..=(x2 + 1).min(CAMPAIGN_MAP_WIDTH - 1) {
+                lit_tiles[branch_tile_idx(Pos { x, y })] = true;
+            }
+        }
+    }
+}
+
+fn carve_l_corridor(grid: &mut [TileKind], lit_tiles: &mut [bool], a: Pos, b: Pos, lit: bool) {
+    for x in a.x.min(b.x)..=a.x.max(b.x) {
+        let idx = branch_tile_idx(Pos { x, y: a.y });
+        if grid[idx] == TileKind::Wall {
+            grid[idx] = TileKind::Floor;
+        }
+        if lit {
+            lit_tiles[idx] = true;
+        }
+    }
+    for y in a.y.min(b.y)..=a.y.max(b.y) {
+        let idx = branch_tile_idx(Pos { x: b.x, y });
+        if grid[idx] == TileKind::Wall {
+            grid[idx] = TileKind::Floor;
+        }
+        if lit {
+            lit_tiles[idx] = true;
+        }
+    }
+}
+
+fn build_branch_level(
+    id: LevelId,
+    grid: Vec<TileKind>,
+    lit_tiles: Vec<bool>,
+    special_room: Option<SpecialRoomKind>,
+    special_level_id: Option<String>,
+    centers: [Pos; 6],
+) -> Result<(GameLevel, [Pos; 6]), ContentError> {
+    let mut overrides = Vec::with_capacity(grid.len());
+    for y in 0..CAMPAIGN_MAP_HEIGHT {
+        for x in 0..CAMPAIGN_MAP_WIDTH {
+            let p = Pos { x, y };
+            overrides.push((p, grid[branch_tile_idx(p)]));
+        }
+    }
+    Ok((
+        GameLevel {
+            id,
+            map: GameMap::from_level_data(&Layout(overrides))?,
+            explored: Vec::new(),
+            lit_tiles,
+            special_room,
+            engravings: Vec::new(),
+            altar_alignments: Vec::new(),
+            special_level_id,
+        },
+        centers,
+    ))
+}
+
+fn generate_sokoban(id: LevelId) -> Result<(GameLevel, [Pos; 6]), ContentError> {
+    let mut grid = vec![TileKind::Wall; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+    let mut lit_tiles = vec![false; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+    let centers = [
+        Pos { x: 8, y: 10 },
+        Pos { x: 24, y: 5 },
+        Pos { x: 52, y: 5 },
+        Pos { x: 70, y: 10 },
+        Pos { x: 52, y: 15 },
+        Pos { x: 24, y: 15 },
+    ];
+    carve_floor_rect(&mut grid, &mut lit_tiles, 4, 6, 14, 14, true);
+    carve_floor_rect(&mut grid, &mut lit_tiles, 20, 3, 28, 7, true);
+    carve_floor_rect(&mut grid, &mut lit_tiles, 48, 3, 56, 7, true);
+    carve_floor_rect(&mut grid, &mut lit_tiles, 66, 6, 75, 14, true);
+    carve_floor_rect(&mut grid, &mut lit_tiles, 48, 13, 56, 17, true);
+    carve_floor_rect(&mut grid, &mut lit_tiles, 20, 13, 28, 17, true);
+    carve_floor_rect(&mut grid, &mut lit_tiles, 15, 9, 65, 11, true);
+    carve_floor_rect(&mut grid, &mut lit_tiles, 34, 8, 60, 12, true);
+    carve_l_corridor(
+        &mut grid,
+        &mut lit_tiles,
+        centers[1],
+        Pos { x: 24, y: 9 },
+        true,
+    );
+    carve_l_corridor(
+        &mut grid,
+        &mut lit_tiles,
+        centers[2],
+        Pos { x: 52, y: 9 },
+        true,
+    );
+    carve_l_corridor(
+        &mut grid,
+        &mut lit_tiles,
+        centers[4],
+        Pos { x: 52, y: 11 },
+        true,
+    );
+    carve_l_corridor(
+        &mut grid,
+        &mut lit_tiles,
+        centers[5],
+        Pos { x: 24, y: 11 },
+        true,
+    );
+
+    grid[branch_tile_idx(centers[0])] = TileKind::StairsUp;
+    if id.depth < 4 {
+        grid[branch_tile_idx(centers[3])] = TileKind::StairsDown;
+    }
+
+    // Vertical barrier at x = 42 forces Sokoban boulder/pit puzzle completion before reaching East exit/prize.
+    for y in 8..=12_i16 {
+        grid[branch_tile_idx(Pos { x: 42, y })] = TileKind::Wall;
+    }
+
+    // Solvable boulder/pit puzzle lanes aligned directly against the x = 42 pit barrier.
+    let puzzle_pairs: &[(Pos, Pos)] = match id.depth {
+        1 => &[
+            (Pos { x: 37, y: 9 }, Pos { x: 42, y: 9 }),
+            (Pos { x: 37, y: 11 }, Pos { x: 42, y: 11 }),
+        ],
+        2 => &[
+            (Pos { x: 37, y: 8 }, Pos { x: 42, y: 8 }),
+            (Pos { x: 37, y: 11 }, Pos { x: 42, y: 11 }),
+        ],
+        3 => &[
+            (Pos { x: 36, y: 8 }, Pos { x: 42, y: 8 }),
+            (Pos { x: 38, y: 10 }, Pos { x: 42, y: 10 }),
+            (Pos { x: 36, y: 12 }, Pos { x: 42, y: 12 }),
+        ],
+        _ => &[
+            (Pos { x: 36, y: 8 }, Pos { x: 42, y: 8 }),
+            (Pos { x: 37, y: 10 }, Pos { x: 42, y: 10 }),
+            (Pos { x: 36, y: 12 }, Pos { x: 42, y: 12 }),
+        ],
+    };
+    for &(boulder_pos, pit_pos) in puzzle_pairs {
+        grid[branch_tile_idx(boulder_pos)] = TileKind::Boulder;
+        grid[branch_tile_idx(pit_pos)] = TileKind::Trap(TrapKind::Pit);
+    }
+    // Extra spare boulder in side alcove of puzzle hall
+    grid[branch_tile_idx(Pos { x: 56, y: 8 })] = TileKind::Boulder;
+
+    build_branch_level(
+        id,
+        grid,
+        lit_tiles,
+        None,
+        Some(format!("sokoban_{}", id.depth)),
+        centers,
+    )
+}
+
+fn generate_quest(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 6]), ContentError> {
+    let mut state = seed_for_level(seed, id);
+    let mut grid = vec![TileKind::Wall; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+    let mut lit_tiles = vec![false; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+    let jitter_x = (next_rng(&mut state) % 3) as i16 - 1;
+    let centers = [
+        Pos { x: 10, y: 10 },
+        Pos {
+            x: 30 + jitter_x,
+            y: 5,
+        },
+        Pos {
+            x: 52 + jitter_x,
+            y: 5,
+        },
+        Pos { x: 70, y: 10 },
+        Pos {
+            x: 52 + jitter_x,
+            y: 15,
+        },
+        Pos {
+            x: 30 + jitter_x,
+            y: 15,
+        },
+    ];
+    for c in centers {
+        carve_floor_rect(
+            &mut grid,
+            &mut lit_tiles,
+            c.x - 5,
+            c.y - 3,
+            c.x + 5,
+            c.y + 3,
+            true,
+        );
+    }
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[0], centers[1], true);
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[1], centers[2], true);
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[2], centers[3], true);
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[0], centers[5], true);
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[5], centers[4], true);
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[4], centers[3], true);
+
+    grid[branch_tile_idx(centers[0])] = TileKind::StairsUp;
+    let special_room = if id.depth < 3 {
+        grid[branch_tile_idx(centers[3])] = TileKind::StairsDown;
+        Some(SpecialRoomKind::Barracks)
+    } else {
+        Some(SpecialRoomKind::Vault)
+    };
+    build_branch_level(
+        id,
+        grid,
+        lit_tiles,
+        special_room,
+        Some(format!("quest_{}", id.depth)),
+        centers,
+    )
+}
+
+fn generate_gehennom(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 6]), ContentError> {
+    let mut state = seed_for_level(seed, id);
+    let mut grid = vec![TileKind::Wall; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+    let mut lit_tiles = vec![false; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+    let offset = (next_rng(&mut state) % 2) as i16;
+    let centers = [
+        Pos { x: 9, y: 10 },
+        Pos {
+            x: 28 + offset,
+            y: 5,
+        },
+        Pos {
+            x: 50 + offset,
+            y: 5,
+        },
+        Pos { x: 70, y: 10 },
+        Pos {
+            x: 50 + offset,
+            y: 15,
+        },
+        Pos {
+            x: 28 + offset,
+            y: 15,
+        },
+    ];
+    for (idx, c) in centers.iter().copied().enumerate() {
+        let (y1, y2) = match idx {
+            1 | 2 => (c.y - 3, c.y + 2),
+            4 | 5 => (c.y - 2, c.y + 3),
+            _ => (c.y - 3, c.y + 3),
+        };
+        carve_floor_rect(&mut grid, &mut lit_tiles, c.x - 5, y1, c.x + 5, y2, true);
+    }
+    carve_floor_rect(&mut grid, &mut lit_tiles, 14, 9, 65, 11, true);
+    for c in [centers[1], centers[2]] {
+        carve_l_corridor(&mut grid, &mut lit_tiles, c, Pos { x: c.x, y: 9 }, true);
+        grid[branch_tile_idx(Pos { x: c.x, y: 8 })] = TileKind::Door(DoorState::Closed);
+    }
+    for c in [centers[4], centers[5]] {
+        carve_l_corridor(&mut grid, &mut lit_tiles, c, Pos { x: c.x, y: 11 }, true);
+    }
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[1], centers[2], true);
+    carve_l_corridor(&mut grid, &mut lit_tiles, centers[5], centers[4], true);
+
+    if id.depth == 3 {
+        // Wizard's Tower moat border (keeps side floor paths open around the edges)
+        for x in [46_i16, 47, 54, 55] {
+            for y in [3_i16, 17] {
+                grid[branch_tile_idx(Pos { x, y })] = TileKind::Water;
+            }
+        }
+    } else if id.depth == 4 {
+        // Moloch's Sanctum lava border around central bridge
+        for x in 60..=76 {
+            for y in [5_i16, 15] {
+                grid[branch_tile_idx(Pos { x, y })] = TileKind::Lava;
+            }
+        }
+    }
+
+    grid[branch_tile_idx(centers[0])] = TileKind::StairsUp;
+    if id.depth < 4 {
+        grid[branch_tile_idx(centers[3])] = TileKind::StairsDown;
+    }
+
+    let (special_room, special_level_id) = match id.depth {
+        1 => (None, Some("valley_of_the_dead".to_owned())),
+        2 => (
+            Some(SpecialRoomKind::Barracks),
+            Some("orcus_town".to_owned()),
+        ),
+        3 => (None, Some("wizards_tower".to_owned())),
+        _ => (
+            Some(SpecialRoomKind::Vault),
+            Some("molochs_sanctum".to_owned()),
+        ),
+    };
+
+    build_branch_level(id, grid, lit_tiles, special_room, special_level_id, centers)
+}
+
+fn generate_planes(seed: u64, id: LevelId) -> Result<(GameLevel, [Pos; 6]), ContentError> {
+    let _ = seed_for_level(seed, id);
+    let mut grid = vec![TileKind::Wall; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+    let mut lit_tiles = vec![false; (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize];
+
+    if id.depth == 5 {
+        // Astral Plane: entry west hall leading to 3 distinct High Altar chapels on east
+        let centers = [
+            Pos { x: 10, y: 10 },
+            Pos { x: 60, y: 4 },
+            Pos { x: 60, y: 10 },
+            Pos { x: 60, y: 16 },
+            Pos { x: 38, y: 10 },
+            Pos { x: 24, y: 10 },
+        ];
+        carve_floor_rect(&mut grid, &mut lit_tiles, 5, 6, 46, 14, true);
+        carve_floor_rect(&mut grid, &mut lit_tiles, 46, 9, 68, 11, true);
+        carve_floor_rect(&mut grid, &mut lit_tiles, 52, 2, 68, 6, true);
+        carve_floor_rect(&mut grid, &mut lit_tiles, 52, 8, 68, 12, true);
+        carve_floor_rect(&mut grid, &mut lit_tiles, 52, 14, 68, 18, true);
+        carve_floor_rect(&mut grid, &mut lit_tiles, 48, 3, 52, 17, true);
+
+        grid[branch_tile_idx(centers[0])] = TileKind::StairsUp;
+        grid[branch_tile_idx(centers[1])] = TileKind::Altar;
+        grid[branch_tile_idx(centers[2])] = TileKind::Altar;
+        grid[branch_tile_idx(centers[3])] = TileKind::Altar;
+        return build_branch_level(
+            id,
+            grid,
+            lit_tiles,
+            Some(SpecialRoomKind::Temple),
+            Some("astral_plane".to_owned()),
+            centers,
+        );
+    }
+
+    let centers = [
+        Pos { x: 10, y: 10 },
+        Pos { x: 28, y: 5 },
+        Pos { x: 50, y: 5 },
+        Pos { x: 70, y: 10 },
+        Pos { x: 50, y: 15 },
+        Pos { x: 28, y: 15 },
+    ];
+    match id.depth {
+        1 => {
+            // Plane of Earth: mostly Wall cavern with carved winding tunnels
+            for c in centers {
+                carve_floor_rect(
+                    &mut grid,
+                    &mut lit_tiles,
+                    c.x - 4,
+                    c.y - 2,
+                    c.x + 4,
+                    c.y + 2,
+                    true,
+                );
+            }
+            carve_l_corridor(&mut grid, &mut lit_tiles, centers[0], centers[1], true);
+            carve_l_corridor(&mut grid, &mut lit_tiles, centers[1], centers[2], true);
+            carve_l_corridor(&mut grid, &mut lit_tiles, centers[2], centers[3], true);
+            carve_l_corridor(&mut grid, &mut lit_tiles, centers[0], centers[5], true);
+            carve_l_corridor(&mut grid, &mut lit_tiles, centers[5], centers[4], true);
+            carve_l_corridor(&mut grid, &mut lit_tiles, centers[4], centers[3], true);
+        }
+        2 => {
+            // Plane of Air: expansive sky arena
+            carve_floor_rect(&mut grid, &mut lit_tiles, 3, 2, 76, 18, true);
+            for wall_x in [20_i16, 40, 58] {
+                for wall_y in [4_i16, 16] {
+                    grid[branch_tile_idx(Pos {
+                        x: wall_x,
+                        y: wall_y,
+                    })] = TileKind::Wall;
+                }
+            }
+        }
+        3 | 4 => {
+            // Plane of Fire (3) / Plane of Water (4): hazard fill with solid floor islands and bridges
+            let hazard = if id.depth == 3 {
+                TileKind::Lava
+            } else {
+                TileKind::Water
+            };
+            for y in 2..=18 {
+                for x in 2..=77 {
+                    let idx = branch_tile_idx(Pos { x, y });
+                    grid[idx] = hazard;
+                    lit_tiles[idx] = true;
+                }
+            }
+            for c in centers {
+                carve_floor_rect(
+                    &mut grid,
+                    &mut lit_tiles,
+                    c.x - 4,
+                    c.y - 2,
+                    c.x + 4,
+                    c.y + 2,
+                    true,
+                );
+            }
+            carve_floor_rect(&mut grid, &mut lit_tiles, 10, 9, 70, 11, true);
+            carve_floor_rect(&mut grid, &mut lit_tiles, 27, 5, 29, 15, true);
+            carve_floor_rect(&mut grid, &mut lit_tiles, 49, 5, 51, 15, true);
+        }
+        _ => {}
+    }
+
+    grid[branch_tile_idx(centers[0])] = TileKind::StairsUp;
+    grid[branch_tile_idx(centers[3])] = TileKind::MagicPortal;
+
+    let special_level_id = match id.depth {
+        1 => Some("plane_of_earth".to_owned()),
+        2 => Some("plane_of_air".to_owned()),
+        3 => Some("plane_of_fire".to_owned()),
+        _ => Some("plane_of_water".to_owned()),
+    };
+
+    build_branch_level(id, grid, lit_tiles, None, special_level_id, centers)
 }
 
 fn is_clean_choke_doorway(grid: &[TileKind], pos: Pos) -> bool {
@@ -612,7 +1088,21 @@ fn all_targets_reachable(grid: &[TileKind], start: Pos, targets: &[Pos]) -> bool
 
 /// 저장된 캠페인 지도의 구조적 불변조건을 검사한다(내부 굴착 Wall->Floor는 허용, 외곽/계단/특수타일 위조·단절 거부).
 pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<(), String> {
+    validate_persisted_map_inner(seed, actual, false)
+}
+
+/// P8–P12 8층 캠페인 세이브(`Main 1..6`, `Mines 1..2`)의 지도를 검증한다(`Main 6` 게헤놈 하향 계단 부재 허용).
+pub(crate) fn validate_persisted_p12_map(seed: u64, actual: &GameLevel) -> Result<(), String> {
+    validate_persisted_map_inner(seed, actual, true)
+}
+
+fn validate_persisted_map_inner(
+    seed: u64,
+    actual: &GameLevel,
+    allow_p12_main6_floor_stairs: bool,
+) -> Result<(), String> {
     let id = actual.id;
+    let p12_main6_compat = allow_p12_main6_floor_stairs && id == LevelId::main(6);
     let (expected, _) = generate(seed, id).map_err(|error| error.to_string())?;
     if actual.map.width != CAMPAIGN_MAP_WIDTH || actual.map.height != CAMPAIGN_MAP_HEIGHT {
         return Err("campaign generator/map dimension mismatch".to_owned());
@@ -620,6 +1110,14 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
     let expected_tile_count = (CAMPAIGN_MAP_WIDTH * CAMPAIGN_MAP_HEIGHT) as usize;
     if actual.map.tiles().len() != expected_tile_count {
         return Err("campaign generator/map tile count mismatch".to_owned());
+    }
+    if expected.special_level_id.is_some() && actual.special_level_id != expected.special_level_id {
+        return Err("campaign generator/map mismatch: special_level_id mismatch".to_owned());
+    }
+    if let Some(special_id) = &actual.special_level_id {
+        if special_id.len() > MAX_PERSISTED_TEXT_BYTES || special_id.chars().any(char::is_control) {
+            return Err("campaign map contains invalid special_level_id".to_owned());
+        }
     }
     if !actual.lit_tiles.is_empty() && actual.lit_tiles.len() != expected_tile_count {
         return Err("campaign map lit_tiles length mismatch".to_owned());
@@ -656,22 +1154,63 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
         }
     }
 
-    // 2. 내부 타일 전이 규칙(Wall->Floor 굴착 허용, 그 외 변조 차단)을 검증한다.
+    // 2. 내부 타일 전이 규칙(Wall->Floor 굴착 허용, Sokoban/Planes 2..5 제한 및 볼더-함정 보존)을 검증한다.
+    let diggable =
+        id.branch != BranchId::Sokoban && !(id.branch == BranchId::Planes && id.depth > 1);
+    let mut exp_boulders = 0_usize;
+    let mut exp_pits = 0_usize;
+    let mut act_boulders = 0_usize;
+    let mut act_pits = 0_usize;
     for y in 1..CAMPAIGN_MAP_HEIGHT - 1 {
         for x in 1..CAMPAIGN_MAP_WIDTH - 1 {
             let p = Pos { x, y };
             let exp_tile = expected.map.tile(p).map_err(|e| e.to_string())?;
             let act_tile = actual.map.tile(p).map_err(|e| e.to_string())?;
+            if exp_tile == TileKind::Boulder {
+                exp_boulders += 1;
+            }
+            if matches!(
+                exp_tile,
+                TileKind::Trap(TrapKind::Pit) | TileKind::HiddenTrap(TrapKind::Pit)
+            ) {
+                exp_pits += 1;
+            }
+            if act_tile == TileKind::Boulder {
+                act_boulders += 1;
+            }
+            if matches!(
+                act_tile,
+                TileKind::Trap(TrapKind::Pit) | TileKind::HiddenTrap(TrapKind::Pit)
+            ) {
+                act_pits += 1;
+            }
             let allowed = match (exp_tile, act_tile) {
-                (TileKind::Wall, TileKind::Wall | TileKind::Floor) => true,
+                (TileKind::Wall, TileKind::Wall) => true,
+                (TileKind::Wall, TileKind::Floor) => diggable,
                 (TileKind::Floor, TileKind::Floor) => true,
+                (TileKind::Floor, TileKind::Boulder) if id.branch == BranchId::Sokoban => true,
+                (TileKind::Boulder, TileKind::Boulder | TileKind::Floor)
+                    if id.branch == BranchId::Sokoban =>
+                {
+                    true
+                }
+                (TileKind::Trap(TrapKind::Pit), TileKind::Floor | TileKind::Boulder)
+                    if id.branch == BranchId::Sokoban =>
+                {
+                    true
+                }
+                (TileKind::HiddenTrap(TrapKind::Pit), TileKind::Floor | TileKind::Boulder)
+                    if id.branch == BranchId::Sokoban =>
+                {
+                    true
+                }
                 (
                     TileKind::Door(DoorState::Closed),
-                    TileKind::Door(DoorState::Closed | DoorState::Open),
+                    TileKind::Door(DoorState::Closed | DoorState::Open | DoorState::Locked),
                 ) => true,
                 (
                     TileKind::Door(DoorState::Open),
-                    TileKind::Door(DoorState::Open | DoorState::Closed),
+                    TileKind::Door(DoorState::Open | DoorState::Closed | DoorState::Locked),
                 ) => true,
                 (
                     TileKind::Door(DoorState::Locked),
@@ -679,7 +1218,8 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
                 ) => true,
                 (
                     TileKind::HiddenDoor,
-                    TileKind::HiddenDoor | TileKind::Door(DoorState::Closed | DoorState::Open),
+                    TileKind::HiddenDoor
+                    | TileKind::Door(DoorState::Closed | DoorState::Open | DoorState::Locked),
                 ) => true,
                 (TileKind::HiddenTrap(k), TileKind::HiddenTrap(k2) | TileKind::Trap(k2))
                     if k == k2 =>
@@ -691,11 +1231,13 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
                 | (TileKind::StairsDown, TileKind::StairsDown)
                 | (TileKind::Shop, TileKind::Shop)
                 | (TileKind::Altar, TileKind::Altar)
+                | (TileKind::MagicPortal, TileKind::MagicPortal)
                 | (TileKind::Fountain, TileKind::Fountain | TileKind::DryFountain)
                 | (TileKind::DryFountain, TileKind::DryFountain)
                 | (TileKind::Sink, TileKind::Sink)
                 | (TileKind::Water, TileKind::Water)
                 | (TileKind::Lava, TileKind::Lava) => true,
+                (TileKind::StairsDown, TileKind::Floor) if p12_main6_compat => true,
                 _ => false,
             };
             if !allowed {
@@ -706,13 +1248,21 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
             }
         }
     }
+    if id.branch == BranchId::Sokoban
+        && (act_boulders > exp_boulders
+            || act_pits > exp_pits
+            || (exp_boulders - act_boulders) != (exp_pits - act_pits))
+    {
+        return Err("campaign generator/map mismatch: sokoban conservation violated".to_owned());
+    }
 
-    // 3. 필수 구조 타일(계단, 상점, 제단)의 정확한 좌표/개수 불변성을 검증한다.
+    // 3. 필수 구조 타일(계단, 상점, 제단, 포털)의 정확한 좌표/개수 불변성을 검증한다.
     let collect_tiles = |map: &GameMap| {
         let mut stairs_up = Vec::new();
         let mut stairs_down = Vec::new();
         let mut shops = Vec::new();
         let mut altars = Vec::new();
+        let mut portals = Vec::new();
         for y in 0..map.height {
             for x in 0..map.width {
                 let p = Pos { x, y };
@@ -721,16 +1271,19 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
                     Ok(TileKind::StairsDown) => stairs_down.push(p),
                     Ok(TileKind::Shop) => shops.push(p),
                     Ok(TileKind::Altar) => altars.push(p),
+                    Ok(TileKind::MagicPortal) => portals.push(p),
                     _ => {}
                 }
             }
         }
-        (stairs_up, stairs_down, shops, altars)
+        (stairs_up, stairs_down, shops, altars, portals)
     };
 
-    let (exp_up, exp_down, exp_shops, exp_altars) = collect_tiles(&expected.map);
-    let (act_up, act_down, act_shops, act_altars) = collect_tiles(&actual.map);
-    if act_up != exp_up || act_down != exp_down {
+    let (exp_up, exp_down, exp_shops, exp_altars, exp_portals) = collect_tiles(&expected.map);
+    let (act_up, act_down, act_shops, act_altars, act_portals) = collect_tiles(&actual.map);
+    let down_matches =
+        act_down == exp_down || (p12_main6_compat && act_down.is_empty() && exp_down.len() == 1);
+    if act_up != exp_up || !down_matches {
         return Err("campaign generator/map mismatch: stairs tampering detected".to_owned());
     }
     if act_shops != exp_shops {
@@ -739,8 +1292,11 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
     if act_altars != exp_altars {
         return Err("campaign generator/map mismatch: altar tampering detected".to_owned());
     }
+    if act_portals != exp_portals {
+        return Err("campaign generator/map mismatch: portal tampering detected".to_owned());
+    }
 
-    // 4. 위 계단에서 아래 계단/상점/제단까지의 구조적 BFS 연결성을 확인한다.
+    // 4. 위 계단에서 아래 계단/상점/제단/포털까지의 구조적 BFS 연결성을 확인한다.
     let Some(start) = act_up.first().copied() else {
         return Err("campaign generator/map mismatch: missing stairs up".to_owned());
     };
@@ -748,6 +1304,7 @@ pub(crate) fn validate_persisted_map(seed: u64, actual: &GameLevel) -> Result<()
     required_targets.extend(act_down);
     required_targets.extend(act_shops);
     required_targets.extend(act_altars);
+    required_targets.extend(act_portals);
     if !all_targets_reachable(actual.map.tiles(), start, &required_targets) {
         return Err(
             "campaign generator/map mismatch: critical structure is disconnected".to_owned(),

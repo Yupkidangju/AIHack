@@ -549,21 +549,22 @@ fn p5a_locked_doors_spawn_kick_open_and_tamper_rejection() {
     );
     assert!(GameSession::from_save_data(session.to_save_data()).is_ok());
 
-    // Tampering: forging Locked on Main 1 Closed door or on Floor must be rejected
+    // Existing Main 1 Closed door can transition to Locked (SkeletonKey/WizardLock/WandLocking);
+    // forging Locked on a non-door Floor tile must still be rejected.
     let (main1_door_pos, main1_tile) = find_door_matching(&base, LevelId::main(1), |t| {
         t == TileKind::Door(DoorState::Closed)
     })
     .unwrap();
     assert_eq!(main1_tile, TileKind::Door(DoorState::Closed));
-    let mut forged_closed = base.to_save_data();
-    forged_closed
+    let mut locked_closed_door = base.to_save_data();
+    locked_closed_door
         .world
         .levels
         .map_mut(LevelId::main(1))
         .unwrap()
         .set_tile(main1_door_pos, TileKind::Door(DoorState::Locked))
         .unwrap();
-    assert!(GameSession::from_save_data(forged_closed).is_err());
+    assert!(GameSession::from_save_data(locked_closed_door).is_ok());
 
     let mut forged_floor = base.to_save_data();
     let up_m1 = forged_floor

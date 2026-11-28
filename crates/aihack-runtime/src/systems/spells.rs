@@ -4,8 +4,8 @@ use aihack_core::{
         SPELL_MEMORY_TURNS,
     },
     domain::{
-        combat::{AttackProfile, DamageRoll},
-        entity::{ActorKind, EntityLocation, Faction},
+        combat::{AttackProfile, DamageRoll, DeathCause},
+        entity::{ActorKind, EntityLocation, Faction, DEFAULT_PET_HUNGER},
         item::{BucStatus, ItemClass},
         monster::MonsterKind,
         status::Resistances,
@@ -69,22 +69,23 @@ pub fn spell_failure_percent(world: &GameWorld, spell: SpellKind) -> u8 {
         return 0;
     }
     let rank = skills::current_rank(world, SkillCategory::Spellcasting);
-    let base = i16::from(spell.spell_level()) * 14 + metal_penalty;
+    let base = i16::from(spell.spell_level()) * 16 + metal_penalty;
     let reduction = campaign.attributes.int_spell_bonus() * 6
+        + i16::from(campaign.level().saturating_sub(1)) * 4
         + i16::from(rank.as_u8()) * 10
         + if campaign.knows_spell(spell) { 20 } else { 0 };
-    (base - reduction).clamp(0, 95) as u8
+    (base - reduction).clamp(0, 100) as u8
 }
 
 pub fn study_spellbook(
     world: &mut GameWorld,
-    _rng: &mut GameRng,
+    rng: &mut GameRng,
     item: EntityId,
     turn: u64,
 ) -> Result<Vec<GameEvent>, String> {
-    if world.campaign.is_none() {
+    let Some(campaign) = world.campaign else {
         return Err("spellbooks are only available in campaign mode".to_string());
-    }
+    };
     if !world.inventory.contains(item) {
         return Err("item is not in player inventory".to_string());
     }
@@ -107,6 +108,16 @@ pub fn study_spellbook(
         .get(item)
         .and_then(|e| e.item_buc())
         .unwrap_or(BucStatus::Uncursed);
+    let already_known = world
+        .learned_spells
+        .iter()
+        .any(|entry| entry.spell == spell);
+    if buc != BucStatus::Cursed
+        && !already_known
+        && world.learned_spells.len() >= MAX_LEARNED_SPELLS
+    {
+        return Err("your spell memory is full".to_string());
+    }
 
     world.identify_item_kind(kind);
     world.state_mut().entities.set_item_buc_known(item, true);
@@ -119,39 +130,74 @@ pub fn study_spellbook(
 
     let mut events = Vec::new();
     if buc == BucStatus::Cursed {
-        let state = world.state_mut();
-        state.status_timers.confused = state.status_timers.confused.max(4);
-        events.push(GameEvent::Message {
-            priority: MessagePriority::Warning,
-            text: "The cursed spellbook's runes explode in confusion!".to_string(),
-        });
-    } else {
-        let learned = &mut world.state_mut().learned_spells;
-        if let Some(existing) = learned.iter_mut().find(|entry| entry.spell == spell) {
-            existing.learned_at_turn = turn;
-        } else if learned.len() < MAX_LEARNED_SPELLS {
-            learned.push(LearnedSpell {
-                spell,
-                learned_at_turn: turn,
-            });
-        } else {
-            return Err("your spell memory is full".to_string());
+        let dmg = combat::roll_die(rng, 6);
+        let player_id = world.player_id;
+        {
+            let state = world.state_mut();
+            state.status_timers.confused = state.status_timers.confused.max(4);
+            state.status_timers.blind = state.status_timers.blind.max(3);
+            if let Some(stats) = state.entities.actor_stats_mut(player_id) {
+                stats.hp = stats.hp.saturating_sub(dmg);
+            }
         }
-        skills::record_practice(world, SkillCategory::Spellcasting, 4);
         events.push(GameEvent::Message {
-            priority: MessagePriority::Info,
+            priority: MessagePriority::Danger,
             text: format!(
-                "You study the spellbook and learn {}!",
-                spell.display_name()
+                "The cursed spellbook's runes explode in blind confusion for {dmg} damage!"
             ),
         });
+        events.extend(death::collect_death_events_if_hp_depleted(
+            world,
+            player_id,
+            DeathCause::Explosion,
+        )?);
+    } else {
+        let rank = skills::current_rank(world, SkillCategory::Spellcasting);
+        let study_difficulty = i16::from(spell.spell_level()) * 3;
+        let study_power = i16::from(campaign.level())
+            + campaign.attributes.int_spell_bonus() * 2
+            + i16::from(rank.as_u8()) * 2
+            + 4;
+        let study_failed = if buc == BucStatus::Uncursed && study_power < study_difficulty {
+            let fail_chance =
+                u64::try_from(((study_difficulty - study_power) * 12).clamp(15, 90)).unwrap_or(50);
+            (rng.next_u64() % 100) < fail_chance
+        } else {
+            false
+        };
+        if study_failed {
+            world.state_mut().status_timers.confused = world.status_timers.confused.max(2);
+            skills::record_practice(world, SkillCategory::Spellcasting, 1);
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Warning,
+                text: format!(
+                    "You struggle to decipher {} and grow confused.",
+                    spell.display_name()
+                ),
+            });
+        } else {
+            let learned = &mut world.state_mut().learned_spells;
+            if let Some(existing) = learned.iter_mut().find(|entry| entry.spell == spell) {
+                existing.learned_at_turn = turn;
+            } else {
+                learned.push(LearnedSpell {
+                    spell,
+                    learned_at_turn: turn,
+                });
+            }
+            skills::record_practice(world, SkillCategory::Spellcasting, 4);
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: format!(
+                    "You study the spellbook and learn {}!",
+                    spell.display_name()
+                ),
+            });
+        }
     }
     if next_charges == 0 {
         items::remove_inventory_item(world, item)?;
-        world
-            .state_mut()
-            .entities
-            .set_item_location(item, EntityLocation::Consumed);
+        items::mark_item_consumed(&mut world.state_mut().entities, item);
         events.push(GameEvent::Message {
             priority: MessagePriority::Info,
             text: "The spellbook turns to dust.".to_string(),
@@ -187,6 +233,30 @@ pub fn cast_at(
         (false, Some(_)) => return Err("this spell does not take a direction".to_string()),
     };
 
+    let fail_pct = spell_failure_percent(world, spell);
+    if fail_pct > 0 && (rng.next_u64() % 100) < u64::from(fail_pct) {
+        let fail_cost = (cost / 2).max(1);
+        world.state_mut().mp = world.mp.saturating_sub(fail_cost);
+        let mp_after = world.mp;
+        let player_id = world.player_id;
+        skills::record_practice(world, SkillCategory::Spellcasting, 1);
+        return Ok(vec![
+            GameEvent::SpellCast {
+                entity: player_id,
+                spell,
+                direction: validated_direction,
+                mp_after,
+            },
+            GameEvent::Message {
+                priority: MessagePriority::Warning,
+                text: format!(
+                    "You fail to cast {} cleanly ({fail_pct}%).",
+                    spell.display_name()
+                ),
+            },
+        ]);
+    }
+
     world.state_mut().mp -= cost;
     let mp_after = world.mp;
     let player_id = world.player_id;
@@ -196,18 +266,6 @@ pub fn cast_at(
         direction: validated_direction,
         mp_after,
     }];
-
-    let fail_pct = spell_failure_percent(world, spell);
-    if fail_pct > 0 && (rng.next_u64() % 100) < u64::from(fail_pct) {
-        events.push(GameEvent::Message {
-            priority: MessagePriority::Warning,
-            text: format!(
-                "You fail to cast {} cleanly ({fail_pct}%).",
-                spell.display_name()
-            ),
-        });
-        return Ok(events);
-    }
 
     let spell_bonus = skills::current_rank(world, SkillCategory::Spellcasting).spell_power_bonus();
     let power_bonus = i16::from(campaign.level() / 2)
@@ -555,6 +613,7 @@ pub fn cast_at(
                     let entities = &mut world.state_mut().entities;
                     entities.set_actor_faction(target, Faction::Pet);
                     entities.set_actor_tameness(target, 5);
+                    entities.set_actor_pet_hunger(target, DEFAULT_PET_HUNGER);
                     events.push(GameEvent::Message {
                         priority: MessagePriority::Info,
                         text: "The creature gazes at you with newfound loyalty!".to_string(),
@@ -673,6 +732,7 @@ pub fn cast_at(
                 let entities = &mut world.state_mut().entities;
                 entities.set_actor_location(fam_id, level, spawn_pos);
                 entities.set_actor_tameness(fam_id, 5);
+                entities.set_actor_pet_hunger(fam_id, DEFAULT_PET_HUNGER);
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
                     text: "A loyal familiar appears at your side!".to_string(),
@@ -693,7 +753,11 @@ pub fn cast_at(
             for _step in 1..=2 {
                 candidate = candidate.offset(dir.delta());
                 let passable = world.map(level).tile(candidate).is_ok_and(|t| {
-                    t.is_movement_passable() && !matches!(t, TileKind::Water | TileKind::Lava)
+                    t.is_movement_passable()
+                        && !matches!(t, TileKind::Water | TileKind::Lava)
+                        && !crate::systems::movement::sokoban_unplugged_pit_at(
+                            world, level, candidate,
+                        )
                 });
                 if !passable {
                     break;
@@ -839,6 +903,12 @@ pub(crate) fn carve_interior_walls(
     dir: Direction,
     max_tiles: usize,
 ) -> usize {
+    let current = world.current_level();
+    if current.branch == aihack_core::ids::BranchId::Sokoban
+        || (current.branch == aihack_core::ids::BranchId::Planes && current.depth > 1)
+    {
+        return 0;
+    }
     let mut carved = 0;
     let mut cur = from;
     let (width, height) = {

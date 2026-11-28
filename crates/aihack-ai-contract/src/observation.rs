@@ -5,6 +5,7 @@ use aihack_core::{
         entity::{EntityKind, Faction},
         inventory::InventoryLetter,
         item::{BucStatus, EquipmentSlot, ItemClass, ItemKind},
+        level::SpecialRoomKind,
         tile::TileKind,
     },
     event::GameEvent,
@@ -230,6 +231,14 @@ pub struct CampaignObservation {
     pub learned_spells: Vec<LearnedSpell>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub spell_failure_rates: Vec<(SpellKind, u8)>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_level_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_room: Option<SpecialRoomKind>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub on_magic_portal: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_high_altar: Option<Alignment>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

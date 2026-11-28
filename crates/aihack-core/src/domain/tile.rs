@@ -40,6 +40,8 @@ pub enum TileKind {
     Sink,
     Water,
     Lava,
+    Boulder,
+    MagicPortal,
 }
 
 impl TileKind {
@@ -59,6 +61,7 @@ impl TileKind {
                 | Self::Sink
                 | Self::Water
                 | Self::Lava
+                | Self::MagicPortal
         )
     }
     pub fn is_los_transparent(self) -> bool {

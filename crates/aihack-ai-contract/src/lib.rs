@@ -20,6 +20,7 @@ pub use aihack_core::{
         item::{
             AmuletEffect, BucStatus, EquipmentSlot, ItemClass, ItemKind, RingEffect, ToolAction,
         },
+        level::SpecialRoomKind,
         monster::MonsterKind,
         status::{Resistances, StatusTimers},
         tile::{DoorState, TileKind, TrapKind},

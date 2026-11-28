@@ -64,6 +64,115 @@ pub(crate) fn campaign_world(
     )
 }
 
+const BRANCH_SPELLBOOKS: [ItemKind; 28] = [
+    ItemKind::SpellbookForceBolt,
+    ItemKind::SpellbookMagicMissile,
+    ItemKind::SpellbookFireball,
+    ItemKind::SpellbookConeOfCold,
+    ItemKind::SpellbookLightningBolt,
+    ItemKind::SpellbookFingerOfDeath,
+    ItemKind::SpellbookHeal,
+    ItemKind::SpellbookExtraHealing,
+    ItemKind::SpellbookCureSickness,
+    ItemKind::SpellbookStoneToFlesh,
+    ItemKind::SpellbookDetect,
+    ItemKind::SpellbookIdentify,
+    ItemKind::SpellbookMagicMapping,
+    ItemKind::SpellbookDetectTreasure,
+    ItemKind::SpellbookSleep,
+    ItemKind::SpellbookConfuseMonster,
+    ItemKind::SpellbookCharmMonster,
+    ItemKind::SpellbookSlowMonster,
+    ItemKind::SpellbookRemoveCurse,
+    ItemKind::SpellbookProtection,
+    ItemKind::SpellbookTurnUndead,
+    ItemKind::SpellbookCreateFamiliar,
+    ItemKind::SpellbookJumping,
+    ItemKind::SpellbookHasteSelf,
+    ItemKind::SpellbookTeleportAway,
+    ItemKind::SpellbookKnock,
+    ItemKind::SpellbookWizardLock,
+    ItemKind::SpellbookDig,
+];
+
+const BRANCH_WANDS: [ItemKind; 17] = [
+    ItemKind::WandMagicMissile,
+    ItemKind::WandFire,
+    ItemKind::WandCold,
+    ItemKind::WandLightning,
+    ItemKind::WandSleep,
+    ItemKind::WandDigging,
+    ItemKind::WandTeleport,
+    ItemKind::WandPolymorph,
+    ItemKind::WandCancellation,
+    ItemKind::WandDeath,
+    ItemKind::WandStriking,
+    ItemKind::WandSlowMonster,
+    ItemKind::WandSpeedMonster,
+    ItemKind::WandOpening,
+    ItemKind::WandLocking,
+    ItemKind::WandMakeInvisible,
+    ItemKind::WandCreateMonster,
+];
+
+fn branch_loot_slot_index(id: aihack_core::ids::LevelId) -> Option<usize> {
+    use aihack_core::ids::BranchId;
+    match (id.branch, id.depth) {
+        (BranchId::Sokoban, 1) => Some(0),
+        (BranchId::Sokoban, 2) => Some(1),
+        (BranchId::Sokoban, 3) => Some(2),
+        (BranchId::Quest, 1) => Some(3),
+        (BranchId::Quest, 2) => Some(4),
+        (BranchId::Quest, 3) => Some(5),
+        (BranchId::Gehennom, 1) => Some(6),
+        (BranchId::Gehennom, 2) => Some(7),
+        (BranchId::Gehennom, 3) => Some(8),
+        (BranchId::Gehennom, 4) => Some(9),
+        (BranchId::Planes, 1) => Some(10),
+        (BranchId::Planes, 2) => Some(11),
+        (BranchId::Planes, 3) => Some(12),
+        _ => None,
+    }
+}
+
+fn resolve_unoccupied_floor_item_pos(
+    level: &aihack_core::domain::level::GameLevel,
+    entities: &EntityStore,
+    preferred: Pos,
+) -> Pos {
+    use aihack_core::domain::tile::TileKind;
+    let level_id = level.id;
+    let is_ok = |p: Pos| -> bool {
+        let in_sokoban_puzzle = level_id.branch == aihack_core::ids::BranchId::Sokoban
+            && (34..=60).contains(&p.x)
+            && (8..=12).contains(&p.y);
+        !in_sokoban_puzzle
+            && level.map.contains(p)
+            && level.map.tile(p).ok() == Some(TileKind::Floor)
+            && entities.items_at(level_id, p).is_empty()
+    };
+    if is_ok(preferred) {
+        return preferred;
+    }
+    for radius in 1..=4_i16 {
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if dx.abs().max(dy.abs()) != radius {
+                    continue;
+                }
+                let candidate = Pos {
+                    x: preferred.x.saturating_add(dx),
+                    y: preferred.y.saturating_add(dy),
+                };
+                if is_ok(candidate) {
+                    return candidate;
+                }
+            }
+        }
+    }
+    resolve_safe_floor_pos(&level.map, preferred)
+}
+
 pub(crate) fn campaign_world_with_build(
     registry: &ContentRegistry,
     seed: u64,
@@ -73,8 +182,7 @@ pub(crate) fn campaign_world_with_build(
 ) -> Result<WorldState<EntityStore>, ContentError> {
     use aihack_core::{
         campaign::{CampaignState, Role},
-        domain::{item::BucStatus, monster::MonsterKind},
-        ids::{BranchId, LevelId},
+        ids::LevelId,
     };
     if !role.is_valid_combo(race, alignment) {
         return Err(ContentError::Parse {
@@ -96,652 +204,13 @@ pub(crate) fn campaign_world_with_build(
         .spawn_player(start[0])
         .map_err(allocation_content_error)?;
     state.inventory = Inventory::new(state.player_id);
-    let mut amulet = None;
-    for id in crate::campaign_map::level_ids() {
-        let (mut level, centers) = crate::campaign_map::generate(seed, id)?;
-        if id == LevelId::main(3) {
-            let positions: Vec<Pos> = (0..level.map.height)
-                .flat_map(|y| (0..level.map.width).map(move |x| Pos { x, y }))
-                .filter(|&p| {
-                    level.map.tile(p).ok() == Some(aihack_core::domain::tile::TileKind::Altar)
-                })
-                .collect();
-            for pos in positions {
-                level.set_altar_alignment(pos, alignment);
-            }
-        } else if id
-            == (LevelId {
-                branch: BranchId::Mines,
-                depth: 2,
-            })
-        {
-            let cross = alignment.cross_alignment();
-            let positions: Vec<Pos> = (0..level.map.height)
-                .flat_map(|y| (0..level.map.width).map(move |x| Pos { x, y }))
-                .filter(|&p| {
-                    level.map.tile(p).ok() == Some(aihack_core::domain::tile::TileKind::Altar)
-                })
-                .collect();
-            for pos in positions {
-                level.set_altar_alignment(pos, cross);
-            }
-        }
-        state.levels.levels.push(level);
-        let mut monster_spawns = match (id.branch, id.depth) {
-            (aihack_core::ids::BranchId::Main, 1 | 2) => {
-                vec![(MonsterKind::Jackal, centers[2])]
-            }
-            (aihack_core::ids::BranchId::Main, 3) => vec![(MonsterKind::Goblin, centers[2])],
-            (aihack_core::ids::BranchId::Main, 4) => vec![
-                (MonsterKind::Orc, centers[2]),
-                (
-                    MonsterKind::FloatingEye,
-                    Pos {
-                        x: centers[2].x + 1,
-                        y: centers[2].y - 1,
-                    },
-                ),
-                (
-                    MonsterKind::GnollArcher,
-                    Pos {
-                        x: centers[3].x - 1,
-                        y: centers[3].y + 1,
-                    },
-                ),
-            ],
-            (aihack_core::ids::BranchId::Main, 5) => vec![
-                (MonsterKind::Orc, centers[2]),
-                (
-                    MonsterKind::Troll,
-                    Pos {
-                        x: centers[2].x + 1,
-                        y: centers[2].y + 1,
-                    },
-                ),
-                (
-                    MonsterKind::FireAnt,
-                    Pos {
-                        x: centers[3].x - 1,
-                        y: centers[3].y + 1,
-                    },
-                ),
-            ],
-            (aihack_core::ids::BranchId::Main, 6) => vec![
-                (MonsterKind::Ogre, centers[2]),
-                (
-                    MonsterKind::FireAnt,
-                    Pos {
-                        x: centers[2].x + 1,
-                        y: centers[2].y + 1,
-                    },
-                ),
-                (
-                    MonsterKind::Dragon,
-                    Pos {
-                        x: centers[3].x - 1,
-                        y: centers[3].y,
-                    },
-                ),
-            ],
-            (aihack_core::ids::BranchId::Mines, 1) => vec![
-                (MonsterKind::Kobold, centers[2]),
-                (
-                    MonsterKind::FloatingEye,
-                    Pos {
-                        x: centers[2].x + 1,
-                        y: centers[2].y - 1,
-                    },
-                ),
-                (
-                    MonsterKind::GiantSpider,
-                    Pos {
-                        x: centers[3].x - 1,
-                        y: centers[3].y + 1,
-                    },
-                ),
-                (MonsterKind::Bat, centers[4]),
-            ],
-            _ => vec![
-                (MonsterKind::Orc, centers[2]),
-                (
-                    MonsterKind::Kobold,
-                    Pos {
-                        x: centers[2].x + 1,
-                        y: centers[2].y + 1,
-                    },
-                ),
-                (
-                    MonsterKind::Minotaur,
-                    Pos {
-                        x: centers[3].x - 1,
-                        y: centers[3].y,
-                    },
-                ),
-            ],
-        };
-        if id.branch == aihack_core::ids::BranchId::Main && (2..=5).contains(&id.depth) {
-            let weighted = aihack_content::weighted_monster_kinds_for_depth(id.depth, registry);
-            let total: u32 = weighted.iter().map(|(_, w)| *w).sum();
-            if total > 0 {
-                let mut roll = (seed
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add((id.depth as u64).wrapping_mul(1442695040888963407))
-                    % u64::from(total)) as u32;
-                let mut picked = weighted[0].0;
-                for (kind, weight) in weighted {
-                    if roll < weight {
-                        picked = kind;
-                        break;
-                    }
-                    roll -= weight;
-                }
-                if let Some(level_ref) = state.levels.levels.last() {
-                    let mut chosen = None;
-                    for radius in 0..=2_i16 {
-                        for dy in -radius..=radius {
-                            for dx in -radius..=radius {
-                                if radius > 0 && dx.abs().max(dy.abs()) != radius {
-                                    continue;
-                                }
-                                let pos = Pos {
-                                    x: centers[5].x.saturating_add(dx),
-                                    y: centers[5].y.saturating_add(dy),
-                                };
-                                if level_ref.map.tile(pos).ok()
-                                    == Some(aihack_core::domain::tile::TileKind::Floor)
-                                    && pos != centers[0]
-                                    && !monster_spawns.iter().any(|(_, p)| *p == pos)
-                                {
-                                    chosen = Some(pos);
-                                    break;
-                                }
-                            }
-                            if chosen.is_some() {
-                                break;
-                            }
-                        }
-                        if chosen.is_some() {
-                            break;
-                        }
-                    }
-                    if let Some(pos) = chosen {
-                        monster_spawns.push((picked, pos));
-                    }
-                }
-            }
-        }
-        for (kind, pos) in monster_spawns.drain(..) {
-            let monster = state
-                .entities
-                .spawn_monster_with_template(
-                    kind,
-                    try_monster_template_from_registry(kind, registry)?,
-                    pos,
-                )
-                .map_err(allocation_content_error)?;
-            state.entities.set_actor_location(monster, id, pos);
-        }
-        let mut floor_items = vec![
-            (ItemKind::FoodRation, centers[1], BucStatus::Uncursed, 0_i8),
-            (
-                ItemKind::PotionHealing,
-                Pos {
-                    x: centers[1].x + 1,
-                    y: centers[1].y,
-                },
-                BucStatus::Uncursed,
-                0,
-            ),
-        ];
-        match (id.branch, id.depth) {
-            (aihack_core::ids::BranchId::Main, 1) => {
-                floor_items.push((
-                    ItemKind::ScrollEnchantWeapon,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::OilLamp,
-                    Pos {
-                        x: centers[4].x + 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::Sack,
-                    Pos {
-                        x: centers[4].x - 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::SkeletonKey,
-                    Pos {
-                        x: centers[5].x + 1,
-                        y: centers[5].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::PotionWater,
-                    Pos {
-                        x: centers[5].x - 1,
-                        y: centers[5].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::SpellbookMagicMissile,
-                    Pos {
-                        x: centers[4].x,
-                        y: centers[4].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-            }
-            (aihack_core::ids::BranchId::Main, 2) => {
-                floor_items.push((
-                    ItemKind::ScrollCharging,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::ScrollRemoveCurse,
-                    Pos {
-                        x: centers[1].x + 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((ItemKind::ArmorShield, centers[4], BucStatus::Uncursed, 0));
-                floor_items.push((
-                    ItemKind::PickAxe,
-                    Pos {
-                        x: centers[4].x + 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::TinWhistle,
-                    Pos {
-                        x: centers[4].x - 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::ScrollBlank,
-                    Pos {
-                        x: centers[5].x + 1,
-                        y: centers[5].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-            }
-            (aihack_core::ids::BranchId::Main, 3) => {
-                floor_items.push((
-                    ItemKind::ShortSword,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Blessed,
-                    1,
-                ));
-                floor_items.push((
-                    ItemKind::ScrollEnchantArmor,
-                    Pos {
-                        x: centers[1].x + 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((ItemKind::ArmorGloves, centers[4], BucStatus::Uncursed, 0));
-                floor_items.push((
-                    ItemKind::PotionWater,
-                    Pos {
-                        x: centers[4].x + 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Blessed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::Blindfold,
-                    Pos {
-                        x: centers[4].x - 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::BagOfHolding,
-                    Pos {
-                        x: centers[5].x + 1,
-                        y: centers[5].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::SpellbookRemoveCurse,
-                    Pos {
-                        x: centers[4].x,
-                        y: centers[4].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-            }
-            (aihack_core::ids::BranchId::Main, 4) => {
-                floor_items.push((
-                    ItemKind::PotionExtraHealing,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::PotionCure,
-                    Pos {
-                        x: centers[1].x + 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::RingFireResistance,
-                    Pos {
-                        x: centers[1].x - 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((ItemKind::PotionSpeed, centers[4], BucStatus::Uncursed, 0));
-                floor_items.push((
-                    ItemKind::UnicornHorn,
-                    Pos {
-                        x: centers[4].x + 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::DwarvishMattock,
-                    Pos {
-                        x: centers[4].x - 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-            }
-            (aihack_core::ids::BranchId::Main, 5) => {
-                floor_items.push((
-                    ItemKind::ScrollCharging,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::WandFire,
-                    Pos {
-                        x: centers[1].x + 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((ItemKind::ArmorCloak, centers[5], BucStatus::Uncursed, 0));
-                floor_items.push((
-                    ItemKind::PotionWater,
-                    Pos {
-                        x: centers[4].x + 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Cursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::LockPick,
-                    Pos {
-                        x: centers[4].x - 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::WandCold,
-                    Pos {
-                        x: centers[4].x,
-                        y: centers[4].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-            }
-            (aihack_core::ids::BranchId::Main, 6) => {
-                floor_items.push((
-                    ItemKind::PotionExtraHealing,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((ItemKind::ArmorBoots, centers[5], BucStatus::Uncursed, 0));
-            }
-            (aihack_core::ids::BranchId::Mines, 1) => {
-                floor_items.push((
-                    ItemKind::ShortSword,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::PotionCure,
-                    Pos {
-                        x: centers[1].x + 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::Dagger,
-                    Pos {
-                        x: centers[1].x - 1,
-                        y: centers[1].y,
-                    },
-                    BucStatus::Cursed,
-                    -1,
-                ));
-                floor_items.push((
-                    ItemKind::RingPoisonResistance,
-                    Pos {
-                        x: centers[1].x - 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((ItemKind::ArmorHelm, centers[5], BucStatus::Uncursed, 0));
-                floor_items.push((
-                    ItemKind::PickAxe,
-                    Pos {
-                        x: centers[4].x + 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::OilLamp,
-                    Pos {
-                        x: centers[4].x - 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::Sack,
-                    Pos {
-                        x: centers[5].x + 1,
-                        y: centers[5].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-            }
-            (aihack_core::ids::BranchId::Mines, 2) => {
-                floor_items.push((
-                    ItemKind::ArmorChainMail,
-                    Pos {
-                        x: centers[1].x,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-                floor_items.push((
-                    ItemKind::Mace,
-                    Pos {
-                        x: centers[1].x + 1,
-                        y: centers[1].y + 1,
-                    },
-                    BucStatus::Uncursed,
-                    1,
-                ));
-                floor_items.push((
-                    ItemKind::RingProtection,
-                    Pos {
-                        x: centers[1].x - 1,
-                        y: centers[1].y,
-                    },
-                    BucStatus::Uncursed,
-                    1,
-                ));
-                floor_items.push((ItemKind::AmuletEsp, centers[4], BucStatus::Uncursed, 0));
-                floor_items.push((
-                    ItemKind::UnicornHorn,
-                    Pos {
-                        x: centers[4].x + 1,
-                        y: centers[4].y,
-                    },
-                    BucStatus::Uncursed,
-                    0,
-                ));
-            }
-            _ => {}
-        }
-        for (kind, raw_pos, buc, enchantment) in floor_items {
-            let pos = state
-                .levels
-                .levels
-                .last()
-                .map(|lvl| resolve_safe_floor_pos(&lvl.map, raw_pos))
-                .unwrap_or(raw_pos);
-            let item_id = spawn_item(
-                &mut state.entities,
-                registry,
-                kind,
-                EntityLocation::OnMap { level: id, pos },
-            )?;
-            state.entities.set_item_buc(item_id, buc);
-            state.entities.set_item_enchantment(item_id, enchantment);
-        }
-        if matches!(
-            (id.branch, id.depth),
-            (aihack_core::ids::BranchId::Main, 2) | (aihack_core::ids::BranchId::Mines, 2)
-        ) {
-            let chest_pos = Pos {
-                x: centers[5].x - 1,
-                y: centers[5].y,
-            };
-            let chest_id = spawn_item(
-                &mut state.entities,
-                registry,
-                ItemKind::Chest,
-                EntityLocation::OnMap {
-                    level: id,
-                    pos: chest_pos,
-                },
-            )?;
-            state.entities.set_item_container_locked(chest_id, true);
-            state.entities.set_item_container_trapped(chest_id, true);
-            let contents: &[(ItemKind, BucStatus, i8)] = if id == LevelId::main(2) {
-                &[
-                    (ItemKind::PotionExtraHealing, BucStatus::Uncursed, 0),
-                    (ItemKind::LockPick, BucStatus::Uncursed, 0),
-                ]
-            } else {
-                &[
-                    (ItemKind::RingProtection, BucStatus::Blessed, 1),
-                    (ItemKind::PotionWater, BucStatus::Blessed, 0),
-                ]
-            };
-            for &(child_kind, child_buc, child_enchant) in contents {
-                let child_id = spawn_item(
-                    &mut state.entities,
-                    registry,
-                    child_kind,
-                    EntityLocation::InContainer {
-                        container: chest_id,
-                    },
-                )?;
-                state.entities.set_item_buc(child_id, child_buc);
-                state.entities.set_item_enchantment(child_id, child_enchant);
-                state.entities.push_contained_item(chest_id, child_id);
-            }
-        }
-        if id == LevelId::main(6) {
-            amulet = Some(spawn_item(
-                &mut state.entities,
-                registry,
-                ItemKind::AmuletAscension,
-                EntityLocation::OnMap {
-                    level: id,
-                    pos: centers[3],
-                },
-            )?);
-        }
+    for id in crate::campaign_map::p12_level_ids() {
+        let _ = build_and_populate_campaign_level(
+            &mut state, registry, seed, role, alignment, id, true,
+        )?;
     }
+    let (amulet, _) = install_p13_branch_levels(&mut state, registry, seed, role, alignment, true)?;
+    let amulet = amulet.expect("Gehennom 4 was generated");
     let extras = match role {
         Role::Knight => vec![ItemKind::ArmorLeather, ItemKind::PotionHealing],
         Role::Scout => vec![ItemKind::FoodRation, ItemKind::FoodRation],
@@ -823,12 +292,12 @@ pub(crate) fn campaign_world_with_build(
         state.entities.set_item_buc_known(item, true);
         state.entities.set_item_enchant_known(item, true);
     }
-    let campaign =
-        CampaignState::new_custom(role, race, alignment, amulet.expect("Main 6 was generated"))
-            .map_err(|message| ContentError::Parse {
-                file: "campaign build".to_owned(),
-                message,
-            })?;
+    let campaign = CampaignState::new_custom(role, race, alignment, amulet).map_err(|message| {
+        ContentError::Parse {
+            file: "campaign build".to_owned(),
+            message,
+        }
+    })?;
     let stats = state
         .entities
         .actor_stats_mut(state.player_id)
@@ -845,9 +314,937 @@ pub(crate) fn campaign_world_with_build(
     state.mp = campaign.max_mp();
     state.ascension_pursuit_stage = 0;
     state.shop_debt = 0;
+    state.shop_debts.clear();
     spawn_campaign_companions_and_npcs(&mut state, registry, role, race)?;
     mark_level_initial_explored(&mut state);
     Ok(state)
+}
+
+pub(crate) fn install_p13_branch_levels(
+    state: &mut WorldState<EntityStore>,
+    registry: &ContentRegistry,
+    seed: u64,
+    role: aihack_core::campaign::Role,
+    alignment: aihack_core::campaign::Alignment,
+    spawn_amulet: bool,
+) -> Result<(Option<EntityId>, Pos), ContentError> {
+    use aihack_core::ids::{BranchId, LevelId};
+    let mut amulet = None;
+    let mut amulet_pos = Pos { x: 0, y: 0 };
+    for id in crate::campaign_map::p13_branch_level_ids() {
+        let (spawned_amulet, center3) = build_and_populate_campaign_level(
+            state,
+            registry,
+            seed,
+            role,
+            alignment,
+            id,
+            spawn_amulet,
+        )?;
+        if id == LevelId::new(BranchId::Gehennom, 4) {
+            amulet_pos = center3;
+            if spawned_amulet.is_some() {
+                amulet = spawned_amulet;
+            }
+        }
+    }
+    Ok((amulet, amulet_pos))
+}
+
+fn build_and_populate_campaign_level(
+    state: &mut WorldState<EntityStore>,
+    registry: &ContentRegistry,
+    seed: u64,
+    role: aihack_core::campaign::Role,
+    alignment: aihack_core::campaign::Alignment,
+    id: aihack_core::ids::LevelId,
+    spawn_amulet: bool,
+) -> Result<(Option<EntityId>, Pos), ContentError> {
+    use aihack_core::{
+        campaign::Role,
+        domain::{item::BucStatus, monster::MonsterKind},
+        ids::{BranchId, LevelId},
+    };
+    let mut amulet = None;
+    let (mut level, centers) = crate::campaign_map::generate(seed, id)?;
+    if id == LevelId::main(3) {
+        let positions: Vec<Pos> = (0..level.map.height)
+            .flat_map(|y| (0..level.map.width).map(move |x| Pos { x, y }))
+            .filter(|&p| level.map.tile(p).ok() == Some(aihack_core::domain::tile::TileKind::Altar))
+            .collect();
+        for pos in positions {
+            level.set_altar_alignment(pos, alignment);
+        }
+    } else if id
+        == (LevelId {
+            branch: BranchId::Mines,
+            depth: 2,
+        })
+    {
+        let cross = alignment.cross_alignment();
+        let positions: Vec<Pos> = (0..level.map.height)
+            .flat_map(|y| (0..level.map.width).map(move |x| Pos { x, y }))
+            .filter(|&p| level.map.tile(p).ok() == Some(aihack_core::domain::tile::TileKind::Altar))
+            .collect();
+        for pos in positions {
+            level.set_altar_alignment(pos, cross);
+        }
+    } else if id
+        == (LevelId {
+            branch: BranchId::Planes,
+            depth: 5,
+        })
+    {
+        let mut positions: Vec<Pos> = (0..level.map.height)
+            .flat_map(|y| (0..level.map.width).map(move |x| Pos { x, y }))
+            .filter(|&p| level.map.tile(p).ok() == Some(aihack_core::domain::tile::TileKind::Altar))
+            .collect();
+        positions.sort_by_key(|p| (p.y, p.x));
+        let aligns = [
+            aihack_core::campaign::Alignment::Lawful,
+            aihack_core::campaign::Alignment::Neutral,
+            aihack_core::campaign::Alignment::Chaotic,
+        ];
+        for (pos, align) in positions.into_iter().zip(aligns) {
+            level.set_altar_alignment(pos, align);
+            state.ascension_altars.push((id, pos));
+        }
+    }
+    state.levels.levels.push(level);
+    let mut monster_spawns = match (id.branch, id.depth) {
+        (aihack_core::ids::BranchId::Main, 1 | 2) => {
+            vec![(MonsterKind::Jackal, centers[2])]
+        }
+        (aihack_core::ids::BranchId::Main, 3) => vec![(MonsterKind::Goblin, centers[2])],
+        (aihack_core::ids::BranchId::Main, 4) => vec![
+            (MonsterKind::Orc, centers[2]),
+            (
+                MonsterKind::FloatingEye,
+                Pos {
+                    x: centers[2].x + 1,
+                    y: centers[2].y - 1,
+                },
+            ),
+            (
+                MonsterKind::GnollArcher,
+                Pos {
+                    x: centers[3].x - 1,
+                    y: centers[3].y + 1,
+                },
+            ),
+        ],
+        (aihack_core::ids::BranchId::Main, 5) => vec![
+            (MonsterKind::Orc, centers[2]),
+            (
+                MonsterKind::Troll,
+                Pos {
+                    x: centers[2].x + 1,
+                    y: centers[2].y + 1,
+                },
+            ),
+            (
+                MonsterKind::FireAnt,
+                Pos {
+                    x: centers[3].x - 1,
+                    y: centers[3].y + 1,
+                },
+            ),
+        ],
+        (aihack_core::ids::BranchId::Main, 6) => vec![
+            (MonsterKind::Ogre, centers[2]),
+            (
+                MonsterKind::FireAnt,
+                Pos {
+                    x: centers[2].x + 1,
+                    y: centers[2].y + 1,
+                },
+            ),
+            (
+                MonsterKind::Dragon,
+                Pos {
+                    x: centers[4].x,
+                    y: centers[4].y,
+                },
+            ),
+        ],
+        (aihack_core::ids::BranchId::Mines, 1) => vec![
+            (MonsterKind::Kobold, centers[2]),
+            (
+                MonsterKind::FloatingEye,
+                Pos {
+                    x: centers[2].x + 1,
+                    y: centers[2].y - 1,
+                },
+            ),
+            (
+                MonsterKind::GiantSpider,
+                Pos {
+                    x: centers[3].x - 1,
+                    y: centers[3].y + 1,
+                },
+            ),
+            (MonsterKind::Bat, centers[4]),
+        ],
+        (aihack_core::ids::BranchId::Mines, _) => vec![
+            (MonsterKind::Orc, centers[2]),
+            (
+                MonsterKind::Kobold,
+                Pos {
+                    x: centers[2].x + 1,
+                    y: centers[2].y + 1,
+                },
+            ),
+            (
+                MonsterKind::Minotaur,
+                Pos {
+                    x: centers[3].x - 1,
+                    y: centers[3].y,
+                },
+            ),
+        ],
+        (aihack_core::ids::BranchId::Sokoban, 1 | 2) => {
+            vec![(MonsterKind::Kobold, centers[2])]
+        }
+        (aihack_core::ids::BranchId::Sokoban, _) => vec![
+            (MonsterKind::Orc, centers[2]),
+            (MonsterKind::GiantSpider, centers[4]),
+        ],
+        (aihack_core::ids::BranchId::Quest, 1) => vec![
+            (MonsterKind::Orc, centers[2]),
+            (MonsterKind::Ogre, centers[4]),
+        ],
+        (aihack_core::ids::BranchId::Quest, 2) => vec![
+            (MonsterKind::Troll, centers[2]),
+            (MonsterKind::FireAnt, centers[4]),
+        ],
+        (aihack_core::ids::BranchId::Quest, _) => vec![
+            (
+                MonsterKind::QuestNemesis,
+                Pos {
+                    x: centers[3].x + 2,
+                    y: centers[3].y,
+                },
+            ),
+            (MonsterKind::Ogre, centers[2]),
+        ],
+        (aihack_core::ids::BranchId::Gehennom, 1) => vec![
+            (MonsterKind::FireAnt, centers[2]),
+            (MonsterKind::Troll, centers[4]),
+        ],
+        (aihack_core::ids::BranchId::Gehennom, 2) => vec![
+            (MonsterKind::Orcus, centers[2]),
+            (MonsterKind::Ogre, centers[4]),
+        ],
+        (aihack_core::ids::BranchId::Gehennom, 3) => vec![
+            (MonsterKind::WizardOfYendor, centers[2]),
+            (MonsterKind::Wraith, centers[4]),
+        ],
+        (aihack_core::ids::BranchId::Gehennom, _) => vec![
+            (
+                MonsterKind::HighPriestMoloch,
+                Pos {
+                    x: centers[3].x + 2,
+                    y: centers[3].y,
+                },
+            ),
+            (MonsterKind::Dragon, centers[2]),
+        ],
+        (aihack_core::ids::BranchId::Planes, 1) => {
+            vec![(MonsterKind::EarthElemental, centers[2])]
+        }
+        (aihack_core::ids::BranchId::Planes, 2) => {
+            vec![(MonsterKind::AirElemental, centers[2])]
+        }
+        (aihack_core::ids::BranchId::Planes, 3) => {
+            vec![(MonsterKind::FireElemental, centers[2])]
+        }
+        (aihack_core::ids::BranchId::Planes, 4) => {
+            vec![(MonsterKind::WaterElemental, centers[2])]
+        }
+        (aihack_core::ids::BranchId::Main, _) => vec![(MonsterKind::Ogre, centers[2])],
+        (aihack_core::ids::BranchId::Planes, _) => vec![
+            (
+                MonsterKind::RiderDeath,
+                Pos {
+                    x: centers[1].x + 2,
+                    y: centers[1].y,
+                },
+            ),
+            (
+                MonsterKind::RiderPestilence,
+                Pos {
+                    x: centers[2].x + 2,
+                    y: centers[2].y,
+                },
+            ),
+            (
+                MonsterKind::RiderFamine,
+                Pos {
+                    x: centers[3].x + 2,
+                    y: centers[3].y,
+                },
+            ),
+        ],
+    };
+    if id.branch == aihack_core::ids::BranchId::Main && (2..=5).contains(&id.depth) {
+        let weighted = aihack_content::weighted_monster_kinds_for_depth(id.depth, registry);
+        let total: u32 = weighted.iter().map(|(_, w)| *w).sum();
+        if total > 0 {
+            let mut roll = (seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add((id.depth as u64).wrapping_mul(1442695040888963407))
+                % u64::from(total)) as u32;
+            let mut picked = weighted[0].0;
+            for (kind, weight) in weighted {
+                if roll < weight {
+                    picked = kind;
+                    break;
+                }
+                roll -= weight;
+            }
+            if let Some(level_ref) = state.levels.levels.last() {
+                let mut chosen = None;
+                for radius in 0..=2_i16 {
+                    for dy in -radius..=radius {
+                        for dx in -radius..=radius {
+                            if radius > 0 && dx.abs().max(dy.abs()) != radius {
+                                continue;
+                            }
+                            let pos = Pos {
+                                x: centers[5].x.saturating_add(dx),
+                                y: centers[5].y.saturating_add(dy),
+                            };
+                            if level_ref.map.tile(pos).ok()
+                                == Some(aihack_core::domain::tile::TileKind::Floor)
+                                && pos != centers[0]
+                                && !monster_spawns.iter().any(|(_, p)| *p == pos)
+                            {
+                                chosen = Some(pos);
+                                break;
+                            }
+                        }
+                        if chosen.is_some() {
+                            break;
+                        }
+                    }
+                    if chosen.is_some() {
+                        break;
+                    }
+                }
+                if let Some(pos) = chosen {
+                    monster_spawns.push((picked, pos));
+                }
+            }
+        }
+    }
+    for (kind, pos) in monster_spawns.drain(..) {
+        let monster = state
+            .entities
+            .spawn_monster_with_template(
+                kind,
+                try_monster_template_from_registry(kind, registry)?,
+                pos,
+            )
+            .map_err(allocation_content_error)?;
+        state.entities.set_actor_location(monster, id, pos);
+    }
+    let mut floor_items = vec![
+        (ItemKind::FoodRation, centers[1], BucStatus::Uncursed, 0_i8),
+        (
+            ItemKind::PotionHealing,
+            Pos {
+                x: centers[1].x + 1,
+                y: centers[1].y,
+            },
+            BucStatus::Uncursed,
+            0,
+        ),
+    ];
+    match (id.branch, id.depth) {
+        (aihack_core::ids::BranchId::Main, 1) => {
+            floor_items.push((
+                ItemKind::ScrollEnchantWeapon,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::OilLamp,
+                Pos {
+                    x: centers[4].x + 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::Sack,
+                Pos {
+                    x: centers[4].x - 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::SkeletonKey,
+                Pos {
+                    x: centers[5].x + 1,
+                    y: centers[5].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::PotionWater,
+                Pos {
+                    x: centers[5].x - 1,
+                    y: centers[5].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::SpellbookMagicMissile,
+                Pos {
+                    x: centers[4].x,
+                    y: centers[4].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Main, 2) => {
+            floor_items.push((
+                ItemKind::ScrollCharging,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::ScrollRemoveCurse,
+                Pos {
+                    x: centers[1].x + 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((ItemKind::ArmorShield, centers[4], BucStatus::Uncursed, 0));
+            floor_items.push((
+                ItemKind::PickAxe,
+                Pos {
+                    x: centers[4].x + 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::TinWhistle,
+                Pos {
+                    x: centers[4].x - 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::ScrollBlank,
+                Pos {
+                    x: centers[5].x + 1,
+                    y: centers[5].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Main, 3) => {
+            floor_items.push((
+                ItemKind::ShortSword,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Blessed,
+                1,
+            ));
+            floor_items.push((
+                ItemKind::ScrollEnchantArmor,
+                Pos {
+                    x: centers[1].x + 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((ItemKind::ArmorGloves, centers[4], BucStatus::Uncursed, 0));
+            floor_items.push((
+                ItemKind::PotionWater,
+                Pos {
+                    x: centers[4].x + 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Blessed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::Blindfold,
+                Pos {
+                    x: centers[4].x - 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::BagOfHolding,
+                Pos {
+                    x: centers[5].x + 1,
+                    y: centers[5].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::SpellbookRemoveCurse,
+                Pos {
+                    x: centers[4].x,
+                    y: centers[4].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Main, 4) => {
+            floor_items.push((
+                ItemKind::PotionExtraHealing,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::PotionCure,
+                Pos {
+                    x: centers[1].x + 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::RingFireResistance,
+                Pos {
+                    x: centers[1].x - 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((ItemKind::PotionSpeed, centers[4], BucStatus::Uncursed, 0));
+            floor_items.push((
+                ItemKind::UnicornHorn,
+                Pos {
+                    x: centers[4].x + 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::DwarvishMattock,
+                Pos {
+                    x: centers[4].x - 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Main, 5) => {
+            floor_items.push((
+                ItemKind::ScrollCharging,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::WandFire,
+                Pos {
+                    x: centers[1].x + 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((ItemKind::ArmorCloak, centers[5], BucStatus::Uncursed, 0));
+            floor_items.push((
+                ItemKind::PotionWater,
+                Pos {
+                    x: centers[4].x + 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Cursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::LockPick,
+                Pos {
+                    x: centers[4].x - 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::WandCold,
+                Pos {
+                    x: centers[4].x,
+                    y: centers[4].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Main, 6) => {
+            floor_items.push((
+                ItemKind::PotionExtraHealing,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((ItemKind::ArmorBoots, centers[5], BucStatus::Uncursed, 0));
+        }
+        (aihack_core::ids::BranchId::Mines, 1) => {
+            floor_items.push((
+                ItemKind::ShortSword,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::PotionCure,
+                Pos {
+                    x: centers[1].x + 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::Dagger,
+                Pos {
+                    x: centers[1].x - 1,
+                    y: centers[1].y,
+                },
+                BucStatus::Cursed,
+                -1,
+            ));
+            floor_items.push((
+                ItemKind::RingPoisonResistance,
+                Pos {
+                    x: centers[1].x - 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((ItemKind::ArmorHelm, centers[5], BucStatus::Uncursed, 0));
+            floor_items.push((
+                ItemKind::PickAxe,
+                Pos {
+                    x: centers[4].x + 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::OilLamp,
+                Pos {
+                    x: centers[4].x - 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::Sack,
+                Pos {
+                    x: centers[5].x + 1,
+                    y: centers[5].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Mines, 2) => {
+            floor_items.push((
+                ItemKind::ArmorChainMail,
+                Pos {
+                    x: centers[1].x,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::Mace,
+                Pos {
+                    x: centers[1].x + 1,
+                    y: centers[1].y + 1,
+                },
+                BucStatus::Uncursed,
+                1,
+            ));
+            floor_items.push((
+                ItemKind::RingProtection,
+                Pos {
+                    x: centers[1].x - 1,
+                    y: centers[1].y,
+                },
+                BucStatus::Uncursed,
+                1,
+            ));
+            floor_items.push((ItemKind::AmuletEsp, centers[4], BucStatus::Uncursed, 0));
+            floor_items.push((
+                ItemKind::UnicornHorn,
+                Pos {
+                    x: centers[4].x + 1,
+                    y: centers[4].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Sokoban, 4) => {
+            let prize = if seed.is_multiple_of(2) {
+                ItemKind::AmuletReflection
+            } else {
+                ItemKind::BagOfHolding
+            };
+            floor_items.push((prize, centers[3], BucStatus::Blessed, 0));
+        }
+        (aihack_core::ids::BranchId::Gehennom, 1) => {
+            floor_items.push((
+                ItemKind::PotionExtraHealing,
+                centers[5],
+                BucStatus::Blessed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::PotionExtraHealing,
+                Pos {
+                    x: centers[5].x + 1,
+                    y: centers[5].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+            floor_items.push((ItemKind::WandWishing, centers[4], BucStatus::Uncursed, 0));
+        }
+        (aihack_core::ids::BranchId::Gehennom, 2..=4) => {
+            floor_items.push((
+                ItemKind::PotionExtraHealing,
+                centers[5],
+                BucStatus::Blessed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::PotionExtraHealing,
+                Pos {
+                    x: centers[5].x + 1,
+                    y: centers[5].y,
+                },
+                BucStatus::Uncursed,
+                0,
+            ));
+        }
+        (aihack_core::ids::BranchId::Planes, 1..=4) => {
+            floor_items.push((
+                ItemKind::PotionExtraHealing,
+                centers[5],
+                BucStatus::Blessed,
+                0,
+            ));
+            floor_items.push((
+                ItemKind::PotionFullHealing,
+                centers[1],
+                BucStatus::Blessed,
+                0,
+            ));
+        }
+        _ => {}
+    }
+    for (kind, raw_pos, buc, enchantment) in floor_items {
+        let pos = state
+            .levels
+            .levels
+            .last()
+            .map(|lvl| resolve_safe_floor_pos(&lvl.map, raw_pos))
+            .unwrap_or(raw_pos);
+        let item_id = spawn_item(
+            &mut state.entities,
+            registry,
+            kind,
+            EntityLocation::OnMap { level: id, pos },
+        )?;
+        state.entities.set_item_buc(item_id, buc);
+        state.entities.set_item_enchantment(item_id, enchantment);
+    }
+    if id == LevelId::new(BranchId::Quest, 3) {
+        let quest_def = aihack_core::campaign::quest_artifact_for_role(role);
+        let art_pos = state
+            .levels
+            .levels
+            .last()
+            .map(|lvl| resolve_safe_floor_pos(&lvl.map, centers[3]))
+            .unwrap_or(centers[3]);
+        let art_id = spawn_item(
+            &mut state.entities,
+            registry,
+            quest_def.base_kind,
+            EntityLocation::OnMap {
+                level: id,
+                pos: art_pos,
+            },
+        )?;
+        state
+            .entities
+            .set_item_artifact_id(art_id, Some(quest_def.id.to_owned()));
+        state.entities.set_item_buc(art_id, BucStatus::Blessed);
+        state.entities.set_item_buc_known(art_id, true);
+        state.entities.set_item_enchantment(art_id, 1);
+        state.entities.set_item_enchant_known(art_id, true);
+        state.entities.set_item_erosion(art_id, 0);
+        state.generated_artifacts.insert(quest_def.id.to_owned());
+    }
+    if matches!(
+        (id.branch, id.depth),
+        (aihack_core::ids::BranchId::Main, 2) | (aihack_core::ids::BranchId::Mines, 2)
+    ) {
+        let chest_pos = Pos {
+            x: centers[5].x - 1,
+            y: centers[5].y,
+        };
+        let chest_id = spawn_item(
+            &mut state.entities,
+            registry,
+            ItemKind::Chest,
+            EntityLocation::OnMap {
+                level: id,
+                pos: chest_pos,
+            },
+        )?;
+        state.entities.set_item_container_locked(chest_id, true);
+        state.entities.set_item_container_trapped(chest_id, true);
+        let contents: &[(ItemKind, BucStatus, i8)] = if id == LevelId::main(2) {
+            &[
+                (ItemKind::PotionExtraHealing, BucStatus::Uncursed, 0),
+                (ItemKind::LockPick, BucStatus::Uncursed, 0),
+            ]
+        } else {
+            &[
+                (ItemKind::RingProtection, BucStatus::Blessed, 1),
+                (ItemKind::PotionWater, BucStatus::Blessed, 0),
+            ]
+        };
+        for &(child_kind, child_buc, child_enchant) in contents {
+            let child_id = spawn_item(
+                &mut state.entities,
+                registry,
+                child_kind,
+                EntityLocation::InContainer {
+                    container: chest_id,
+                },
+            )?;
+            state.entities.set_item_buc(child_id, child_buc);
+            state.entities.set_item_enchantment(child_id, child_enchant);
+            state.entities.push_contained_item(chest_id, child_id);
+        }
+    }
+    if let Some(slot_idx) = branch_loot_slot_index(id) {
+        let role_idx = Role::ALL.iter().position(|&r| r == role).unwrap_or(0);
+        let salt = (seed as usize).wrapping_add(role_idx.wrapping_mul(5));
+        let book_a = BRANCH_SPELLBOOKS[(salt + slot_idx * 2) % BRANCH_SPELLBOOKS.len()];
+        let book_b = BRANCH_SPELLBOOKS[(salt + slot_idx * 2 + 1) % BRANCH_SPELLBOOKS.len()];
+        let wand = BRANCH_WANDS[(salt + slot_idx) % BRANCH_WANDS.len()];
+        let candidates = [
+            (
+                book_a,
+                Pos {
+                    x: centers[5].x - 1,
+                    y: centers[5].y,
+                },
+            ),
+            (
+                book_b,
+                Pos {
+                    x: centers[5].x,
+                    y: centers[5].y + 1,
+                },
+            ),
+            (
+                wand,
+                Pos {
+                    x: centers[1].x - 1,
+                    y: centers[1].y,
+                },
+            ),
+        ];
+        for (kind, preferred) in candidates {
+            let pos = state
+                .levels
+                .levels
+                .last()
+                .map(|lvl| resolve_unoccupied_floor_item_pos(lvl, &state.entities, preferred))
+                .unwrap_or(preferred);
+            let item_id = spawn_item(
+                &mut state.entities,
+                registry,
+                kind,
+                EntityLocation::OnMap { level: id, pos },
+            )?;
+            state.entities.set_item_buc(item_id, BucStatus::Uncursed);
+            state.entities.set_item_enchantment(item_id, 0);
+        }
+    }
+    let gehennom4_spot = state
+        .levels
+        .levels
+        .last()
+        .map(|lvl| resolve_safe_floor_pos(&lvl.map, centers[3]))
+        .unwrap_or(centers[3]);
+    if spawn_amulet && id == LevelId::new(BranchId::Gehennom, 4) {
+        amulet = Some(spawn_item(
+            &mut state.entities,
+            registry,
+            ItemKind::AmuletAscension,
+            EntityLocation::OnMap {
+                level: id,
+                pos: gehennom4_spot,
+            },
+        )?);
+    }
+    Ok((amulet, gehennom4_spot))
 }
 
 fn find_open_actor_tile(
@@ -992,6 +1389,9 @@ fn spawn_campaign_companions_and_npcs(
                         },
                     )?;
                     state.entities.set_item_unpaid(item_id, true);
+                    state
+                        .entities
+                        .set_item_unpaid_level(item_id, Some(shop_level));
                     placed += 1;
                 }
             }
@@ -1205,6 +1605,7 @@ pub fn initial_world(registry: &ContentRegistry) -> Result<WorldState<EntityStor
         generated_artifacts: BTreeSet::new(),
         ascension_altars: Vec::new(),
         shop_debt: 0,
+        shop_debts: Vec::new(),
         last_death_cause: None,
     };
     mark_level_initial_explored(&mut state);

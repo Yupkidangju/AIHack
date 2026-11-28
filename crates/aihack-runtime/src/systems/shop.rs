@@ -81,6 +81,7 @@ fn find_buy_stack(
         let (existing_kind, _, _, _, _) = entity.item()?;
         let qty = entity.item_quantity().unwrap_or(1);
         if existing_kind == kind
+            && entity.item_unpaid() != Some(true)
             && entity.item_buc().unwrap_or(BucStatus::Uncursed) == BucStatus::Uncursed
             && entity.item_enchantment().unwrap_or(0) == 0
             && qty < MAX_ITEM_STACK

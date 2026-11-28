@@ -300,6 +300,208 @@ pub(crate) fn invoke(
                 text: format!("Sting glows cold blue — you sense {nearby} hostile foes nearby!"),
             });
         }
+        "magic_mirror_of_merlin" => {
+            events.extend(traps::reveal_all_hidden_tiles(world));
+            let state = world.state_mut();
+            state.status_timers.blind = 0;
+            state.status_timers.hallucinating = 0;
+            state.hallucinating = false;
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Magic Mirror of Merlin reveals hidden truths!".to_string(),
+            });
+        }
+        "cloak_of_the_wayfarer" => {
+            let state = world.state_mut();
+            state.status_timers.invisible = state.status_timers.invisible.max(8);
+            state.status_timers.fast = state.status_timers.fast.max(5);
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Cloak of the Wayfarer conceals your form in wind and shadow!"
+                    .to_string(),
+            });
+        }
+        "tome_of_arcana" => {
+            let state = world.state_mut();
+            state.mp = state.mp.saturating_add(16).min(state.max_mp);
+            state.status_timers.confused = 0;
+            state.status_timers.stunned = 0;
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Tome of Arcana surges with arcane mana!".to_string(),
+            });
+        }
+        "candelabrum_of_grace" => {
+            let heal = combat::roll_die(rng, 8) + combat::roll_die(rng, 8) + 4;
+            let state = world.state_mut();
+            state.poison_turns = 0;
+            if let Some(stats) = state.entities.actor_stats_mut(player_id) {
+                let before = stats.hp;
+                stats.hp = stats.hp.saturating_add(heal).min(stats.max_hp);
+                let amount = stats.hp - before;
+                if amount > 0 {
+                    events.push(GameEvent::EntityHealed {
+                        entity: player_id,
+                        amount,
+                        hp_after: stats.hp,
+                    });
+                }
+            }
+            events.extend(traps::reveal_all_hidden_tiles(world));
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Candelabrum of Grace shines with consecrating warmth!".to_string(),
+            });
+        }
+        "orb_of_fate" => {
+            for target in adjacent_hostile_targets(world, level, pos) {
+                let dmg = combat::roll_die(rng, 6) + combat::roll_die(rng, 6);
+                if let Some(stats) = world.state_mut().entities.actor_stats_mut(target) {
+                    stats.hp = stats.hp.saturating_sub(dmg);
+                }
+                events.extend(death::collect_death_events_after_attack(
+                    world, player_id, target,
+                )?);
+            }
+            let state = world.state_mut();
+            state.status_timers.fast = state.status_timers.fast.max(4);
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Orb of Fate bends battle fortune in your favor!".to_string(),
+            });
+        }
+        "eye_of_the_aethiopica" => {
+            let state = world.state_mut();
+            state.mp = state.max_mp;
+            state.status_timers.confused = 0;
+            events.extend(traps::reveal_all_hidden_tiles(world));
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Eye of the Aethiopica opens your mind to total clarity!".to_string(),
+            });
+        }
+        "master_key_of_thievery" => {
+            for dir in aihack_core::position::Direction::ALL {
+                let adj = pos.offset(dir.delta());
+                if world.current_map().tile(adj).ok()
+                    == Some(TileKind::Door(aihack_core::domain::tile::DoorState::Locked))
+                {
+                    let _ = world.current_map_mut().set_tile(
+                        adj,
+                        TileKind::Door(aihack_core::domain::tile::DoorState::Closed),
+                    );
+                    events.push(GameEvent::DoorChanged {
+                        pos: adj,
+                        from: aihack_core::domain::tile::DoorState::Locked,
+                        to: aihack_core::domain::tile::DoorState::Closed,
+                    });
+                }
+            }
+            events.extend(traps::reveal_all_hidden_tiles(world));
+            let state = world.state_mut();
+            state.status_timers.invisible = state.status_timers.invisible.max(6);
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Master Key of Thievery unlocks nearby wards!".to_string(),
+            });
+        }
+        "mitre_of_holiness" => {
+            let heal =
+                combat::roll_die(rng, 8) + combat::roll_die(rng, 8) + combat::roll_die(rng, 8);
+            let state = world.state_mut();
+            state.mp = state.mp.saturating_add(6).min(state.max_mp);
+            state.poison_turns = 0;
+            if let Some(stats) = state.entities.actor_stats_mut(player_id) {
+                let before = stats.hp;
+                stats.hp = stats.hp.saturating_add(heal).min(stats.max_hp);
+                let amount = stats.hp - before;
+                if amount > 0 {
+                    events.push(GameEvent::EntityHealed {
+                        entity: player_id,
+                        amount,
+                        hp_after: stats.hp,
+                    });
+                }
+            }
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Mitre of Holiness blesses you with sacred vigor!".to_string(),
+            });
+        }
+        "tsurugi_of_muramasa" => {
+            for target in adjacent_hostile_targets(world, level, pos) {
+                let dmg =
+                    combat::roll_die(rng, 8) + combat::roll_die(rng, 8) + combat::roll_die(rng, 8);
+                if let Some(stats) = world.state_mut().entities.actor_stats_mut(target) {
+                    stats.hp = stats.hp.saturating_sub(dmg);
+                }
+                events.extend(death::collect_death_events_after_attack(
+                    world, player_id, target,
+                )?);
+            }
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Tsurugi of Muramasa unleashes a razor-sharp tempest!".to_string(),
+            });
+        }
+        "heart_of_ahriman" => {
+            if let Some(target) = nearest_hostile_target(world, level, pos, 6) {
+                let dmg =
+                    combat::roll_die(rng, 6) + combat::roll_die(rng, 6) + combat::roll_die(rng, 6);
+                if let Some(stats) = world.state_mut().entities.actor_stats_mut(target) {
+                    stats.hp = stats.hp.saturating_sub(dmg);
+                }
+                events.extend(death::collect_death_events_after_attack(
+                    world, player_id, target,
+                )?);
+            }
+            let state = world.state_mut();
+            state.status_timers.fast = state.status_timers.fast.max(6);
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Heart of Ahriman pulses with relentless battle fury!".to_string(),
+            });
+        }
+        "longbow_of_diana" => {
+            if let Some(target) = nearest_hostile_target(world, level, pos, 8) {
+                let dmg = combat::roll_die(rng, 10) + combat::roll_die(rng, 10);
+                if let Some(stats) = world.state_mut().entities.actor_stats_mut(target) {
+                    stats.hp = stats.hp.saturating_sub(dmg);
+                }
+                events.extend(death::collect_death_events_after_attack(
+                    world, player_id, target,
+                )?);
+            }
+            events.extend(traps::search(world));
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Longbow of Diana looses an unerring silver shaft!".to_string(),
+            });
+        }
+        "eyes_of_the_overworld" => {
+            let state = world.state_mut();
+            state.status_timers.blind = 0;
+            state.status_timers.confused = 0;
+            state.status_timers.hallucinating = 0;
+            state.hallucinating = false;
+            events.extend(traps::reveal_all_hidden_tiles(world));
+            world.mark_current_level_explored();
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "The Eyes of the Overworld pierce every veil of darkness!".to_string(),
+            });
+        }
+        "orb_of_detection" => {
+            events.extend(traps::reveal_all_hidden_tiles(world));
+            world.mark_current_level_explored();
+            let nearby = count_hostiles_within(world, level, pos, 12);
+            events.push(GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: format!(
+                    "The Orb of Detection maps your surroundings ({nearby} foes sensed)!"
+                ),
+            });
+        }
         _ => {}
     }
 

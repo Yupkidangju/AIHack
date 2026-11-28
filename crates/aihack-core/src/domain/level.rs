@@ -63,21 +63,25 @@ impl BranchGraph {
                 max_depth: 2,
                 parent: Some((LevelId::main(3), BranchEntryKind::StairsUp)),
             },
-            // P10~P13 분기 그래프 예약 훅 (초기 캠페인에서는 level_ids로 활성화하지 않음)
             BranchDef {
                 id: BranchId::Sokoban,
-                max_depth: 0,
+                max_depth: 4,
                 parent: Some((LevelId::main(4), BranchEntryKind::StairsDown)),
             },
             BranchDef {
                 id: BranchId::Quest,
-                max_depth: 0,
+                max_depth: 3,
                 parent: Some((LevelId::main(5), BranchEntryKind::StairsDown)),
             },
             BranchDef {
                 id: BranchId::Gehennom,
-                max_depth: 0,
+                max_depth: 4,
                 parent: Some((LevelId::main(6), BranchEntryKind::StairsDown)),
+            },
+            BranchDef {
+                id: BranchId::Planes,
+                max_depth: 5,
+                parent: None,
             },
         ];
         Self { branches: BRANCHES }
@@ -97,6 +101,15 @@ impl BranchGraph {
         out
     }
 
+    pub fn has_branch_entry(self, from: LevelId, entry_kind: BranchEntryKind) -> bool {
+        self.branches.iter().any(|branch| {
+            branch.max_depth > 0
+                && branch
+                    .parent
+                    .is_some_and(|(parent, kind)| parent == from && kind == entry_kind)
+        })
+    }
+
     pub fn branch_entry_from(self, from: LevelId, tile: TileKind) -> Option<LevelId> {
         self.branches.iter().find_map(|branch| {
             if branch.max_depth <= 0 {
@@ -112,12 +125,27 @@ impl BranchGraph {
         })
     }
 
+    pub fn portal_target(self, from: LevelId) -> Option<LevelId> {
+        if from.branch != BranchId::Planes {
+            return None;
+        }
+        let planes = self.branch_def(BranchId::Planes)?;
+        (from.depth >= 1 && from.depth < planes.max_depth)
+            .then(|| LevelId::new(BranchId::Planes, from.depth + 1))
+    }
+
     pub fn descend_target(self, from: LevelId) -> Option<LevelId> {
+        if from.branch == BranchId::Planes {
+            return None;
+        }
         let branch = self.branch_def(from.branch)?;
         (from.depth < branch.max_depth).then(|| LevelId::new(from.branch, from.depth + 1))
     }
 
     pub fn ascend_target(self, from: LevelId) -> Option<LevelId> {
+        if from.branch == BranchId::Planes {
+            return None;
+        }
         let branch = self.branch_def(from.branch)?;
         if from.depth > 1 {
             Some(LevelId::new(from.branch, from.depth - 1))

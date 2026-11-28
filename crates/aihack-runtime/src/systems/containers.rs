@@ -266,7 +266,7 @@ pub fn container_put(
             entities.clear_contained_items(id);
             entities.clear_item_letter(id);
             entities.set_item_tool_active(id, false);
-            entities.set_item_location(id, EntityLocation::Consumed);
+            items::mark_item_consumed(entities, id);
         }
         let dmg = roll_die(rng, 8) + roll_die(rng, 8);
         let player_id = world.player_id;
@@ -413,7 +413,7 @@ pub fn container_take(
         let entities = &mut world.state_mut().entities;
         entities.remove_contained_item(container, item);
         entities.set_item_quantity(existing_id, next_qty);
-        entities.set_item_location(item, EntityLocation::Consumed);
+        items::mark_item_consumed(entities, item);
         entities.set_item_quantity(item, 1);
         events.push(GameEvent::ItemPickedUp {
             entity: player_id,

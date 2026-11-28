@@ -17,7 +17,7 @@ use aihack_core::{
 
 use crate::{
     domain::{item::try_item_data_from_registry, monster::try_monster_template_from_registry},
-    systems::{combat, death, items, skills, spells},
+    systems::{artifacts, combat, death, items, skills, spells},
     world::GameWorld,
 };
 
@@ -83,6 +83,7 @@ pub const CURATED_WISHES: &[(&str, WishChoice)] = &[
 
 pub fn wish(
     world: &mut GameWorld,
+    rng: &mut GameRng,
     item: EntityId,
     choice: WishChoice,
 ) -> Result<Vec<GameEvent>, String> {
@@ -121,7 +122,10 @@ pub fn wish(
             ) {
                 return Err("that item cannot be wished for".to_string());
             }
-            (kind, blessed, enchant.clamp(0, 3), None)
+            if !(-3..=3).contains(&enchant) {
+                return Err("wished enchantment must be within -3..=+3".to_string());
+            }
+            (kind, blessed, enchant, None)
         }
         WishChoice::ArtifactExcalibur => resolve_artifact_wish(world, "excalibur"),
         WishChoice::ArtifactSunsword => resolve_artifact_wish(world, "sunsword"),
@@ -195,10 +199,21 @@ pub fn wish(
         .and_then(artifact_def)
         .map(|d| d.name.to_string())
         .unwrap_or(item_name);
-    Ok(vec![GameEvent::Message {
+    let mut events = vec![GameEvent::Message {
         priority: MessagePriority::Info,
         text: format!("Your wish is granted! You receive {label}."),
-    }])
+    }];
+    if let Some(def) = artifact_id.and_then(artifact_def) {
+        if world
+            .campaign
+            .is_some_and(|c| artifacts::is_artifact_hostile_to(def, c.alignment))
+        {
+            events.extend(artifacts::apply_artifact_blast(
+                world, rng, def, 2, 6, "wish for",
+            )?);
+        }
+    }
+    Ok(events)
 }
 
 fn resolve_artifact_wish(
@@ -289,7 +304,12 @@ pub fn throw_item(
         spawned
     } else {
         items::remove_inventory_item(world, item)?;
-        world.state_mut().entities.set_item_location(
+        let entities = &mut world.state_mut().entities;
+        if entities.get(item).and_then(|e| e.item_unpaid()) == Some(true) {
+            entities.set_item_unpaid(item, false);
+            entities.set_item_unpaid_level(item, None);
+        }
+        entities.set_item_location(
             item,
             EntityLocation::OnMap {
                 level,
@@ -410,6 +430,9 @@ pub fn zap_wand(
         return Err("wand has no charges".to_string());
     }
     if wand_effect == WandEffect::Wishing {
+        if world.campaign.is_some() {
+            world.identify_item_kind(wand_kind);
+        }
         return Ok(vec![GameEvent::Message {
             priority: MessagePriority::Info,
             text: "Use the wish action to make a wish from this wand.".to_string(),
@@ -589,9 +612,10 @@ pub fn zap_wand(
         }
         WandEffect::MakeInvisible => {
             if let Some(target) = outcome.hit_target {
+                world.state_mut().entities.set_actor_invisible(target, true);
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
-                    text: format!("The shimmer briefly conceals creature #{}.", target.0),
+                    text: "The shimmer renders the creature invisible!".to_string(),
                 });
             } else {
                 events.push(GameEvent::Message {
@@ -692,6 +716,10 @@ pub fn zap_wand(
         WandEffect::Cancellation => {
             if let Some(target) = outcome.hit_target {
                 events.extend(crate::systems::npc::provoke_actor(world, target));
+                world
+                    .state_mut()
+                    .entities
+                    .set_actor_invisible(target, false);
                 if let Some(stats) = world.state_mut().entities.actor_stats_mut(target) {
                     stats.resistances = Resistances::NONE;
                     stats.hit_bonus = stats.hit_bonus.saturating_sub(1);
@@ -932,6 +960,7 @@ pub(crate) fn trace_path_with_max_distance(
         if matches!(
             tile,
             TileKind::Wall
+                | TileKind::Boulder
                 | TileKind::Door(DoorState::Closed | DoorState::Locked)
                 | TileKind::HiddenDoor
         ) {

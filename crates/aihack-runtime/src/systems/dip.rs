@@ -110,6 +110,15 @@ fn dip_into_tile(
                 }]);
             }
             if kind != ItemKind::PotionWater || buc != BucStatus::Uncursed {
+                if data.class == ItemClass::Potion
+                    && (!world.is_item_identified(kind)
+                        || !entity.item_buc_known().unwrap_or(false))
+                {
+                    return Ok(vec![GameEvent::Message {
+                        priority: MessagePriority::Info,
+                        text: "Nothing happens.".to_string(),
+                    }]);
+                }
                 return Err("only uncursed water can be blessed on an altar".to_string());
             }
             if world.mp < 3 {
@@ -204,6 +213,15 @@ fn dip_into_potion(
 
     if target_kind == ItemKind::PotionWater {
         if item_kind == ItemKind::PotionWater && target_buc == BucStatus::Uncursed {
+            if !world.is_item_identified(target_kind)
+                || !target_entity.item_buc_known().unwrap_or(false)
+                || !world.is_item_identified(item_kind)
+            {
+                return Ok(vec![GameEvent::Message {
+                    priority: MessagePriority::Info,
+                    text: "Nothing happens.".to_string(),
+                }]);
+            }
             return Err("dipping plain water into plain water does nothing".to_string());
         }
         match target_buc {
@@ -383,6 +401,12 @@ fn dip_into_potion(
         return Ok(events);
     }
 
+    if !world.is_item_identified(target_kind) || !world.is_item_identified(item_kind) {
+        return Ok(vec![GameEvent::Message {
+            priority: MessagePriority::Info,
+            text: "Nothing happens.".to_string(),
+        }]);
+    }
     Err("dipping into that potion has no special effect".to_string())
 }
 
@@ -445,6 +469,7 @@ fn can_place_result_single(
             let q = e.item_quantity().unwrap_or(1);
             entry.item != source_item
                 && k == new_kind
+                && e.item_unpaid() != Some(true)
                 && e.item_buc().unwrap_or(BucStatus::Uncursed) == new_buc
                 && e.item_enchantment().unwrap_or(0) == new_enchant
                 && e.item_erosion().unwrap_or(0) == 0
@@ -550,6 +575,7 @@ fn spawn_or_replace_single(
             let q = e.item_quantity().unwrap_or(1);
             if entry.item != source_item
                 && k == new_kind
+                && e.item_unpaid() != Some(true)
                 && e.item_buc().unwrap_or(BucStatus::Uncursed) == new_buc
                 && e.item_enchantment().unwrap_or(0) == new_enchant
                 && e.item_erosion().unwrap_or(0) == 0

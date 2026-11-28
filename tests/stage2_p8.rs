@@ -23,7 +23,7 @@ use aihack_core::{
     event::GameEvent,
     ids::{BranchId, EntityId, LevelId},
     position::{Direction, Pos},
-    save::{SAVE_SCHEMA_VERSION_V1, SAVE_SCHEMA_VERSION_V3},
+    save::{SAVE_SCHEMA_VERSION_V1, SAVE_SCHEMA_VERSION_V4},
 };
 use aihack_llm::{service::LlmObservationView, transport::REQUEST_BODY_LIMIT};
 use aihack_runtime::GameSession;
@@ -1187,7 +1187,7 @@ fn p8c_generator_v3_map_validation_branch_graph_save_v3_llm_and_tui_viewport() {
 
     // BranchGraph topology check
     let graph = BranchGraph::campaign_v3();
-    assert_eq!(graph.active_level_ids().len(), 8);
+    assert_eq!(graph.active_level_ids().len(), 24);
     assert_eq!(
         graph.branch_entry_from(LevelId::main(3), TileKind::StairsUp),
         Some(LevelId::new(BranchId::Mines, 1))
@@ -1242,7 +1242,7 @@ fn p8c_generator_v3_map_validation_branch_graph_save_v3_llm_and_tui_viewport() {
             .accepted
     );
     let mut save_v3 = sess_v3.to_save_data();
-    assert_eq!(save_v3.schema_version, SAVE_SCHEMA_VERSION_V3);
+    assert_eq!(save_v3.schema_version, SAVE_SCHEMA_VERSION_V4);
     save_v3
         .world
         .intrinsic_resistances
@@ -1254,10 +1254,7 @@ fn p8c_generator_v3_map_validation_branch_graph_save_v3_llm_and_tui_viewport() {
         learned_at_turn: 3,
     });
     save_v3.world.generated_artifacts.insert("sting".into());
-    save_v3
-        .world
-        .ascension_altars
-        .push((LevelId::main(1), Pos { x: 10, y: 10 }));
+    assert_eq!(save_v3.world.ascension_altars.len(), 3);
     save_v3.world.levels.levels[0].engravings.push(Engraving {
         pos: Pos { x: 5, y: 5 },
         text: "Elbereth".into(),
@@ -1283,11 +1280,20 @@ fn p8c_generator_v3_map_validation_branch_graph_save_v3_llm_and_tui_viewport() {
     assert_eq!(rw.spell_skill.get("spellcasting"), Some(&1));
     assert_eq!(rw.learned_spells.len(), 1);
     assert!(rw.generated_artifacts.contains("sting"));
+    assert_eq!(rw.ascension_altars.len(), 3);
     assert_eq!(rw.levels.levels[0].engravings[0].text, "Elbereth");
     assert_eq!(
         rw.entities().get(art_id).unwrap().item_artifact_id(),
         Some("sting")
     );
+
+    // Forged ascension_altars entry outside Planes 5 must be rejected.
+    let mut bad_altars = restored.to_save_data();
+    bad_altars
+        .world
+        .ascension_altars
+        .push((LevelId::main(1), Pos { x: 10, y: 10 }));
+    assert!(GameSession::from_save_data(bad_altars).is_err());
 
     // Legacy V1 saves omit extended keys and reject tampered P8/P9~P13 payloads
     let legacy = GameSession::new_for_playing(42);

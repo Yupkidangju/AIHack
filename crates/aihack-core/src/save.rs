@@ -24,6 +24,7 @@ use crate::{
 pub const SAVE_SCHEMA_VERSION_V1: u16 = 1;
 pub const SAVE_SCHEMA_VERSION_V2: u16 = 2;
 pub const SAVE_SCHEMA_VERSION_V3: u16 = 3;
+pub const SAVE_SCHEMA_VERSION_V4: u16 = 4;
 
 /// JSON save에 포함되는 world 상태다. runtime-only 사망 원인은 저장하지 않는다.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +70,8 @@ pub struct SavedWorldV1<E> {
     pub ascension_altars: Vec<(LevelId, Pos)>,
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub shop_debt: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shop_debts: Vec<(LevelId, u32)>,
 }
 
 impl<E: Clone> From<&WorldState<E>> for SavedWorldV1<E> {
@@ -101,6 +104,7 @@ impl<E: Clone> From<&WorldState<E>> for SavedWorldV1<E> {
             generated_artifacts: world.generated_artifacts.clone(),
             ascension_altars: world.ascension_altars.clone(),
             shop_debt: world.shop_debt,
+            shop_debts: world.shop_debts.clone(),
         }
     }
 }
@@ -135,6 +139,7 @@ impl<E> From<SavedWorldV1<E>> for WorldState<E> {
             generated_artifacts: saved.generated_artifacts,
             ascension_altars: saved.ascension_altars,
             shop_debt: saved.shop_debt,
+            shop_debts: saved.shop_debts,
             last_death_cause: None,
         }
     }

@@ -43,6 +43,7 @@ fn saved_world_roundtrip_preserves_persisted_state_and_resets_runtime_death_caus
         generated_artifacts: BTreeSet::new(),
         ascension_altars: Vec::new(),
         shop_debt: 0,
+        shop_debts: Vec::new(),
         last_death_cause: Some(DeathCause::Combat {
             attacker: EntityId(9),
         }),

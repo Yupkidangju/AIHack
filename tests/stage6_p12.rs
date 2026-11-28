@@ -11,9 +11,7 @@ use aihack_content::{
 };
 use aihack_core::{
     action::{CommandIntent as C, WishChoice},
-    campaign::{
-        LearnedSpell, Role, SkillCategory, SpellKind, SpellSchool, MAX_XP, SPELL_MEMORY_TURNS,
-    },
+    campaign::{LearnedSpell, Role, SkillCategory, SpellKind, SpellSchool, SPELL_MEMORY_TURNS},
     domain::{
         combat::DamageRoll,
         entity::{ActorKind, EntityLocation, Faction},
@@ -103,6 +101,17 @@ fn give_item(
     id
 }
 
+fn quaff_gain_level(sess: &mut GameSession, count: u16) {
+    let mut save = sess.to_save_data();
+    let pot = give_item(&mut save, ItemKind::PotionGainLevel, BucStatus::Uncursed, 0);
+    save.world.entities.set_item_quantity(pot, count);
+    *sess = GameSession::from_save_data(save).unwrap();
+    for _ in 0..count {
+        let out = sess.submit(C::Quaff { item: pot });
+        assert!(out.accepted, "{:?}", out.events);
+    }
+}
+
 fn spawn_monster_at(
     save: &mut aihack_runtime::save::SaveDataV1,
     kind: MonsterKind,
@@ -170,22 +179,6 @@ fn p12_1_spellbook_study_memory_decay_and_failure_rate() {
         BucStatus::Uncursed,
         0,
     );
-    save.world.max_mp = 50;
-    let camp = save.world.campaign.unwrap();
-    save.world.campaign.as_mut().unwrap().xp = MAX_XP;
-    let c2 = save.world.campaign.unwrap();
-    let pstats = save
-        .world
-        .entities
-        .actor_stats_mut(save.world.player_id)
-        .unwrap();
-    pstats.max_hp = c2.max_hp();
-    pstats.hp = c2.max_hp();
-    pstats.hit_bonus = c2.hit_bonus();
-    pstats.damage_bonus = c2.damage_bonus();
-    save.world.max_mp = c2.max_mp();
-    save.world.mp = c2.max_mp();
-    let _ = camp;
     let ppos = save
         .world
         .entities
@@ -196,6 +189,7 @@ fn p12_1_spellbook_study_memory_decay_and_failure_rate() {
     let _ = east_pos;
 
     let mut sess = GameSession::from_save_data(save).unwrap();
+    quaff_gain_level(&mut sess, 9);
     // Study SpellbookFireball via Read
     let read_out = sess.submit(C::Read { item: book_id });
     assert!(read_out.accepted, "{:?}", read_out.events);
@@ -314,7 +308,6 @@ fn p12_2_seven_schools_and_representative_28_spells() {
     let mut save = start_campaign(77, Role::Wizard).to_save_data();
     let main1 = save.world.current_level;
     park_monsters_to(&mut save, LevelId::main(6));
-    save.world.campaign.as_mut().unwrap().xp = MAX_XP;
     save.world.campaign.as_mut().unwrap().attributes.int = 20;
     save.world.campaign.as_mut().unwrap().attributes.wis = 18;
     let cap_role_rank = save
@@ -327,25 +320,27 @@ fn p12_2_seven_schools_and_representative_28_spells() {
     save.world
         .spell_skill
         .insert("spellcasting".to_string(), cap_role_rank);
+
+    let mut sess = GameSession::from_save_data(save).unwrap();
+    quaff_gain_level(&mut sess, 19);
+
+    let mut save = sess.to_save_data();
     let camp = save.world.campaign.unwrap();
     let pstats = save
         .world
         .entities
         .actor_stats_mut(save.world.player_id)
         .unwrap();
-    pstats.max_hp = camp.max_hp() + 30;
     pstats.hp = pstats.max_hp - 15;
-    pstats.hit_bonus = camp.hit_bonus();
-    pstats.damage_bonus = camp.damage_bonus();
-    save.world.max_mp = camp.max_mp() + 40;
     save.world.mp = save.world.max_mp;
 
-    // Learn all 28 spells at turn 0
+    // Learn all 28 spells at current turn
+    let turn_now = save.turn;
     for &spell in SpellKind::ALL {
         if !camp.knows_spell(spell) {
             save.world.learned_spells.push(LearnedSpell {
                 spell,
-                learned_at_turn: 0,
+                learned_at_turn: turn_now,
             });
         }
     }
@@ -464,8 +459,6 @@ fn p12_2_seven_schools_and_representative_28_spells() {
     // 3. Matter: Knock opens closed door, WizardLock locks it on a genuine generated door
     let mut door_save = start_campaign(78, Role::Wizard).to_save_data();
     park_monsters_to(&mut door_save, LevelId::main(6));
-    door_save.world.max_mp = 50;
-    door_save.world.mp = 50;
     for &spell in &[SpellKind::Knock, SpellKind::WizardLock] {
         door_save.world.learned_spells.push(LearnedSpell {
             spell,
@@ -526,6 +519,15 @@ fn p12_2_seven_schools_and_representative_28_spells() {
     );
     assert_eq!(
         door_sess.world().map(door_lvl).tile(door_pos).ok(),
+        Some(TileKind::Door(DoorState::Locked))
+    );
+    let door_json = serde_json::to_string(&door_sess.to_save_data()).unwrap();
+    let door_reloaded = GameSession::from_save_data(
+        serde_json::from_str::<aihack_runtime::save::SaveDataV1>(&door_json).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        door_reloaded.world().map(door_lvl).tile(door_pos).ok(),
         Some(TileKind::Door(DoorState::Locked))
     );
 
@@ -658,9 +660,18 @@ fn p12_3_eighteen_wands_wishing_and_polymorph() {
         .entities
         .set_actor_location(save.world.player_id, main1, new_ppos);
     let wall_dir = Some(wall_dir);
-    let mob_a = spawn_monster_at(&mut save, MonsterKind::RedMold, main1, p1, Faction::Hostile);
 
     let mut sess = GameSession::from_save_data(save).unwrap();
+    quaff_gain_level(&mut sess, 2);
+    let mut after_quaff = sess.to_save_data();
+    let mob_a = spawn_monster_at(
+        &mut after_quaff,
+        MonsterKind::RedMold,
+        main1,
+        p1,
+        Faction::Hostile,
+    );
+    sess = GameSession::from_save_data(after_quaff).unwrap();
 
     // Wishing: blessed +2 silver dragon scale mail
     let w1 = sess.submit(C::Wish {
@@ -700,13 +711,16 @@ fn p12_3_eighteen_wands_wishing_and_polymorph() {
             .accepted
     );
 
-    // Unique artifact wish twice: first creates Excalibur artifact, second falls back to non-artifact LongSword
+    // Unique artifact wish twice: first creates Excalibur artifact (and blasts Neutral Mage), second falls back to non-artifact LongSword
+    let hp_before_excal = sess.observation().player.hp;
+    let excal_wish = sess.submit(C::Wish {
+        item: wand_wish,
+        wish: WishChoice::ArtifactExcalibur,
+    });
+    assert!(excal_wish.accepted, "{:?}", excal_wish.events);
     assert!(
-        sess.submit(C::Wish {
-            item: wand_wish,
-            wish: WishChoice::ArtifactExcalibur
-        })
-        .accepted
+        sess.observation().player.hp < hp_before_excal,
+        "cross-aligned artifact wish must deal blast damage to Neutral Mage"
     );
     assert!(sess.world().generated_artifacts.contains("excalibur"));
     assert!(
@@ -1062,8 +1076,8 @@ fn p12_5_full_catalog_130_items_85_monsters_smoke_test() {
     let reg = registry().unwrap();
     assert_eq!(GENERATED_ITEM_COUNT, 130);
     assert_eq!(ItemKind::ALL.len(), 130);
-    assert_eq!(GENERATED_MONSTER_COUNT, 85);
-    assert_eq!(MonsterKind::ALL.len(), 85);
+    const { assert!(GENERATED_MONSTER_COUNT >= 85) };
+    assert_eq!(MonsterKind::ALL.len(), GENERATED_MONSTER_COUNT);
 
     // Verify all randomized appearance pools produce unique non-colliding appearances per seed
     for seed in [42_u64, 1337_u64] {

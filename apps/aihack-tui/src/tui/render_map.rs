@@ -39,6 +39,8 @@ impl Widget for MapWidget<'_> {
                     crate::domain::tile::TileKind::Water | crate::domain::tile::TileKind::Lava => {
                         '~'
                     }
+                    crate::domain::tile::TileKind::Boulder => '0',
+                    crate::domain::tile::TileKind::MagicPortal => '^',
                 };
                 let style = if tile.visible {
                     let fg = match tile.tile {
@@ -53,6 +55,8 @@ impl Widget for MapWidget<'_> {
                         crate::domain::tile::TileKind::Sink => Color::Gray,
                         crate::domain::tile::TileKind::Water => Color::Blue,
                         crate::domain::tile::TileKind::Lava => Color::LightRed,
+                        crate::domain::tile::TileKind::Boulder => Color::Gray,
+                        crate::domain::tile::TileKind::MagicPortal => Color::LightMagenta,
                         crate::domain::tile::TileKind::Floor if tile.engraving.is_some() => {
                             self.theme.accent
                         }

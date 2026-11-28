@@ -634,6 +634,13 @@ pub fn monster_is_large(kind: MonsterKind, registry: &ContentRegistry) -> bool {
                 | MonsterKind::BlueDragon
                 | MonsterKind::SilverDragon
                 | MonsterKind::AirElemental
+                | MonsterKind::EarthElemental
+                | MonsterKind::FireElemental
+                | MonsterKind::WaterElemental
+                | MonsterKind::Orcus
+                | MonsterKind::RiderDeath
+                | MonsterKind::RiderPestilence
+                | MonsterKind::RiderFamine
         )
 }
 

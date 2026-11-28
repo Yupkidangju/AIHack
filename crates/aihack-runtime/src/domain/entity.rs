@@ -210,6 +210,18 @@ impl EntityStore {
         self.0.set_item_unpaid(id, unpaid)
     }
 
+    pub fn set_item_unpaid_level(
+        &mut self,
+        id: EntityId,
+        level: Option<aihack_core::ids::LevelId>,
+    ) -> bool {
+        self.0.set_item_unpaid_level(id, level)
+    }
+
+    pub fn set_actor_invisible(&mut self, id: EntityId, next: bool) -> bool {
+        self.0.set_actor_invisible(id, next)
+    }
+
     pub fn set_actor_faction(&mut self, id: EntityId, next: Faction) -> bool {
         self.0.set_actor_faction(id, next)
     }

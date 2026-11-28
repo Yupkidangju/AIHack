@@ -48,6 +48,7 @@ pub const MAX_MONSTER_ACTIONS_PER_TURN: usize = 4;
 const MAX_MONSTER_INVENTORY: usize = 4;
 
 pub fn run_monster_turn(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     state: &mut RunState,
@@ -108,7 +109,7 @@ pub fn run_monster_turn(
                 stats_mut.energy = spent;
             }
             if in_campaign {
-                let acted = step_campaign_actor(world, rng, actor, &mut events)?;
+                let acted = step_campaign_actor(seed, world, rng, actor, &mut events)?;
                 if !acted {
                     let clamped = spent.min(ENERGY_THRESHOLD.saturating_sub(effective_gain).max(0));
                     if let Some(stats_mut) = world.state_mut().entities.actor_stats_mut(actor) {
@@ -125,7 +126,7 @@ pub fn run_monster_turn(
                     }
                     break;
                 }
-                apply_monster_intent(world, rng, intent, &mut events)?;
+                apply_monster_intent(seed, world, rng, intent, &mut events)?;
             }
         }
     }
@@ -199,6 +200,7 @@ pub fn try_split_on_hit(
 }
 
 fn step_campaign_actor(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     actor: EntityId,
@@ -225,7 +227,7 @@ fn step_campaign_actor(
     match faction {
         Faction::Pet => {
             let before = events.len();
-            let pet_events = pets::step_pet_ai(world, rng, actor)?;
+            let pet_events = pets::step_pet_ai(seed, world, rng, actor)?;
             let acted = !pet_events.is_empty();
             events.extend(pet_events);
             return Ok(acted || events.len() > before);
@@ -236,7 +238,7 @@ fn step_campaign_actor(
         }
         Faction::Peaceful => {
             if aihack_content::monster_has_ai_flag(mk, "watch", world.content_registry()) {
-                return step_watchman_ai(world, rng, actor, mk, level, actor_pos, events);
+                return step_watchman_ai(seed, world, rng, actor, mk, (level, actor_pos), events);
             }
             return Ok(false);
         }
@@ -277,7 +279,7 @@ fn step_campaign_actor(
             let name = aihack_content::monster_display_name(mk, world.content_registry());
             let entities = &mut world.state_mut().entities;
             entities.remove_monster_inventory(actor, potion_id);
-            entities.set_item_location(potion_id, EntityLocation::Consumed);
+            crate::systems::items::mark_item_consumed(entities, potion_id);
             if let Some(s) = entities.actor_stats_mut(actor) {
                 let next = s.hp.saturating_add(heal).min(s.max_hp);
                 let gained = next - s.hp;
@@ -298,7 +300,7 @@ fn step_campaign_actor(
 
     // 2. Pick up useful floor gear into monster_inventory
     if picks_up && carried.len() < MAX_MONSTER_INVENTORY {
-        if let Some((item_id, item_kind, ac_bonus)) = world
+        if let Some((item_id, item_kind, ac_bonus, armor_slot)) = world
             .entities
             .items_at(level, actor_pos)
             .into_iter()
@@ -324,19 +326,31 @@ fn step_campaign_actor(
                     ItemClass::Wand => charges.unwrap_or(0) > 0,
                     _ => false,
                 };
-                useful.then_some((id, kind, data.ac_bonus))
+                useful.then_some((id, kind, data.ac_bonus, data.effective_armor_slot()))
             })
         {
             let monster_name = aihack_content::monster_display_name(mk, world.content_registry());
-            let item_name = aihack_content::item_display_name(item_kind, world.content_registry());
+            let item_name =
+                crate::appearance::display_name_for_world_item(seed, world, item_id, item_kind);
+            if let Some(slot) = armor_slot.filter(|_| ac_bonus > 0) {
+                let prev_best = carried
+                    .iter()
+                    .filter_map(|&cid| {
+                        let d = world.entities.item_data(cid)?;
+                        (d.effective_armor_slot() == Some(slot)).then_some(d.ac_bonus.min(4))
+                    })
+                    .max()
+                    .unwrap_or(0);
+                let gain = ac_bonus.min(4).saturating_sub(prev_best);
+                if gain > 0 {
+                    if let Some(s) = world.state_mut().entities.actor_stats_mut(actor) {
+                        s.ac = s.ac.saturating_sub(gain).max(-10);
+                    }
+                }
+            }
             let entities = &mut world.state_mut().entities;
             entities.set_item_location(item_id, EntityLocation::Inventory { owner: actor });
             entities.push_monster_inventory(actor, item_id);
-            if ac_bonus > 0 {
-                if let Some(s) = entities.actor_stats_mut(actor) {
-                    s.ac = s.ac.saturating_sub(ac_bonus.min(4)).max(-10);
-                }
-            }
             events.push(GameEvent::Message {
                 priority: MessagePriority::Info,
                 text: format!("The {monster_name} picks up a {item_name}!"),
@@ -438,13 +452,14 @@ fn step_campaign_actor(
         if matches!(flee, MonsterIntent::Wait) {
             return Ok(false);
         }
-        apply_monster_intent(world, rng, flee, events)?;
+        apply_monster_intent(seed, world, rng, flee, events)?;
         return Ok(true);
     }
 
     // 6. Adjacent melee attack
     if actor_pos.chebyshev_distance(target_pos) <= 1 {
         apply_monster_intent(
+            seed,
             world,
             rng,
             MonsterIntent::MeleeAttack {
@@ -555,11 +570,17 @@ fn step_campaign_actor(
                     .map(|s| s.resistances)
                     .unwrap_or(Resistances::NONE)
             };
+            let actual_target_is_undead = matches!(
+                world.entities.get(actual_target).and_then(|e| e.actor()),
+                Some((ActorKind::Monster(tmk), _, _, _, _, _))
+                    if aihack_content::monster_has_ai_flag(tmk, "undead", world.content_registry())
+            );
             if (wand_effect == WandEffect::Fire && target_res.contains(Resistances::FIRE))
                 || (wand_effect == WandEffect::Cold && target_res.contains(Resistances::COLD))
                 || (wand_effect == WandEffect::Lightning && target_res.contains(Resistances::SHOCK))
                 || (wand_effect == WandEffect::Death
-                    && target_res.contains(Resistances::MAGIC_RESISTANCE))
+                    && (target_res.contains(Resistances::MAGIC_RESISTANCE)
+                        || actual_target_is_undead))
             {
                 events.push(GameEvent::Message {
                     priority: MessagePriority::Info,
@@ -615,6 +636,7 @@ fn step_campaign_actor(
         && ranged_shot_has_clear_line(world, actor_pos, target_pos)
     {
         apply_monster_intent(
+            seed,
             world,
             rng,
             MonsterIntent::RangedAttack {
@@ -632,7 +654,7 @@ fn step_campaign_actor(
         if matches!(intent, MonsterIntent::Wait) {
             return Ok(false);
         }
-        apply_monster_intent(world, rng, intent, events)?;
+        apply_monster_intent(seed, world, rng, intent, events)?;
         return Ok(true);
     }
 
@@ -656,12 +678,12 @@ fn step_campaign_actor(
 }
 
 fn step_watchman_ai(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     actor: EntityId,
     mk: MonsterKind,
-    level: LevelId,
-    actor_pos: Pos,
+    (level, actor_pos): (LevelId, Pos),
     events: &mut Vec<GameEvent>,
 ) -> Result<bool, String> {
     let target = world
@@ -685,6 +707,7 @@ fn step_watchman_ai(
     };
     if dist <= 1 {
         apply_monster_intent(
+            seed,
             world,
             rng,
             MonsterIntent::MeleeAttack {
@@ -873,6 +896,7 @@ fn teleport_monster_safely(
 }
 
 fn apply_monster_intent(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     intent: MonsterIntent,
@@ -977,9 +1001,11 @@ fn apply_monster_intent(
                     }
                     Some(MonsterPassive::StealItem) if world.campaign.is_some() => {
                         if let Some((stolen_id, stolen_kind)) = pick_stealable_player_item(world) {
-                            let item_name = aihack_content::item_display_name(
+                            let item_name = crate::appearance::display_name_for_world_item(
+                                seed,
+                                world,
+                                stolen_id,
                                 stolen_kind,
-                                world.content_registry(),
                             );
                             if world
                                 .entities
@@ -1032,9 +1058,8 @@ fn apply_monster_intent(
                                 .entities
                                 .set_item_erosion(metal_id, next_erosion);
                             let _ = items::recompute_player_ac(world);
-                            let item_name = aihack_content::item_display_name(
-                                metal_kind,
-                                world.content_registry(),
+                            let item_name = crate::appearance::display_name_for_world_item(
+                                seed, world, metal_id, metal_kind,
                             );
                             events.push(GameEvent::PassiveAttackTriggered {
                                 source: attacker,

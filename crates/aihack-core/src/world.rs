@@ -75,6 +75,8 @@ pub struct WorldState<E> {
     pub ascension_altars: Vec<(LevelId, Pos)>,
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub shop_debt: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shop_debts: Vec<(LevelId, u32)>,
     /// 현재 실행 중인 사망 처리만 위한 transient 값이며 save에는 넣지 않는다.
     pub last_death_cause: Option<DeathCause>,
 }

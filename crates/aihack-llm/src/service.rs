@@ -9,9 +9,10 @@ use std::{
 };
 
 use aihack_ai_contract::{
-    ActionSpace, BucStatus, ClientRevision, EntityId, EntityKind, EntityObservation, EquipmentSlot,
-    Faction, GameEvent, InventoryLetter, ItemClass, ItemKind, ItemObservation, Observation,
-    PlayerObservation, Pos, RunStateSummary, TileObservation,
+    ActionSpace, Alignment, Attributes, BucStatus, ClientRevision, EntityId, EntityKind,
+    EntityObservation, EquipmentSlot, Faction, GameEvent, InventoryLetter, ItemClass, ItemKind,
+    ItemObservation, Observation, PlayerObservation, Pos, Race, Role, RunStateSummary,
+    SkillCategory, SkillRank, SpecialRoomKind, SpellKind, TileKind, TileObservation,
 };
 use serde::Serialize;
 
@@ -30,6 +31,12 @@ pub type VisibleEntity = LlmVisibleEntity;
 pub type InventoryObservation = LlmInventoryItem;
 pub type GameEventSummary = GameEvent;
 
+fn is_zero_i16(value: &i16) -> bool {
+    *value == 0
+}
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
+}
 fn is_zero_u16(value: &u16) -> bool {
     *value == 0
 }
@@ -161,6 +168,207 @@ impl LlmInventoryItem {
     }
 }
 
+const COMPACT_VIEW_LIMIT_BYTES: usize = 24_000;
+const CAMPAIGN_MAX_REAL_TILES: usize = 1_680;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LlmEquippedSlot {
+    pub slot: EquipmentSlot,
+    pub label: String,
+    #[serde(skip_serializing_if = "is_false")]
+    pub cursed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LlmSpellSummary {
+    pub spell: SpellKind,
+    pub mana_cost: i16,
+    pub fail_pct: u8,
+    #[serde(skip_serializing_if = "is_false")]
+    pub directional: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LlmSkillSummary {
+    pub category: SkillCategory,
+    pub rank: SkillRank,
+    #[serde(skip_serializing_if = "is_false")]
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LlmCampaignSummary {
+    pub role: Role,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub race: Option<Race>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alignment: Option<Alignment>,
+    pub level: u8,
+    pub xp: u32,
+    pub carried_weight: i16,
+    pub carrying_capacity: i16,
+    #[serde(skip_serializing_if = "is_false")]
+    pub has_amulet: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<Attributes>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub resistances: String,
+    #[serde(skip_serializing_if = "is_zero_i16")]
+    pub god_anger: i16,
+    #[serde(skip_serializing_if = "is_zero_u16")]
+    pub prayer_timeout: u16,
+    #[serde(skip_serializing_if = "is_zero_u16")]
+    pub artifact_invoke_cooldown: u16,
+    #[serde(skip_serializing_if = "is_zero_u32")]
+    pub shop_debt: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_level_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_room: Option<SpecialRoomKind>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub on_magic_portal: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_high_altar: Option<Alignment>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub equipped: Vec<LlmEquippedSlot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spells: Vec<LlmSpellSummary>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<LlmSkillSummary>,
+}
+
+fn masked_item_label(item: &ItemObservation, in_campaign: bool) -> String {
+    if in_campaign && !item.identified {
+        if let Some(appearance) = &item.appearance {
+            return appearance.clone();
+        }
+    }
+    item.name
+        .clone()
+        .unwrap_or_else(|| format!("{:?}", item.kind))
+}
+
+impl LlmCampaignSummary {
+    fn from_obs(observation: &Observation) -> Option<Self> {
+        let campaign = observation.campaign.as_ref()?;
+        let equipped = observation
+            .inventory
+            .iter()
+            .filter_map(|item| {
+                let slot = item.equipped_slot?;
+                Some(LlmEquippedSlot {
+                    slot,
+                    label: masked_item_label(item, true),
+                    cursed: item.buc_known && item.buc == BucStatus::Cursed,
+                    artifact_id: item.artifact_id.clone(),
+                })
+            })
+            .collect();
+        let tools = observation
+            .inventory
+            .iter()
+            .filter(|item| item.item_class == Some(ItemClass::Tool))
+            .map(|item| {
+                let label = masked_item_label(item, true);
+                if item.tool_active {
+                    format!("{label} (active)")
+                } else {
+                    label
+                }
+            })
+            .collect();
+        let spells = campaign
+            .spell_failure_rates
+            .iter()
+            .map(|&(spell, fail_pct)| LlmSpellSummary {
+                spell,
+                mana_cost: spell.mana_cost(),
+                fail_pct,
+                directional: spell.is_directional(),
+            })
+            .collect();
+        let skills = campaign
+            .skills
+            .iter()
+            .filter(|s| s.rank != SkillRank::Unskilled || s.ready)
+            .map(|s| LlmSkillSummary {
+                category: s.category,
+                rank: s.rank,
+                ready: s.ready,
+            })
+            .collect();
+        Some(Self {
+            role: campaign.role,
+            race: campaign.race,
+            alignment: campaign.alignment,
+            level: campaign.level,
+            xp: campaign.xp,
+            carried_weight: campaign.carried_weight,
+            carrying_capacity: campaign.carrying_capacity,
+            has_amulet: campaign.has_amulet,
+            attributes: campaign.attributes,
+            resistances: aihack_ai_contract::Resistances(observation.player.resistances)
+                .badge_string(),
+            god_anger: campaign.god_anger,
+            prayer_timeout: campaign.prayer_timeout,
+            artifact_invoke_cooldown: campaign.artifact_invoke_cooldown,
+            shop_debt: observation.player.shop_debt,
+            special_level_id: campaign.special_level_id.clone(),
+            special_room: campaign.special_room,
+            on_magic_portal: campaign.on_magic_portal,
+            on_high_altar: campaign.on_high_altar,
+            equipped,
+            tools,
+            spells,
+            skills,
+        })
+    }
+}
+
+fn is_poi_tile(tile: TileKind) -> bool {
+    !matches!(tile, TileKind::Floor | TileKind::Wall)
+}
+
+fn trim_view(
+    view: &mut LlmObservationView,
+    player_pos: Pos,
+    tile_cap: usize,
+    entity_cap: usize,
+    event_cap: usize,
+) {
+    if view.visible_tiles.len() > tile_cap {
+        view.visible_tiles.sort_by_key(|t| {
+            (
+                !is_poi_tile(t.tile),
+                t.pos.chebyshev_distance(player_pos),
+                t.pos.y,
+                t.pos.x,
+            )
+        });
+        view.visible_tiles.truncate(tile_cap);
+        view.visible_tiles.sort_by_key(|t| (t.pos.y, t.pos.x));
+    }
+    if view.visible_entities.len() > entity_cap {
+        view.visible_entities.sort_by_key(|e| {
+            (
+                e.pos.chebyshev_distance(player_pos),
+                e.pos.y,
+                e.pos.x,
+                e.entity.0,
+            )
+        });
+        view.visible_entities.truncate(entity_cap);
+    }
+    if view.last_events.len() > event_cap {
+        let keep_from = view.last_events.len() - event_cap;
+        view.last_events.drain(..keep_from);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LlmObservationView {
     pub turn: u64,
@@ -170,12 +378,14 @@ pub struct LlmObservationView {
     pub visible_entities: Vec<VisibleEntity>,
     pub inventory: Vec<InventoryObservation>,
     pub last_events: Vec<GameEventSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub campaign: Option<LlmCampaignSummary>,
 }
 
 impl From<&Observation> for LlmObservationView {
     fn from(observation: &Observation) -> Self {
         let in_campaign = observation.campaign.is_some();
-        Self {
+        let mut view = Self {
             turn: observation.turn,
             run_state: observation.run_state,
             player: observation.player.clone(),
@@ -196,7 +406,35 @@ impl From<&Observation> for LlmObservationView {
                 .map(|item| LlmInventoryItem::from_obs(item, in_campaign))
                 .collect(),
             last_events: observation.last_events.clone(),
+            campaign: LlmCampaignSummary::from_obs(observation),
+        };
+        if in_campaign && observation.visible_tiles.len() <= CAMPAIGN_MAX_REAL_TILES {
+            let needs_compact = view.visible_tiles.len() > 240
+                || serde_json::to_string(&view)
+                    .map(|s| s.len() > COMPACT_VIEW_LIMIT_BYTES)
+                    .unwrap_or(true);
+            if needs_compact {
+                trim_view(&mut view, observation.player_pos, 240, 128, 8);
+                if serde_json::to_string(&view)
+                    .map(|s| s.len() > COMPACT_VIEW_LIMIT_BYTES)
+                    .unwrap_or(true)
+                {
+                    trim_view(&mut view, observation.player_pos, 120, 64, 6);
+                    if serde_json::to_string(&view)
+                        .map(|s| s.len() > COMPACT_VIEW_LIMIT_BYTES)
+                        .unwrap_or(true)
+                    {
+                        trim_view(&mut view, observation.player_pos, 48, 32, 4);
+                        if let Some(summary) = &mut view.campaign {
+                            summary.tools.truncate(8);
+                            summary.spells.truncate(10);
+                            summary.skills.truncate(8);
+                        }
+                    }
+                }
+            }
         }
+        view
     }
 }
 
@@ -215,13 +453,31 @@ impl LlmRequestInput {
         observation: &Observation,
         kind: LlmRequestKind,
     ) -> Self {
-        Self {
+        let mut input = Self {
             schema_version: observation.schema_version,
             revision,
             observation: LlmObservationView::from(observation),
             action_space: observation.action_space.clone(),
             kind,
+        };
+        if observation.campaign.is_some()
+            && observation.visible_tiles.len() <= CAMPAIGN_MAX_REAL_TILES
+            && canonical_request_json(&input)
+                .map(|s| s.len() > REQUEST_BODY_LIMIT)
+                .unwrap_or(false)
+        {
+            trim_view(&mut input.observation, observation.player_pos, 16, 16, 2);
+            if canonical_request_json(&input)
+                .map(|s| s.len() > REQUEST_BODY_LIMIT)
+                .unwrap_or(false)
+            {
+                input.observation.inventory.retain(|i| {
+                    i.equipped_slot.is_some() || matches!(i.kind, Some(ItemKind::AmuletAscension))
+                });
+                input.observation.inventory.truncate(24);
+            }
         }
+        input
     }
 }
 
@@ -456,6 +712,10 @@ pub(crate) fn prepare_request_input(input: &mut LlmRequestInput) -> Result<(), L
         });
     }
     Ok(())
+}
+
+pub fn canonical_request_size_bytes(input: &LlmRequestInput) -> serde_json::Result<usize> {
+    canonical_request_json(input).map(|json| json.len())
 }
 
 pub(crate) fn canonical_request_json(input: &LlmRequestInput) -> serde_json::Result<String> {

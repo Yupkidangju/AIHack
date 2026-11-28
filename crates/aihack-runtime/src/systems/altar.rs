@@ -51,7 +51,40 @@ pub fn offer(
         .ok_or_else(|| "entity is not an item".to_string())?;
     let data = *data;
     if data.kind == ItemKind::AmuletAscension {
-        return Err("cannot offer the Amulet of Ascension".to_string());
+        let level_id = world.current_level();
+        let pos = world.player_pos();
+        let on_astral_high_altar = level_id
+            == aihack_core::ids::LevelId::new(aihack_core::ids::BranchId::Planes, 5)
+            && world.ascension_altars.contains(&(level_id, pos));
+        if !on_astral_high_altar {
+            return Err("cannot offer the Amulet of Ascension".to_string());
+        }
+        if altar_alignment(world) == Some(campaign.alignment) {
+            return Ok(vec![GameEvent::Message {
+                priority: MessagePriority::Info,
+                text: "You offer the Amulet of Yendor to your deity... You ascend to demigodhood!"
+                    .to_string(),
+            }]);
+        }
+        campaign.god_anger = campaign.god_anger.saturating_add(3).min(MAX_GOD_ANGER);
+        world.state_mut().campaign = Some(campaign);
+        let dmg = combat::roll_die(rng, 8) + combat::roll_die(rng, 8) + combat::roll_die(rng, 8);
+        let player_id = world.player_id;
+        if let Some(stats) = world.state_mut().entities.actor_stats_mut(player_id) {
+            stats.hp = stats.hp.saturating_sub(dmg);
+        }
+        let mut events = vec![GameEvent::Message {
+            priority: MessagePriority::Danger,
+            text: format!(
+                "Your offering enrages the rival deity! Divine wrath strikes for {dmg} damage!"
+            ),
+        }];
+        events.extend(death::collect_death_events_if_hp_depleted(
+            world,
+            player_id,
+            DeathCause::DivineWrath,
+        )?);
+        return Ok(events);
     }
     if !entity.item_contained_items().unwrap_or_default().is_empty() {
         return Err("cannot offer a non-empty container".to_string());
@@ -69,6 +102,14 @@ pub fn offer(
         0
     };
     let cross_aligned = altar_alignment(world).is_some_and(|align| align != campaign.alignment);
+    let level_id = world.current_level();
+    let pos = world.player_pos();
+    let on_astral_high_altar = level_id
+        == aihack_core::ids::LevelId::new(aihack_core::ids::BranchId::Planes, 5)
+        || world.ascension_altars.contains(&(level_id, pos));
+    if cross_aligned && on_astral_high_altar {
+        return Err("the high altars of the Astral Plane cannot be converted".to_string());
+    }
     if cross_aligned && data.class != ItemClass::Corpse {
         return Err("only a corpse can convert a cross-aligned altar".to_string());
     }

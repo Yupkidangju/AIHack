@@ -382,7 +382,7 @@ color="white"
 base_level=12
 corpse_chance=40
 corpse_nutrition=120
-ai_flags=["humanoid", "opens_doors", "shopkeeper", "peaceful_default"]
+ai_flags=["humanoid", "opens_doors", "shopkeeper", "peaceful_default", "npc"]
 spawn_weight=0
 
 [[monster]]
@@ -400,7 +400,7 @@ color="bright_cyan"
 base_level=10
 corpse_chance=40
 corpse_nutrition=120
-ai_flags=["humanoid", "opens_doors", "priest", "peaceful_default"]
+ai_flags=["humanoid", "opens_doors", "priest", "peaceful_default", "npc"]
 spawn_weight=0
 
 [[monster]]
@@ -418,7 +418,7 @@ color="bright_magenta"
 base_level=8
 corpse_chance=30
 corpse_nutrition=100
-ai_flags=["humanoid", "oracle", "peaceful_default"]
+ai_flags=["humanoid", "oracle", "peaceful_default", "npc"]
 spawn_weight=0
 
 [[monster]]
@@ -436,7 +436,7 @@ color="blue"
 base_level=6
 corpse_chance=50
 corpse_nutrition=120
-ai_flags=["humanoid", "opens_doors", "picks_up", "uses_items", "watch", "peaceful_default"]
+ai_flags=["humanoid", "opens_doors", "picks_up", "uses_items", "watch", "peaceful_default", "npc"]
 spawn_weight=0
 
 [[monster]]
@@ -1756,4 +1756,222 @@ corpse_nutrition=0
 ai_flags=["elemental", "large", "fast"]
 spawn_depth_range=[6, 20]
 spawn_weight=5
+
+[[monster]]
+id="monster.wizard_of_yendor"
+glyph="@"
+hp=36
+ac=2
+hit_bonus=7
+damage="1d8"
+ai="ranged_on_sight"
+passive="summon_allies"
+speed=14
+difficulty=15
+name="Wizard of Yendor"
+color="bright_magenta"
+base_level=16
+hp_dice="8d8"
+resistances=["fire", "cold", "shock", "poison", "magic_resistance"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["opens_doors", "caster", "npc"]
+spawn_depth_range=[10, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.high_priest_moloch"
+glyph="@"
+hp=34
+ac=3
+hit_bonus=7
+damage="1d8"
+ai="chase_on_sight"
+passive="drain_life"
+speed=13
+difficulty=14
+name="high priest of Moloch"
+color="red"
+base_level=15
+hp_dice="7d8"
+resistances=["fire", "poison", "magic_resistance"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["opens_doors", "caster", "npc"]
+spawn_depth_range=[10, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.orcus"
+glyph="&"
+hp=34
+ac=3
+hit_bonus=7
+damage="1d8"
+ai="ranged_on_sight"
+passive="cold_breath"
+speed=13
+difficulty=14
+name="Orcus"
+color="bright_red"
+base_level=15
+hp_dice="7d8"
+resistances=["fire", "cold", "poison"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["demon", "large", "opens_doors", "breath", "npc"]
+spawn_depth_range=[10, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.quest_nemesis"
+glyph="&"
+hp=30
+ac=3
+hit_bonus=6
+damage="1d8"
+ai="ranged_on_sight"
+passive="fire_breath"
+speed=13
+difficulty=11
+name="quest nemesis"
+color="yellow"
+base_level=12
+hp_dice="6d8"
+resistances=["fire", "poison"]
+corpse_chance=50
+corpse_nutrition=150
+ai_flags=["opens_doors", "breath", "npc"]
+spawn_depth_range=[8, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.earth_elemental"
+glyph="E"
+hp=28
+ac=3
+hit_bonus=5
+damage="1d8"
+ai="chase_on_sight"
+speed=10
+difficulty=9
+name="earth elemental"
+color="brown"
+base_level=9
+hp_dice="6d8"
+resistances=["fire", "cold", "poison", "sleep"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["elemental", "large"]
+spawn_depth_range=[10, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.fire_elemental"
+glyph="E"
+hp=26
+ac=4
+hit_bonus=5
+damage="1d6"
+ai="chase_on_sight"
+passive="fire_on_melee"
+speed=13
+difficulty=9
+name="fire elemental"
+color="red"
+base_level=9
+hp_dice="5d8"
+resistances=["fire", "poison", "sleep"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["elemental", "large"]
+spawn_depth_range=[10, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.water_elemental"
+glyph="E"
+hp=26
+ac=4
+hit_bonus=5
+damage="1d6"
+ai="chase_on_sight"
+speed=12
+difficulty=9
+name="water elemental"
+color="blue"
+base_level=9
+hp_dice="5d8"
+resistances=["cold", "poison", "sleep"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["elemental", "large"]
+spawn_depth_range=[10, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.rider_death"
+glyph="&"
+hp=38
+ac=1
+hit_bonus=8
+damage="1d8"
+ai="chase_on_sight"
+passive="drain_life"
+speed=14
+difficulty=16
+name="Death"
+color="gray"
+base_level=16
+hp_dice="8d8"
+resistances=["fire", "cold", "shock", "poison", "sleep", "magic_resistance"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["undead", "large", "opens_doors", "npc"]
+spawn_depth_range=[12, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.rider_pestilence"
+glyph="&"
+hp=34
+ac=2
+hit_bonus=7
+damage="1d8"
+ai="chase_on_sight"
+passive="poison_on_melee"
+speed=13
+difficulty=15
+name="Pestilence"
+color="green"
+base_level=15
+hp_dice="7d8"
+resistances=["fire", "cold", "shock", "poison", "sleep", "magic_resistance"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["undead", "large", "opens_doors", "npc"]
+spawn_depth_range=[12, 20]
+spawn_weight=0
+
+[[monster]]
+id="monster.rider_famine"
+glyph="&"
+hp=34
+ac=2
+hit_bonus=7
+damage="1d8"
+ai="chase_on_sight"
+passive="sleep_on_melee"
+speed=13
+difficulty=15
+name="Famine"
+color="orange"
+base_level=15
+hp_dice="7d8"
+resistances=["fire", "cold", "shock", "poison", "sleep", "magic_resistance"]
+corpse_chance=0
+corpse_nutrition=0
+ai_flags=["undead", "large", "opens_doors", "npc"]
+spawn_depth_range=[12, 20]
+spawn_weight=0
 

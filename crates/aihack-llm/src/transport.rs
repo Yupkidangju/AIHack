@@ -22,8 +22,7 @@ use aihack_ai_contract::llm::SoftAdjudicationPayload;
 pub const REQUEST_BODY_LIMIT: usize = 32_768;
 pub const RESPONSE_BODY_LIMIT: usize = 65_536;
 
-const SYSTEM_PROMPT: &str =
-    "Return one JSON object matching the requested AIHack schema. Never emit a state patch.";
+const SYSTEM_PROMPT: &str = "Return one JSON object matching the requested AIHack schema. Never emit a state patch. Consider observation.campaign (stats, resistances, equipment, spells, portals, high altar, amulet) and respect masked unidentified items.";
 
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]

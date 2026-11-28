@@ -64,6 +64,16 @@ pub fn resolve_attack(
         ) {
             profile.hit_bonus = profile.hit_bonus.saturating_sub(2);
         }
+        if world.campaign.is_some()
+            && world
+                .entities
+                .get(defender_id)
+                .and_then(|e| e.actor_invisible())
+                == Some(true)
+            && !world.has_see_invisible()
+        {
+            profile.hit_bonus = profile.hit_bonus.saturating_sub(4);
+        }
         if let Some(weapon_id) = world.inventory.equipped_melee {
             if let Some(weapon) = world.entities.get(weapon_id) {
                 let enchant = i16::from(weapon.item_enchantment().unwrap_or(0));

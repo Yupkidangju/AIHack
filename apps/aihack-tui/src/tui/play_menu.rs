@@ -158,7 +158,7 @@ pub(super) fn action_menu(
                 .inventory
                 .iter()
                 .find(|i| i.item == wand)
-                .is_some_and(|i| i.kind == ItemKind::WandWishing);
+                .is_some_and(|i| i.identified && i.kind == ItemKind::WandWishing);
             if is_wish_wand
                 && commands
                     .iter()
@@ -517,7 +517,7 @@ pub(super) fn action_menu(
             entries.push(Entry {
                 key: item.letter.0,
                 label: item_observation_label(item),
-                candidate: if key == 'z' && item.kind == ItemKind::WandWishing {
+                candidate: if key == 'z' && item.identified && item.kind == ItemKind::WandWishing {
                     U::ChooseWish(item.item)
                 } else if matches!(key, 't' | 'z') {
                     U::ChooseItem {
@@ -777,7 +777,7 @@ pub(super) fn item_menu(observation: &Observation, item: EntityId) -> PlayMenu {
                     .inventory
                     .iter()
                     .find(|i| i.item == item)
-                    .is_some_and(|i| i.kind == ItemKind::WandWishing)
+                    .is_some_and(|i| i.identified && i.kind == ItemKind::WandWishing)
             {
                 U::ChooseWish(item)
             } else if matches!(key, 't' | 'z')
@@ -848,9 +848,24 @@ pub(super) fn commands_menu(observation: &Observation) -> PlayMenu {
     })
     .collect();
     if observation.legal_actions.contains(&C::EnterBranch) {
+        let label = match (
+            observation
+                .campaign
+                .as_ref()
+                .is_some_and(|c| c.on_magic_portal),
+            observation.current_level.branch,
+            observation.current_level.depth,
+        ) {
+            (true, _, _) => "Enter Magic Portal",
+            (_, aihack_ai_contract::BranchId::Main, 3) => "Enter Mines",
+            (_, aihack_ai_contract::BranchId::Main, 4) => "Enter Sokoban",
+            (_, aihack_ai_contract::BranchId::Main, 5) => "Enter Quest",
+            (_, aihack_ai_contract::BranchId::Main, 6) => "Enter Gehennom",
+            _ => "Enter Branch",
+        };
         entries.push(Entry {
             key: 'B',
-            label: "Enter Mines".into(),
+            label: label.into(),
             candidate: U::Command(C::EnterBranch),
         });
     }

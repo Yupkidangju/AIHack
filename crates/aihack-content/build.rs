@@ -61,98 +61,195 @@ struct ItemEntry {
     unidentified_pool: Option<String>,
 }
 
+fn strip_toml_comment(raw: &str) -> &str {
+    let mut in_double = false;
+    let mut in_single = false;
+    let mut escaped = false;
+    for (idx, ch) in raw.char_indices() {
+        if in_double {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_double = false;
+            }
+        } else if in_single {
+            if ch == '\'' {
+                in_single = false;
+            }
+        } else {
+            match ch {
+                '"' => in_double = true,
+                '\'' => in_single = true,
+                '#' => return &raw[..idx],
+                _ => {}
+            }
+        }
+    }
+    raw
+}
+
+fn table_header_name(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if let Some(inner) = trimmed
+        .strip_prefix("[[")
+        .and_then(|s| s.strip_suffix("]]"))
+    {
+        return Some(format!("[[{}]]", inner.trim()));
+    }
+    if let Some(inner) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        return Some(format!("[{}]", inner.trim()));
+    }
+    None
+}
+
+type ParsedItemBlock = Option<(usize, Option<String>, Option<String>, Option<String>)>;
+
 fn parse_items(src: &str) -> Vec<ItemEntry> {
     let mut entries = Vec::new();
-    let mut current: Option<(Option<String>, Option<String>, Option<String>)> = None;
+    let mut current: ParsedItemBlock = None;
 
-    for raw_line in src.lines() {
-        let line = raw_line.trim();
-        if line.is_empty() || line.starts_with('#') {
+    let flush = |entries: &mut Vec<ItemEntry>, cur: ParsedItemBlock| {
+        if let Some((start_line, id, kind, pool)) = cur {
+            let id = id.unwrap_or_else(|| {
+                panic!("items.toml [[item]] block at line {start_line} is missing `id`")
+            });
+            let kind = kind.unwrap_or_else(|| {
+                panic!("items.toml [[item]] block at line {start_line} is missing `kind`")
+            });
+            entries.push(ItemEntry {
+                id,
+                kind,
+                unidentified_pool: pool,
+            });
+        }
+    };
+
+    for (line_idx, raw_line) in src.lines().enumerate() {
+        let line_no = line_idx + 1;
+        let line = strip_toml_comment(raw_line).trim();
+        if line.is_empty() {
             continue;
         }
-        if line == "[[item]]" {
-            if let Some((Some(id), Some(kind), pool)) = current.take() {
-                entries.push(ItemEntry {
-                    id,
-                    kind,
-                    unidentified_pool: pool,
-                });
+        if let Some(header) = table_header_name(line) {
+            flush(&mut entries, current.take());
+            if header == "[[item]]" {
+                current = Some((line_no, None, None, None));
             }
-            current = Some((None, None, None));
             continue;
         }
-        if line.starts_with('[') {
-            if let Some((Some(id), Some(kind), pool)) = current.take() {
-                entries.push(ItemEntry {
-                    id,
-                    kind,
-                    unidentified_pool: pool,
-                });
-            }
-            continue;
-        }
-        if let Some((ref mut id, ref mut kind, ref mut pool)) = current {
-            if let Some(val) = extract_string_field(line, "id") {
+        if let Some((_, ref mut id, ref mut kind, ref mut pool)) = current {
+            if let Some(val) = extract_string_field(line, "id", line_no) {
+                if id.is_some() {
+                    panic!("items.toml duplicate `id` field at line {line_no}");
+                }
                 *id = Some(val);
-            } else if let Some(val) = extract_string_field(line, "kind") {
+            } else if let Some(val) = extract_string_field(line, "kind", line_no) {
+                if kind.is_some() {
+                    panic!("items.toml duplicate `kind` field at line {line_no}");
+                }
                 *kind = Some(val);
-            } else if let Some(val) = extract_string_field(line, "unidentified_pool") {
+            } else if let Some(val) = extract_string_field(line, "unidentified_pool", line_no) {
+                if pool.is_some() {
+                    panic!("items.toml duplicate `unidentified_pool` field at line {line_no}");
+                }
                 *pool = Some(val);
             }
         }
     }
-    if let Some((Some(id), Some(kind), pool)) = current.take() {
-        entries.push(ItemEntry {
-            id,
-            kind,
-            unidentified_pool: pool,
-        });
-    }
+    flush(&mut entries, current.take());
     entries
 }
 
 fn parse_monsters(src: &str) -> Vec<String> {
     let mut ids = Vec::new();
-    let mut in_monster = false;
+    let mut current: Option<(usize, Option<String>)> = None;
 
-    for raw_line in src.lines() {
-        let line = raw_line.trim();
-        if line.is_empty() || line.starts_with('#') {
+    let flush = |ids: &mut Vec<String>, cur: Option<(usize, Option<String>)>| {
+        if let Some((start_line, id)) = cur {
+            let id = id.unwrap_or_else(|| {
+                panic!("monsters.toml [[monster]] block at line {start_line} is missing `id`")
+            });
+            ids.push(id);
+        }
+    };
+
+    for (line_idx, raw_line) in src.lines().enumerate() {
+        let line_no = line_idx + 1;
+        let line = strip_toml_comment(raw_line).trim();
+        if line.is_empty() {
             continue;
         }
-        if line == "[[monster]]" {
-            in_monster = true;
+        if let Some(header) = table_header_name(line) {
+            flush(&mut ids, current.take());
+            if header == "[[monster]]" {
+                current = Some((line_no, None));
+            }
             continue;
         }
-        if line.starts_with('[') {
-            in_monster = false;
-            continue;
-        }
-        if in_monster {
-            if let Some(val) = extract_string_field(line, "id") {
-                ids.push(val);
-                in_monster = false;
+        if let Some((_, ref mut id)) = current {
+            if let Some(val) = extract_string_field(line, "id", line_no) {
+                if id.is_some() {
+                    panic!("monsters.toml duplicate `id` field at line {line_no}");
+                }
+                *id = Some(val);
             }
         }
     }
+    flush(&mut ids, current.take());
     ids
 }
 
-fn extract_string_field(line: &str, expected_key: &str) -> Option<String> {
+fn extract_string_field(line: &str, expected_key: &str, line_no: usize) -> Option<String> {
     let (lhs, rhs) = line.split_once('=')?;
     if lhs.trim() != expected_key {
         return None;
     }
     let val = rhs.trim();
-    if let Some(stripped) = val.strip_prefix('"') {
-        if let Some(end) = stripped.find('"') {
-            return Some(stripped[..end].to_owned());
+    if let Some(rest) = val.strip_prefix('"') {
+        let mut out = String::new();
+        let mut chars = rest.char_indices();
+        while let Some((idx, ch)) = chars.next() {
+            match ch {
+                '"' => {
+                    let trailing = rest[idx + 1..].trim();
+                    if !trailing.is_empty() {
+                        panic!("unexpected trailing tokens for `{expected_key}` at line {line_no}: {trailing}");
+                    }
+                    return Some(out);
+                }
+                '\\' => {
+                    match chars.next() {
+                        Some((_, '"')) => out.push('"'),
+                        Some((_, '\\')) => out.push('\\'),
+                        Some((_, 'n')) => out.push('\n'),
+                        Some((_, 't')) => out.push('\t'),
+                        Some((_, 'r')) => out.push('\r'),
+                        Some((_, other)) => {
+                            panic!("unsupported escape \\{other} for `{expected_key}` at line {line_no}")
+                        }
+                        None => panic!(
+                            "unterminated string escape for `{expected_key}` at line {line_no}"
+                        ),
+                    }
+                }
+                other => out.push(other),
+            }
         }
+        panic!("unterminated double-quoted string for `{expected_key}` at line {line_no}");
     }
-    if let Some(stripped) = val.strip_prefix('\'') {
-        if let Some(end) = stripped.find('\'') {
-            return Some(stripped[..end].to_owned());
+    if let Some(rest) = val.strip_prefix('\'') {
+        if let Some(end) = rest.find('\'') {
+            let trailing = rest[end + 1..].trim();
+            if !trailing.is_empty() {
+                panic!(
+                    "unexpected trailing tokens for `{expected_key}` at line {line_no}: {trailing}"
+                );
+            }
+            return Some(rest[..end].to_owned());
         }
+        panic!("unterminated single-quoted string for `{expected_key}` at line {line_no}");
     }
     None
 }

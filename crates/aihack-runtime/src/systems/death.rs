@@ -42,18 +42,21 @@ pub fn collect_death_events_if_hp_depleted(
         && world.has_amulet_effect(AmuletEffect::LifeSaving)
     {
         if let Some(amulet_id) = world.inventory.equipped_amulet {
-            let state = world.state_mut();
-            state.inventory.equipped_amulet = None;
-            let _ = state.inventory.remove(amulet_id);
-            state
-                .entities
-                .set_item_location(amulet_id, EntityLocation::Consumed);
-            state.poison_turns = 0;
-            state.paralysis_turns = 0;
-            state.nutrition = state.nutrition.max(300);
-            if let Some(pstats) = state.entities.actor_stats_mut(entity) {
-                pstats.hp = pstats.max_hp;
+            {
+                let state = world.state_mut();
+                state.inventory.equipped_amulet = None;
+                let _ = state.inventory.remove(amulet_id);
+                crate::systems::items::mark_item_consumed(&mut state.entities, amulet_id);
+                state.poison_turns = 0;
+                state.paralysis_turns = 0;
+                state.hallucinating = false;
+                state.status_timers = aihack_core::domain::status::StatusTimers::default();
+                state.nutrition = state.nutrition.max(300);
+                if let Some(pstats) = state.entities.actor_stats_mut(entity) {
+                    pstats.hp = pstats.max_hp;
+                }
             }
+            let _ = crate::systems::items::recompute_player_ac(world);
         }
         world.identify_item_kind(ItemKind::AmuletLifeSaving);
         return Ok(vec![GameEvent::Message {
@@ -123,9 +126,13 @@ pub fn collect_death_events_if_hp_depleted(
             crate::systems::npc::on_shopkeeper_died(world, level);
         }
     }
+    let killed_by_player =
+        matches!(cause, DeathCause::Combat { attacker } if attacker == world.player_id);
     if entity == world.player_id {
         world.state_mut().last_death_cause = Some(cause);
-    } else if faction != Some(aihack_core::domain::entity::Faction::Pet) {
+    } else if faction != Some(aihack_core::domain::entity::Faction::Pet)
+        && (world.campaign.is_none() || killed_by_player)
+    {
         let gold_gain = if world.campaign.is_some() {
             u32::from(difficulty).saturating_mul(25)
         } else {

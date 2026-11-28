@@ -3,7 +3,7 @@ use aihack_core::{
     domain::{
         entity::{ActorKind, EntityLocation, Faction},
         monster::MonsterKind,
-        tile::{DoorState, TileKind},
+        tile::TileKind,
     },
     event::{GameEvent, MessagePriority},
     ids::{EntityId, LevelId},
@@ -80,15 +80,21 @@ pub fn has_peaceful_shopkeeper_on_level(world: &GameWorld) -> bool {
     })
 }
 
+pub fn unpaid_item_price_for_data(
+    campaign: Option<aihack_core::campaign::CampaignState>,
+    data: &aihack_core::domain::item::ItemData,
+) -> u32 {
+    let base = data.base_price.max(10);
+    campaign
+        .map(|c| c.attributes.cha_buy_price(base))
+        .unwrap_or(base)
+}
+
 pub fn unpaid_item_price(world: &GameWorld, item: EntityId) -> u32 {
     let Some(data) = world.entities.item_data(item) else {
         return 10;
     };
-    let base = data.base_price.max(10);
-    world
-        .campaign
-        .map(|c| c.attributes.cha_buy_price(base))
-        .unwrap_or(base)
+    unpaid_item_price_for_data(world.campaign, data)
 }
 
 pub fn priest_donation_fee(world: &GameWorld) -> u32 {
@@ -208,17 +214,76 @@ pub fn provoke_actor(world: &mut GameWorld, target: EntityId) -> Vec<GameEvent> 
     events
 }
 
+pub fn shop_debt_on(world: &GameWorld, level: LevelId) -> u32 {
+    world
+        .shop_debts
+        .iter()
+        .find(|&&(l, _)| l == level)
+        .map(|&(_, amt)| amt)
+        .unwrap_or(0)
+}
+
+fn sync_total_shop_debt(
+    state: &mut aihack_core::world::WorldState<crate::domain::entity::EntityStore>,
+) {
+    state.shop_debts.retain(|&(_, amt)| amt > 0);
+    state.shop_debts.sort_by_key(|&(lvl, _)| lvl);
+    state.shop_debt = state
+        .shop_debts
+        .iter()
+        .fold(0_u32, |acc, &(_, amt)| acc.saturating_add(amt))
+        .min(MAX_SHOP_DEBT);
+}
+
+pub fn add_shop_debt(world: &mut GameWorld, level: LevelId, amount: u32) {
+    if amount == 0 {
+        return;
+    }
+    let headroom = MAX_SHOP_DEBT.saturating_sub(world.shop_debt);
+    let actual = amount.min(headroom);
+    if actual == 0 {
+        return;
+    }
+    let state = world.state_mut();
+    if let Some((_, existing)) = state.shop_debts.iter_mut().find(|(l, _)| *l == level) {
+        *existing = existing.saturating_add(actual);
+    } else {
+        state.shop_debts.push((level, actual));
+    }
+    sync_total_shop_debt(state);
+}
+
+pub fn sub_shop_debt(world: &mut GameWorld, level: LevelId, amount: u32) {
+    if amount == 0 {
+        return;
+    }
+    let state = world.state_mut();
+    if let Some((_, existing)) = state.shop_debts.iter_mut().find(|(l, _)| *l == level) {
+        *existing = existing.saturating_sub(amount);
+    }
+    sync_total_shop_debt(state);
+}
+
+pub fn clear_shop_debt_on(world: &mut GameWorld, level: LevelId) {
+    let state = world.state_mut();
+    state.shop_debts.retain(|&(l, _)| l != level);
+    sync_total_shop_debt(state);
+}
+
 pub fn check_shop_theft_on_move_or_stairs(
     world: &mut GameWorld,
     leaving_level: bool,
 ) -> Vec<GameEvent> {
-    if world.campaign.is_none() || world.shop_debt == 0 {
+    if world.campaign.is_none() {
+        return Vec::new();
+    }
+    let debt = shop_debt_on(world, world.current_level());
+    if debt == 0 {
         return Vec::new();
     }
     if (leaving_level || !is_in_shop_zone(world, world.player_pos()))
         && has_peaceful_shopkeeper_on_level(world)
     {
-        let debt = world.shop_debt;
         return anger_shop_and_watch(
             world,
             &format!("Stop, thief! You owe {debt} gold to the shopkeeper!"),
@@ -237,25 +302,31 @@ pub fn on_shopkeeper_died(world: &mut GameWorld, level: LevelId) {
     if any_other_alive {
         return;
     }
-    world.state_mut().shop_debt = 0;
-    let to_clear: Vec<EntityId> = world
-        .entities
-        .entities()
-        .iter()
-        .filter_map(|e| {
-            if e.item_unpaid() != Some(true) {
-                return None;
+    let mut to_clear = Vec::new();
+    for e in world.entities.entities() {
+        if e.item_unpaid() != Some(true) {
+            continue;
+        }
+        let Some((_, _, loc, _, _)) = e.item() else {
+            continue;
+        };
+        match loc {
+            EntityLocation::Inventory { owner } if owner == world.player_id => {
+                if e.item_unpaid_level() == Some(level) {
+                    to_clear.push(e.id);
+                }
             }
-            let (_, _, loc, _, _) = e.item()?;
-            match loc {
-                EntityLocation::Inventory { owner } if owner == world.player_id => Some(e.id),
-                EntityLocation::OnMap { level: l, .. } if l == level => Some(e.id),
-                _ => None,
+            EntityLocation::OnMap { level: l, .. } if l == level => {
+                to_clear.push(e.id);
             }
-        })
-        .collect();
+            _ => {}
+        }
+    }
+    clear_shop_debt_on(world, level);
+    let entities = &mut world.state_mut().entities;
     for id in to_clear {
-        world.state_mut().entities.set_item_unpaid(id, false);
+        entities.set_item_unpaid(id, false);
+        entities.set_item_unpaid_level(id, None);
     }
 }
 
@@ -278,10 +349,8 @@ pub fn can_pay(world: &GameWorld) -> bool {
     if world.campaign.is_none() {
         return false;
     }
-    if world.shop_debt > 0
-        && has_peaceful_shopkeeper_on_level(world)
-        && world.gold >= world.shop_debt
-    {
+    let cur_debt = shop_debt_on(world, world.current_level());
+    if cur_debt > 0 && has_peaceful_shopkeeper_on_level(world) && world.gold >= cur_debt {
         return true;
     }
     if adjacent_peaceful_npc(world, MonsterKind::TemplePriest).is_some()
@@ -301,17 +370,23 @@ pub fn pay(seed: u64, world: &mut GameWorld, rng: &mut GameRng) -> Result<Vec<Ga
     if world.campaign.is_none() {
         return Err("paying NPCs is only available in campaign mode".to_string());
     }
-    if world.shop_debt > 0 && has_peaceful_shopkeeper_on_level(world) {
-        let debt = world.shop_debt;
+    let current_level = world.current_level();
+    let debt = shop_debt_on(world, current_level);
+    if debt > 0 && has_peaceful_shopkeeper_on_level(world) {
         if world.gold < debt {
             return Err(format!("not enough gold to pay {debt} gold debt"));
         }
         world.state_mut().gold -= debt;
-        world.state_mut().shop_debt = 0;
+        clear_shop_debt_on(world, current_level);
         let carried: Vec<EntityId> = world.inventory.entries.iter().map(|e| e.item).collect();
         for id in carried {
-            if world.entities.get(id).and_then(|e| e.item_unpaid()) == Some(true) {
+            let belongs_here = world.entities.get(id).is_some_and(|e| {
+                e.item_unpaid() == Some(true)
+                    && e.item_unpaid_level().unwrap_or(current_level) == current_level
+            });
+            if belongs_here {
                 world.state_mut().entities.set_item_unpaid(id, false);
+                world.state_mut().entities.set_item_unpaid_level(id, None);
                 world.state_mut().entities.set_item_buc_known(id, true);
             }
         }
@@ -384,33 +459,22 @@ pub fn pay(seed: u64, world: &mut GameWorld, rng: &mut GameRng) -> Result<Vec<Ga
         }
         world.state_mut().gold -= ORACLE_CONSULTATION_FEE;
         world.state_mut().luck = world.luck.saturating_add(1).min(MAX_LUCK);
-        let mut revealed = 0_u32;
-        let map = world.current_map_mut();
-        for y in 0..map.height {
-            for x in 0..map.width {
-                let pos = Pos { x, y };
-                match map.tile(pos).ok() {
-                    Some(TileKind::HiddenDoor) => {
-                        let _ = map.set_tile(pos, TileKind::Door(DoorState::Closed));
-                        revealed += 1;
-                    }
-                    Some(TileKind::HiddenTrap(trap)) => {
-                        let _ = map.set_tile(pos, TileKind::Trap(trap));
-                        revealed += 1;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let reveal_events = crate::systems::traps::reveal_all_hidden_tiles(world);
+        let revealed = reveal_events.len();
         let mut events = vec![GameEvent::Message {
             priority: MessagePriority::Info,
             text: format!(
                 "You pay {ORACLE_CONSULTATION_FEE} gold. The Oracle reveals {revealed} hidden features on this level!"
             ),
         }];
+        events.extend(reveal_events);
         if let Some((item_id, kind)) = find_first_unidentified_inventory_item(world) {
             world.identify_item_kind(kind);
             world.state_mut().entities.set_item_buc_known(item_id, true);
+            world
+                .state_mut()
+                .entities
+                .set_item_enchant_known(item_id, true);
             let name = appearance::display_name_for_world_item(seed, world, item_id, kind);
             events.push(GameEvent::Message {
                 priority: MessagePriority::Info,
@@ -483,11 +547,9 @@ pub fn chat(
             format!("Your {name} responds affectionately ({mood}, tameness {tameness}, xp {xp}).")
         }
         Faction::Shopkeeper => {
-            if world.shop_debt > 0 {
-                format!(
-                    "Shopkeeper says: \"You currently owe {} gold. Pay before leaving!\"",
-                    world.shop_debt
-                )
+            let debt = shop_debt_on(world, world.current_level());
+            if debt > 0 {
+                format!("Shopkeeper says: \"You currently owe {debt} gold. Pay before leaving!\"")
             } else {
                 "Shopkeeper says: \"Welcome! Pick up wares to buy on tab, or press $ to trade.\""
                     .to_string()
@@ -508,10 +570,10 @@ pub fn chat(
                 )
             }
             MonsterKind::Watchman => {
-                if world.shop_debt > 0 {
+                let debt = shop_debt_on(world, world.current_level());
+                if debt > 0 {
                     format!(
-                        "Watchman warns: \"Make sure you pay your {} gold shop bill before leaving!\"",
-                        world.shop_debt
+                        "Watchman warns: \"Make sure you pay your {debt} gold shop bill before leaving!\""
                     )
                 } else {
                     "Watchman says: \"Keep the peace in Minetown, adventurer.\"".to_string()

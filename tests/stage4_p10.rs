@@ -580,40 +580,29 @@ fn p10_3_excalibur_fountain_unique_artifacts_blasts_erosion_and_invoke() {
     );
     assert!(!low_sess.world().generated_artifacts.contains("excalibur"));
 
-    // Reach level 5 (xp = 80), credit defeated dungeon monsters for valid XP budget, dip LongSword -> Excalibur!
-    let mut earned = 0_u32;
-    let monster_ids: Vec<(EntityId, u16)> = save
+    // Reach level 5 (xp = 80) legitimately via PotionGainLevel quaffs, then dip LongSword -> Excalibur!
+    let mut lvl5_save = low_sess.to_save_data();
+    let player_id = lvl5_save.world.player_id;
+    let gain_pot = lvl5_save
         .world
         .entities
-        .entities()
-        .iter()
-        .filter_map(|e| {
-            let diff = e.monster_difficulty()?;
-            Some((e.id, diff))
-        })
-        .collect();
-    for (id, diff) in monster_ids {
-        if earned >= 80 {
-            break;
-        }
-        save.world.entities.set_alive(id, false);
-        earned = earned.saturating_add(u32::from(diff.max(1)) * 10);
-    }
-    assert!(earned >= 80, "campaign must have >= 80 monster XP budget");
-    save.world.campaign.as_mut().unwrap().xp = 80;
-    let camp = save.world.campaign.unwrap();
-    let stats = save
-        .world
-        .entities
-        .actor_stats_mut(save.world.player_id)
+        .spawn_item(
+            ItemKind::PotionGainLevel,
+            EntityLocation::Inventory { owner: player_id },
+        )
         .unwrap();
-    stats.max_hp = camp.max_hp();
-    stats.hp = camp.max_hp();
-    stats.hit_bonus = camp.hit_bonus();
-    stats.damage_bonus = camp.damage_bonus();
-    save.world.max_mp = camp.max_mp();
-    save.world.mp = camp.max_mp();
-    let mut lvl5_sess = GameSession::from_save_data(save).unwrap();
+    lvl5_save.world.entities.set_item_quantity(gain_pot, 4);
+    let letter = lvl5_save
+        .world
+        .inventory
+        .add_existing_with_next_letter(gain_pot)
+        .unwrap();
+    lvl5_save.world.entities.set_item_letter(gain_pot, letter);
+    let mut lvl5_sess = GameSession::from_save_data(lvl5_save).unwrap();
+    for _ in 0..4 {
+        assert!(lvl5_sess.submit(C::Quaff { item: gain_pot }).accepted);
+    }
+    assert_eq!(lvl5_sess.world().campaign.unwrap().level(), 5);
     assert!(
         lvl5_sess
             .submit(C::Dip {

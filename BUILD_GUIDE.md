@@ -13,7 +13,7 @@
 ## 1. 현재 상태
 
 멀티 감사 2 실행법: `cargo run -p aihack-tui --locked -- --seed 42 --save-dir runtime/tui`.
-P1–P3는 생성 화면 1/2/3으로 시작한다(Enter는 legacy). Headless 예: `cargo run -p aihack-headless --locked -- --seed 42 --role knight --turns 10 --policy wait-v1`. `--role`과 `--load`는 함께 쓸 수 없다. campaign 저장은 wire schema 2이고 구형 V1 reader가 거부한다. 구형 run은 자동 변환하지 않는다.
+P1–P3는 생성 화면 1/2/3으로 시작한다(Enter는 legacy). Headless 예: `cargo run -p aihack-headless --locked -- --seed 42 --role knight --turns 10 --policy wait-v1`. `--role`과 `--load`는 함께 쓸 수 없다. 현재 P13 24층 campaign 저장은 wire schema 4(`SAVE_SCHEMA_VERSION_V4 = 4`), 레거시 2층(`campaign = None`) 저장은 wire schema 1(`SAVE_SCHEMA_VERSION_V1 = 1`)을 사용하며 구형 V1 reader는 V2+/캠페인 파일을 거부한다. 미수정 P8–P12 8층 campaign V3 파일은 원본을 덮어쓰지 않고 메모리에서 24층 V4로 업그레이드해 재개하며(다음 저장 시 V4 기록), V2/손상/절단 세이브는 거부한다.
 `--save-dir` 생략 시에도 `runtime/tui`이며 현재 작업 디렉터리 기준이다. 기존 capability `ArtifactStore`의 경로/권한 검증을 유지하고 저장 파일은 프로세스 종료로 삭제하지 않는다. 테스트 기본 `TuiApp::new`만 격리된 임시 저장소를 사용한다. root regression은 실제 renderer/dispatcher를 호출하기 위해 기존 workspace 버전과 같은 ratatui 0.30/crossterm 0.29 dev-dependency를 직접 명시한다.
 
 | 항목 | 현재 working tree | v0.3.0 target |

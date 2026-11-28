@@ -92,6 +92,10 @@ pub struct EntitySnapshot {
     pub monster_inventory: Vec<EntityId>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub unpaid: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unpaid_level: Option<LevelId>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub invisible: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,6 +185,8 @@ pub struct GameSnapshot {
     pub generated_artifacts: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub shop_debt: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shop_debts: Vec<(LevelId, u32)>,
 }
 
 impl GameSnapshot {
@@ -230,6 +236,8 @@ impl GameSnapshot {
                             .unwrap_or_default()
                             .to_vec(),
                         unpaid: false,
+                        unpaid_level: None,
+                        invisible: entity.actor_invisible().unwrap_or(false),
                     }
                 } else {
                     let (kind, _, location, assigned_letter, charges) =
@@ -264,6 +272,8 @@ impl GameSnapshot {
                         pet_hunger: 0,
                         monster_inventory: Vec::new(),
                         unpaid: entity.item_unpaid().unwrap_or(false),
+                        unpaid_level: entity.item_unpaid_level(),
+                        invisible: false,
                     }
                 }
             })
@@ -333,6 +343,7 @@ impl GameSnapshot {
             skill_practice: world.skill_practice.clone(),
             generated_artifacts: world.generated_artifacts.clone(),
             shop_debt: world.shop_debt,
+            shop_debts: world.shop_debts.clone(),
         }
     }
 

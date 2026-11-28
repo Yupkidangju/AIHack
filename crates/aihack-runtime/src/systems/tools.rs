@@ -265,6 +265,12 @@ fn apply_dig(
     if world.campaign.is_none() {
         return Err("digging is only available in campaign mode".to_string());
     }
+    let current = world.current_level();
+    if current.branch == aihack_core::ids::BranchId::Sokoban
+        || (current.branch == aihack_core::ids::BranchId::Planes && current.depth > 1)
+    {
+        return Err("the walls here cannot be dug through".to_string());
+    }
     let dir = direction.ok_or_else(|| "choose a direction to dig".to_string())?;
     let pos = world.player_pos().offset(dir.delta());
     let (width, height, tile) = {

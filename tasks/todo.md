@@ -110,3 +110,28 @@
 - [x] S6-runtime: `appearance`·`spells`(마법서 학습/20,000턴 감퇴/실패율/28주문)·`items`·`projectiles`(18완드/소원/변이)·`death`(생명보존)·`combat`(크기별 무기/은)·`monster_ai`(반사/갈등/패시브)·`session`/`bootstrap`/`observation`/`save` 통합.
 - [x] S6-adapters: `aihack-tui`(동적 28주문/실패율·소원·마법서) 및 `aihack-headless`(부적/상급 치유) 동기화.
 - [x] S6-verify: `tests/stage6_p12.rs`(**6 PASS / 0 FAIL**), 전체 워크스페이스 102개 바이너리 **565 PASS / 0 FAIL / 0 ignored**(워크스페이스 561 PASS + ConPTY 단독 재실행 `conpty_contract` 4 PASS), `cargo fmt --all -- --check`, `cargo clippy`(0 warnings), `cargo build --release --locked`, `cargo audit`(0 vulnerabilities / 318 deps, 허용 경고 2건), `cargo deny`, 레거시 참조 0건, `r7_checkpoint.sh`/`r8_checkpoint.sh` 및 마감 문서 동기화 완료.
+
+# Stage 7 (P13) 체크리스트 (2026-11-28)
+
+- [x] S7-doc: `DESIGN_DECISIONS.md` (`ADR-P13-01`), `spec.md`, `docs/campaign_spec.md`, `tasks/plan.md`, `tasks/todo.md` D3D 기준 선행 확정.
+- [x] S7-core: `BranchId::Planes`·`TileKind::{Boulder, MagicPortal}`·`BranchGraph` 24층 활성화·`MonsterKind` 10종(95종)·`ARTIFACTS` 13직업 퀘스트 유물·`CampaignObservation` 확장.
+- [x] S7-content: `monsters.toml` P13 10종(95종) 투입, `lib.rs`(`monster_is_large`), LF SHA-256·`PROVENANCE.md`·`registry.rs` 동기화.
+- [x] S7-runtime: `campaign_map`·`bootstrap`·`movement`·`tools`/`projectiles`/`spells`·`artifacts`·`stairs`/`ascension`/`altar`·`session`/`observation`/`save`/`campaign` 통합.
+- [x] S7-llm-adapters: `aihack-llm` (`LlmCampaignSummary` + 32KiB 압축)·`aihack-tui` (`Boulder`/`MagicPortal`/HUD/Offer)·`aihack-headless` 동기화.
+- [x] S7-verify: `tests/stage7_p13.rs`(**6 PASS / 0 FAIL**), `tests/campaign.rs`(**12 PASS / 0 FAIL**, `Gehennom 1..4 -> Main 1 -> Planes 1..5` Astral `Offer` Victory·리플레이·24층 3-seed 연결성), `tests/stage2_p8.rs`(**7 PASS**), `tests/campaign_p7.rs`(**6 PASS**), `tests/long_run.rs`(**7 PASS**, legacy R9 해시 불변), `tests/llm_transport.rs`(**23 PASS**), 전체 워크스페이스 103개 바이너리(`570 PASS / 1 FAIL` in `stage6_p12::p12_5` 85->95 카운트 단언 -> `tests/stage6_p12.rs` 수정 후 **6 PASS / 0 FAIL**, `conpty_contract` **4 PASS**, `tui_contract` **20 PASS**), `cargo fmt --all -- --check`, `cargo clippy` (`0 warnings`), `cargo build --release --locked`, `cargo audit`(`0 vulnerabilities / 318 deps`, 허용 경고 2건), `cargo deny`, 레거시 참조 0건, `r7_checkpoint.sh`/`r8_checkpoint.sh` 및 마감 문서 동기화 완료.
+
+# Audit 36 시정 체크리스트 (2026-11-28)
+
+- [x] A36-doc: `DESIGN_DECISIONS.md`, `docs/campaign_spec.md`, `PROVENANCE.md`, `IMPLEMENTATION_SUMMARY.md`, `tasks/{plan,todo}.md` D3D 문서 동기화 (`IMP-F005`, `IMP-F006`, `XPF-F001`, `XPF-F002`).
+- [x] A36-content: `monsters.toml` 11종 `"npc"` 플래그 추가(LF), `build.rs` 파서 보강, `r7-content.sha256`·`PROVENANCE.md`·`registry.rs` 동기화 (`IMP-F003`, `DBG-F005`).
+- [x] A36-core-persist: `Actor.invisible`/`Item.unpaid_level`, `campaign_map.rs`(`DBG-F001`, `DBG-F002`), `campaign.rs`/`save.rs`(`SEC-F003`, `SEC-F001`) 구현.
+- [x] A36-systems: `altar.rs`, `spells.rs`, `projectiles.rs`/`combat.rs`, `npc.rs`/`bootstrap.rs`/`items.rs`, `observation.rs`/`play_menu.rs`/`pets.rs`/`monster_ai.rs`, `death.rs`/`artifacts.rs`, `session.rs`/`render_panels.rs` 수정 (`IMP-F001`..`IMP-F005`, `DBG-F003`..`DBG-F005`, `SEC-F002`).
+- [x] A36-verify: 기존 테스트 픽스처 정비(`DBG-F001`, `DBG-F006`), `tests/audit36_remediation.rs` 작성, 8개 검증 게이트 EXIT 0 및 마감 문서 동기화.
+
+# Audit 37 시정 체크리스트 (2026-11-28)
+
+- [x] A37-doc: `DESIGN_DECISIONS.md`(`ADR-P13-02`), `docs/campaign_spec.md`, `BUILD_GUIDE.md`, `spec.md`, `tasks/{plan,todo}.md` D3D 문서 선행 확정 및 `r8_documentation` 검증.
+- [x] A37-ledger: `shop_debts` 원장 + `Consumed`/외부드롭 `unpaid` 정리(`A37-01`) + 상점별 정산(`A37-02`) + 스냅샷 해시 `unpaid_level`/`shop_debts` 반영(`A37-06`, 레거시 V1/R9 불변).
+- [x] A37-sokoban-loot: 소코반 `x = 42` 필수 퍼즐 게이팅(`A37-04`) 및 `Gehennom 1` `WandWishing` 확정 배치 + 28마법서/17완드 분기 공급(`A37-03`).
+- [x] A37-compat: `SAVE_SCHEMA_VERSION_V4 = 4` 및 미수정 P12 `V3` 비파괴 메모리 내 업그레이드(`A37-05`).
+- [x] A37-verify: `tests/audit37_remediation.rs`, Audit 37 CLI 대조 재검증(원본 SHA-256 불변), 8개 게이트 전부 EXIT 0 및 마감 문서 동기화.

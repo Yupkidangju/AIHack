@@ -18,9 +18,12 @@ fn selected_role_bootstraps_real_campaign_and_v2_save() {
         let session = start(42, role);
         assert_eq!(session.world().campaign.unwrap().role, role);
         assert_eq!(session.observation().player.max_hp, role.base_hp());
-        assert_eq!(session.world().levels.len(), 8);
+        assert_eq!(session.world().levels.len(), 24);
         let save = session.to_save_data();
-        assert_eq!(save.schema_version, 3);
+        assert_eq!(
+            save.schema_version,
+            aihack_core::save::SAVE_SCHEMA_VERSION_V4
+        );
         let restored = GameSession::from_save_data(save).unwrap();
         assert_eq!(
             session.snapshot().stable_hash(),
@@ -224,6 +227,7 @@ fn route(
                         | TileKind::Sink
                         | TileKind::StairsUp
                         | TileKind::StairsDown
+                        | TileKind::MagicPortal
                         | TileKind::Door(_)
                         | TileKind::HiddenDoor
                         | TileKind::Trap(_)
@@ -258,7 +262,7 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
         },
         position::Direction,
     };
-    for _ in 0..2000 {
+    'walk_step: for _ in 0..2000 {
         let observation = session.observation();
         assert!(
             session.world().player_alive(),
@@ -311,7 +315,10 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
         let healing = observation.inventory.iter().find(|i| {
             matches!(
                 i.kind,
-                ItemKind::PotionHealing | ItemKind::PotionExtraHealing | ItemKind::PotionCure
+                ItemKind::PotionHealing
+                    | ItemKind::PotionExtraHealing
+                    | ItemKind::PotionFullHealing
+                    | ItemKind::PotionCure
             )
         });
         if session.world().carried_weight() > session.world().carrying_capacity() {
@@ -327,18 +334,20 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             assert!(session.submit(C::Drop { item: item.item }).accepted);
             continue;
         }
-        if observation.player.hp * 3 < observation.player.max_hp * 2 {
-            let heal_cmd = C::Cast {
-                spell: SpellKind::Heal,
-                direction: None,
-            };
-            if observation.legal_actions.contains(&heal_cmd) {
-                assert!(session.submit(heal_cmd).accepted);
-                continue;
+        if observation.player.hp * 4 < observation.player.max_hp * 3 {
+            for heal_spell in [SpellKind::ExtraHealing, SpellKind::Heal] {
+                let heal_cmd = C::Cast {
+                    spell: heal_spell,
+                    direction: None,
+                };
+                if observation.legal_actions.contains(&heal_cmd) {
+                    assert!(session.submit(heal_cmd).accepted);
+                    continue 'walk_step;
+                }
             }
             if let Some(item) = healing {
                 assert!(session.submit(C::Quaff { item: item.item }).accepted);
-                continue;
+                continue 'walk_step;
             }
         }
         let mut fought = false;
@@ -393,6 +402,87 @@ fn walk(session: &mut GameSession, target: aihack_core::position::Pos) {
             assert!(session.submit(C::Move(dir)).accepted);
             fought = true;
             break;
+        }
+        if !fought {
+            'ranged: for dir in Direction::ALL {
+                let delta = dir.delta();
+                for step in 2..=5_i16 {
+                    let probe_pos = aihack_core::position::Pos {
+                        x: observation.player_pos.x + delta.dx * step,
+                        y: observation.player_pos.y + delta.dy * step,
+                    };
+                    if let Some(target_id) = session
+                        .world()
+                        .entities()
+                        .alive_hostile_at(session.world().current_level(), probe_pos)
+                    {
+                        let is_floating_eye =
+                            session.world().entities().get(target_id).is_some_and(|e| {
+                                e.actor_kind() == Some(ActorKind::Monster(MonsterKind::FloatingEye))
+                            });
+                        if !is_floating_eye {
+                            let bolt_cmd = C::Cast {
+                                spell: SpellKind::ForceBolt,
+                                direction: Some(dir),
+                            };
+                            if observation.legal_actions.contains(&bolt_cmd) {
+                                assert!(session.submit(bolt_cmd).accepted);
+                                fought = true;
+                                break 'ranged;
+                            }
+                            if let Some(wand_cmd) = observation
+                                .inventory
+                                .iter()
+                                .filter(|i| {
+                                    matches!(
+                                        i.kind,
+                                        ItemKind::WandMagicMissile | ItemKind::WandFire
+                                    )
+                                })
+                                .filter(|i| {
+                                    session
+                                        .world()
+                                        .entities()
+                                        .get(i.item)
+                                        .and_then(|e| e.item())
+                                        .and_then(|(_, _, _, _, ch)| ch)
+                                        .unwrap_or(0)
+                                        > 0
+                                })
+                                .map(|i| C::Zap {
+                                    item: i.item,
+                                    direction: dir,
+                                })
+                                .find(|cmd| observation.legal_actions.contains(cmd))
+                            {
+                                assert!(session.submit(wand_cmd).accepted);
+                                fought = true;
+                                break 'ranged;
+                            }
+                        }
+                        break;
+                    }
+                    if !matches!(
+                        session.world().current_map().tile(probe_pos),
+                        Ok(TileKind::Floor
+                            | TileKind::Door(DoorState::Open)
+                            | TileKind::Fountain
+                            | TileKind::DryFountain
+                            | TileKind::Sink
+                            | TileKind::StairsUp
+                            | TileKind::StairsDown
+                            | TileKind::Shop
+                            | TileKind::Altar
+                            | TileKind::MagicPortal
+                            | TileKind::Water
+                            | TileKind::Lava
+                            | TileKind::Trap(_)
+                            | TileKind::HiddenTrap(_))
+                    ) {
+                        break;
+                    }
+                }
+            }
         }
         if fought {
             continue;
@@ -507,7 +597,7 @@ fn tour(seed: u64, role: Role) -> GameSession {
             walk(&mut session, up);
             assert!(session.submit(C::Ascend).accepted);
         }
-        let potions: Vec<_> = session
+        let pickups: Vec<_> = session
             .world()
             .entities
             .entities()
@@ -521,7 +611,9 @@ fn tour(seed: u64, role: Role) -> GameSession {
                                 kind,
                                 ItemKind::PotionHealing
                                     | ItemKind::PotionExtraHealing
+                                    | ItemKind::PotionFullHealing
                                     | ItemKind::PotionCure
+                                    | ItemKind::FoodRation
                             ) =>
                     {
                         Some(pos)
@@ -530,9 +622,13 @@ fn tour(seed: u64, role: Role) -> GameSession {
                 }
             })
             .collect();
-        for pos in potions {
+        for pos in pickups {
             walk(&mut session, pos);
-            assert!(session.submit(C::Pickup).accepted);
+            if session.observation().legal_actions.contains(&C::Pickup)
+                && session.world().inventory.entries.len() < 48
+            {
+                assert!(session.submit(C::Pickup).accepted);
+            }
         }
         if depth == 4 {
             if let Some((ring_id, ring_pos)) = session
@@ -568,6 +664,55 @@ fn tour(seed: u64, role: Role) -> GameSession {
             assert!(session.submit(C::Descend).accepted);
         }
     }
+    let main6_down = session
+        .world()
+        .levels
+        .stairs_down_pos(LevelId::main(6))
+        .unwrap();
+    walk(&mut session, main6_down);
+    assert!(session.submit(C::Descend).accepted);
+    for gdepth in 1..=4 {
+        let gid = LevelId::new(BranchId::Gehennom, gdepth);
+        assert_eq!(session.world().current_level(), gid);
+        let pickups: Vec<_> = session
+            .world()
+            .entities
+            .entities()
+            .iter()
+            .filter_map(|entity| {
+                let (kind, _, location, _, _) = entity.item()?;
+                match location {
+                    EntityLocation::OnMap { level, pos }
+                        if level == gid
+                            && matches!(
+                                kind,
+                                ItemKind::PotionHealing
+                                    | ItemKind::PotionExtraHealing
+                                    | ItemKind::PotionFullHealing
+                                    | ItemKind::PotionCure
+                                    | ItemKind::FoodRation
+                            ) =>
+                    {
+                        Some(pos)
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+        for pos in pickups {
+            walk(&mut session, pos);
+            if session.observation().legal_actions.contains(&C::Pickup)
+                && session.world().inventory.entries.len() < 48
+            {
+                assert!(session.submit(C::Pickup).accepted);
+            }
+        }
+        if gdepth < 4 {
+            let pos = session.world().levels.stairs_down_pos(gid).unwrap();
+            walk(&mut session, pos);
+            assert!(session.submit(C::Descend).accepted);
+        }
+    }
     let amulet = session.world().campaign.unwrap().amulet;
     let EntityLocation::OnMap { pos, .. } = session
         .world()
@@ -593,6 +738,12 @@ fn tour(seed: u64, role: Role) -> GameSession {
         GameSession::from_save_data(serde_json::from_str(&encoded).unwrap()).unwrap();
     assert_eq!(session.submit(C::Wait), restored.submit(C::Wait));
     session = restored;
+    for gdepth in (1..=4).rev() {
+        let gid = LevelId::new(BranchId::Gehennom, gdepth);
+        let up = session.world().levels.stairs_up_pos(gid).unwrap();
+        walk(&mut session, up);
+        assert!(session.submit(C::Ascend).accepted);
+    }
     for depth in (1..=6).rev() {
         let up = session
             .world()
@@ -600,24 +751,95 @@ fn tour(seed: u64, role: Role) -> GameSession {
             .stairs_up_pos(LevelId::main(depth))
             .unwrap();
         walk(&mut session, up);
-        let mut checkpoint = session.clone();
         let outcome = session.submit(C::Ascend);
         assert!(outcome.accepted, "{:?}", outcome.events);
-        if depth == 1 {
-            let line = aihack_core::save::ReplayLineV1 {
-                turn_before: checkpoint.turn(),
-                command: C::Ascend,
-                snapshot_hash_after: outcome.snapshot_hash.clone(),
-                outcome: outcome.clone(),
-            };
-            aihack_headless::run_replay_to_turn(&mut checkpoint, session.turn(), &[line]).unwrap();
-            assert_eq!(
-                checkpoint.snapshot().stable_hash(),
-                session.snapshot().stable_hash()
-            );
-        }
     }
+    for pdepth in 1..=4 {
+        let pid = LevelId::new(BranchId::Planes, pdepth);
+        assert_eq!(session.world().current_level(), pid);
+        let pickups: Vec<_> = session
+            .world()
+            .entities
+            .entities()
+            .iter()
+            .filter_map(|entity| {
+                let (kind, _, location, _, _) = entity.item()?;
+                match location {
+                    EntityLocation::OnMap { level, pos }
+                        if level == pid
+                            && matches!(
+                                kind,
+                                ItemKind::PotionHealing
+                                    | ItemKind::PotionExtraHealing
+                                    | ItemKind::PotionFullHealing
+                                    | ItemKind::FoodRation
+                            ) =>
+                    {
+                        Some(pos)
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+        for pos in pickups {
+            walk(&mut session, pos);
+            if session.observation().legal_actions.contains(&C::Pickup)
+                && session.world().inventory.entries.len() < 48
+            {
+                assert!(session.submit(C::Pickup).accepted);
+            }
+        }
+        let portal_pos = (0..21)
+            .flat_map(|y| (0..80).map(move |x| aihack_core::position::Pos { x, y }))
+            .find(|&p| {
+                session.world().current_map().tile(p).ok()
+                    == Some(aihack_core::domain::tile::TileKind::MagicPortal)
+            })
+            .expect("MagicPortal must exist on elemental planes 1..4");
+        walk(&mut session, portal_pos);
+        assert!(session
+            .observation()
+            .legal_actions
+            .contains(&C::EnterBranch));
+        assert!(session.submit(C::EnterBranch).accepted);
+    }
+    let planes5 = LevelId::new(BranchId::Planes, 5);
+    assert_eq!(session.world().current_level(), planes5);
+    let player_align = session.world().campaign.unwrap().alignment;
+    let goal_altar = session
+        .world()
+        .ascension_altars
+        .iter()
+        .copied()
+        .find(|&(lvl, altar_pos)| {
+            lvl == planes5
+                && session
+                    .world()
+                    .levels
+                    .get(lvl)
+                    .and_then(|l| l.altar_alignment(altar_pos))
+                    == Some(player_align)
+        })
+        .expect("Astral Plane has co-aligned high altar");
+    walk(&mut session, goal_altar.1);
+    let offer_cmd = C::Offer { item: amulet };
+    assert!(session.observation().legal_actions.contains(&offer_cmd));
+    let mut checkpoint = session.clone();
+    let outcome = session.submit(offer_cmd);
+    assert!(outcome.accepted, "{:?}", outcome.events);
+    let line = aihack_core::save::ReplayLineV1 {
+        turn_before: checkpoint.turn(),
+        command: offer_cmd,
+        snapshot_hash_after: outcome.snapshot_hash.clone(),
+        outcome: outcome.clone(),
+    };
+    aihack_headless::run_replay_to_turn(&mut checkpoint, session.turn(), &[line]).unwrap();
+    assert_eq!(
+        checkpoint.snapshot().stable_hash(),
+        session.snapshot().stable_hash()
+    );
     assert!(matches!(session.run_state(), RunState::Victory { .. }));
+    assert!(session.observation().campaign.unwrap().has_amulet);
     let before = session.snapshot().stable_hash();
     assert!(!session.submit(C::Ascend).accepted);
     assert_eq!(before, session.snapshot().stable_hash());
@@ -675,6 +897,7 @@ fn generator_is_repeatable_seed_sensitive_and_every_floor_is_connected() {
                     if !matches!(
                         level.map.tile(pos).unwrap(),
                         aihack_core::domain::tile::TileKind::Wall
+                            | aihack_core::domain::tile::TileKind::Boulder
                             | aihack_core::domain::tile::TileKind::Water
                             | aihack_core::domain::tile::TileKind::Lava
                     ) {

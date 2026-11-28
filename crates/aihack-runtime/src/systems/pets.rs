@@ -68,8 +68,7 @@ pub fn try_feed_or_tame_by_throw(
     let next_tameness = cur_tameness.saturating_add(3).clamp(3, MAX_PET_TAMENESS);
     let next_hunger = cur_hunger.saturating_add(300).clamp(300, MAX_PET_HUNGER);
     let entities = &mut world.state_mut().entities;
-    entities.set_item_location(thrown_item, EntityLocation::Consumed);
-    entities.set_item_unpaid(thrown_item, false);
+    crate::systems::items::mark_item_consumed(entities, thrown_item);
     entities.set_actor_faction(target, Faction::Pet);
     entities.set_actor_tameness(target, next_tameness);
     entities.set_actor_pet_hunger(target, next_hunger);
@@ -289,6 +288,7 @@ pub fn is_edible_for_pet(world: &GameWorld, pet_kind: MonsterKind, item_id: Enti
 }
 
 pub fn step_pet_ai(
+    seed: u64,
     world: &mut GameWorld,
     rng: &mut GameRng,
     pet_id: EntityId,
@@ -346,7 +346,7 @@ pub fn step_pet_ai(
             .find(|&id| is_edible_for_pet(world, pet_kind, id))
         {
             let entities = &mut world.state_mut().entities;
-            entities.set_item_location(food_id, EntityLocation::Consumed);
+            crate::systems::items::mark_item_consumed(entities, food_id);
             entities.set_actor_pet_hunger(pet_id, pet_hunger.saturating_add(300));
             entities.set_actor_tameness(pet_id, pet_tameness.saturating_add(2));
             events.push(GameEvent::Message {
@@ -364,11 +364,14 @@ pub fn step_pet_ai(
             let item_label = world
                 .entities
                 .item_data(stolen_id)
-                .map(|d| aihack_content::item_display_name(d.kind, world.content_registry()))
+                .map(|d| {
+                    crate::appearance::display_name_for_world_item(seed, world, stolen_id, d.kind)
+                })
                 .unwrap_or_else(|| "item".to_string());
             let entities = &mut world.state_mut().entities;
             entities.remove_monster_inventory(pet_id, stolen_id);
             entities.set_item_unpaid(stolen_id, false);
+            entities.set_item_unpaid_level(stolen_id, None);
             entities.set_item_location(
                 stolen_id,
                 EntityLocation::OnMap {
@@ -400,7 +403,9 @@ pub fn step_pet_ai(
             let item_label = world
                 .entities
                 .item_data(unpaid_id)
-                .map(|d| aihack_content::item_display_name(d.kind, world.content_registry()))
+                .map(|d| {
+                    crate::appearance::display_name_for_world_item(seed, world, unpaid_id, d.kind)
+                })
                 .unwrap_or_else(|| "item".to_string());
             let entities = &mut world.state_mut().entities;
             entities.set_item_location(unpaid_id, EntityLocation::Inventory { owner: pet_id });

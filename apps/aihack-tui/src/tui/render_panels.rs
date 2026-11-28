@@ -120,6 +120,22 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
     } else {
         format!(" {}", status_flags.join(","))
     };
+    let special_suffix = observation
+        .campaign
+        .as_ref()
+        .map(|c| {
+            let mut s = String::new();
+            if let Some(id) = &c.special_level_id {
+                s.push_str(&format!(" ({id})"));
+            }
+            if let Some(align) = c.on_high_altar {
+                s.push_str(&format!(" HIGH ALTAR({})", align.short_label()));
+            } else if c.on_magic_portal {
+                s.push_str(" PORTAL");
+            }
+            s
+        })
+        .unwrap_or_default();
     let mut lines = vec![
         format!("turn {}{flags_suffix}", observation.turn),
         format!(
@@ -142,9 +158,10 @@ pub fn status_lines(observation: &Observation) -> Vec<String> {
             }
         ),
         format!(
-            "level {}:{} AC:{}",
+            "level {}:{}{} AC:{}",
             observation.current_level.branch.display_name(),
             observation.current_level.depth,
+            special_suffix,
             observation.player.ac
         ),
         format!(
@@ -544,6 +561,8 @@ fn tile_label(tile: TileKind) -> &'static str {
         TileKind::Sink => "sink",
         TileKind::Water => "water",
         TileKind::Lava => "lava",
+        TileKind::Boulder => "boulder",
+        TileKind::MagicPortal => "magic portal",
     }
 }
 
@@ -590,7 +609,7 @@ pub fn character_creation_lines_with_selection(
             "  Pick role: [1]-[9],[b],[g],[m],[k] or [Tab]".to_string(),
             "  HP: 16/16".to_string(),
             "  AC: 10".to_string(),
-            "  Campaign: Main 6 + Mines 2; Main 3 up: B->Mines".to_string(),
+            "  Campaign: 24 floors (6 branches -> Astral Plane)".to_string(),
         ),
         Some(role) => {
             let attrs = role.base_attributes().with_race_deltas(race);
@@ -695,7 +714,7 @@ pub fn victory_lines(score: i32) -> Vec<String> {
     vec![
         "".into(),
         "              ASCENDED".into(),
-        "The Amulet has reached the surface.".into(),
+        "You offered the Amulet and ascended to demigodhood.".into(),
         format!("Score: {score}"),
         "[N] New Run    [Q] Quit".into(),
     ]

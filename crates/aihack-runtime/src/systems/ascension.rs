@@ -11,29 +11,36 @@ pub fn on_level_entered(world: &mut GameWorld, to: LevelId) -> Result<Vec<GameEv
     if world.campaign.is_none() || !crate::campaign::has_amulet(world) {
         return Ok(Vec::new());
     }
-    if to.branch != BranchId::Main {
-        return Ok(Vec::new());
-    }
 
-    let (target_stage, monster_kind, announcement) = match (to.depth, world.ascension_pursuit_stage)
-    {
-        (4, stage) if stage < 1 => (
-            1,
-            MonsterKind::FireAnt,
-            "The dungeon senses the Amulet! A pursuing fire ant appears!",
-        ),
-        (2, stage) if stage < 2 => (
-            2,
-            MonsterKind::Troll,
-            "The dungeon senses the Amulet! A pursuing troll appears!",
-        ),
-        (1, stage) if stage < 3 => (
-            3,
-            MonsterKind::Minotaur,
-            "The dungeon senses the Amulet! A pursuing minotaur appears!",
-        ),
-        _ => return Ok(Vec::new()),
-    };
+    let (target_stage, monster_kind, announcement) =
+        match (to.branch, to.depth, world.ascension_pursuit_stage) {
+            (BranchId::Main, 4, stage) if stage < 1 => (
+                1,
+                MonsterKind::FireAnt,
+                "The dungeon senses the Amulet! A pursuing fire ant appears!",
+            ),
+            (BranchId::Main, 2, stage) if stage < 2 => (
+                2,
+                MonsterKind::Troll,
+                "The dungeon senses the Amulet! A pursuing troll appears!",
+            ),
+            (BranchId::Main, 1, stage) if stage < 3 => (
+                3,
+                MonsterKind::Minotaur,
+                "The dungeon senses the Amulet! A pursuing minotaur appears!",
+            ),
+            (BranchId::Planes, 2, stage) if stage < 4 => (
+                4,
+                MonsterKind::WizardOfYendor,
+                "The Wizard of Yendor materializes: 'The Amulet belongs to me!'",
+            ),
+            (BranchId::Planes, 4, stage) if stage < 5 => (
+                5,
+                MonsterKind::WizardOfYendor,
+                "The Wizard of Yendor returns in fury across the planes!",
+            ),
+            _ => return Ok(Vec::new()),
+        };
 
     let spawn_pos = find_pursuit_spawn_pos(world, to)
         .ok_or_else(|| "no valid spawn position for ascension pursuer".to_string())?;

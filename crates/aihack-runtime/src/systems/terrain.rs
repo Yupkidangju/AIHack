@@ -389,7 +389,8 @@ pub fn on_player_enter_tile(
 
 pub fn monster_can_traverse(kind: MonsterKind, tile: TileKind) -> bool {
     match tile {
-        TileKind::Water | TileKind::Lava => matches!(
+        TileKind::Boulder => false,
+        TileKind::Water => matches!(
             kind,
             MonsterKind::Bat
                 | MonsterKind::Dragon
@@ -397,11 +398,39 @@ pub fn monster_can_traverse(kind: MonsterKind, tile: TileKind) -> bool {
                 | MonsterKind::BlueDragon
                 | MonsterKind::SilverDragon
                 | MonsterKind::AirElemental
+                | MonsterKind::WaterElemental
                 | MonsterKind::FireVortex
                 | MonsterKind::IceVortex
                 | MonsterKind::Gargoyle
                 | MonsterKind::Imp
                 | MonsterKind::Wraith
+                | MonsterKind::WizardOfYendor
+                | MonsterKind::HighPriestMoloch
+                | MonsterKind::Orcus
+                | MonsterKind::RiderDeath
+                | MonsterKind::RiderPestilence
+                | MonsterKind::RiderFamine
+        ),
+        TileKind::Lava => matches!(
+            kind,
+            MonsterKind::Bat
+                | MonsterKind::Dragon
+                | MonsterKind::WhiteDragon
+                | MonsterKind::BlueDragon
+                | MonsterKind::SilverDragon
+                | MonsterKind::AirElemental
+                | MonsterKind::FireElemental
+                | MonsterKind::FireVortex
+                | MonsterKind::IceVortex
+                | MonsterKind::Gargoyle
+                | MonsterKind::Imp
+                | MonsterKind::Wraith
+                | MonsterKind::WizardOfYendor
+                | MonsterKind::HighPriestMoloch
+                | MonsterKind::Orcus
+                | MonsterKind::RiderDeath
+                | MonsterKind::RiderPestilence
+                | MonsterKind::RiderFamine
         ),
         _ => true,
     }

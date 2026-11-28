@@ -11,10 +11,17 @@
 목표 버전: 0.3.0
 현재 코드 기준: Cargo package 0.3.0, report 30 technical successor SHA `ed02dbff3911194e1c4aaaf9b989e5bd41c1b80a`의 [Actions `32733235414`](https://github.com/Yupkidangju/AIHack/actions/runs/32733235414) clean same-SHA Ubuntu/Windows actual bundle Verified.
 Report 31 implementation-summary lifecycle finding과 FIN-F012는 successor `8c042d48df57621e23a9c2a3406cc6fa68bea0af`의 [Actions `32741917348`](https://github.com/Yupkidangju/AIHack/actions/runs/32741917348) 및 Report 32 독립 재감사에서 종결됐다.
-현재 독립 감사 권위는 `docs/audit/audit_report_32.md`다. current HEAD 날짜와 modification period 불일치인 R32-DBG-F001/FIN-F015가 열려 있으므로 새 final same-SHA 양 OS evidence와 후속 독립 PASS 및 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
+현재 독립 감사 권위는 `docs/audit/audit_report_32.md`다. `MODIFICATIONS.md` 고지 기간(`2025-05-20..2026-11-28`)은 현 `HEAD`(`2026-11-28`)와 일치하나, R32-DBG-F001/FIN-F015 후속 및 이후 미커밋 스테이지·시정 작업의 새 final same-SHA 양 OS evidence와 후속 독립 PASS 및 별도 게시 승인 전까지 PROGRAM/PUBLICATION HOLD를 유지한다.
 기준 문서: `AI_IMPLEMENTATION_DOC_STANDARD.md`
 
 ## 1. 문서 운영 규칙
+
+### Stage 7 (P13) 풀 엔드게임 및 시정 기준 (`P13`, `ADR-P13-01`/`ADR-P13-02`, 2026-11-28)
+
+`DESIGN_DECISIONS.md` (`ADR-P13-01`, `ADR-P13-02`) 및 `docs/campaign_spec.md` `## Stage 7 (P13)` ~ `## Stage 7.5 (Audit-37-Fix)` 계약을 따른다:
+- **24층 브랜치 토폴로지 & 소코반 필수 퍼즐**: `Main 1..6`, `Mines 1..2`, `Sokoban 1..4`(`x = 42` 벽 장벽 + 구덩이 메우기 필수, 직접 도보 통과 차단), `Quest 1..3`(13직업 고유 유물), `Gehennom 1..4`(`AmuletAscension` 수호 + `Gehennom 1` 희귀 `WandWishing` + 28마법서/17완드 분기 순회 공급), `Planes 1..5`(원소 포탈 및 아스트랄 3고위 제단 진정한 승천).
+- **상점별 채무 원장 & 결정론 스냅샷**: `WorldState::shop_debts: Vec<(LevelId, u32)>`로 상점 층별 외상 잔액을 추적하고, 소비(`Consumed`)/타 상점 드롭 시 `unpaid`/`unpaid_level`을 정리하되 원산지 상점 채무는 유지한다. `EntitySnapshot::unpaid_level`·`GameSnapshot::shop_debts`를 스냅샷 해시에 포함한다(레거시 V1/R9 해시 불변).
+- **저장 스키마 `V4` 및 P12 `V3` 비파괴 업그레이드**: 현행 P13 24층 저장은 `SAVE_SCHEMA_VERSION_V4 = 4`를 기록하며, 미수정 P8–P12 8층 `V3`(`!Victory`) 세이브만 디스크 원본 수정 없이 메모리에서 `V4`로 업그레이드·검증한다.
 
 ### Stage 6 (P12) 마법 체계 심화 및 대규모 도감 기준 (`P12`, 2026-11-28)
 
@@ -923,9 +930,10 @@ release `output/` directory 전체가 게시 bundle이다. build는 workspace �
 
 R9-1은 semantic delta/witness 테스트 기반, R9-2는 음식·영양·시체, R9-3은 content behavior projection, R9-4는 경제·점수, R9-5는 상태 orphan 폐쇄, R9-6은 3 seed 장기 회귀와 전체 감사다. 각 단계는 RED 테스트를 먼저 만들고 해당 단계의 workspace build/test가 통과한 뒤 다음 단계로 진행한다.
 
-## 20. 캠페인 확장 기준 (`Stage 1` ~ `Stage 6 / P12`)
+## 20. 캠페인 확장 기준 (`Stage 1` ~ `Stage 7 / P13`)
 
-- 캠페인 모드(`campaign.is_some()`, `SAVE_SCHEMA_VERSION_V3 = 3`)의 세부 계약은 `docs/campaign_spec.md`와 `DESIGN_DECISIONS.md` (`ADR-P7-01` ~ `ADR-P12-01`)을 따른다.
+- 캠페인 모드(`campaign.is_some()`, `SAVE_SCHEMA_VERSION_V3 = 3`)의 세부 계약은 `docs/campaign_spec.md`와 `DESIGN_DECISIONS.md` (`ADR-P7-01` ~ `ADR-P13-01`)을 따른다.
 - `Stage 5 (P11, ADR-P11-01)`은 캠페인 전용 반려동물(펫) 동반·길들이기·성장·진화·저주 회피·상점 절도·층간 동반, 실제 NPC(`Shopkeeper`, `TemplePriest`, `Oracle`, `Watchman`)·바닥 진열 상품·`shop_debt` 채무 정산(`Chat`/`Pay`)·도둑질 적대화, 고급 몬스터 AI(문 열기·아이템 줍기/장착/사용/사망 드롭·금화/아이템 훔치기+텔레포트·금속 부식·분열·소환·실명 방어 시선 공격·파벌전)를 추가한다.
 - `Stage 6 (P12, ADR-P12-01)`은 `build.rs` 정적 카탈로그 + 선언적 매크로 단일 테이블, `ItemClass::Spellbook` 학습/20,000턴 감퇴/실패율/7학파 28종 `SpellKind`, 18종 `WandEffect`·`CommandIntent::Wish`·변이, 12종 `RingEffect`·6종 `AmuletEffect`(`LifeSaving`/`Reflection`/`MagicalBreathing`/`Unchanging`)·5종 확장 저항(`REFLECTION`/`MAGIC_RESISTANCE`/`CONFLICT`/`TELEPORT_CONTROL`/`SEARCHING`), 130종 아이템·85종 몬스터 대규모 도감을 추가한다.
+- `Stage 7 (P13, ADR-P13-01)`은 24층 던전 토폴로지(`Main 1..6`, `Mines 1..2`, `Sokoban 1..4`, `Quest 1..3`, `Gehennom 1..4`, `Planes 1..5`), `TileKind::{Boulder, MagicPortal}`, 소코반 바위/구덩이 퍼즐, 13직업 고유 퀘스트 아티팩트(`ARTIFACTS` 19종), 게헤놈 성소 `AmuletAscension` 이관·`WizardOfYendor` 탈출 추격·95종 몬스터 도감, 4원소계+아스트랄계 3성향 고위 제단 봉헌 진정한 승천(`RunState::Victory`), 그리고 `LlmObservationView` 32,768B 이내 구조화 캠페인 요약을 추가한다.
 - 레거시 2층 모드(`campaign.is_none()`, `SAVE_SCHEMA_VERSION_V1 = 1`), `CommandIntent: Copy`, `LlmObservationView < 32,768B`, `ActionSpace <= 64`, `tests/long_run.rs` R9 causal 해시 불변조건은 모든 캠페인 확장에서도 유지한다.

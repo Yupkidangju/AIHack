@@ -1214,9 +1214,9 @@ fn p7c_bosses_dragon_breath_ascension_pursuit_and_llm_wire() {
     assert!(burden_sess.submit(C::Wait).accepted);
     assert_eq!(burden_sess.world().nutrition, nut_before - 2);
 
-    // Save validation rejects pursuit stage > 3 or legacy > 0.
+    // Save validation rejects pursuit stage > 5 or legacy > 0.
     let mut bad_stage = revisit_sess.to_save_data();
-    bad_stage.world.ascension_pursuit_stage = 4;
+    bad_stage.world.ascension_pursuit_stage = 6;
     assert!(GameSession::from_save_data(bad_stage).is_err());
     let mut legacy_stage = GameSession::new_for_playing(42).to_save_data();
     legacy_stage.world.ascension_pursuit_stage = 1;

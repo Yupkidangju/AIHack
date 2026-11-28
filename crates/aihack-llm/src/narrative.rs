@@ -91,14 +91,45 @@ fn sanitize_text(text: &str) -> Option<String> {
 pub fn fallback_response(request: &NarrativeRequest, timed_out: bool) -> NarrativeResponse {
     let observation = &request.observation;
     let text = match request.topic {
-        NarrativeTopic::SituationSummary => format!(
-            "Turn {}: depth {}, HP {}/{}, observing {} visible entities.",
-            observation.turn,
-            observation.current_level.depth,
-            observation.player.hp,
-            observation.player.max_hp,
-            observation.visible_entities.len()
-        ),
+        NarrativeTopic::SituationSummary => {
+            if let Some(campaign) = &observation.campaign {
+                let loc = campaign
+                    .special_level_id
+                    .as_deref()
+                    .unwrap_or_else(|| observation.current_level.branch.display_name());
+                let amulet = if campaign.has_amulet { " [Amulet]" } else { "" };
+                let feature = if let Some(align) = campaign.on_high_altar {
+                    format!(" [High Altar {}]", align.short_label())
+                } else if campaign.on_magic_portal {
+                    " [Portal]".to_string()
+                } else {
+                    String::new()
+                };
+                format!(
+                    "Turn {}: {} L{} at {}:{} ({}), HP {}/{}{}{}, {} visible.",
+                    observation.turn,
+                    campaign.role.display_name(),
+                    campaign.level,
+                    observation.current_level.branch.display_name(),
+                    observation.current_level.depth,
+                    loc,
+                    observation.player.hp,
+                    observation.player.max_hp,
+                    amulet,
+                    feature,
+                    observation.visible_entities.len()
+                )
+            } else {
+                format!(
+                    "Turn {}: depth {}, HP {}/{}, observing {} visible entities.",
+                    observation.turn,
+                    observation.current_level.depth,
+                    observation.player.hp,
+                    observation.player.max_hp,
+                    observation.visible_entities.len()
+                )
+            }
+        }
     };
     NarrativeResponse {
         text,

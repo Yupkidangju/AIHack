@@ -303,7 +303,10 @@ fn headless_cli_cleric_role_creates_campaign_save_and_report() {
     );
     let save_bytes = fs::read(root.join("runtime/saves/cleric.json")).unwrap();
     let save: aihack_runtime::save::SaveDataV1 = serde_json::from_slice(&save_bytes).unwrap();
-    assert_eq!(save.schema_version, 3);
+    assert_eq!(
+        save.schema_version,
+        aihack_runtime::save::SAVE_SCHEMA_VERSION_V4
+    );
     assert_eq!(
         save.world.campaign.unwrap().role,
         aihack_ai_contract::Role::Cleric

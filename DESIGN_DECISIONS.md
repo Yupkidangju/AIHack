@@ -12,6 +12,62 @@
 
 Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아카이브의 과거 결정과 충돌하면 이 파일과 `spec.md`를 적용한다.
 
+## ADR-P13-02: Audit 37 시정 — 상점별 채무 원장 · 스냅샷 해시 완전성 · SaveV4 및 P12 V3 비파괴 승격 · 소원 완드/도감 공급 · 소코반 퍼즐 강제 게이팅 (Accepted)
+
+- **Decision Date**: 2026-11-28
+- **Context**: `docs/audit/audit_report_37.md`에서 7건의 결함 및 설계 확인 항목(`A37-01`..`A37-07`)이 보고됐다:
+  1. `A37-01`: 미결제 상점 물품을 마지막 1개 또는 스택 소모하면 `EntityLocation::Consumed` 전이 시 `unpaid = true`가 남아 `save.rs` 검증이 저장을 거부했다.
+  2. `A37-02`: `npc::on_shopkeeper_died`가 다른 상점 잔존 채무를 현재 인벤토리 미결제 물품만 보고 판단해 소비된 타 상점 외상(`Mines 1`)이 `Main 2` 상점주인 사망 시 `0`으로 소거됐다.
+  3. `A37-03`: 39회 캠페인 생성(`seeds [42, 7, 1234] × 13 roles`)에서 `WandWishing`이 0회 스폰되고, 마법서 2종·완드 3종만 자연 스폰되어 나머지 26종 마법서와 완드의 자연 획득 경로가 비어 있었다.
+  4. `A37-04`: `Sokoban 1..4` 중앙 회랑에 우회 바닥이 열려 바위를 한 번도 밀지 않고 다음 계단/보상(`62, 62, 64, 64`걸음)에 도달할 수 있었다.
+  5. `A37-05`: P12(8층)와 P13(24층)이 동일한 `schema_version = 3`을 기록해 미수정 P12 세이브(`p12-run37.json`)가 손상 세이브와 같은 층 불일치 오류로 거부됐다.
+  6. `A37-06`: `EntitySnapshot`이 `unpaid_level`을, `GameSnapshot`이 상점별 채무 원장을 생략해 `on_shopkeeper_died` 후속 결과가 다른 두 상태가 동일 해시(`8f35bbd61b334592`)를 산출했다.
+  7. `A37-07`: `BUILD_GUIDE.md`의 저장 스키마 버전 표기와 `spec.md`의 현 HEAD 날짜·고지 기간 불일치 문구가 현행 상태와 어긋났다.
+- **Decision**:
+  1. **상점별 채무 원장(`WorldState::shop_debts: Vec<(LevelId, u32)>`) · 소비/외부 드롭 수명주기 (`A37-01`, `A37-02`, `A37-06`)**:
+     - `WorldState`, `SavedWorldV1`, `GameSnapshot`에 정렬된 `(LevelId, u32)` 원장 `shop_debts`를 추가한다(`LevelId` 키 serde JSON 호환 및 빈 목록 시 직렬화 생략으로 레거시 V1 JSON/R9 해시 불변). 각 항목은 유효한 유일 층·양수 금액이며 합계는 항상 `world.shop_debt <= MAX_SHOP_DEBT`와 일치해야 한다(레거시는 빈 목록 강제).
+     - `unpaid` 아이템이 `EntityLocation::Consumed`로 전이될 때(`systems::items::mark_item_consumed`: 읽기/마시기/두루마리 붕괴/생명보존 아뮬렛 소멸/컨테이너 폭발/스택 병합/펫 급여 등) `unpaid = false`와 `unpaid_level = None`을 정리해 저장 불변조건을 지키는 동시에 원산지 상점의 `shop_debts[origin]`과 총 `shop_debt`는 그대로 보존한다(다수량 스택 부분 소모 시 잔여 수량만 `unpaid = true` 유지, 원상점 내 드롭 시 잔여분만 환불).
+     - 원산지 상점 구역 밖 또는 타 층에 `unpaid` 아이템을 드롭하면 환불 없이 `unpaid = false`, `unpaid_level = None`으로 전환해 재픽업 이중 과금을 막되 `shop_debts[origin]` 채무는 유지한다.
+     - `npc::{can_pay, pay, on_shopkeeper_died, check_shop_theft_on_move_or_stairs, chat}`와 `items::{pickup, drop}`은 현재/대상 층 `LevelId`의 `shop_debts` 잔액만을 조회·정산·소거한다.
+     - `EntitySnapshot`에 `unpaid_level: Option<LevelId>`(`skip_serializing_if = "Option::is_none"`), `GameSnapshot`에 `shop_debts: Vec<(LevelId, u32)>`(`skip_serializing_if = "Vec::is_empty"`)를 추가해 원산지나 상점별 채무가 다른 상태는 반드시 다른 `stable_hash()`를 생성하도록 보장한다(레거시 V1 해시 불변).
+  2. **`SAVE_SCHEMA_VERSION_V4 = 4` 및 P12 `V3` 비파괴 메모리 내 승격 계약 (`A37-05`)**:
+     - 현행 P13 24층 캠페인 세이브 스키마를 **`SAVE_SCHEMA_VERSION_V4 = 4`**로 승격한다(레거시 2층 `campaign = None`은 `SAVE_SCHEMA_VERSION_V1 = 1` 불변).
+     - `GameSession::from_save_data_with_registry`는 (a) `V1` 레거시 2층, (b) `V4` 엄격 24층 P13 캠페인(8층 `V4` 등 절단/변조 거부), (c) **미수정 P8–P12 `V3`(`schema_version == 3`) 8층(`Main 1..6`, `Mines 1..2`, 비-`Victory`) 캠페인 세이브의 비파괴 메모리 내 `V3 -> V4` 업그레이드**만 허용한다.
+     - `V3 -> V4` 업그레이드는 디스크 원본 파일을 절대 수정하지 않고 메모리에서 (1) `RunState::Victory` P12 세이브(구 Main 1 승리) 및 비-8층/변조 `V3` 세이브 거부, (2) 8개 P12 맵 검증(`Main 6` `rooms[3].center`의 `Floor` 허용 후 `StairsDown` 패치), (3) 동일 시드·역할·성향 결정론으로 16개 P13 분기 층과 스폰/`WandWishing`/`ascension_altars` 보충 및 `Main 6` 바닥의 `AmuletAscension`을 `Gehennom 4`로 이관(인벤토리 소지 시 유지), (4) 레거시 P12 `shop_debt`의 `shop_debts`/`unpaid_level` 역채움, (5) `schema_version = 4` 부여 후 전체 `SaveV4` 엄격 검증 통과 순으로 수행한다.
+  3. **희귀 소원 완드 자연 획득 경로 및 28마법서·18완드 분기 공급 범위 (`A37-03`)**:
+     - `Gehennom 1` (`"valley_of_the_dead"`) 보조 방(`centers[4]`)에 미식별 `ItemKind::WandWishing`(기본 충전 3, 시드 무관 확정 희귀 배치) 1개를 자연 배치해 실제 탐험·픽업·식별/자프·소원·충전 감소 경로를 제공한다.
+     - `Sokoban 1..3`, `Quest 1..3`, `Gehennom 1..4`, `Planes 1..3` 13개 분기 층의 보조 방 바닥에 `(seed, role)` 결정론 순회로 층당 마법서 2종 + 완드 1종을 배치하여 전체 **28종 `Spellbook*` · 17종 비소원 `Wand*` + 1종 `WandWishing`** 전 카탈로그가 시드 분산을 통해 자연 공급되도록 확정한다(`Main 1..6`/`Mines 1..2` 및 기존 초반 밸런스/토큰 보존).
+  4. **소코반(`Sokoban 1..4`) 퍼즐 완주 필수화 (`A37-04`)**:
+     - `Sokoban 1..4` 중앙 회랑의 `x = 42` (`y = 8..=12`)에 수직 `TileKind::Wall` 장벽을 세우고 `Trap(TrapKind::Pit)` 타일들을 `x = 42`에 배치한다(1층 기존 바위/구덩이 좌표 `(37,9)->(42,9)`, `(37,11)->(42,11)` 보존).
+     - `Sokoban` 분기에서는 메워지지 않은 `Trap(Pit)`/`HiddenTrap(Pit)` 타일 위로 직접 도보 이동(`Move`)을 차단해, 반드시 바위를 밀어 구덩이를 `Floor`로 메워야만 `StairsDown`/`Sokoban 4` 보상에 도달할 수 있게 한다.
+  5. **문서 정합성 동기화 (`A37-07`)**:
+     - `BUILD_GUIDE.md` 현행 실행 안내를 `SAVE_SCHEMA_VERSION_V4(4)`·P12 `V3` 업그레이드·24층 기준으로 교정하고, `spec.md` 헤더를 `MODIFICATIONS.md`(`2025-05-20..2026-11-28`)와 현 `HEAD` 날짜 정합성에 맞게 수정하되 `docs/audit/audit_report_32.md` 활성 권위 테스트(`tests/r8_documentation.rs`)를 보존한다.
+- **Outcome**: 정상 외상 소모·다상점 채무 격리·스냅샷 해시 결정론·`WandWishing` 및 28마법서/18완드 자연 공급·소코반 퍼즐 강제 게이팅·P12 V3 비파괴 승격과 V4 분리·빌드/명세 문서 동기화가 단일 계약으로 닫힌다.
+
+## ADR-P13-01: Stage 7 (P13) 풀 엔드게임 · 특수 분기 · 로컬 LLM 심화 통합 계약 (Accepted)
+
+- **Decision Date**: 2026-11-28
+- **Context**: `Stage 6 (P12)` 완료로 AIHack은 130종 아이템·85종 몬스터·28종 주문·18종 완드 기반을 갖추었으나, `BranchGraph::campaign_v3()`의 `Sokoban`/`Quest`/`Gehennom` 분기는 아직 `max_depth = 0` 예약 상태이고 승천(`Victory`)도 `Main 6` 아뮬렛 획득 후 `Main 1` 상향 계단에서 즉시 종료되며, `LlmObservationView`는 `campaign` 구조화 요약(능력치·저항·10슬롯 장비·도구·신앙·특수 층·주문 상태)을 포함하지 않는다. `docs/CODER_HANDOFF_P7_TO_P13.md` Stage 7 (`P13`) 요구사항에 따라 (1) 소코반 4층(바위 밀기/구덩이 메우기 퍼즐·보상), (2) 직업별 퀘스트 분기 3층 및 13직업 고유 퀘스트 아티팩트, (3) 게헤놈 4층(오르쿠스·옌도르의 마법사·몰록의 대사제·`AmuletAscension` 이관 및 마법사 추격전), (4) 4원소계(`Earth`/`Air`/`Fire`/`Water`) + 아스트랄계(`Astral`) 3성향 고위 제단 봉헌 진정한 승천, (5) 32,768B(`REQUEST_BODY_LIMIT`) 이내 구조화 로컬 LLM 전술 통합(`LlmCampaignSummary`)을 구현한다. 동시에 레거시 2층 모드(`campaign.is_none()`, `SAVE_SCHEMA_VERSION_V1 = 1`), `tests/long_run.rs` R9 causal 해시, `MAX_XP = 180`, `CommandIntent: Copy`, `SAVE_SCHEMA_VERSION_V3 = 3`, `ActionSpace <= 64`, `Cargo.lock` 불변을 보존한다.
+- **Decision**:
+  1. **24층 캠페인 브랜치 그래프 (`BranchId::Planes` 추가, `BranchGraph::campaign_v3()`)**:
+     - `Main` (`1..6`, 시작점), `Mines` (`1..2`, `Main 3 StairsUp`), `Sokoban` (`1..4`, `Main 4 StairsDown`), `Quest` (`1..3`, `Main 5 StairsDown`), `Gehennom` (`1..4`, `Main 6 StairsDown`), `Planes` (`1..5`: Earth·Air·Fire·Water·Astral, `Main 1 StairsUp` 아뮬렛 소지 승천 진입) 총 24층을 활성화한다.
+     - `TileKind::Boulder`(이동 차단·밀기 가능 퍼즐 장애물) 및 `TileKind::MagicPortal`(원소계 차원 이동 포탈)을 추가하고, 레거시 V1 세이브 검증(`is_p9_only_tile`)에서는 이를 거부해 V1을 완전히 격리한다.
+  2. **10종 엔드게임 몬스터(총 95종) 및 13역할 고유 퀘스트 아티팩트 (`items.toml` 130종 유지)**:
+     - `monsters.toml`에 `WizardOfYendor`, `HighPriestMoloch`, `Orcus`, `QuestNemesis`, `EarthElemental`, `FireElemental`, `WaterElemental`, `RiderDeath`, `RiderPestilence`, `RiderFamine` 10종을 추가(총 95종)하되, 캠페인 `Lv 1..10`(`MAX_XP = 180`) 곡선에 맞춘 공략 가능 스탯(`HP 26..38`)과 패시브/저항을 부여한다.
+     - `ARTIFACTS`에 13역할 각각에 대응하는 퀘스트 아티팩트 13종(`quest_role: Some(role)`)을 추가한다(기존 `items.toml` 130종 베이스 아이템 재사용, `eligible_sacrifice_artifacts`는 `quest_role.is_none()` 6종 계약 유지, `#invoke` 특수 효과 부여).
+  3. **소코반 · 퀘스트 · 게헤놈 · 4원소계 & 아스트랄계 다중 제단 승천 (`SaveV3` 엄격 검증)**:
+     - `Sokoban 1..4`에서는 `Wall->Floor` 굴착을 차단하고 바위(`Boulder`) 밀기 및 구덩이(`Trap::Pit`/`HiddenTrap::Pit`) 메우기(`Floor` 전환)를 구현하며 `validate_persisted_map`이 바위/구덩이 보존 수량을 검증한다. 4층 보상으로 시드 기반 `AmuletReflection` 또는 `BagOfHolding`을 제공한다.
+     - `Main 6` 하향 계단(`>`/`B`)으로 진입하는 `Gehennom 1..4`의 4층 성소에 `AmuletAscension`을 배치하고(`HighPriestMoloch` 수호), 획득 후 탈출 시 `WizardOfYendor`가 게헤놈 탈출을 방해 추격한다.
+     - `AmuletAscension` 소지 상태에서 `Main 1` 상향 계단(`<`)으로 오르면 승리 직행 대신 `Planes 1`(`Plane of Earth`)으로 진입하며 `Earth -> Air -> Fire -> Water -> Astral` 포탈을 순차 돌파한다(`Planes 2..5` 굴착 금지, `Planes 1` 굴착 허용).
+     - `Planes 5`(아스트랄계)의 `L`/`N`/`C` 3개 고위 제단(`world.ascension_altars` 등록)은 비정렬 시체 `#offer`로도 개종할 수 없으며(`#offer` 개종은 일반 던전 제단으로 한정), 플레이어 성향 일치 제단에 `CommandIntent::Offer { item: amulet }`을 바치면 아뮬렛 소비 없이 `RunState::Victory { final_score }`를 달성한다(불일치 제단 봉헌 시 신벌 피해만 발생하고 승리 거부). `save.rs`·`campaign.rs`의 `SaveV3` 검증은 `Planes 5`의 3개 고위 제단 좌표 일치·`{Lawful, Neutral, Chaotic}` 불변 정렬 및 일치 제단 `Victory` 조건을 강제한다.
+  4. **로컬 LLM 심화 통합 (`LlmObservationView` 32,768B 이내 구조화 `LlmCampaignSummary`)**:
+     - `CampaignObservation`에 `special_level_id`, `special_room`, `on_magic_portal`, `on_high_altar`를 추가한다(optional serde).
+     - `LlmObservationView`에 `campaign: Option<LlmCampaignSummary>`(역할·종족·성향·레벨/XP·아뮬렛·무게/용량·6능력치·활성 저항·10장비 슬롯·보유 도구·신앙/분노/기도·특수 층/포탈/고위 제단·기억 주문 요약·준비 숙련 수)를 추가한다. 미식별 장비·도구는 외형명만 전달해 정보 누출(`MAJ-03`)을 차단하며, `LlmObservationView::from(&Observation)` 내부 단계적 타일/이벤트 압축으로 어떤 엔드게임 52슬롯/28주문 상태에서도 `canonical_request_json`이 `REQUEST_BODY_LIMIT(32,768B)` 미만임을 보장한다.
+- **Alternatives Considered**:
+  - `items.toml`에 퀘스트 아티팩트용 별도 베이스 아이템 13종을 추가하는 안 → 기존 `ArtifactDef` 체계(`base_kind` + `artifact_id` 1회 생성 제약)를 재사용하는 편이 `items.toml` 130종 불변성과 TUI/SaveV3/컨텐츠 해시 무결성을 깔끔히 유지한다.
+  - `LlmObservationView` 크기가 32KiB를 넘길 때 `enqueue` 시점에 거절만 하는 안 → 엔드게임에서도 어드바이저가 항상 동작하도록 `LlmObservationView::from(&Observation)` 단계에서 결정론적 시야 타일/이벤트 요약으로 24KB 캡을 유지하면서 수동 대용량 입력 거부 게이트(`prepare_request_input`)도 보존한다.
+- **Outcome**: 소코반·퀘스트·게헤놈·4원소계/아스트랄계 다중 제단 진정한 승천·구조화 로컬 LLM 전술 어드바이저가 결정론 `GameSession::submit`, `SaveV3`/V1 격리, TUI/Headless, 32KiB/64액션 예산 안에서 통합 완성된다.
+
 ## ADR-P12-01: Stage 6 (P12) 마법 체계 심화 · 대규모 도감 투입 · build.rs 데이터 주도 전환 계약 (Accepted)
 
 - **Decision Date**: 2026-11-28
@@ -25,7 +81,7 @@ Accepted는 계획 승인을 뜻하며 구현 완료를 뜻하지 않는다. 아
      - `SpellSchool` 7학파(`Attack`, `Healing`, `Divination`, `Enchantment`, `Clerical`, `Escape`, `Matter`)와 `SpellKind` 28종을 정의한다.
      - `CommandIntent::Read`로 마법서를 읽으면(Blessed 확정 습득/갱신, Uncursed `Int`·레벨·`Spellcasting` 숙련도 판정, Cursed 혼란/실명/피해 역풍) `world.learned_spells`에 `LearnedSpell { spell, learned_at_turn }`을 기록·갱신하며, `charges == 0` 시 책이 소멸한다.
      - 비고유(non-innate) 습득 주문은 `turn - learned_at_turn < 20_000` 동안만 기억되며 20,000턴 경과 후 시전 시 기억 만료로 거부되고 마법서 재독서로 갱신된다.
-     - `spell_failure_percent(world, spell)`: 장착된 금속 방어구/방패(`iron`/`steel`/`mithril`) 패널티, `Int`, `campaign.level()`, `Spellcasting` 숙련도, `spell_level(1..=7)`로 실패율(`0..=100%`)을 산출한다(단, 기존 직업 고유 시작 주문 + 비금속 무장 상태는 `0%`를 유지해 P7~P11 호환성을 보존한다). 시전 실패 시 MP 절반(최소 1) 소비·소량 숙련도 획득 후 주문이 불발한다.
+     - `spell_failure_percent(world, spell)`: 장착된 금속 방어구/방패(`iron`/`steel`, `mithril` 면제) 패널티, `Int`, `campaign.level()`, `Spellcasting` 숙련도, `spell_level(1..=7)`로 실패율(`0..=100%`)을 산출한다(단, 기존 직업 고유 시작 주문 + 비금속 무장 상태는 `0%`를 유지해 P7~P11 호환성을 보존한다). 시전 실패 시 MP 절반(최소 1) 소비·소량 숙련도 획득 후 주문이 불발한다.
   3. **18종 완드 · 소원(`CommandIntent::Wish: Copy`) · 12종 반지 · 6종 아뮬렛 · 5종 확장 저항**:
      - `Resistances` 비트셋(기존 `u16`)에 `REFLECTION`(bit 8), `MAGIC_RESISTANCE`(bit 9), `CONFLICT`(bit 10), `TELEPORT_CONTROL`(bit 11), `SEARCHING`(bit 12)을 추가한다.
      - `CommandIntent::Wish { item, wish: WishChoice }` (`CURATED_WISHES` 고정 enum으로 `CommandIntent: Copy` 보존)를 추가하며 `WandWishing` 충전을 소비해 아이템(축복/인챈트 포함) 또는 미생성 고유 아티팩트를 소환하고 `AmuletAscension`/`WandWishing`/`|enchant| > 3` 금지 소원을 거부한다.

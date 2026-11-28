@@ -144,6 +144,8 @@ pub enum EntityPayload {
         pet_xp: u32,
         #[serde(default, skip_serializing_if = "is_zero_i16")]
         pet_hunger: i16,
+        #[serde(default, skip_serializing_if = "is_false")]
+        invisible: bool,
     },
     Item {
         kind: ItemKind,
@@ -179,6 +181,8 @@ pub enum EntityPayload {
         erosion: u8,
         #[serde(default, skip_serializing_if = "is_false")]
         unpaid: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        unpaid_level: Option<LevelId>,
     },
 }
 
@@ -446,9 +450,23 @@ impl Entity {
         }
     }
 
+    pub fn actor_invisible(&self) -> Option<bool> {
+        match &self.payload {
+            EntityPayload::Actor { invisible, .. } => Some(*invisible),
+            EntityPayload::Item { .. } => None,
+        }
+    }
+
     pub fn item_unpaid(&self) -> Option<bool> {
         match &self.payload {
             EntityPayload::Item { unpaid, .. } => Some(*unpaid),
+            EntityPayload::Actor { .. } => None,
+        }
+    }
+
+    pub fn item_unpaid_level(&self) -> Option<LevelId> {
+        match &self.payload {
+            EntityPayload::Item { unpaid_level, .. } => *unpaid_level,
             EntityPayload::Actor { .. } => None,
         }
     }
@@ -590,6 +608,7 @@ impl EntityStore {
                 tameness: 0,
                 pet_xp: 0,
                 pet_hunger: 0,
+                invisible: false,
             },
         });
         Ok(id)
@@ -624,6 +643,7 @@ impl EntityStore {
                 container_trapped: false,
                 erosion: 0,
                 unpaid: false,
+                unpaid_level: None,
             },
         });
         Ok(id)
@@ -1054,6 +1074,28 @@ impl EntityStore {
             return false;
         };
         *unpaid_ref = unpaid;
+        true
+    }
+
+    pub fn set_item_unpaid_level(&mut self, id: EntityId, level: Option<LevelId>) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Item { unpaid_level, .. } = &mut entity.payload else {
+            return false;
+        };
+        *unpaid_level = level;
+        true
+    }
+
+    pub fn set_actor_invisible(&mut self, id: EntityId, next: bool) -> bool {
+        let Some(entity) = self.get_mut(id) else {
+            return false;
+        };
+        let EntityPayload::Actor { invisible, .. } = &mut entity.payload else {
+            return false;
+        };
+        *invisible = next;
         true
     }
 

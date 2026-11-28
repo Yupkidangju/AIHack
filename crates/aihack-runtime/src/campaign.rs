@@ -1,11 +1,17 @@
 use crate::{save::SavedWorldV1, systems::skills, world::GameWorld};
 use aihack_core::{
     campaign::{
-        artifact_def, SkillCategory, SkillRank, ARTIFACT_INVOKE_COOLDOWN_TURNS, MAX_GOD_ANGER,
-        MAX_LUCK, MAX_PRAYER_TIMEOUT, MAX_XP, MIN_LUCK,
+        artifact_def, Alignment, SkillCategory, SkillRank, ARTIFACT_INVOKE_COOLDOWN_TURNS,
+        MAX_GOD_ANGER, MAX_LUCK, MAX_PRAYER_TIMEOUT, MAX_XP, MIN_LUCK,
     },
-    domain::{entity::EntityLocation, item::ItemKind},
+    domain::{
+        entity::{ActorKind, EntityLocation, Faction},
+        item::ItemKind,
+        tile::TileKind,
+    },
     event::{GameEvent, MessagePriority},
+    ids::{BranchId, LevelId},
+    position::Pos,
 };
 use std::collections::HashSet;
 
@@ -40,7 +46,7 @@ pub(crate) fn award_xp(world: &mut GameWorld, difficulty: u16) -> Vec<GameEvent>
     }]
 }
 
-pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
+pub(crate) fn validate(world: &SavedWorldV1, turn: Option<u64>) -> Result<(), String> {
     let quest_items: Vec<_> = world
         .entities
         .entities()
@@ -70,6 +76,7 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
             || !world.generated_artifacts.is_empty()
             || !world.ascension_altars.is_empty()
             || world.shop_debt > 0
+            || !world.shop_debts.is_empty()
         {
             return Err("legacy mode cannot have campaign P8/extended state".into());
         }
@@ -77,6 +84,23 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
     };
     if world.shop_debt > crate::systems::npc::MAX_SHOP_DEBT {
         return Err("campaign shop_debt out of range".into());
+    }
+    let mut prev_shop_level: Option<LevelId> = None;
+    let mut debt_sum = 0_u32;
+    for &(shop_lvl, amount) in &world.shop_debts {
+        if amount == 0 || !world.levels.contains(shop_lvl) {
+            return Err("campaign shop_debts entry has invalid level or zero amount".into());
+        }
+        if prev_shop_level.is_some_and(|prev| prev >= shop_lvl) {
+            return Err("campaign shop_debts entries must be unique and sorted".into());
+        }
+        prev_shop_level = Some(shop_lvl);
+        debt_sum = debt_sum
+            .checked_add(amount)
+            .ok_or_else(|| "campaign shop_debts sum overflows".to_string())?;
+    }
+    if debt_sum != world.shop_debt {
+        return Err("campaign shop_debt disagrees with per-shop shop_debts ledger".into());
     }
     if !campaign
         .role
@@ -105,20 +129,36 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
             return Err("duplicate spell in learned_spells".into());
         }
     }
-    if world.ascension_altars.len() > 8 {
-        return Err("ascension_altars exceeds cap".into());
+    let planes5_id = LevelId::new(BranchId::Planes, 5);
+    let planes5 = world
+        .levels
+        .get(planes5_id)
+        .ok_or_else(|| "campaign Planes 5 (Astral Plane) level missing".to_string())?;
+    let mut expected_altar_positions: Vec<Pos> = (0..planes5.map.height)
+        .flat_map(|y| (0..planes5.map.width).map(move |x| Pos { x, y }))
+        .filter(|&pos| planes5.map.tile(pos).ok() == Some(TileKind::Altar))
+        .collect();
+    expected_altar_positions.sort_by_key(|p| (p.y, p.x));
+    if expected_altar_positions.len() != 3 {
+        return Err("Planes 5 must contain exactly 3 astral high altars".into());
     }
-    let mut seen_altar_keys = HashSet::new();
-    for &(level_id, pos) in &world.ascension_altars {
-        if !world
-            .levels
-            .map(level_id)
-            .is_some_and(|map| map.contains(pos))
-        {
-            return Err("ascension_altars contains invalid level or out-of-bounds pos".into());
-        }
-        if !seen_altar_keys.insert((level_id, pos)) {
-            return Err("duplicate entry in ascension_altars".into());
+    let expected_ascension_altars: Vec<(LevelId, Pos)> = expected_altar_positions
+        .iter()
+        .copied()
+        .map(|pos| (planes5_id, pos))
+        .collect();
+    let mut actual_ascension_altars = world.ascension_altars.clone();
+    actual_ascension_altars.sort_by_key(|&(lvl, pos)| (lvl, pos.y, pos.x));
+    if world.ascension_altars.len() != 3 || actual_ascension_altars != expected_ascension_altars {
+        return Err("ascension_altars must match Planes 5 high altar coordinates".into());
+    }
+    let expected_alignments = [Alignment::Lawful, Alignment::Neutral, Alignment::Chaotic];
+    if planes5.altar_alignments.len() != 3 {
+        return Err("Planes 5 altar_alignments must assign all 3 high altars".into());
+    }
+    for (&pos, expected_align) in expected_altar_positions.iter().zip(expected_alignments) {
+        if planes5.altar_alignment(pos) != Some(expected_align) {
+            return Err("Planes 5 high altar alignment invariant violated".into());
         }
     }
     for art_id in &world.generated_artifacts {
@@ -166,21 +206,88 @@ pub(crate) fn validate(world: &SavedWorldV1) -> Result<(), String> {
     if campaign.xp > MAX_XP || campaign.xp % 10 != 0 {
         return Err("campaign XP out of range".into());
     }
-    if world.max_mp < 0
-        || world.max_mp > campaign.max_mp().saturating_add(40)
-        || !(0..=world.max_mp).contains(&world.mp)
-    {
-        return Err("campaign MP out of range".into());
-    }
-    if world.ascension_pursuit_stage > 3 {
-        return Err("campaign ascension pursuit stage out of range".into());
-    }
+    let dead_monster_xp: u32 = if world.kill_count == 0 {
+        0
+    } else {
+        world
+            .entities
+            .entities()
+            .iter()
+            .filter_map(|entity| {
+                let (ActorKind::Monster(_), faction, _, _, _, alive) = entity.actor()? else {
+                    return None;
+                };
+                if alive || faction == Faction::Pet {
+                    return None;
+                }
+                let diff = entity.monster_difficulty().unwrap_or(1).max(1);
+                Some(u32::from(diff).saturating_mul(10))
+            })
+            .fold(0_u32, u32::saturating_add)
+    };
+    let used_gain_level = world.identified_items.contains(&ItemKind::PotionGainLevel)
+        && world.entities.entities().iter().any(|entity| {
+            entity
+                .item()
+                .is_some_and(|(kind, _, _, _, _)| kind == ItemKind::PotionGainLevel)
+        });
     let stats = world
         .entities
         .actor_stats(world.player_id)
         .ok_or("campaign player missing")?;
+    let (extra_hp_cap, extra_mp_cap) = match turn {
+        Some(0) => {
+            if campaign.xp != 0 || world.kill_count != 0 {
+                return Err("turn 0 campaign cannot have earned XP or kills".into());
+            }
+            if stats.max_hp != campaign.max_hp() || world.max_mp != campaign.max_mp() {
+                return Err("turn 0 campaign max_hp/max_mp mismatch".into());
+            }
+            (0_i16, 0_i16)
+        }
+        Some(t) => {
+            let max_potion_xp = if used_gain_level {
+                u32::try_from(t.saturating_mul(20).min(u64::from(MAX_XP))).unwrap_or(MAX_XP)
+            } else {
+                0
+            };
+            let max_earned_xp = dead_monster_xp.saturating_add(max_potion_xp).min(MAX_XP);
+            if campaign.xp > max_earned_xp {
+                return Err("campaign XP exceeds verifiable progression budget".into());
+            }
+            if used_gain_level && campaign.xp == MAX_XP {
+                (
+                    i16::try_from(t.saturating_mul(3).min(60)).unwrap_or(60),
+                    i16::try_from(t.saturating_mul(2).min(40)).unwrap_or(40),
+                )
+            } else {
+                (0_i16, 0_i16)
+            }
+        }
+        None => {
+            let max_potion_xp = if used_gain_level { MAX_XP } else { 0 };
+            let max_earned_xp = dead_monster_xp.saturating_add(max_potion_xp).min(MAX_XP);
+            if campaign.xp > max_earned_xp {
+                return Err("campaign XP exceeds verifiable progression budget".into());
+            }
+            if used_gain_level && campaign.xp == MAX_XP {
+                (60_i16, 40_i16)
+            } else {
+                (0_i16, 0_i16)
+            }
+        }
+    };
+    if world.max_mp < 0
+        || world.max_mp > campaign.max_mp().saturating_add(extra_mp_cap)
+        || !(0..=world.max_mp).contains(&world.mp)
+    {
+        return Err("campaign MP out of range".into());
+    }
+    if world.ascension_pursuit_stage > 5 {
+        return Err("campaign ascension pursuit stage out of range".into());
+    }
     if stats.max_hp < 4
-        || stats.max_hp > campaign.max_hp().saturating_add(60)
+        || stats.max_hp > campaign.max_hp().saturating_add(extra_hp_cap)
         || stats.hit_bonus != campaign.hit_bonus()
         || stats.damage_bonus != campaign.damage_bonus()
     {

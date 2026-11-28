@@ -325,7 +325,7 @@ P1–P6 캠페인 위에 제단·마나(MP)/주문, 시드별 미식별 외형·
 - `ItemClass::Spellbook`(`+`)을 `CommandIntent::Read`로 학습한다(`Blessed` 확정 습득, `Uncursed` `Int`/레벨/`Spellcasting` 판정, `Cursed` 혼란·실명·1d6 피해 역풍). 읽을 때마다 `charges`가 감소하고 0이 되면 소멸한다.
 - 7학파(`Attack`, `Healing`, `Divination`, `Enchantment`, `Clerical`, `Escape`, `Matter`) 28종 `SpellKind`를 지원한다.
 - 비고유(non-innate) 습득 주문은 `SPELL_MEMORY_TURNS = 20_000`턴 동안 기억되며 이후 만료되어 마법서 재학습을 요구한다.
-- `spell_failure_percent`는 `spell_level`, `Int`, 캐릭터 레벨, `Spellcasting` 숙련도, 장착 금속 갑옷·방패 페널티를 반영한다(단, 고유 시작 주문 + 비금속 상태는 0% 유지).
+- `spell_failure_percent`는 `spell_level`, `Int`, 캐릭터 레벨(`campaign.level()`), `Spellcasting` 숙련도, 장착 철/강철(`iron`/`steel`, `mithril` 면제) 갑옷·방패 페널티를 반영해 `0..=100%`로 산출하며(단, 고유 시작 주문 + 비금속 상태는 `0%` 유지), 시전 실패 시 MP 절반(최소 1) 소비·소량 숙련도 획득 후 불발한다.
 
 ### P12-3 18종 완드 · 소원 · 변이 · 12종 반지 · 6종 아뮬렛 · 확장 저항
 - `Resistances`에 `REFLECTION`(bit 8), `MAGIC_RESISTANCE`(bit 9), `CONFLICT`(bit 10), `TELEPORT_CONTROL`(bit 11), `SEARCHING`(bit 12)을 추가한다.
@@ -336,3 +336,47 @@ P1–P6 캠페인 위에 제단·마나(MP)/주문, 시드별 미식별 외형·
 ### P12-4 130종 아이템 · 85종 몬스터 대규모 도감 및 검증 계약
 - `items.toml` 130종(신규 마법서 28·완드 16·반지 9·아뮬렛 5·무기 5·방어구 5·물약/두루마리 4·식량/보석 3)과 `monsters.toml` 85종(신규 55종, 고난도 `difficulty >= 6`은 `spawn_depth_range = [6, 20]`)을 투입하고 LF 체크섬·`PROVENANCE.md`·golden hash를 동기화한다.
 - 도감 전 종(130 아이템 · 85 몬스터) 스폰·관찰·TUI 렌더링·시체/전리품 스모크 테스트, TUI 동적 마법/소원 메뉴, Headless 부적 장착/주문 연동, `SaveV3`/레거시 V1 차단, `LlmObservationView < 32,768B` 및 `ActionSpace <= 64`를 검증한다.
+
+## Stage 7 (P13): 풀 엔드게임 · 특수 분기 · 로컬 LLM 심화 통합 (2026-11-28)
+
+`ADR-P13-01`에 따라 캠페인 24층 풀 엔드게임 토폴로지, 특수 분기(소코반·직업 퀘스트·게헤놈), 4원소계+아스트랄계 다중 제단 승천, 그리고 구조화된 로컬 LLM 어드바이저 심화 통합을 구현한다. 레거시 2층 모드(`campaign == None`, V1 세이브, R9 causal 해시), `MAX_XP = 180`, `SaveV3`, `CommandIntent: Copy`를 보존한다.
+
+### P13-1 24층 브랜치 그래프 · 소코반 4층 · 바위/구덩이 물리
+- `BranchId::Planes`를 추가하고 `BranchGraph::campaign_v3()` 전체 분기를 활성화한다(`Main 1..6`, `Mines 1..2`, `Sokoban 1..4` ← `Main 4 StairsDown`, `Quest 1..3` ← `Main 5 StairsDown`, `Gehennom 1..4` ← `Main 6 StairsDown`, `Planes 1..5`: 총 **24층**).
+- `Sokoban 1..4` (`"sokoban_1"`..`"sokoban_4"`)에 `TileKind::Boulder`와 `Trap(TrapKind::Pit)` 퍼즐 방을 생성한다. 바위 방향 `Move` 시 너머가 `Floor`면 바위가 밀리고, `Trap(Pit)`/`HiddenTrap(Pit)`이면 구덩이를 메워 `Floor`로 전환한다. 소코반 분기 내 굴착은 금지되며 `validate_persisted_map`은 바위/구덩이 보존 불변조건을 검증한다. `Sokoban 4` 완주 방에는 시드별 보상(`AmuletReflection` 또는 `BagOfHolding`)을 배치한다.
+
+### P13-2 직업별 퀘스트 분기 3층 & 13직업 고유 퀘스트 아티팩트
+- `Quest 1..3` (`"quest_1"`, `"quest_2"`, `"quest_3"`)을 생성한다. `Quest 3` 성소에 `QuestNemesis` 보스와 현재 역할(`Role`)에 대응하는 고유 퀘스트 아티팩트(`ARTIFACTS` 내 13종 `quest_role: Some(role)`, `#invoke` 특수 효과 및 `generated_artifacts` 1회 생성 추적)를 배치한다.
+
+### P13-3 게헤놈 4층 (`95종 몬스터`) & `AmuletAscension` 이관 · 추격전
+- `monsters.toml`에 10종 엔드게임 몬스터(`WizardOfYendor`, `HighPriestMoloch`, `Orcus`, `QuestNemesis`, `EarthElemental`, `FireElemental`, `WaterElemental`, `RiderDeath`, `RiderPestilence`, `RiderFamine`)를 추가해 **95종**으로 확장한다.
+- `AmuletAscension` 생성 위치를 `Main 6`에서 `Gehennom 4` (`"molochs_sanctum"`, `HighPriestMoloch` 수호)로 이관하며 `Gehennom 1` (`"valley_of_the_dead"`), `Gehennom 2` (`"orcus_town"`, `Orcus`), `Gehennom 3` (`"wizards_tower"`, `WizardOfYendor`)를 배치한다. 아뮬렛 획득 후 `Main 4`(FireAnt)→`Main 2`(Troll)→`Main 1`(Minotaur)→`Planes 2`(WizardOfYendor)→`Planes 4`(WizardOfYendor) 경로에서 추격자(`ascension_pursuit_stage` `1..=5`)가 단계적으로 방해 스폰된다.
+
+### P13-4 4원소계 · 아스트랄계(`Planes 1..5`) · 3성향 고위 제단 진정한 승천
+- 아뮬렛을 소지한 채 `Main 1` `StairsUp`에서 `Ascend`를 실행하면 즉시 승리가 아니라 `Planes 1` (`"plane_of_earth"`)로 진입한다.
+- `Earth(Planes 1, "plane_of_earth", 굴착 허용)` → `Air(Planes 2, "plane_of_air")` → `Fire(Planes 3, "plane_of_fire")` → `Water(Planes 4, "plane_of_water")` 각 층의 `TileKind::MagicPortal` 위에서 `EnterBranch` 또는 `Ascend`로 다음 원소계를 돌파해 `Planes 5` (`"astral_plane"`, 3기수 `RiderDeath`/`RiderPestilence`/`RiderFamine` 및 `L`/`N`/`C` 3개 고위 제단, `world.ascension_altars` 등록)에 도달한다.
+- `Planes 5`의 3개 고위 제단은 `#offer`로 개종할 수 없으며, 본인 성향과 일치하는 고위 제단 위에서 `CommandIntent::Offer { item: amulet }`을 바치면 `RunState::Victory { final_score }`를 달성한다(비일치 제단 헌납 시 신벌 3d8 피해만 발생, 승리 불가). `save.rs`·`campaign.rs`의 `SaveV3` 검증은 `Planes 5` 고위 제단 좌표·`{Lawful, Neutral, Chaotic}` 불변 정렬 및 일치 제단 `Victory` 조건을 강제한다.
+
+### P13-5 로컬 LLM 심화 통합 (`LlmObservationView < 32,768B`)
+- `CampaignObservation`에 `special_level_id`, `special_room`, `on_magic_portal`, `on_high_altar`를 추가한다.
+- `LlmObservationView`에 `campaign: Option<LlmCampaignSummary>`(6능력치·저항·10장비 슬롯·도구·신앙/분노·특수 층/포탈/고위 제단·기억 주문 요약·준비 숙련, 미식별 항목 외형명 마스킹)를 추가하고 결정론적 시야 타일/이벤트 압축으로 52슬롯/28주문 엔드게임에서도 `canonical_request_json < 32,768B` 및 `snapshot().stable_hash()` 불변을 보장한다.
+
+## Stage 7.5 (`Audit-37-Fix`): 상점 원장 · SaveV4/P12 V3 호환 · 소원 완드/도감 · 소코반 게이팅 (`ADR-P13-02`, 2026-11-28)
+
+`docs/audit/audit_report_37.md` 및 `DESIGN_DECISIONS.md` `ADR-P13-02`에 따른 시정 계약이다:
+
+- **상점별 채무 원장 & `Consumed` 수명주기 (`A37-01`, `A37-02`, `A37-06`)**:
+  - `WorldState::shop_debts: Vec<(LevelId, u32)>`로 각 상점 층의 미결제 잔액을 추적하며, 정렬/유일/양수/총합(`== shop_debt <= MAX_SHOP_DEBT`) 불변조건을 `campaign.rs`·`save.rs`에서 강제한다(레거시는 빈 목록).
+  - 미결제(`unpaid = true`) 아이템이 소비(`EntityLocation::Consumed`)될 때 `unpaid = false`·`unpaid_level = None`으로 정리하여 저장 가능 상태를 유지하되 해당 상점 `shop_debts[origin]` 채무는 그대로 남긴다(다수량 스택 부분 소모 시 잔여 수량만 `unpaid` 유지). 원산지 상점 구역 밖/타 층 드롭 시 환불 없이 `unpaid` 플래그를 해제해 이중 청구를 방지한다.
+  - `Pay`, `on_shopkeeper_died`, 절도 적대화, `Chat` 안내 모두 현재/대상 층 `shop_debts`만 정산·소거한다.
+  - `EntitySnapshot::unpaid_level`과 `GameSnapshot::shop_debts`를 optional serde로 해시에 포함한다(레거시 V1 해시 불변).
+- **저장 스키마 호환 매트릭스 (`A37-05`)**:
+  - `SAVE_SCHEMA_VERSION_V4 = 4`: 현행 P13 24층(`Main 1..6`, `Mines 1..2`, `Sokoban 1..4`, `Quest 1..3`, `Gehennom 1..4`, `Planes 1..5`) 표준 저장 포맷.
+  - `SAVE_SCHEMA_VERSION_V1 = 1`: 레거시 2층(`campaign = None`) 전용 불변 포맷.
+  - `SAVE_SCHEMA_VERSION_V3 = 3` 비파괴 메모리 내 승격: 미수정 P8–P12 8층(`Main 1..6`, `Mines 1..2`, 비-`Victory`) 캠페인 세이브만 디스크 원본 수정 없이 메모리에서 `Main 6` 하향 계단·16개 P13 분기 층/스폰/`AmuletAscension` 이관/`shop_debts` 역채움을 거쳐 `V4`로 업그레이드 후 전체 `SaveV4` 검증을 통과시킨다. 8층 `V4` 절단 파일, 24층 `V3` 위조 파일, `V3 Victory`, `V2`, `V1`↔캠페인 혼용은 모두 거부한다.
+- **`WandWishing` 희귀 배치 및 28마법서/18완드 공급 범위 (`A37-03`)**:
+  - `Gehennom 1`(`"valley_of_the_dead"`) 보조 방 `centers[4]`에 미식별 `WandWishing`(3회 충전) 1개를 확정 배치한다.
+  - `Sokoban 1..3`, `Quest 1..3`, `Gehennom 1..4`, `Planes 1..3` 13개 분기 층 보조 방에 `(seed, role)` 결정론 순회로 층당 마법서 2종 + 완드 1종을 배치해 28종 `Spellbook*`·17종 비소원 `Wand*` + `WandWishing` 전 종을 자연 획득 범위로 제공한다.
+- **소코반(`Sokoban 1..4`) 퍼즐 필수 게이팅 (`A37-04`)**:
+  - `Sokoban 1..4` 중앙 회랑 `x = 42`(`y = 8..=12`)에 수직 벽 장벽을 두고 모든 `Trap(Pit)` 타일을 `x = 42`에 배치한다. `Sokoban` 분기 내 미충전 `Pit`/`HiddenTrap(Pit)` 위로의 직접 도보 이동은 거부되며, 바위를 밀어 구덩이를 `Floor`로 메워야 `StairsDown`/`Sokoban 4` 보상으로 진행할 수 있다.
+- **문서 정합성 (`A37-07`)**: `BUILD_GUIDE.md` 스키마 안내 및 `spec.md` 고지 기간 정합성을 현행판에 맞춘다.
